@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the first idle period already uses it, and a change takes effect at once without a reload. The
   component had read a `data-screensaver-idle` attribute since #693 that nothing ever set.
 
+## [2.73.0] - 2026-10-04
+
 ### Fixed
 
 - **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**
@@ -65,7 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused request used this second sentence, which advised signing in again although the session
   was fine. It now says "You do not have permission to do that", the same sentence as everywhere
   else, in all 26 languages.
-
 - **Closing an event dialog on a wide screen no longer moves the address to the page you came
   from.** In the day, week and month views an event opens in a small card. Choosing "Edit" or
   "Delete" there closes the card and opens the next dialog a moment later - the form, or the
