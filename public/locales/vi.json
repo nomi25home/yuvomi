@@ -1789,6 +1789,8 @@
         "wallModeHint": "Biến trang chủ trên thiết bị này thành một màn hình tĩnh lặng cho máy tính bảng treo tường: giờ, chương trình trong ngày, hôm nay tới lượt ai và thời tiết - đủ lớn để đọc từ khoảng cách hai mét, không cần thao tác. Từ 22 giờ đến 6 giờ màn hình sẽ tối đi. Chỉ áp dụng cho thiết bị này, không áp dụng cho các thiết bị khác trong nhà.",
         "wallModeOn": "Đã bật chế độ treo tường, xem tại {{page}}.",
         "wallModeOff": "Đã tắt chế độ treo tường.",
+        "screensaverIdleLabel": "Bắt đầu trình bảo vệ màn hình sau",
+        "screensaverIdleHint": "Thời gian thiết bị này không được chạm vào trước khi trình bảo vệ màn hình ảnh bắt đầu. Chỉ áp dụng cho thiết bị này, không áp dụng cho các thiết bị khác trong gia đình. Có hiệu lực khi quản trị viên đã kết nối Immich.",
         "changePassword": "Đổi mật khẩu",
         "currentPasswordLabel": "Mật khẩu hiện tại",
         "newPasswordLabel": "Mật khẩu mới",

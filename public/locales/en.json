@@ -1789,6 +1789,8 @@
         "wallModeHint": "Turns the home screen on this device into a calm display for a wall tablet: time, today's schedule, who's up today and the weather - large enough to read from two metres away, with nothing to operate. It dims between 10 pm and 6 am. Applies to this device only, not to the rest of the household.",
         "wallModeOn": "Wall mode on - visible under {{page}}.",
         "wallModeOff": "Wall mode off.",
+        "screensaverIdleLabel": "Start the screensaver after",
+        "screensaverIdleHint": "How long this device stays untouched before the photo screensaver starts. Applies to this device only, not to the rest of the household. Takes effect once an admin has connected Immich.",
         "changePassword": "Change password",
         "currentPasswordLabel": "Current password",
         "newPasswordLabel": "New password",

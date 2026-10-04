@@ -1,7 +1,12 @@
 import { api } from '../api.js';
 import { formatDate } from '../i18n.js';
 
-const IDLE_MS = Math.max(30, Number.parseInt(document.documentElement.dataset.screensaverIdle || '300', 10)) * 1000;
+// Read on every arming, not once at load: the delay is a per-device choice
+// (utils/screensaver-idle.js, #885) that theme-init.js applies before this
+// module loads and the appearance settings change while the page is open.
+function idleMs() {
+  return Math.max(30, Number.parseInt(document.documentElement.dataset.screensaverIdle || '300', 10) || 300) * 1000;
+}
 const SLIDE_MS = 20_000;
 
 let idleTimer;
@@ -21,7 +26,7 @@ function resetIdle(event) {
   const wasVisible = Boolean(overlay);
   stop();
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(start, IDLE_MS);
+  idleTimer = setTimeout(start, idleMs());
   // A dismissing gesture belongs to the overlay and must not activate the
   // dashboard control underneath it (particularly important on wall tablets).
   if (wasVisible && event) {
@@ -52,7 +57,7 @@ async function start() {
     // and on a wall tablet, "the next event" can be hours away. This way the
     // timer only postpones the screensaver, it does not switch it off.
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(start, IDLE_MS);
+    idleTimer = setTimeout(start, idleMs());
     return false;
   }
 
@@ -113,4 +118,15 @@ window.addEventListener('pointermove', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stop(); else resetIdle();
 });
+// A new delay re-arms the timer at once, so it applies without a reload. Only
+// while nothing is showing: the change comes from the settings page, and a
+// visible screensaver there is the admin preview, which stays until dismissed.
+new MutationObserver(() => {
+  if (overlay) return;
+  // stop() also retires a start() still waiting for its photos, so the re-armed
+  // timer cannot open a second overlay on top of it.
+  stop();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(start, idleMs());
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-screensaver-idle'] });
 resetIdle();

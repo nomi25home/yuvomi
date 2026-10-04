@@ -1789,6 +1789,8 @@
         "wallModeHint": "Maakt van het startscherm op dit apparaat een rustig display voor een wandtablet: tijd, dagprogramma, wie vandaag aan de beurt is en het weer - groot genoeg om vanaf twee meter te lezen, zonder bediening. Tussen 22 en 6 uur dimt het. Geldt alleen hier, niet voor de andere apparaten in huis.",
         "wallModeOn": "Wandmodus aan, zichtbaar bij {{page}}.",
         "wallModeOff": "Wandmodus uit.",
+        "screensaverIdleLabel": "Schermbeveiliging starten na",
+        "screensaverIdleHint": "Hoe lang dit apparaat onaangeroerd blijft voordat de fotoschermbeveiliging start. Geldt alleen voor dit apparaat, niet voor de rest van het huishouden. Werkt zodra een beheerder Immich heeft gekoppeld.",
         "changePassword": "Wachtwoord wijzigen",
         "currentPasswordLabel": "Huidig wachtwoord",
         "newPasswordLabel": "Nieuw wachtwoord",

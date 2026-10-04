@@ -1772,6 +1772,8 @@
         "wallModeHint": "Convierte el inicio de este dispositivo en una pantalla tranquila para una tableta de pared: hora, programa del día, a quién le toca hoy y el tiempo, en un tamaño legible a dos metros y sin nada que tocar. Se atenúa entre las 22 y las 6. Solo vale para este dispositivo, no para el resto del hogar.",
         "wallModeOn": "Modo pared activado, visible en {{page}}.",
         "wallModeOff": "Modo pared desactivado.",
+        "screensaverIdleLabel": "Iniciar el salvapantallas tras",
+        "screensaverIdleHint": "Cuánto tiempo permanece este dispositivo sin tocar antes de que se inicie el salvapantallas de fotos. Solo se aplica a este dispositivo, no al resto del hogar. Surte efecto cuando un administrador haya conectado Immich.",
         "changePassword": "Cambiar contraseña",
         "currentPasswordLabel": "Contraseña actual",
         "newPasswordLabel": "Nueva contraseña",

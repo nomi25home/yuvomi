@@ -1772,6 +1772,8 @@
         "wallModeHint": "Transforma o início neste dispositivo em uma tela tranquila para um tablet de parede: hora, programa do dia, quem está de serviço hoje e o tempo, num tamanho legível a dois metros e sem nada para operar. Escurece entre as 22 e as 6. Vale só para este dispositivo, não para os restantes da casa.",
         "wallModeOn": "Modo parede ativo, visível em {{page}}.",
         "wallModeOff": "Modo parede desativado.",
+        "screensaverIdleLabel": "Iniciar o protetor de tela após",
+        "screensaverIdleHint": "Quanto tempo este dispositivo fica sem toque antes de o protetor de tela de fotos começar. Vale apenas para este dispositivo, não para o restante da casa. Passa a valer quando um administrador conectar o Immich.",
         "changePassword": "Alterar senha",
         "currentPasswordLabel": "Senha atual",
         "newPasswordLabel": "Nova senha",

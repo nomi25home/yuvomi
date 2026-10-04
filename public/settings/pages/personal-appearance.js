@@ -1,4 +1,5 @@
 import {
+  formatUnit,
   getLocale,
   getSupportedLocales,
   setLocale,
@@ -12,6 +13,11 @@ import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
+import {
+  SCREENSAVER_IDLE_STEPS,
+  getScreensaverIdleSeconds,
+  setScreensaverIdleSeconds,
+} from '/utils/screensaver-idle.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
 import { adoptZone, zoneHintEl, zoneMismatch } from '/utils/household-zone-hint.js';
 import {
@@ -197,6 +203,14 @@ function clearError(element) {
   element.hidden = true;
 }
 
+// Minutes in the UI language (CLDR via formatUnit), so the five steps need no
+// plural keys of their own in 26 locales.
+function screensaverIdleOptions() {
+  const current = getScreensaverIdleSeconds();
+  return SCREENSAVER_IDLE_STEPS.map((seconds) => `
+    <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(formatUnit(seconds / 60, 'minute', { unitDisplay: 'long' }))}</option>`).join('');
+}
+
 function renderLoadError(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -263,6 +277,19 @@ function renderPage(container, preferences, isAdmin) {
           attrs: { id: 'wall-mode-toggle', 'aria-describedby': 'wall-mode-hint' },
         })}
         <p class="form-hint" id="wall-mode-hint">${t('settings.wallModeHint')}</p>
+      </div>
+      <!-- Next to wall mode and for the same reason: device-local (#885). A
+           photo frame and a kitchen tablet in one household want different
+           delays, and a household value would reach every phone too. The
+           Immich connection itself stays under Household -> Integrations. -->
+      <div class="settings-card">
+        <div class="form-group">
+          <label class="form-label" for="screensaver-idle-select">${t('settings.screensaverIdleLabel')}</label>
+          <select class="form-input" id="screensaver-idle-select" aria-describedby="screensaver-idle-hint">
+            ${screensaverIdleOptions()}
+          </select>
+        </div>
+        <p class="form-hint" id="screensaver-idle-hint">${t('settings.screensaverIdleHint')}</p>
       </div>
     </section>
 
@@ -532,6 +559,13 @@ function bindEvents(container, user) {
         : t('settings.wallModeOff'),
       'success',
     );
+  });
+
+  // Device-local as well; the screensaver watches the attribute this sets, so
+  // the new delay applies without a reload.
+  const idleSelect = container.querySelector('#screensaver-idle-select');
+  idleSelect?.addEventListener('change', () => {
+    setScreensaverIdleSeconds(Number(idleSelect.value));
   });
 
   const localeSelect = container.querySelector('#locale-select');

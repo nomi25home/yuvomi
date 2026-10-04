@@ -94,3 +94,20 @@
     }
   } catch (e) { /* Storage nicht verfuegbar → kein Wand-Modus in dieser Sitzung */ }
 })();
+
+// THE SCREENSAVER DELAY BELONGS TO THE INITIAL STATE TOO (#885).
+//
+// components/photo-screensaver.js arms its idle timer as soon as it loads, from
+// `data-screensaver-idle`. Set here, before any module, so the first idle period
+// already uses the delay chosen on this device. Only a step from
+// utils/screensaver-idle.js is applied; anything else leaves the attribute off
+// and the component keeps its five-minute default. The key and the steps are
+// literals because this classic script cannot import - a guard in
+// test-frontend-audit.js keeps them in step with the module.
+(function () {
+  try {
+    var idle = localStorage.getItem('yuvomi-screensaver-idle');
+    if ([60, 120, 300, 600, 900].indexOf(Number(idle)) === -1) return;
+    document.documentElement.setAttribute('data-screensaver-idle', String(Number(idle)));
+  } catch (e) { /* Storage nicht verfuegbar → Standardwert */ }
+})();

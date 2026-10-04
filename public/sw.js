@@ -212,6 +212,7 @@ const APP_SHELL = [
   '/utils/row-action.js',
   '/utils/schedule-tabs.js',
   '/utils/schedule-reminder-offset.js',
+  '/utils/screensaver-idle.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
   '/utils/segment-indicator.js',

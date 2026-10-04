@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Each device chooses how long it waits before the photo screensaver starts** (#885). Settings →
+  Appearance, next to wall mode, offers 1, 2, 5, 10 or 15 minutes; five stays the default, so
+  nothing changes on a device that never touches it. The choice is stored in the browser like wall
+  mode, because the devices in one household want different delays: a photo frame on the wall
+  wants its pictures back after a minute, a kitchen tablet people work on should wait longer, and a
+  household value would also reach every phone. The value is applied before the page renders, so
+  the first idle period already uses it, and a change takes effect at once without a reload. The
+  component had read a `data-screensaver-idle` attribute since #693 that nothing ever set.
+
 ### Fixed
 
 - **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**

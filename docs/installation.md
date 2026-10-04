@@ -662,7 +662,8 @@ optional `DB_ENCRYPTION_KEY`.
 ### Immich Photo Screensaver (Optional)
 
 Connect a self-hosted Immich server under **Settings → Household → Integrations → Immich** to show random
-photos after five minutes without activity. The administration page can test the connection and
+photos after five minutes without activity; each device can choose its own delay under **Settings → Account →
+Appearance**. The administration page can test the connection and
 open an immediate preview. An optional album UUID limits the selection; otherwise Yuvomi uses the
 whole accessible library. The Immich API key needs `asset.read` and `asset.view` permissions.
 

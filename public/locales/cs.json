@@ -1893,6 +1893,8 @@
         "wallModeHint": "Promění domovskou stránku na tomto zařízení v klidný displej pro nástěnný tablet: čas, program dne, kdo je dnes na řadě a počasí - dost velké na čtení ze dvou metrů, bez ovládání. Mezi 22. a 6. hodinou ztlumí. Platí jen zde, ne pro ostatní zařízení v domácnosti.",
         "wallModeOn": "Nástěnný režim zapnut, uvidíte ho v {{page}}.",
         "wallModeOff": "Nástěnný režim vypnut.",
+        "screensaverIdleLabel": "Spustit spořič obrazovky po",
+        "screensaverIdleHint": "Jak dlouho zůstane toto zařízení bez dotyku, než se spustí fotografický spořič obrazovky. Platí jen pro toto zařízení, ne pro zbytek domácnosti. Projeví se, jakmile správce připojí Immich.",
         "changePassword": "Změnit heslo",
         "currentPasswordLabel": "Aktuální heslo",
         "newPasswordLabel": "Nové heslo",

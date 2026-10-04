@@ -1830,6 +1830,8 @@
         "wallModeHint": "Zeigt die Startseite auf diesem Gerät als ruhige Anzeige fürs Wandtablet: Uhrzeit, Tagesprogramm, wer heute dran ist und das Wetter - groß genug für zwei Meter Abstand, ohne Bedienung. Zwischen 22 und 6 Uhr dunkelt sie ab. Gilt nur hier, nicht für die anderen Geräte im Haushalt.",
         "wallModeOn": "Wand-Modus an - sichtbar unter {{page}}.",
         "wallModeOff": "Wand-Modus aus.",
+        "screensaverIdleLabel": "Bildschirmschoner starten nach",
+        "screensaverIdleHint": "So lange bleibt dieses Gerät unberührt, bevor der Foto-Bildschirmschoner startet. Gilt nur hier, nicht für die anderen Geräte im Haushalt. Wirkt erst, wenn ein Admin Immich verbunden hat.",
         "changePassword": "Passwort ändern",
         "currentPasswordLabel": "Aktuelles Passwort",
         "newPasswordLabel": "Neues Passwort",

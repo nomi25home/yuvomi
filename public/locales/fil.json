@@ -1830,6 +1830,8 @@
         "wallModeHint": "Ginagawang tahimik na display ang home sa device na ito para sa tablet na nakasabit sa dingding: oras, programa ng araw, kung sino ang naka-duty at ang panahon - sapat na laki para mabasa mula dalawang metro, walang kailangang pindutin. Dumidilim ito mula 10 ng gabi hanggang 6 ng umaga. Dito lang ito, hindi sa ibang device sa bahay.",
         "wallModeOn": "Naka-on ang wall mode, makikita sa {{page}}.",
         "wallModeOff": "Naka-off ang wall mode.",
+        "screensaverIdleLabel": "Simulan ang screensaver pagkalipas ng",
+        "screensaverIdleHint": "Gaano katagal hindi gagalawin ang device na ito bago magsimula ang photo screensaver. Para lang sa device na ito, hindi sa iba pang bahagi ng sambahayan. Magkakabisa kapag naikonekta na ng admin ang Immich.",
         "changePassword": "Palitan ang password",
         "currentPasswordLabel": "Kasalukuyang password",
         "newPasswordLabel": "Bagong password",

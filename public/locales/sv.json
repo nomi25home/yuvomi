@@ -1772,6 +1772,8 @@
         "wallModeHint": "Gör startsidan på den här enheten till en lugn skärm för en väggplatta: klockslag, dagens program, vem som står på tur och vädret - stort nog att läsa på två meters håll, utan något att trycka på. Mellan 22 och 6 dämpas den. Gäller bara här, inte för hushållets övriga enheter.",
         "wallModeOn": "Väggläge på, syns under {{page}}.",
         "wallModeOff": "Väggläge av.",
+        "screensaverIdleLabel": "Starta skärmsläckaren efter",
+        "screensaverIdleHint": "Hur länge den här enheten är orörd innan fotoskärmsläckaren startar. Gäller bara den här enheten, inte resten av hushållet. Gäller när en administratör har anslutit Immich.",
         "changePassword": "Byt lösenord",
         "currentPasswordLabel": "Aktuellt lösenord",
         "newPasswordLabel": "Nytt lösenord",
