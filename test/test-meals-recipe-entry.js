@@ -313,3 +313,117 @@ test('Autocomplete: Rezepttreffer per Tastatur waehlen setzt Rezept, Zutaten und
     restore();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Verschieben per Ziehen: sofort, und im Fehlerfall hoerbar (Critique 2026-10-05, R16)
+// ---------------------------------------------------------------------------
+// `moveMeal` wartete auf den Server und baute erst danach neu: die Karte stand
+// solange am alten Platz - das Ablegen sah aus, als haette es nicht geklappt.
+// Scheiterte der Aufruf, baute die Woche still neu, und die Karte war ohne ein
+// Wort wieder da, wo sie herkam.
+
+test('Verschieben: die Karte steht sofort am Ziel, waehrend der Server noch antwortet', async () => {
+  const meal = { id: 5, date: '2026-10-05', meal_type: 'lunch', title: 'Lachs' };
+  meals.state.meals = [meal];
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const calls = [];
+  globalThis.__apiStub = { put: (path, body) => { calls.push([path, body]); return gate.then(() => ({ data: null })); } };
+  let renders = 0;
+  const pending = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => { renders += 1; } });
+  assert.deepEqual([meal.date, meal.meal_type], ['2026-10-07', 'dinner'], 'der Zustand zieht vor der Antwort um');
+  assert.equal(renders, 1, 'und die Woche ist schon neu gezeichnet');
+  assert.deepEqual(calls, [['/meals/5', { date: '2026-10-07', meal_type: 'dinner' }]]);
+  release();
+  await pending;
+  assert.deepEqual([meal.date, meal.meal_type], ['2026-10-07', 'dinner']);
+  delete globalThis.__apiStub;
+});
+
+test('Verschieben: scheitert der Server, kehrt die Karte zurueck UND es gibt eine Meldung', async () => {
+  const meal = { id: 5, date: '2026-10-05', meal_type: 'lunch', title: 'Lachs' };
+  meals.state.meals = [meal];
+  globalThis.__apiStub = { put: async () => { const err = new Error('boom'); err.data = { error: 'Nicht erlaubt' }; throw err; } };
+  const toasts = [];
+  const prevYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: (...args) => toasts.push(args), friendlyError: (err) => err.data?.error };
+  let renders = 0;
+  try {
+    await meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => { renders += 1; } });
+  } finally {
+    globalThis.window.yuvomi = prevYuvomi;
+    delete globalThis.__apiStub;
+  }
+  assert.deepEqual([meal.date, meal.meal_type], ['2026-10-05', 'lunch'], 'der Zustand steht wieder am Ursprung');
+  assert.equal(renders, 2, 'einmal optimistisch, einmal zurueck');
+  assert.deepEqual(toasts, [['Nicht erlaubt', 'danger']], 'der Fehler wird gemeldet, nicht verschluckt');
+});
+
+// Zweimal ziehen, bevor der Server geantwortet hat (Review #1673). Jeder Zug
+// merkte sich als Ursprung den Platz, an dem die Karte GERADE stand - beim
+// zweiten also das optimistische Ziel des ersten. Scheiterten beide, kehrte
+// die Karte auf einen Tag zurueck, den der Server nie gespeichert hat.
+function gatedPut() {
+  const calls = [];
+  const put = (path, body) => new Promise((resolve, reject) => { calls.push({ path, body, resolve, reject }); });
+  return { calls, put };
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test('Verschieben: scheitern zwei Zuege derselben Karte, steht sie am letzten BESTAETIGTEN Platz', async () => {
+  const meal = { id: 5, date: '2026-10-05', meal_type: 'lunch', title: 'Lachs' };
+  meals.state.meals = [meal];
+  const { calls, put } = gatedPut();
+  globalThis.__apiStub = { put };
+  const prevYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  try {
+    const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
+    const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-07', 'dinner'], 'optimistisch am Ziel des zweiten Zugs');
+    await tick();
+    assert.equal(calls.length, 1, 'der zweite Aufruf wartet, bis der erste entschieden ist');
+    calls[0].reject(new Error('boom'));
+    await first;
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-07', 'dinner'], 'der Platz gehoert noch dem spaeteren Zug');
+    await tick();
+    assert.equal(calls.length, 2);
+    calls[1].reject(new Error('boom'));
+    await second;
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-05', 'lunch'], 'nicht das gescheiterte Ziel des ersten Zugs');
+  } finally {
+    globalThis.window.yuvomi = prevYuvomi;
+    delete globalThis.__apiStub;
+  }
+});
+
+test('Verschieben: gelingt der erste Zug und scheitert der zweite, bleibt das Ziel des ersten', async () => {
+  const meal = { id: 5, date: '2026-10-05', meal_type: 'lunch', title: 'Lachs' };
+  meals.state.meals = [meal];
+  const { calls, put } = gatedPut();
+  globalThis.__apiStub = { put };
+  const prevYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  try {
+    const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
+    const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });
+    await tick();
+    calls[0].resolve({ data: null });
+    await first;
+    await tick();
+    calls[1].reject(new Error('boom'));
+    await second;
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-06', 'lunch'], 'dort steht sie auch auf dem Server');
+  } finally {
+    globalThis.window.yuvomi = prevYuvomi;
+    delete globalThis.__apiStub;
+  }
+});
+
+test('Speichern: die Quittung nennt das Ergebnis, nicht den Dialogtitel', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/meals.js', import.meta.url), 'utf8');
+  // „Mahlzeit hinzufuegen" als Erfolgsmeldung liest sich wie eine Aufforderung.
+  assert.doesNotMatch(src, /showToast\([^)]*t\('meals\.(addMealTitle|editMeal)'\)/);
+  assert.match(src, /showToast\(mode === 'create' \? t\('meals\.mealSaved'\) : t\('meals\.mealUpdated'\), 'success'\)/);
+});

@@ -1,6 +1,9 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { periodStepperHtml, swapPeriod } from '/utils/period-stepper.js';
+import { swapContent } from '/utils/content-swap.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
@@ -582,25 +585,54 @@ async function refreshStatistics() {
   statistics = { ...statistics, userId: Number(userId), entries: result.data?.entries ?? [], bounds, loading: false };
 }
 
-async function activateView(view) {
+/* Richtung des naechsten Reiterwechsels (R16, Bewegung). Der Klick in der
+ * Leiste navigiert ueber den Router (guardedActivateView -> navigate ->
+ * update -> activateView); die Richtung reist deshalb nicht als Argument,
+ * sondern wartet hier auf GENAU den naechsten activateView() und faellt dann.
+ * null = kein Reiterwechsel (Deep-Link, Retry, FAB): tauschen ohne Blende. */
+let pendingTabDirection = null;
+
+/**
+ * `step` setzt nur das Blaettern in der Uebersicht: dann bleibt der gezeigte
+ * Zeitraum stehen, bis die Antwort da ist, und der neue kommt gerichtet herein
+ * (swapPeriod) - vorher leerte jeder Schritt die Flaeche in eine Ladekarte.
+ */
+async function activateView(view, { step = null } = {}) {
+  const direction = pendingTabDirection;
+  pendingTabDirection = null;
   activeView = view;
+  const bodyEl = () => root?.querySelector('.schedule-body') ?? null;
+  // Erster Aufbau dieser Aktivierung: beim Reiterwechsel als Blende in
+  // Schrittrichtung der Leiste, sonst ein schlichtes Neuzeichnen.
+  const paint = () => {
+    if (direction === null) renderPage();
+    else swapContent(bodyEl(), renderPage, { direction });
+  };
   if (view === 'overview') {
     const requestId = ++overviewRequestId;
-    overview = { ...overview, entries: [], holidays: [], loading: true, error: false };
-    renderPage();
+    const hold = step !== null && !overview.loading && !overview.error;
+    if (hold) {
+      overview = { ...overview, error: false };
+    } else {
+      overview = { ...overview, entries: [], holidays: [], loading: true, error: false };
+      paint();
+    }
     try { await refreshOverview(); }
     catch (error) {
       if (requestId !== overviewRequestId) return; // eine juengere Anfrage entscheidet, nicht diese veraltete
       overview = { ...overview, loading: false, error: true };
       window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
     }
-    if (requestId === overviewRequestId) renderPage();
+    if (requestId === overviewRequestId) {
+      if (hold) swapPeriod(bodyEl(), step, renderPage);
+      else renderPage();
+    }
     return;
   }
-  if (view !== 'statistics') { renderPage(); return; }
+  if (view !== 'statistics') { paint(); return; }
   const requestId = ++statisticsRequestId;
   statistics = { ...statistics, entries: [], bounds: null, loading: true, error: false };
-  renderPage();
+  paint();
   try { await refreshStatistics(); }
   catch (error) {
     if (requestId !== statisticsRequestId) return;
@@ -639,6 +671,17 @@ function overviewFetchRange(weekCursor, weekStartPref) {
  * sie veraltet und darf `overview` nicht mehr ueberschreiben (schnelles
  * Vor-/Zurueck-Klicken liess sonst manchmal die AELTERE Woche gewinnen).
  */
+/* LADEN ZEIGT DIE FORM DES INHALTS, NICHT EINEN SATZ (R16, Bewegung). Hier
+ * stand eine Karte mit dem Wort "Laedt..." - die einzige Textkarte der App an
+ * der Stelle, an der jedes andere Modul sein Skelett zeigt, und sie sprang
+ * beim Eintreffen der Daten auf eine voellig andere Hoehe. Der Satz bleibt
+ * fuer Screenreader (`role="status"`), sichtbar ist das geteilte Skelett:
+ * eine Zeile je gewaehlter Person in der Uebersicht, drei Bloecke in der
+ * Auswertung. */
+function scheduleLoadingHtml({ rows, lines }) {
+  return `<div class="schedule-stat-loading" role="status" aria-live="polite"><span class="sr-only">${esc(t('common.loading'))}</span>${renderSkeletonList({ rows, lines })}</div>`;
+}
+
 async function refreshOverview() {
   const requestId = overviewRequestId;
   const { entriesFrom, from, to } = overviewFetchRange(overview.weekCursor, state.weekStartPref);
@@ -1203,7 +1246,7 @@ function renderStatistics() {
   // Falschaussage. Eigener Zweig, denselben Fehlerzustand wie andere Module
   // (mountLoadError/emptyStateHTML variant:'error') statt erfundener Zahlen.
   const results = statistics.loading
-    ? '<div class="card card--padded schedule-stat-loading" role="status" aria-live="polite">' + esc(t('common.loading')) + '</div>'
+    ? scheduleLoadingHtml({ rows: 3, lines: 2 })
     : statistics.error
       ? emptyStateHTML({ variant: 'error', title: t('common.errorGeneric'), description: t('common.loadErrorDescription'), action: { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-action': 'retry-statistics' } } })
       : !bounds
@@ -1650,6 +1693,7 @@ function scheduleOverviewEntryTitle(entry) {
 function renderOverview() {
   const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel', 'schedule.overviewClearSelection');
   const weekDays = overviewVisibleDays();
+  const showsToday = weekDays.includes(todayKey());
   const weekLabel = overview.viewMode === 'day'
     ? formatDayMonth(weekDays[0])
     : `${formatDayMonth(weekDays[0])} - ${formatDayMonth(weekDays[weekDays.length - 1])}`;
@@ -1661,10 +1705,26 @@ function renderOverview() {
     ${picker}
     <div class="schedule-overview__week-nav" role="group" aria-label="${esc(weekLabel)}">
       ${viewToggle}
-      <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t('calendar.back'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <button type="button" class="btn btn--secondary" data-action="overview-week" data-direction="today">${esc(t('calendar.today'))}</button>
-      <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t('calendar.forward'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-      <span class="schedule-overview__week-label">${esc(weekLabel)}</span>
+      ${/* Der Stepper ist ein eigener Kasten (R16): schmal loest sich die
+           Gruppe auf (schedule.css), Ansicht und Personen teilen sich Zeile 1,
+           der Stepper bekommt Zeile 2 - dafuer muss er EIN Rasterkind sein. */ ''}
+      ${/* DER ZEITRAUM-KOPF DER APP (DESIGN.md, R16): zurueck, Wert, vor - und
+           DAHINTER der Reset, wie Kalender, Wochenplan, Budget und die
+           Berichte der Haushaltshilfe. Hier stand `< Heute > Wert` mit den
+           Namen "Zurueck"/"Weiter": die eine Stelle, an der "Heute" zwischen
+           den Pfeilen sass und die Pfeile ihr Objekt nicht nannten. Die
+           Reihenfolge steht im MARKUP (= Tab-Folge), nicht per `order`. */ ''}
+      ${/* Markup, Reihenfolge und die Reset-Regel kommen aus dem EINEN
+           Baustein (utils/period-stepper.js). Neu fuer den Schichtplan: "Heute"
+           steht nur, wenn der heutige Tag NICHT zu sehen ist - bis R16 2b stand
+           es auch in der laufenden Woche, als einziger der fuenf Stepper. */ ''}
+      <div class="schedule-overview__stepper">${periodStepperHtml({
+        prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
+        value: { className: `schedule-overview__week-label${showsToday ? '' : ' period-stepper__value--away'}`, text: weekLabel, live: true },
+        next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
+        reset: { label: t('calendar.today'), current: showsToday, attrs: { 'data-action': 'overview-week', 'data-direction': 'today' } },
+      })}
+      </div>
     </div>
   </div>`;
 
@@ -1673,7 +1733,7 @@ function renderOverview() {
   // `error` bleibt sonst stumm (nur ein voruebergehender Toast) - ein leerer
   // Zeitraum sah bisher genauso aus wie einer, der nie geladen werden konnte.
   if (overview.loading) {
-    return `<section class="schedule-overview">${header}<div class="card card--padded schedule-stat-loading" role="status" aria-live="polite">${esc(t('common.loading'))}</div></section>`;
+    return `<section class="schedule-overview">${header}${scheduleLoadingHtml({ rows: Math.max(2, overview.selectedIds.length), lines: 1 })}</section>`;
   }
   if (overview.error) {
     return `<section class="schedule-overview">${header}${emptyStateHTML({ variant: 'error', title: t('common.errorGeneric'), description: t('common.loadErrorDescription'), action: { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-action': 'retry-overview' } } })}</section>`;
@@ -1761,6 +1821,7 @@ async function guardedActivateView(id) {
       { danger: true, confirmLabel: t('modal.discardChanges'), detail: t('schedule.discardCycleDayEditsDetail') },
     );
     if (!confirmed) {
+      pendingTabDirection = null;
       scheduleTablist?.sync(activeView);
       return;
     }
@@ -1816,7 +1877,7 @@ function renderShell() {
   scheduleTablist = wireTablist(root.querySelector('.schedule-tabs'), {
     activeId: activeView,
     manualActivation: true,
-    onChange: (id) => { guardedActivateView(id); },
+    onChange: (id, { direction = 0 } = {}) => { pendingTabDirection = direction; guardedActivateView(id); },
   });
   // Gleitende Auswahl-Kapsel (utils/segment-indicator.js), dieselbe Bewegung
   // wie die Gesundheit auf derselben `.sub-tabs-bar` (Kanon, Runde 7 D8). Die
@@ -2721,8 +2782,12 @@ async function action(event) {
     if (button.dataset.action === 'overview-week') {
       const step = overview.viewMode === 'day' ? 1 : 7;
       const days = button.dataset.direction === 'prev' ? -step : button.dataset.direction === 'next' ? step : null;
-      overview = { ...overview, weekCursor: days ? addLocalDays(overview.weekCursor, days) : todayKey() };
-      await activateView('overview');
+      // Richtung des Schritts; "Heute" kommt von dort, wo heute liegt
+      // (Tagesschluessel vergleichen sich als Text).
+      const today = todayKey();
+      const towards = days ? Math.sign(days) : (today === overview.weekCursor ? 0 : (today < overview.weekCursor ? -1 : 1));
+      overview = { ...overview, weekCursor: days ? addLocalDays(overview.weekCursor, days) : today };
+      await activateView('overview', { step: towards });
       return;
     }
     if (button.dataset.action === 'overview-view-mode') {

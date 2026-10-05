@@ -1846,7 +1846,7 @@ test('switching the statistics range outdates any request in flight, matching th
     schedulePage.indexOf("if (button.dataset.action === 'overview-week')"),
     schedulePage.indexOf("if (button.dataset.action === 'overview-view-mode')"),
   );
-  assert.match(overviewBranch, /await activateView\('overview'\)/, 'overview-week must route back through activateView(), which itself owns ++overviewRequestId - unlike statistics-range it does not need its own bump here');
+  assert.match(overviewBranch, /await activateView\('overview'(?:, \{[^}]*\})?\)/, 'overview-week must route back through activateView(), which itself owns ++overviewRequestId - unlike statistics-range it does not need its own bump here');
 });
 
 test('switching Planning sub-tabs while a pattern editor is dirty asks before discarding, and clears on save (S-03)', () => {
@@ -1861,7 +1861,7 @@ test('switching Planning sub-tabs while a pattern editor is dirty asks before di
   assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{button\.dataset\.id\}\/days`, \{ days \}\);\s*\n\s*dirtyPatternIds\.delete\(String\(button\.dataset\.id\)\)/);
   assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`, data\);\s*\n\s*dirtyPatternIds\.delete\(String\(form\.dataset\.id\)\)/);
 
-  assert.match(schedulePage, /onChange: \(id\) => \{ guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
+  assert.match(schedulePage, /onChange: \(id[^\n]*guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
 });
 
 // UX audit batch 3 (comprehension): S-04 cycle positions get real dates,
@@ -2628,4 +2628,46 @@ test('P12: the comparison fits seven days of one person into the desktop width',
   assert.ok(!rules.some((r) => sel(r, '.schedule-overview__lane') && /min-width\s*:\s*220px/.test(r.body)), 'keine 220px-Spur im CSS');
   assert.ok(rules.some((r) => sel(r, '.schedule-overview__day:not(.schedule-overview__gutter)') && /flex\s*:\s*1 1 0/.test(r.body)),
     'die Tage teilen sich die Breite statt auf ihrer Mindestbreite zu stehen');
+});
+
+/* R16 (Critique 2026-10-05, P1 mobil): BEDIENFLAECHE VOR DEM INHALT. Vergleich
+ * 263px (Personenwahl in drei Chipreihen, Ansicht + Stepper + Label auf zwei
+ * Zeilen), Auswertung 257px (Formularkarte, je Feld eine Zeile). Beide sind
+ * mobil zwei Zeilen: gemessen 110 bzw. 104px, Inhalt ab y=248 bzw. 242. */
+test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const all = [...eachRule(css)].map((r) => ({ ...r, selector: r.selector.trim() }));
+  const at = (re) => all.filter((r) => r.at.some((a) => re.test(a)));
+  const phone = at(/max-width:\s*767px/);
+  const body = (list, sel) => list.filter((r) => r.selector === sel).map((r) => r.body).join(';');
+
+  // Der Stepper ist EIN Rasterkind: ohne den Kasten fielen Pfeile und Label einzeln ins Raster.
+  // Seit R16 Schritt 2 in der Reihenfolge des Zeitraum-Kopfs: zurueck, Wert,
+  // vor, dahinter der Reset - im Markup, nicht per `order` (Tab-Folge).
+  // Seit R16 Schritt 2b kommt das Markup aus dem geteilten Baustein
+  // (utils/period-stepper.js); "Heute" verbirgt sich, wenn heute zu sehen ist.
+  assert.match(src, /<div class="schedule-overview__stepper">\$\{periodStepperHtml\(\{[\s\S]*?'data-direction': 'prev'[\s\S]*?schedule-overview__week-label[\s\S]*?'data-direction': 'next'[\s\S]*?current: showsToday[\s\S]*?'data-direction': 'today'[\s\S]*?<\/div>/);
+  assert.match(src, /const showsToday = weekDays\.includes\(todayKey\(\)\);/);
+  const stepper = src.match(/<div class="schedule-overview__stepper">[\s\S]*?<\/div>/)[0];
+  assert.doesNotMatch(stepper, /calendar\.back|calendar\.forward/, 'die Pfeile nennen ihr Objekt (Woche/Tag), nicht nur die Richtung');
+  assert.match(stepper, /calendar\.prevWeek[\s\S]*calendar\.nextWeek/);
+  assert.doesNotMatch(body(phone, '.schedule-overview__stepper > [data-direction="today"]'), /order:/, 'keine zweite Reihenfolge im Stylesheet');
+  assert.match(body(phone, '.schedule-overview__toolbar'), /grid-template-areas:\s*"view people"\s*"step step"/);
+  assert.match(body(phone, '.schedule-overview__week-nav'), /display:\s*contents/);
+  assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /flex-wrap:\s*nowrap/,
+    'die Personen sind EINE scrollende Reihe');
+  assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /overflow-x:\s*auto/);
+  // Die mobile Regel muss NACH der Basisregel stehen (gleiche Spezifitaet): davor verlor sie still.
+  const order = all.map((r, i) => [r, i]).filter(([r]) => r.selector === '.schedule-overview__toolbar');
+  const baseAt = order.find(([r]) => r.at.length === 0)?.[1];
+  const phoneAt = order.find(([r]) => r.at.some((a) => /max-width:\s*767px/.test(a)))?.[1];
+  assert.ok(baseAt >= 0 && phoneAt > baseAt, 'die mobile Bedienflaeche steht hinter ihrer Basisregel');
+
+  const narrow = at(/max-width:\s*639px/);
+  assert.match(body(narrow, '.schedule-stat-filters'), /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+    'Person und Zeitraum stehen nebeneinander');
+  const labels = narrow.find((r) => r.selector.includes('.schedule-stat-range > .label'));
+  assert.match(labels?.body ?? '', /clip-path:\s*inset\(50%\)/, 'die Feld-Labels bleiben im Baum');
 });

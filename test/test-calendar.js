@@ -2146,6 +2146,37 @@ test('Telefon-Monat: „+" legt fuer den gewaehlten Tag an, der Reset fuehrt zu 
   }
 });
 
+// PR #1673 Review: die Tagesansicht laedt seit R16 die Folgetage fuer die
+// Seitenspalte mit. syncTodayButton() las diese LADESPANNE als angezeigten
+// Zeitraum - stand der Cursor bis zu sieben Tage vor heute, galt die Ansicht
+// als aktuell und der Reset war weg; am Telefon (ohne Spalte) ohne Rueckweg.
+// Gegen den Stand davor rot gelaufen.
+test('Tagesansicht: der Reset ist nur am heutigen TAG aktuell, nicht in der Ladespanne der Seitenspalte', () => {
+  const { state, syncTodayButton, getRangeForView } = calendarHelpers;
+  const zuvor = { view: state.view, cursor: state.cursor, today: state.today };
+  const btn = fakeResetButton();
+  const root = { querySelector: (sel) => (sel === '#cal-today' ? btn : null), contains: () => false };
+  try {
+    Object.assign(state, { view: 'day', today: '2026-10-05', cursor: '2026-10-02' });
+    const { from, to } = getRangeForView('day', state.cursor);
+    assert(state.today >= from && state.today <= to, 'Vorbedingung: heute liegt in der Ladespanne des Tages');
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'drei Tage vor heute muss „Heute" erreichbar sein');
+    assert(btn.inert === false, 'drei Tage vor heute darf der Reset nicht inert sein');
+
+    state.cursor = '2026-10-05';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'am heutigen Tag traegt der Reset .is-current');
+    assert(btn.inert === true, 'am heutigen Tag ist der Reset inert');
+
+    state.cursor = '2026-10-06';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'einen Tag nach heute muss „Heute" erreichbar sein');
+  } finally {
+    Object.assign(state, zuvor);
+  }
+});
+
 // Schichtplan-Bloecke im Zeitraster: Ueberlappungs-Layout (#1043)
 //
 // Vorher bekam JEDER Schichtplan-Block dieselben festen Aussenraender
@@ -2358,6 +2389,58 @@ test('renderDayView: zwei ueberlappende Schichten am selben Tag bekommen untersc
       `renderDayView() muss das berechnete Layout an renderScheduleTimeBlock() weiterreichen, sonst liegen `
       + `beide Bloecke deckungsgleich uebereinander (#1043): ${lefts}`);
   });
+});
+
+// --------------------------------------------------------
+// Tagesansicht am Desktop: die Folgetage als Seitenspalte (Critique R16,
+// 2026-10-05). Der Tag war eine einzelne 932px breite Spalte; ab der
+// Split-Schwelle stehen rechts die naechsten sieben Tage als Agenda-Zeilen.
+// --------------------------------------------------------
+
+test('Tagesansicht: laedt die sieben Folgetage mit, die die Seitenspalte zeigt', () => {
+  const { from, to } = calendarHelpers.getRangeForView('day', '2026-03-28');
+  assert(from === '2026-03-28', `der Tag selbst bleibt der Anfang: ${from}`);
+  assert(to === '2026-04-04', `sieben Folgetage, auch ueber die Monatsgrenze: ${to}`);
+});
+
+test('renderDayView: die Seitenspalte zeigt Folgetage mit Eintrag als Agenda-Zeilen, nie den Tag selbst', () => {
+  const schicht = (tag, name) => ({ ...scheduleEntry({ start: '08:00', end: '12:00', name }), date_key: tag });
+  withOverlappingScheduleState({
+    scheduleEntries: [schicht('2026-09-07', 'Heute'), schicht('2026-09-09', 'Uebermorgen'), schicht('2026-09-15', 'Zu weit')],
+  }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const [grid, rail] = container.html.split('<aside class="day-rail"');
+    assert(rail, 'die Tagesansicht traegt eine Seitenspalte (.day-rail)');
+    assert(/<div class="day-layout">\s*<div class="day-view">/.test(grid), 'Raster und Spalte stehen in EINER Huelle (.day-layout)');
+    assert(/class="section-title-link day-rail__more"/.test(rail), 'der Titel ist der Weg in die Agenda');
+    assert((rail.match(/class="agenda-day"/g) || []).length === 1, 'nur Tage mit Eintrag bekommen einen Kopf');
+    assert(rail.includes('Uebermorgen'), 'ein Eintrag in zwei Tagen steht in der Spalte');
+    assert(!rail.includes('Heute'), 'der gezeigte Tag steht im Raster, nicht noch einmal daneben');
+    assert(!rail.includes('Zu weit'), 'nach sieben Tagen ist Schluss');
+  });
+  withOverlappingScheduleState({ scheduleEntries: [] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const rail = container.html.split('<aside class="day-rail"')[1] ?? '';
+    assert(/agenda-day__empty/.test(rail), 'eine leere Spanne sagt, dass sie leer ist');
+    assert(!/class="agenda-day"/.test(rail));
+  });
+});
+
+test('Tagesansicht: die Seitenspalte gibt es erst ab der Split-Schwelle der Modulflaeche', () => {
+  const rules = [...eachRule(calendarCss)];
+  const base = rules.find((r) => r.selector.trim() === '.day-rail' && !r.at.length);
+  assert(/display:\s*none/.test(base?.body ?? ''), 'unter der Schwelle (mobil) ist die Spalte ausgeblendet');
+  const wide = (r) => r.at.some((a) => /@container module-surface \(min-width:\s*65rem\)/.test(a));
+  const shown = rules.find((r) => r.selector.trim() === '.day-rail' && wide(r));
+  assert(/display:\s*block/.test(shown?.body ?? ''), 'ab 65rem Modulflaeche steht sie');
+  const layout = rules.find((r) => r.selector.trim() === '.day-layout' && wide(r));
+  assert(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*var\(--layout-rail-min\)/.test(layout?.body ?? ''),
+    'Stundenraster flexibel, Spalte auf --layout-rail-min');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/classList\.toggle\('app-page--columns', state\.view === 'day'\)/.test(src),
+    'nur die Tagesansicht macht die Seitenwurzel zum Container der Spalte');
 });
 
 // --------------------------------------------------------

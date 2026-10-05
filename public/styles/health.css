@@ -339,10 +339,9 @@
   display: none;
 }
 
-/* Schmal blendet ein neuer Bereich ein (R14 P11, health.js markAreaEntering). */
-.health-panel--entering {
-  animation: fade-in var(--duration-md) var(--ease-out);
-}
+/* Ein neuer Bereich blendet ein: seit R16 ueber swapContent()
+ * (utils/content-swap.js, health.js markAreaEntering) und in jeder Breite -
+ * die eigene Klasse `.health-panel--entering` ist entfallen. */
 
 /* Hier stand `.health-panel__head` - der Traeger des Panel-Titels, den die
  * Sub-Tab-Leiste darueber bereits wortgleich fuehrt. Der Titel ist jetzt
@@ -1950,7 +1949,7 @@ button.health-med-card:hover {
   text-align: left;
   cursor: pointer;
   width: 100%;
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--transition-fast);
 }
 
 .health-overview__card--link:hover,
@@ -2004,6 +2003,18 @@ button.health-med-card:hover {
   color: var(--color-warning);
 }
 
+/* DIE VITALWERTE NEHMEN DIE GANZE BREITE (Critique R16, 2026-10-05). Als eine
+ * Karte unter vielen stand sie in EINER Spalte der Masonry: 300px innen, das
+ * Kachelraster braucht fuer zwei Spalten 308 - neun Kacheln untereinander,
+ * 930px hoch, und die Nachbarspalte endete 640px frueher. Als Band ueber alle
+ * Spalten traegt dieselbe Karte ihr Raster in der Breite (1280: vier Kacheln
+ * je Zeile, 1440: fuenf) und ist rund 300px hoch. Die Karten davor und danach
+ * verteilen sich weiter auf die Spalten. Einspaltig (Telefon) aendert sich
+ * nichts: dort gibt es nichts zu ueberspannen. */
+.health-overview__card--vitals {
+  column-span: all;
+}
+
 /* Letzte Vitalwerte */
 /* Eine Kachelhöhe je Rasterzeile (Finish-Review Runde 2, Fix 6). Die Ursache
  * der ungleichen Höhen war NICHT das Raster, sondern das umbrechende Label:
@@ -2026,6 +2037,38 @@ button.health-med-card:hover {
    * `.metric-card` baut, deklariert `container: metric-grid / inline-size` -
    * `.metric-grid` selbst tut nichts anderes. */
   container: metric-grid / inline-size;
+}
+
+/* TELEFON: ZWEI KERNWERTE (R16). Neun Kacheln waren 575px auf einer Seite,
+ * deren Wurzel die Uebersicht ist; die zwei zuletzt gemessenen bleiben, der
+ * Kartentitel fuehrt zu allen (health.js `overviewVitalsMarkup`). Dieselbe
+ * Grenze wie `PHONE_QUERY`. */
+@media (max-width: 639px) {
+  .health-overview__vitals-grid > .health-overview__vital--extra {
+    display: none;
+  }
+}
+
+/* "Alle Werte anzeigen" (Telefon): die Zeile ist ein Glied der Kartenfolge
+ * und haelt deren Abstand; die Karten dahinter bringen ihren eigenen mit. */
+.health-overview__more-list {
+  margin-bottom: var(--space-4);
+}
+
+.health-overview__more-toggle[aria-expanded="true"] .health-vitals__more-chevron {
+  transform: rotate(180deg);
+}
+
+/* Das Werkzeug im Kopf (CSV-Export). In einem Bereich traegt der schmale Kopf
+ * Rueckweg, Person und Bereichsnamen - das Werkzeug gehoert zur Uebersicht und
+ * weicht dort. */
+.health-toolbar__tools {
+  display: inline-flex;
+  align-items: center;
+}
+
+.health-page[data-health-pushed] .health-toolbar__tools {
+  display: none;
 }
 
 /* Nächste Erinnerungen */
@@ -2425,7 +2468,7 @@ button.health-med-card:hover {
    * der Füllstand kommt als --cycle-fill (0..1) aus dem Markup. */
   transform-origin: left center;
   transform: scaleX(var(--cycle-fill, 0));
-  transition: transform var(--duration-md) ease;
+  transition: transform var(--duration-md) var(--ease-out);
 }
 
 /* Derselbe Fall wie beim Sparziel-Balken in dashboard.css: der Ursprung steht
@@ -2698,7 +2741,7 @@ button.health-med-card:hover {
   font-size: var(--text-sm);
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: background var(--duration-xs) ease;
+  transition: background var(--duration-xs) var(--ease-out);
 }
 
 .cycle-cal__day:disabled { cursor: default; }
@@ -3339,7 +3382,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   font-size: var(--text-sm);
   cursor: pointer;
   min-height: var(--target-base);
-  transition: background var(--duration-xs) ease, border-color var(--duration-xs) ease;
+  transition: background var(--duration-xs) var(--ease-out), border-color var(--duration-xs) var(--ease-out);
 }
 
 .health-choice svg { width: 15px; height: 15px; }

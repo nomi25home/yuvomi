@@ -278,3 +278,83 @@ test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt',
   assert.match(design, /\*\*Variante: Zeitraum-Kopf \(Kalender\)\.\*\*/, 'DESIGN.md benennt die Variante');
   assert.ok(design.includes(PERIOD_TITLE), 'und nennt ihre Kennklasse');
 });
+
+// R16 (Critique 2026-10-05, P1 mobil): „Werkzeuge in der Titelzeile" (DESIGN.md,
+// Kopfregel mobil 1a). Traegt die Werkzeugzeile eines Kopfs hoechstens zwei
+// Icon-Knoepfe und weder Segment noch Stepper noch Tab-Leiste, stehen sie am
+// Ende der Titelzeile; die zweite Zeile entfaellt (114 -> 65px). Wie beim
+// Zeitraum-Kopf ist die Variante MARKIERT: die Klasse steht nur in den Modulen,
+// die DESIGN.md nennt, sie wirkt nur unter 768px, und kein Traeger fuehrt eine
+// Bar-Zeile - mit Tab-Leiste daneben waere es wieder die R9-Verdichtung, die
+// R14 zurueckgenommen hat. Wie viele Knoepfe ein Kopf zur Laufzeit zeigt, ist
+// Messarbeit (Handoff/Messmatrix), nicht dieser Guard.
+const TITLE_TOOLS = 'page-toolbar--title-tools';
+const TITLE_TOOLS_MODULES = [
+  'pages/birthdays.js', 'pages/contacts.js', 'pages/documents.js', 'pages/health.js', 'pages/notes.js', 'pages/waste.js', 'settings/shell.js',
+];
+
+test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben einer Bar-Zeile', () => {
+  const pub = new URL('../public/', import.meta.url);
+  const carriers = [];
+  for (const dir of ['pages', 'utils', 'components', 'settings']) {
+    for (const f of readdirSync(new URL(`${dir}/`, pub)).filter((n) => n.endsWith('.js'))) {
+      if (`${dir}/${f}` === 'utils/page-layout.js') continue;
+      const src = readFileSync(new URL(`${dir}/${f}`, pub), 'utf8');
+      if (!src.includes(TITLE_TOOLS) && !/\btitleTools:\s*true\b/.test(src)) continue;
+      carriers.push(`${dir}/${f}`);
+      assert.doesNotMatch(src, /page-toolbar__bar|\bbar:\s/,
+        `${dir}/${f}: ein Kopf mit Bar-Zeile (Tab-Leiste, Segment) traegt seine Werkzeuge dort, nicht in der Titelzeile`);
+    }
+  }
+  assert.deepEqual(carriers.sort(), [...TITLE_TOOLS_MODULES].sort(),
+    'wer die Werkzeuge in die Titelzeile stellt, steht in DESIGN.md und in TITLE_TOOLS_MODULES');
+  assert.match(read('../public/utils/page-layout.js'), /titleTools && 'page-toolbar--title-tools'/,
+    'renderPageHeader reicht die Variante als Option durch');
+
+  const own = sheets.flatMap(({ file, css }) => rules(css).filter((r) => r.selector.includes(`.${TITLE_TOOLS}`))
+    .map((r) => ({ file, ...r })));
+  assert.ok(own.length >= 1, 'die Regel fehlt in layout.css');
+  for (const r of own) {
+    assert.equal(r.file, 'layout.css', `${r.file}: die Variante gehoert der Shell (${r.selector})`);
+    assert.ok(r.at.some((a) => /max-width:\s*767px/.test(a)),
+      `${r.selector}: nur unter 768px - ab dort hat die Titelzeile Feld und angedockte Pille`);
+  }
+  const title = own.find((r) => r.selector.endsWith(':not(.page-toolbar--in-group) > .page-toolbar__title')
+    && /flex:\s*1 1 0/.test(r.body));
+  assert.ok(title, 'der Titel gibt nach (Basis 0) - die Knoepfe haben kein Label zum Anschneiden');
+  assert.match(title.body, /white-space:\s*nowrap/, 'ein langer Titel kuerzt, er bricht nicht um (Kopfhoehe je Sprache gleich)');
+  assert.match(title.body, /text-overflow:\s*ellipsis/);
+
+  const design = read('../DESIGN.md');
+  assert.match(design, /\*\*1a\. Werkzeuge in der Titelzeile\.\*\*/, 'DESIGN.md benennt die Regel');
+  assert.ok(design.includes(TITLE_TOOLS), 'und nennt ihre Kennklasse');
+});
+
+// R16 (Critique 2026-10-05, P1 mobil): KENNZAHLEN ALS KURZZEILE. Inventar trug
+// 136px Kacheln vor der Liste (eine fuer „0"), die Haushaltshilfe ein 2x2-
+// Raster vor den Besuchen. Beide nutzen mobil die Kurzzeile des Budgets
+// (utils/metric-glance.js). Die steht dafuer in panel.css: budget.css laedt
+// nur im Budget, und die Zeile waere in jedem anderen Modul unsichtbar
+// (`display: none` als Basis) oder ungestylt gewesen.
+test('R16: die Kennzahl-Kurzzeile ist ein geteilter Baustein, und Inventar und Haushaltshilfe nutzen ihn', () => {
+  const panel = rules(read('../public/styles/panel.css'));
+  const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  assert.ok(panel.some((r) => r.at.length === 0 && r.selector === '.budget-glance' && decl(r.body, 'display') === 'none'),
+    'ab 640px gibt es den Traeger nicht');
+  assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance' && decl(r.body, 'display') === 'block'));
+  assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance-details:not(.is-expanded)' && decl(r.body, 'display') === 'none'),
+    'eingeklappt stehen die Karten nicht');
+  assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance-details > .metric-card--empty' && decl(r.body, 'display') === 'none'),
+    'eine leere Kennzahl entfaellt mobil');
+  assert.ok(panel.some((r) => r.selector === '.budget-glance__row'), 'die Zeile selbst steht in panel.css');
+  for (const [file, id, controls] of [
+    ['../public/pages/inventory.js', 'inventory-glance-more', 'inventory-metrics'],
+    ['../public/pages/housekeeping.js', 'housekeeping-glance-more', 'housekeeping-metrics'],
+  ]) {
+    const src = read(file);
+    assert.match(src, /import \{ metricGlanceHtml, wireMetricGlance \} from '\/utils\/metric-glance\.js';/, file);
+    assert.match(src, new RegExp(`id: '${id}',\\s*controls: '${controls}'`), `${file}: Zeile und Bereich gehoeren zusammen`);
+    assert.match(src, new RegExp(`class="metric-grid[^"]*budget-glance-details[^"]*" id="${controls}"`), `${file}: die Karten sind der aufklappbare Bereich`);
+    assert.match(src, new RegExp(`wireMetricGlance\\(\\w+, '${id}'`), `${file}: der Aufklapper ist verdrahtet`);
+  }
+});

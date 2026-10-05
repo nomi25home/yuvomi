@@ -8,7 +8,8 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -500,16 +501,13 @@ async function loadPreferences() {
  * Quelltext zu lesen.
  */
 function weekNavHtml() {
-  return `
-          <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="week-nav__label" id="week-label"></span>
-          <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
-  `;
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return periodStepperHtml({
+    prev: { id: 'week-prev', label: t('meals.prevWeek') },
+    value: { id: 'week-label', className: 'week-nav__label' },
+    next: { id: 'week-next', label: t('meals.nextWeek') },
+    reset: { id: 'week-today', className: 'week-nav__today', label: t('meals.today') },
+  });
 }
 
 /**
@@ -543,15 +541,8 @@ function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#week-today');
   if (!btn) return;
   const isCurrent = state.currentWeek === getMondayOf(todayKey());
-  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
-  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
-  // schon beim Werteauswerten.
-  const active = typeof document !== 'undefined' ? document.activeElement : null;
-  if (isCurrent && active === btn) {
-    (root.querySelector('#week-prev') || root.querySelector('#week-next'))?.focus();
-  }
-  btn.classList.toggle('is-current', isCurrent);
-  btn.inert = isCurrent;
+  // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+  syncPeriodReset(root, { reset: '#week-today', isCurrent, prev: '#week-prev', next: '#week-next' });
 
   const label = t('meals.today');
   btn.setAttribute('aria-label', label);
@@ -1174,25 +1165,33 @@ function setWeekBusy() {
   _container.querySelector('#week-grid')?.setAttribute('aria-busy', 'true');
 }
 
+/* Die neue Woche kommt von der Seite, zu der man blaettert (swapPeriod,
+ * utils/period-stepper.js) - vorher ein harter Schnitt nach dem Laden. */
+function swapWeek(step) {
+  swapPeriod(_container?.querySelector('#week-grid') ?? null, step, renderWeekGrid);
+}
+
 function wireNav() {
   _container.querySelector('#week-prev')?.addEventListener('click', async () => {
     setWeekBusy();
     await loadWeek(addDays(state.currentWeek, -7));
-    renderWeekGrid();
+    swapWeek(-1);
   });
 
   _container.querySelector('#week-next')?.addEventListener('click', async () => {
     setWeekBusy();
     await loadWeek(addDays(state.currentWeek, 7));
-    renderWeekGrid();
+    swapWeek(1);
   });
 
   _container.querySelector('#week-today')?.addEventListener('click', async () => {
     const monday = getMondayOf(todayKey());
     if (monday === state.currentWeek) return;
+    // "Heute" kommt von dort, wo die laufende Woche liegt (Schluessel als Text).
+    const towards = monday < state.currentWeek ? -1 : 1;
     setWeekBusy();
     await loadWeek(monday);
-    renderWeekGrid();
+    swapWeek(towards);
   });
 
   _container.querySelector('[data-action="randomize-plan"]')?.addEventListener('click', openRandomizeModal);
@@ -1552,14 +1551,68 @@ function wireDragDrop(grid) {
   }, true);
 }
 
-async function moveMeal(mealId, targetDate, targetType) {
+/**
+ * Eine Mahlzeit auf einen anderen Tag oder eine andere Mahlzeit ziehen.
+ *
+ * OPTIMISTISCH (Critique 2026-10-05, R16). Die Funktion wartete auf den Server
+ * und baute erst danach neu: die Karte stand solange am alten Platz, das
+ * Ablegen sah also aus, als haette es nicht geklappt. Und scheiterte der
+ * Aufruf, baute die Woche still neu - die Karte war ohne ein Wort wieder da,
+ * wo sie herkam. Jetzt zieht der Zustand sofort um; im Fehlerfall kehrt er
+ * zurueck, und der Fehler wird gemeldet (dasselbe Muster wie beim Einplanen
+ * weiter oben).
+ *
+ * ZWEI ZUEGE DERSELBEN KARTE vor der ersten Antwort (Review #1673): die
+ * Aufrufe laufen je Karte NACHEINANDER, und zurueckgekehrt wird an den letzten
+ * Platz, den der Server bestaetigt hat - nicht an den, an dem die Karte beim
+ * Ziehen gerade stand (das war das unbestaetigte Ziel des ersten Zugs).
+ * Zurueck setzt nur der JUENGSTE Zug: scheitert ein aelterer, gehoert der Platz
+ * dem spaeteren.
+ *
+ * @param {number} mealId
+ * @param {string} targetDate  YYYY-MM-DD
+ * @param {string} targetType
+ * @param {{ rerender?: () => void }} [opts]  nur fuer Tests
+ */
+const _mealMoves = new Map(); // mealId -> { confirmed, tail, latest, pending }
+
+async function moveMeal(mealId, targetDate, targetType, { rerender = renderWeekGrid } = {}) {
+  const meal = state.meals.find((m) => m.id === mealId);
+  let moves = _mealMoves.get(mealId);
+  if (!moves) {
+    moves = {
+      confirmed: meal ? { date: meal.date, meal_type: meal.meal_type } : null,
+      tail: Promise.resolve(),
+      latest: 0,
+      pending: 0,
+    };
+    _mealMoves.set(mealId, moves);
+  }
+  const turn = ++moves.latest;
+  moves.pending += 1;
+  if (meal) {
+    meal.date = targetDate;
+    meal.meal_type = targetType;
+    rerender();
+  }
+  const send = () => api.put(`/meals/${mealId}`, { date: targetDate, meal_type: targetType });
+  // Der Normalfall (kein Zug dieser Karte unterwegs) geht sofort raus.
+  const request = moves.pending > 1 ? moves.tail.then(send) : send();
+  moves.tail = request.catch(() => {});
   try {
-    await api.put(`/meals/${mealId}`, { date: targetDate, meal_type: targetType });
-    const m = state.meals.find((m) => m.id === mealId);
-    if (m) { m.date = targetDate; m.meal_type = targetType; }
-    renderWeekGrid();
-  } catch {
-    renderWeekGrid();
+    await request;
+    moves.confirmed = { date: targetDate, meal_type: targetType };
+    if (!meal) rerender();
+  } catch (err) {
+    if (meal && moves.confirmed && moves.latest === turn) {
+      meal.date = moves.confirmed.date;
+      meal.meal_type = moves.confirmed.meal_type;
+    }
+    rerender();
+    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'danger');
+  } finally {
+    moves.pending -= 1;
+    if (moves.pending === 0) _mealMoves.delete(mealId);
   }
 }
 
@@ -2024,7 +2077,7 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
 `;
   const nameHtml = `
     <div class="form-group" style="position:relative;">
-      <label class="form-label" for="modal-title">${t('common.nameLabel')}</label>
+      <label class="form-label" for="modal-title">${t('common.nameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="modal-title" required
              placeholder="${t('meals.titlePlaceholder')}"
              value="${esc(isEdit ? meal.title : '')}"
@@ -2171,7 +2224,9 @@ async function saveModal(overlay) {
 
     closeModal({ force: true });
     renderWeekGrid();
-    window.yuvomi?.showToast(mode === 'create' ? t('meals.addMealTitle') : t('meals.editMeal'), 'success');
+    // Das Ergebnis, nicht der Dialogtitel: „Mahlzeit hinzufügen" als
+    // Erfolgsmeldung liest sich wie eine Aufforderung (R16).
+    window.yuvomi?.showToast(mode === 'create' ? t('meals.mealSaved') : t('meals.mealUpdated'), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
     saveBtn.disabled    = false;
@@ -2309,6 +2364,8 @@ async function transferMeal(mealId, btn) {
 
 export const __test = {
   buildRandomMealAssignments,
+  // Verschieben per Ziehen (R16): optimistisch, mit Ruecksprung und Meldung.
+  moveMeal,
   // Kuechenkopf (Kopfregel mobil): das EINE Werkzeugmenue (test-meals.js).
   mealsToolsMenuHtml,
   mealPayloadFromRecipe,

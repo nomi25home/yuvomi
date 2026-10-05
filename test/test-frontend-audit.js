@@ -4870,13 +4870,23 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
     'jeder Menü-Eintrag muss ein sichtbares Textlabel tragen');
   const menuStart = page.indexOf("id: 'list-actions-menu'");
   assert.ok(menuStart > 0, 'das Überlaufmenü der Einkaufsliste ist nicht auffindbar - der Guard misst dann nichts');
-  const items = page.slice(menuStart, page.indexOf('})}', menuStart));
+  // Die Eintraege baut seit R16 `listToolsItems()` (vier Gruppen); das Menue
+  // muss sie auch wirklich von dort beziehen, sonst misst der Guard eine
+  // Funktion, die niemand ruft.
+  assert.match(page.slice(menuStart, page.indexOf('})}', menuStart)), /items:\s*listToolsItems\(\)/,
+    'das Überlaufmenü bezieht seine Einträge aus listToolsItems()');
+  const builderStart = page.indexOf('function listToolsItems()');
+  assert.ok(builderStart > 0, 'listToolsItems() ist nicht auffindbar - der Guard misst dann nichts');
+  const items = page.slice(builderStart, page.indexOf('\n}\n', builderStart));
   // Umbenennen kam 2026-08-11 dazu: es hing bis dahin als einzige Affordanz am
   // Listen-Titel im Kopf, und der Kopf ist entfallen (Titelwiederholung).
-  for (const key of ['shopping.renameListLabel', 'shopping.importMeals', 'shopping.manageCategories', 'shopping.deleteListLabel']) {
+  // "In den Vorrat" und "Abgehakt löschen" kamen mit R16 dazu: sie lebten nur
+  // in der Fuenf-Sekunden-Pille.
+  for (const key of ['shopping.renameListLabel', 'shopping.importMeals', 'shopping.manageCategories', 'shopping.deleteListLabel', 'shopping.toPantry']) {
     assert.ok(items.includes(`t('${key}')`), `das Überlaufmenü muss ${key} als Label führen`);
   }
   assert.match(items, /danger:\s*true/, '„Liste löschen" muss im Menü als destruktiv gekennzeichnet sein');
+  assert.match(items, /t\('shopping\.clearChecked',/, 'das Überlaufmenü muss „Abgehakt löschen" führen');
 
   // Der Trigger muss die Liste NENNEN. Er stand früher neben einer Überschrift,
   // die den Bezug herstellte; in der Chip-Leiste steht er allein, und ein bloßes
@@ -6383,7 +6393,7 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   // (Titel + Suche + Aktionen brechen bei Bedarf um), die Filter leben in einer
   // eigenen Zeile darunter — kein in die Kopfzeile gequetschter Filter-Block (#506).
   const documentsPageSrc = read('../public/pages/documents.js');
-  assert.match(documentsPageSrc, /class="page-toolbar page-toolbar--wrap documents-toolbar"/);
+  assert.match(documentsPageSrc, /class="page-toolbar page-toolbar--wrap(?: page-toolbar--title-tools)? documents-toolbar"/);
   assert.match(documentsPageSrc, /<div class="documents-filters">/);
   assert.match(
     documents,
@@ -10532,7 +10542,7 @@ test('split expenses reflows from container width, not viewport width', () => {
     'Grid-Items haben min-width: auto — ohne 0 schiebt die Gruppen-Leiste die Seite über ihren Rand',
   );
   assert.match(
-    cssRuleBody(split, '.split-card-head'),
+    cssRuleBody(split, '.split-section-head'),
     /flex-wrap:\s*wrap/,
     'Titel und Zusatz der Kartenköpfe brechen um, statt in die Nachbarkarte zu laufen',
   );
@@ -17536,6 +17546,72 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     'PAGE-019: der gedeckelte Baustein steht mittig wie die Content-Spalte des Kopfs');
 });
 
+test('PAGE-020: eine Aussenkante je Modul - kein Reiter schaltet das Mass oder den Kopf um', () => {
+  // Critique R16 (2026-10-05): Haushaltshilfe gab NUR der Uebersicht das breite
+  // Mass (`[data-tab="dashboard"] { --page-measure }`), Belohnungen gab NUR im
+  // Katalog dem Kopf die volle Kante (`.rewards-toolbar--wide`). Kopf und
+  // angedockter Primaerknopf sprangen beim Reiterwechsel um bis zu 431px. Das
+  // Mass steht an der Seite und gilt fuer alle ihre Reiter (DESIGN.md,
+  // Breitenregel); die Liste haelt ihr Lesemass im Spaltenraster.
+  let declarations = 0;
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
+    for (const { selector, body } of eachRule(read(`../public/styles/${file}`))) {
+      if (!/--page-measure\s*:/.test(body)) continue;
+      declarations += 1;
+      assert.ok(!/\[data-tab\b/.test(selector),
+        `PAGE-020 ${file}: "${selector.trim()}" setzt --page-measure je Reiter - die Kante des Moduls springt`);
+      assert.ok(!/toolbar--[\w-]+/.test(selector),
+        `PAGE-020 ${file}: "${selector.trim()}" setzt --page-measure an einem Kopf-Modifier - der Kopf folgt der Seite, nicht dem Reiter`);
+    }
+  }
+  assert.ok(declarations >= 8, `PAGE-020: nur ${declarations} --page-measure-Deklarationen gelesen - der Scan ist blind`);
+
+  // Wer das Spaltenraster benutzt, macht die Seitenwurzel zum Container und
+  // fuehrt ein Mass, an dem der Kopf enden kann.
+  const layout = read('../public/styles/layout.css');
+  let root = null;
+  let twoTracks = null;
+  for (const { selector, body, at } of eachRule(layout)) {
+    const sel = selector.trim();
+    if (sel === '.app-page--columns' && !at.length) root = body;
+    if (sel === '.page-columns' && at.some((a) => /@container\s+module-surface/.test(a))) twoTracks = body;
+  }
+  assert.ok(root && /container\s*:\s*module-surface\s*\/\s*inline-size/.test(root),
+    'PAGE-020: .app-page--columns muss der Container module-surface sein - die Spalten messen die Modulflaeche');
+  assert.ok(twoTracks && /var\(--layout-reading\)/.test(twoTracks) && /var\(--layout-rail-min\)/.test(twoTracks),
+    'PAGE-020: ab der Schwelle fuehrt .page-columns die Liste auf --layout-reading und die Seitenspalte ab --layout-rail-min');
+  let users = 0;
+  for (const name of pagesBehindAppShell()) {
+    const src = withoutBlockComments(withoutHtmlComments(read(`../public/pages/${name}`)));
+    if (!/renderPageColumns\(/.test(src)) continue;
+    users += 1;
+    assert.match(src, /app-page--columns/,
+      `PAGE-020 ${name}: nutzt renderPageColumns() ohne app-page--columns an der Wurzel - die Spalten haben keinen Container`);
+    assert.ok(declaredCompositionModes(src).includes('dashboard'),
+      `PAGE-020 ${name}: das Spaltenraster verlangt das breite Mass (dashboard) - im Lesemass endete der Kopf an der Liste`);
+    assert.doesNotMatch(src, /classList\.toggle\('[\w-]*toolbar--[\w-]+'/,
+      `PAGE-020 ${name}: schaltet einen Kopf-Modifier um - der Kopf steht in jedem Reiter an derselben Kante`);
+  }
+  assert.ok(users >= 3, `PAGE-020: nur ${users} Seiten mit Spaltenraster gefunden - Belohnungen, Entsorgung und Haushaltshilfe sollten es sein`);
+});
+
+test('Gesundheit: die letzten Vitalwerte ueberspannen die Spalten der Uebersicht', () => {
+  // Critique R16 (2026-10-05): als eine Karte der Multicolumn-Masonry stand sie
+  // in EINER Spalte - 300px innen, das Kachelraster braucht fuer zwei Spalten
+  // 308 (2 x 150 + Abstand). Neun Kacheln untereinander, 930px hoch, daneben
+  // 640px leer. Als Band ueber alle Spalten traegt sie vier bis fuenf Kacheln
+  // je Zeile.
+  const health = read('../public/pages/health.js');
+  // Seit R16 ist ihr Titel zugleich der Weg zu allen Werten (fuenfter Parameter).
+  assert.match(health, /overviewCard\('activity', 'health\.overview\.vitals\.title', overviewVitalsMarkup\(\), 'vitals', \{ action: 'ov-go-vitals' \}\)/,
+    'die Vitalwerte-Karte traegt ihren Teilnamen - an ihm haengt die Spannweite');
+  const css = read('../public/styles/health.css');
+  const span = [...eachRule(css)].find(({ selector, at }) => selector.trim() === '.health-overview__card--vitals' && !at.length);
+  assert.match(span?.body ?? '', /column-span:\s*all/, 'die Karte ueberspannt alle Spalten der Masonry');
+  const masonry = [...eachRule(css)].find(({ selector, at }) => selector.trim() === '.health-overview__grid' && !at.length);
+  assert.match(masonry?.body ?? '', /column-width:/, 'die Uebersicht ist weiter eine Multicolumn-Masonry - nur dort wirkt column-span');
+});
+
 test('PAGE-010: full-bleed is an explicit --bleed declaration', () => {
   const layout = read('../public/styles/layout.css');
   assert.match(layout, /\.page-section--bleed\s*\{[\s\S]*?padding-inline:\s*var\(--page-inline-pad\)/,
@@ -17611,7 +17687,8 @@ test('PAGE composition: birthdays stays free of page geometry in module CSS', ()
     'renderPageTitle',
     'renderPageActions',
     'renderPageBody',
-    'renderPageSection',
+    // `renderPageSection` trug nur den Dauerhinweis ueber der Liste; der ist
+    // mit R16 entfallen (er steht im Dialog). Die Liste ist die eine Sektion.
     'renderListSection',
   ]) {
     assert.match(src, new RegExp(name), `birthdays.js must call ${name}`);
@@ -19336,4 +19413,335 @@ test('Seiten geben keinen Em- oder En-Dash als UI-Text aus', () => {
   }
   assert.deepStrictEqual(funde, [], `"-" statt Em-/En-Dash (CLAUDE.md):\n  ${funde.join('\n  ')}`);
   assert.deepStrictEqual(verwaist, [], 'diese Ausnahmen sind erledigt - Eintrag aus DASH_PENDING streichen');
+});
+
+/* --------------------------------------------------------------------------
+ * R16 Schritt 2 (Critique 2026-10-05, P1 "Bausteine werden nicht vererbt"):
+ * je vereinheitlichtem Baustein ein Guard. Jeder ist gegen den Stand davor rot
+ * gelaufen (Dateikopie zurueck, laufen lassen, wieder vor).
+ * ------------------------------------------------------------------------ */
+const rulesOf = (css) => [...eachRule(css)];
+const selectorsOf = (rule) => rule.selector.split(',').map((s) => s.trim());
+
+test('R16: der Abhakkreis steht einmal - eine Groesse, eine Tonregel', () => {
+  const listRow = rulesOf(read('../public/styles/list-row.css'));
+  const ring = listRow.find((rule) => rule.selector.trim() === '.check-ring::after');
+  assert.ok(ring, 'list-row.css fuehrt den Ring als `.check-ring::after`');
+  assert.match(ring.body, /width:\s*var\(--space-5\)/);
+  assert.match(ring.body, /height:\s*var\(--space-5\)/);
+  assert.match(ring.body, /border:\s*2px solid var\(--color-text-tertiary\)/, 'in Ruhe neutral, nicht im Modulton');
+  assert.ok(listRow.some((rule) => rule.selector.trim() === '.check-ring:not(.check-ring--static):hover::after'
+    && /--module-accent/.test(rule.body)), 'der Modulton laedt ein, das Zeichen ist ausgenommen');
+
+  // Kein Modul baut den Ring nach: wer am Kreis-Pseudo eine Groesse oder einen
+  // ganzen Rahmen setzt, hat eine zweite Fassung.
+  for (const [file, pseudo] of [
+    ['tasks.css', /^\.task-status-btn::after$/],
+    ['housekeeping.css', /^\.housekeeping-task__check::(?:before|after)$/],
+  ]) {
+    const nachbau = rulesOf(read(`../public/styles/${file}`))
+      .filter((rule) => rule.at.length === 0 && selectorsOf(rule).some((sel) => pseudo.test(sel)))
+      .filter((rule) => /(?:^|[;\s])(?:width|height|border):/.test(rule.body));
+    assert.deepStrictEqual(nachbau.map((rule) => rule.selector.trim()), [], `${file} baut den Ring nicht nach`);
+  }
+
+  const tasksPage = read('../public/pages/tasks.js');
+  assert.match(tasksPage, /class="task-status-btn task-status-btn--\$\{task\.status\} check-ring"/);
+  assert.match(tasksPage, /task-status-btn--static check-ring check-ring--static"/, 'das Zeichen nimmt die Einladung aus');
+  assert.match(read('../public/pages/housekeeping.js'), /class="housekeeping-task__check check-ring"/);
+});
+
+test('R16: die Aufgabenzeile der Haushaltshilfe fuehrt keine Zeilenaktion - Loeschen steht im Dialog, mit Rueckweg', () => {
+  const page = read('../public/pages/housekeeping.js');
+  const row = functionBody(page, 'taskRowHtml');
+  assert.ok(row, 'taskRowHtml() gefunden');
+  assert.doesNotMatch(row, /row-action|list-row__actions/, 'Stift und Papierkorb stehen nicht mehr in der Zeile');
+  assert.equal((row.match(/data-edit-task=/g) || []).length, 1, 'ein Ziel oeffnet den Dialog, nicht zwei');
+  assert.match(row, /swipe-reveal--done swipe-reveal--leading[\s\S]*swipe-reveal--delete swipe-reveal--trailing/,
+    'Wisch: erledigen am Zeilenanfang, loeschen am Zeilenende (DESIGN.md, Wischbedienung)');
+
+  const dialog = functionBody(page, 'openTaskEditModal');
+  assert.match(dialog, /data-delete-task=/, 'der Dialogfuss ist der feste Ort (und der Tastaturweg)');
+  // Mit Rueckruf: der Fokus wandert NACH dem Neuzeichnen (Review PR #1673).
+  assert.match(dialog, /deleteTask\(task, content, \(\) => focusTaskRowAfterDelete\(content, task\.id, index\)\)/);
+
+  const del = functionBody(page, 'deleteTask');
+  assert.match(del, /scheduleUndoableDelete\(/, 'in einem Satz zuruecknehmbar - Undo-Toast statt Rueckfrage');
+  assert.doesNotMatch(del, /confirmModal/);
+  assert.match(del, /pendingTaskDeletes\.add/, 'ein Neuladen im Rueckgaengig-Fenster bringt die Zeile nicht zurueck');
+  assert.match(page, /filter\(\(it\) => !pendingTaskDeletes\.has\(String\(it\.id\)\)\)/);
+});
+
+test('R16: der Abschnittstitel als Weg ist ein Baustein, kein Nachbau je Modul', () => {
+  const layout = rulesOf(read('../public/styles/layout.css'));
+  const link = layout.find((rule) => rule.selector.trim() === '.section-title-link');
+  assert.ok(link, 'layout.css fuehrt `.section-title-link`');
+  assert.match(link.body, /min-height:\s*var\(--target-base\)/);
+  for (const [file, cls] of [['rewards.css', '.rw-section__more'], ['calendar.css', '.day-rail__more']]) {
+    const nachbau = rulesOf(read(`../public/styles/${file}`)).filter((rule) => selectorsOf(rule).some((sel) => sel.startsWith(cls)));
+    assert.deepStrictEqual(nachbau.map((rule) => rule.selector.trim()), [], `${file} traegt keine eigene Fassung mehr`);
+  }
+  assert.match(read('../public/pages/rewards.js'), /class="section-title-link rw-section__more"/);
+  assert.match(read('../public/pages/calendar.js'), /class="section-title-link day-rail__more"/);
+});
+
+test('R16: die Buchungszeile der Belohnungen ist eine `.list-row` im `.row-carrier`', () => {
+  const page = read('../public/pages/rewards.js');
+  assert.doesNotMatch(page, /<li class="rw-ledger-row/, 'keine Zeile ohne `.list-row`');
+  assert.match(page, /<li class="list-row rw-ledger-row">[\s\S]*?class="list-row__main"[\s\S]*?class="list-row__name rw-ledger-row__reason"/);
+  assert.match(page, /<ul class="rw-ledger row-carrier">/);
+  const css = rulesOf(read('../public/styles/rewards.css'));
+  const eigen = css.filter((rule) => selectorsOf(rule).some((sel) => /^\.rw-ledger(?:-row)?$/.test(sel)))
+    .filter((rule) => /background|box-shadow|border-radius|padding:\s*var|display:\s*flex/.test(rule.body));
+  assert.deepStrictEqual(eigen.map((rule) => rule.selector.trim()), [], 'Flaeche, Radius und Polster kommen vom Traeger und von der Zeile');
+  // Abschnittstitel tragen kein Icon - in keinem anderen Modul tun sie es.
+  assert.doesNotMatch(page, /class="rw-section__title u-section-title"[^>]*><i data-lucide/);
+});
+
+test('R16: ein Dialog traegt den Ton des offenen Moduls (aktiver Chip im Filterblatt)', () => {
+  // Am KOERPER (Inhalt), nicht am Overlay: Rahmen, Kopf und Fuss sind Shell und
+  // tragen die Stimme - das haelt "die Shell traegt die Stimme, nicht den Modulton".
+  const body = rulesOf(read('../public/styles/layout.css'))
+    .filter((rule) => rule.at.length === 0 && rule.selector.trim() === '.modal-panel__body')
+    .map((rule) => rule.body).join(';');
+  assert.match(body, /--module-accent:\s*var\(--active-module-accent,\s*var\(--color-accent\)\)/,
+    'der Dialogkoerper haengt ausserhalb der Modulwurzel und bekommt den Ton von der Wurzel');
+  assert.match(read('../public/router.js'), /style\.setProperty\('--active-module-accent', accent\)/,
+    'der Router fuehrt den Ton des offenen Moduls an der Wurzel');
+});
+
+/* R16 Schritt 2b - EIN REITER-SKELETT IM BUDGET (Critique 2026-10-05, P1
+ * Bausteine). Gemessen bei 1280: Kennzahl-Wert 20px in den Seitenspalten von
+ * Uebersicht und Darlehen, 28px in Konten, Abos und Aufteilung - dieselbe
+ * Karte, zwei Grade; Konten zeigte unter 640px als einziger Reiter die Karte
+ * statt der Kurzzeile. Gegen den Stand davor rot gelaufen. */
+test('R16: eine Kennzahlkarte je Zeile traegt Title 1 - die Seitenspalte sagt es der Zeile zu', () => {
+  const panel = rulesOf(read('../public/styles/panel.css'));
+  const stufen = panel.filter((rule) => rule.selector.trim() === '.metric-card__value' && /font-size:/.test(rule.body));
+  assert.equal(stufen.length, 3, 'Basis und zwei Container-Stufen');
+  for (const rule of stufen) {
+    assert.match(rule.body, /font-size:\s*var\(--metric-value-size,\s*var\(--text-(?:3xl|2xl|xl)\)\)/,
+      `Stufe ${rule.at.join(' ') || 'Basis'} fragt zuerst die Zusage der Spalte`);
+  }
+  // Jede BEDINGTE Einspalten-Zeile (Seitenspalte in einer Container-Query) gibt
+  // die Zusage mit; sonst klemmt die 300px-Zeile den Wert auf Title 3.
+  let spalten = 0;
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
+    for (const rule of rulesOf(read(`../public/styles/${file}`))) {
+      if (!/\.metric-grid/.test(rule.selector) || !/--summary-cards:\s*1\b/.test(rule.body)) continue;
+      if (rule.at.length === 0 && !/\.metric-grid--rail/.test(rule.selector)) continue;
+      spalten += 1;
+      assert.match(rule.body, /--metric-value-size:\s*var\(--text-3xl\)/, `${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.ok(spalten >= 4, `Uebersicht, Darlehen, .page-columns__rail und .metric-grid--rail (gefunden: ${spalten})`);
+  // Kein Modul unterbietet den Grad lokal.
+  for (const file of ['budget.css', 'subscriptions.css', 'split-expenses.css']) {
+    const lokal = rulesOf(read(`../public/styles/${file}`))
+      .filter((rule) => /\.metric-card__value/.test(rule.selector) && /font-size:/.test(rule.body));
+    assert.deepStrictEqual(lokal.map((rule) => rule.selector.trim()), [], `${file} setzt keinen eigenen Wert-Grad`);
+  }
+  // Die Zweier-Reihe mit 144px-Karten in der Seitenleiste der Uebersicht ist weg.
+  assert.doesNotMatch(read('../public/styles/budget.css'), /\.budget-overview__aside \.metric-grid[^{]*\{[^}]*--summary-cards:\s*2/);
+});
+
+test('R16: Konten zeigt mobil die Kurzzeile wie jeder Budget-Reiter mit Kennzahlen', () => {
+  const glance = read('../public/utils/metric-glance.js');
+  assert.match(glance, /if \(!controls\) \{[\s\S]*?budget-glance__row budget-glance__row--static/,
+    'ohne Aufklapp-Ziel ist die Zeile ein Zeichen, kein Knopf');
+  const accounts = read('../public/pages/budget.js').match(/const header = `[\s\S]*?<\/div>`;/)?.[0] ?? '';
+  assert.match(accounts, /metricGlanceHtml\(\{\s*label: t\('budget\.netWorth'\)/, 'Konten fuehrt die Kurzzeile');
+  assert.doesNotMatch(accounts, /controls:/, 'eine Zahl hat nichts aufzuklappen');
+  assert.match(accounts, /<div class="metric-grid budget-glance-details">/, 'die Karte bleibt unter 640px aus');
+});
+
+test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen liegen im Traeger', () => {
+  const subs = read('../public/pages/subscriptions.js');
+  const split = read('../public/pages/split-expenses.js');
+  // Abos: Listenkopf und die drei Diagrammtitel.
+  assert.match(subs, /<h2 class="u-section-title" id="subscriptions-list-title"/);
+  assert.equal((subs.match(/<h2 class="u-section-title subscriptions-chart__title">\$\{title\}<\/h2>\s*<div class="subscriptions-chart__card">/g) ?? []).length, 2,
+    'Flaechen- und Balkendiagramm: Titel VOR der Flaeche, nicht darin');
+  assert.match(subs, /<div class="subscriptions-list row-carrier" id="subscriptions-list">/, 'die Abo-Liste ist ein Zeilentraeger');
+  const subsCss = rulesOf(read('../public/styles/subscriptions.css'));
+  for (const sel of ['.subscriptions-list-section', '.subscriptions-chart']) {
+    const flaeche = subsCss.filter((rule) => selectorsOf(rule).includes(sel) && /background(?:-color)?:|box-shadow:|padding:/.test(rule.body));
+    assert.deepStrictEqual(flaeche.map((rule) => rule.selector.trim()), [], `${sel} traegt keine Flaeche mehr - der Titel stuende sonst wieder darin`);
+  }
+  // Aufteilung: drei Abschnitte, Titel ueber dem Traeger.
+  assert.doesNotMatch(split, /split-card\b/, 'die Karte mit Titel darin ist entfallen');
+  assert.equal((split.match(/class="split-section-title u-section-title"/g) ?? []).length, 3);
+  assert.match(split, /return `<div class="row-carrier">\$\{debts\.map/, 'Salden im Traeger');
+  assert.match(split, /return `<div class="row-carrier">\$\{state\.expenses\.map/, 'Ausgaben im Traeger');
+  assert.match(split, /class="split-activity-list row-carrier"/, 'Verlauf im Traeger');
+  const splitCss = rulesOf(read('../public/styles/split-expenses.css'));
+  const sektion = splitCss.filter((rule) => selectorsOf(rule).some((sel) => /^\.split-section(?:-head)?$/.test(sel)) && /background(?:-color)?:|box-shadow:/.test(rule.body));
+  assert.deepStrictEqual(sektion.map((rule) => rule.selector.trim()), [], 'der Abschnitt traegt keine Flaeche');
+  // Zweispaltig steht auch "Gruppen" ueber seiner Flaeche.
+  const breit = splitCss.find((rule) => rule.selector.trim() === '.split-groups-panel' && rule.at.some((at) => /split-page \(min-width: 976px\)/.test(at)));
+  assert.match(breit?.body ?? '', /background-color:\s*transparent/, 'das Gruppen-Panel gibt zweispaltig seine Flaeche an die Liste ab');
+  // Kein Budget-Reiter fuehrt eine sichtbare Ueberschrift ohne Rolle.
+  const typo = read('../public/styles/typography.css');
+  assert.doesNotMatch(typo, /\.split-card-title|\.subscriptions-chart h2/);
+});
+
+/* R16 Schritt 2b (Critique 2026-10-05, "Desktop-Kopf 65 gegen 69px"): gemessen
+ * bei 1280 standen Aufgaben, Dokumente, Gesundheit und Einkauf auf 69px, zehn
+ * andere einzeilige Koepfe auf 65px, der angedockte Primaerknopf entsprechend
+ * bei y 14 bzw. 12 (Kueche 70 bzw. 68). Gegen den Stand davor rot gelaufen. */
+test('R16: die einzeilige Kopfzeile ist am Desktop in jedem Modul ein volles Ziel hoch', () => {
+  const regeln = rulesOf(read('../public/styles/layout.css'))
+    .filter((rule) => rule.selector.trim() === '.page-toolbar' && /min-block-size:/.test(rule.body));
+  assert.equal(regeln.length, 1, 'genau eine Stelle setzt die Mindesthoehe');
+  assert.ok(regeln[0].at.some((at) => /min-width:\s*1024px/.test(at)), 'nur am Desktop - darunter gelten die Large-Title-Regeln');
+  assert.match(regeln[0].body, /min-block-size:\s*calc\(var\(--target-base\) \+ 2 \* var\(--space-3\) \+ 1px\)/,
+    'Ziel + Polster der Leiste + ihre Linie: 69px, gleich was die Zeile traegt');
+  // Kein Modul setzt dem Kopf am Desktop eine eigene Hoehe entgegen.
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css') && name !== 'layout.css')) {
+    const eigen = rulesOf(read(`../public/styles/${file}`))
+      .filter((rule) => selectorsOf(rule).some((sel) => /\.page-toolbar$|-toolbar$/.test(sel)) && /(?:^|;|\s)(?:min-)?(?:block-size|height):/.test(rule.body)
+        && !rule.at.some((at) => /max-width/.test(at)));
+    assert.deepStrictEqual(eigen.map((rule) => `${file}: ${rule.selector.trim()}`), [], 'die Kopfhoehe gehoert der Shell');
+  }
+});
+
+/* R16 Schritt 2b (A-Rest; DESIGN.md "Ueberschrift ueber Inhalt"): die vier
+ * Abschnittskoepfe der Haushaltshilfe standen IN der Karte. Gegen den Stand
+ * davor rot gelaufen. */
+test('R16: die Abschnittstitel der Haushaltshilfe stehen auf der Buehne, ueber der Karte', () => {
+  const page = withoutHtmlComments(read('../public/pages/housekeeping.js'));
+  assert.doesNotMatch(page, /<section class="housekeeping-card/, 'kein Abschnitt ist selbst die Karte');
+  const koepfe = page.match(/<section class="housekeeping-section[^"]*">\s*<div class="housekeeping-section-heading">[\s\S]*?<h2 class="u-section-title">[\s\S]*?<div class="housekeeping-card">/g) ?? [];
+  assert.equal(koepfe.length, 4, 'Letzte Besuche, Zahlungen, Haushaltshilfen, Protokoll: Titel VOR der Flaeche');
+  for (const kopf of koepfe) {
+    assert.ok(kopf.indexOf('u-section-title') < kopf.indexOf('class="housekeeping-card"'));
+  }
+  const css = rulesOf(read('../public/styles/housekeeping.css'));
+  const flaeche = css.filter((rule) => selectorsOf(rule).some((sel) => /^\.housekeeping-section(?:-heading)?$/.test(sel)) && /background(?:-color)?:|box-shadow:/.test(rule.body));
+  assert.deepStrictEqual(flaeche.map((rule) => rule.selector.trim()), [], 'Abschnitt und Kopf tragen keine Flaeche');
+  assert.doesNotMatch(read('../public/styles/typography.css'), /\.housekeeping-card h2/, 'die Rolle kommt von `.u-section-title`, nicht vom Ort in der Karte');
+});
+
+/* R16 Schritt 2b (Critique 2026-10-05, Persona Sam: "Pflichtstern mal Element,
+ * mal Label-Text"): 13 Schluessel trugen " *" im Locale-Text, in jeder der 26
+ * Sprachen. Gegen den Stand davor rot gelaufen. */
+test('R16: der Pflichtstern ist ein Element (`REQUIRED_MARK`), nie Teil eines Locale-Texts', () => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.json'))) {
+    const sterne = [];
+    const walk = (node, path) => {
+      for (const [key, value] of Object.entries(node)) {
+        if (value && typeof value === 'object') walk(value, `${path}${key}.`);
+        else if (typeof value === 'string' && /[*＊][\s‎‏]*$/.test(value)) sterne.push(`${path}${key}`);
+      }
+    };
+    walk(JSON.parse(read(`../public/locales/${file}`)), '');
+    assert.deepStrictEqual(sterne, [], `${file}: der Text nennt das Feld, der Stern ist Markup`);
+  }
+  assert.match(read('../public/utils/html.js'),
+    /export const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> \*<\/span>';/);
+  // Keine Seite baut den Stern von Hand nach (eine Ausnahme: der schaltbare
+  // Stern der Unterkategorie im Budget traegt zusaetzlich `hidden`).
+  for (const file of readdirSync(new URL('../public/pages/', import.meta.url)).filter((name) => name.endsWith('.js'))) {
+    const hand = (read(`../public/pages/${file}`).match(/<span class="required-marker" aria-hidden="true">/g) ?? []).length;
+    assert.equal(hand, 0, `${file}: \${REQUIRED_MARK} statt eines eigenen Spans`);
+  }
+  // Die 13 Felder, deren Text den Stern verloren hat, tragen ihn als Element.
+  const mit = (file, re) => assert.match(read(`../public/pages/${file}`), re, `${file}: ${re}`);
+  mit('inventory.js', /t\('common\.nameLabel'\)\)\}\$\{REQUIRED_MARK\}/);
+  mit('meals.js', /t\('common\.nameLabel'\)\}\$\{REQUIRED_MARK\}/);
+  mit('pantry.js', /t\('common\.nameLabel'\)\)\}\$\{REQUIRED_MARK\}/);
+  mit('recipes.js', /t\('common\.nameLabel'\)\}\$\{REQUIRED_MARK\}/);
+  mit('contacts.js', /t\('contacts\.nameGroupLabel'\)\}\$\{REQUIRED_MARK\}/);
+  for (const key of ['loanPrincipalLabel', 'loanAmountLabel', 'loanInstallmentsLabel', 'loanStartMonthLabel']) {
+    mit('budget.js', new RegExp(`t\\('budget\\.${key}'\\)\\}\\$\\{REQUIRED_MARK\\}`));
+  }
+  assert.equal((read('../public/pages/budget.js').match(/t\('budget\.dateLabel'\)\}\$\{REQUIRED_MARK\}/g) ?? []).length, 2);
+  mit('budget.js', /<span id="lm-borrower-label">[\s\S]{0,120}<\/span>\$\{REQUIRED_MARK\}<\/label>/);
+  for (const key of ['nameLabel', 'amountLabel', 'nextPaymentLabel']) {
+    mit('subscriptions.js', new RegExp(`t\\('subscriptions\\.${key}'\\)\\}\\$\\{REQUIRED_MARK\\}`));
+  }
+  mit('subscriptions.js', /label: t\('subscriptions\.currencyLabel'\),\s*required: true,/);
+});
+
+/* R16 Schritt 2b (Critique 2026-10-05, "Kontakte: Links rgb(206,42,99) neben
+ * Loeschen rgb(215,0,21)"). Gegen den Stand davor rot gelaufen. */
+test('R16: Werte im Kontakt-Leseblatt stehen in Textfarbe, das Zeilenzeichen traegt den Modulton', () => {
+  const css = rulesOf(read('../public/styles/contacts.css'));
+  const link = css.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.contact-detail__link');
+  assert.match(link?.body ?? '', /(?:^|;|\s)color:\s*var\(--color-text-primary\)/, 'kein zweiter Rotton neben "Loeschen"');
+  assert.doesNotMatch(link?.body ?? '', /--module-contacts|--color-accent/);
+  const icon = css.find((rule) => rule.selector.trim() === '.detail-row:has(.contact-detail__link) > .detail-row__icon');
+  assert.match(icon?.body ?? '', /color:\s*var\(--module-contacts, var\(--color-accent\)\)/, 'das Zeichen sagt, dass der Wert eine Handlung ist');
+});
+
+/* R16 Schritt 2b (Critique 2026-10-05: "Ueberschriften im Einstellungsblatt
+ * 22/16/20/17px", "'Termine' zweimal als H2"). Gegen den Stand davor rot
+ * gelaufen. */
+test('R16: das Einstellungsblatt hat eine Stufenleiter - die Reichweite steht ueber ihren Abschnitten', () => {
+  const typo = rulesOf(read('../public/styles/typography.css')).filter((rule) => rule.at.length === 0);
+  const rolle = (sel) => typo.filter((rule) => selectorsOf(rule).includes(sel)).map((rule) => rule.body).join(';');
+  assert.match(rolle('.settings-scope__title'), /font-size:\s*var\(--type-section-title\)/, 'Reichweite = Abschnittstitel (20px)');
+  assert.match(rolle('.settings-scope .settings-section__title'), /font-size:\s*var\(--type-card-title\)/, 'Abschnitt in einer Reichweite = eine Stufe darunter (17px)');
+  assert.ok(selectorsOf(typo.find((rule) => selectorsOf(rule).includes('.u-row-title')) ?? { selector: '' }).includes('.settings-scope .settings-card__title'),
+    'Karte in einer Reichweite = Zeilentitel (16px)');
+  const scope = rulesOf(read('../public/styles/settings.css')).filter((rule) => rule.selector.trim() === '.settings-scope__title').map((rule) => rule.body).join(';');
+  assert.doesNotMatch(scope, /font-size:|font-weight:/, 'settings.css setzt der Reichweite keine eigene Groesse entgegen');
+  assert.doesNotMatch(scope, /--color-text-secondary/, 'und nimmt sie nicht in den Sekundaerton zurueck');
+  // Die Ebene im Baum: Abschnitte und Karten in einer Reichweite stehen eine Ebene tiefer.
+  const shell = read('../public/settings/shell.js');
+  assert.match(shell, /levelScopedHeadings\(leafContainer\);/);
+  assert.match(shell, /'\.settings-scope \.settings-section__title:not\(\[aria-level\]\)'\)\) \{\s*el\.setAttribute\('aria-level', '3'\);/);
+  assert.match(shell, /'\.settings-scope \.settings-card__title:not\(\[aria-level\]\)'\)\) \{\s*el\.setAttribute\('aria-level', '4'\);/);
+  assert.match(shell, /scopedHeadingObserver\.observe\(leafContainer, \{ childList: true, subtree: true \}\)/, 'ein neu gebauter Abschnitt behaelt seine Ebene');
+});
+
+// DER NOTIZ-EDITOR IST EINE ARBEITSFLAECHE, KEIN FORMULAR (Critique 2026-10-05,
+// R16). Gemessen bei 390x844: Leiste 162px, Textfeld 160px ab y=534 - unter der
+// Tastaturlinie; am Desktop 646x160 in einem 680x752-Modal. Das Feld, fuer das
+// der Dialog da ist, war sein kleinstes. Es traegt jetzt eine Mindesthoehe, die
+// den Dialog fuellt, und die beiden sichtbaren Labels sind ihm gewichen (sie
+// bleiben als Name fuer assistive Technik).
+test('R16: das Textfeld der Notiz ist die Flaeche des Editors, nicht eine Zeile darin', () => {
+  const page = read('../public/pages/notes.js');
+  const css = withoutBlockComments(read('../public/styles/notes.css'));
+
+  assert.match(page, /<textarea class="form-input note-editor__text" id="note-content"/,
+    'das Textfeld traegt die Editor-Klasse');
+  assert.doesNotMatch(page, /id="note-content" rows="6"/, 'sechs Zeilen waren 160px');
+  // Die Labels bleiben Namen, stehen aber nicht mehr als Zeile vor dem Feld.
+  assert.match(page, /<label class="form-label sr-only" for="note-title">/);
+  assert.match(page, /<label class="form-label sr-only" for="note-content">/);
+
+  const minHeights = [];
+  for (const rule of eachRule(css)) {
+    if (!/\.note-editor__text\b/.test(rule.selector)) continue;
+    const value = rule.body.match(/min-height:\s*([^;]+);/)?.[1];
+    if (value) minHeights.push({ media: rule.media ?? rule.context ?? '', value });
+  }
+  const rems = (value) => Number(value.match(/max\(\s*([\d.]+)rem/)?.[1] ?? 0);
+  assert.ok(minHeights.length >= 2, 'eine Mindesthoehe mobil und eine fuer breite Dialoge');
+  const all = minHeights.map((entry) => rems(entry.value));
+  assert.ok(Math.min(...all) >= 18.75, `mobil mindestens 300px, gefunden ${JSON.stringify(minHeights)}`);
+  assert.ok(Math.max(...all) >= 25, `am Desktop mindestens 400px, gefunden ${JSON.stringify(minHeights)}`);
+});
+
+// Critique 2026-10-05 (R16): die Abo-Zeile brach ihre Metazeile mobil auf zwei
+// bis drei Zeilen (77-94px statt einer Zeilenhoehe um 62). In 204px Textspalte
+// passt die Faelligkeit ("08.10.2026 · Faellig in 3 Tagen", 184px) - der Turnus
+// daneben nicht mehr. Schmal steht er deshalb unter dem Betrag, zu dem er
+// gehoert ("12,99 EUR / Monatlich"), und weicht aus der Metazeile.
+test('R16: in der schmalen Abo-Liste steht der Turnus unter dem Betrag, nicht in der Metazeile', () => {
+  const page = read('../public/pages/subscriptions.js');
+  assert.match(page, /<span class="subscription-card__meta-cycle">\$\{cycleLabel\(subscription\)\}<\/span>/);
+  assert.match(page, /<span class="subscription-card__cost-cycle">\$\{cycleLabel\(subscription\)\}<\/span>/);
+
+  const rules = [...eachRule(read('../public/styles/subscriptions.css'))];
+  const narrow = (r) => r.at.some((a) => /subscriptions-list\s*\(max-width:\s*559px\)/.test(a));
+  const base = rules.find((r) => r.selector.trim() === '.subscription-card__cost-cycle' && !r.at.length);
+  assert.match(base?.body ?? '', /display:\s*none/, 'breit steht der Turnus nur in der Metazeile');
+  const show = rules.find((r) => narrow(r) && /\.subscription-card__cost-cycle\b/.test(r.selector));
+  assert.match(show?.body ?? '', /display:\s*block/, 'schmal steht er unter dem Betrag');
+  const hide = rules.find((r) => narrow(r) && /\.subscription-card__meta-cycle\b/.test(r.selector));
+  assert.match(hide?.body ?? '', /display:\s*none/, 'und weicht dort aus der Metazeile - nie beides zugleich');
 });

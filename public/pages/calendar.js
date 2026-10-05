@@ -12,7 +12,8 @@ import { openDetailView, visibilityRow, assignedRow } from '/components/detail-v
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
-import { esc, fmtLocation } from '/utils/html.js';
+import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { initials } from '/utils/initials.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -74,6 +75,8 @@ import {
 // --------------------------------------------------------
 
 const VIEWS      = ['month', 'week', 'day', 'agenda'];
+/** So viele Folgetage zeigt die Seitenspalte der Tagesansicht (und laedt sie mit). */
+const DAY_RAIL_DAYS = 7;
 let viewTabs = null; // wireTablist-Controller der View-Umschaltung (Sync aus switchToDayView)
 const VIEW_LABELS = () => ({
   month: t('calendar.viewMonth'),
@@ -760,7 +763,9 @@ function getRangeForView(view, cursor) {
     const mobile = window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false;
     return getWeekRange(cursor, { mobile });
   }
-  if (view === 'day') return { from: cursor, to: cursor };
+  // Der Tag laedt die Folgetage mit: am Desktop stehen sie als Seitenspalte
+  // neben dem Stundenraster (renderDayRail).
+  if (view === 'day') return { from: cursor, to: addDays(cursor, DAY_RAIL_DAYS) };
   if (view === 'agenda') return getAgendaRange(cursor);
   return getMonthRange(cursor);
 }
@@ -2175,7 +2180,8 @@ export async function render(container, { user }) {
   // Pfeilknoepfe bleiben der Weg fuer Tastatur und Maus.
   wirePeriodSwipe(bodyEl, {
     enabled: () => !searchActive && PERIOD_SWIPE_VIEWS.has(state.view),
-    onStep: (step) => navigate(step),
+    // Der Wisch gleitet selbst herein (period-swipe.js) - kein zweiter Uebergang.
+    onStep: (step) => navigate(step, { swap: false }),
   });
 
   if (initialEvent) {
@@ -2224,19 +2230,13 @@ export async function render(container, { user }) {
 function periodNavHtml() {
   const keys = periodArrowKeys();
   const labels = periodArrowLabels(currentPeriodStep());
-  return `
-      <button class="btn btn--icon" id="cal-prev" aria-label="${esc(labels.prev)}" title="${esc(labels.prev)}"
-              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.prev} ${keys.prev}">
-        <i data-lucide="chevron-left" aria-hidden="true"></i>
-      </button>
-      <span class="cal-toolbar__label" id="cal-label"></span>
-      <button class="btn btn--icon" id="cal-next" aria-label="${esc(labels.next)}" title="${esc(labels.next)}"
-              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.next} ${keys.next}">
-        <i data-lucide="chevron-right" aria-hidden="true"></i>
-      </button>
-      <button class="btn btn--secondary cal-toolbar__today" id="cal-today"
-              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.today}">${t('calendar.today')}</button>
-  `;
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return periodStepperHtml({
+    prev: { id: 'cal-prev', label: labels.prev, title: true, keys: `${CAL_SHORTCUT_KEYS.prev} ${keys.prev}` },
+    value: { id: 'cal-label', className: 'cal-toolbar__label' },
+    next: { id: 'cal-next', label: labels.next, title: true, keys: `${CAL_SHORTCUT_KEYS.next} ${keys.next}` },
+    reset: { id: 'cal-today', className: 'cal-toolbar__today', label: t('calendar.today'), keys: CAL_SHORTCUT_KEYS.today },
+  });
 }
 
 /**
@@ -2564,25 +2564,25 @@ function syncViewPanel() {
  * eine Fallunterscheidung je Ansicht: `getRangeForView` kennt ihn fuer alle
  * vier, und eine zweite Rechnung daneben waere die naechste Stelle, an der
  * Monat und Agenda auseinanderlaufen.
+ *
+ * AUSNAHME TAG (PR #1673 Review): dort ist `getRangeForView` seit R16 die
+ * LADESPANNE - der Tag plus die Folgetage fuer die Seitenspalte. Gezeigt wird
+ * EIN Tag; die Spalte ist Ausblick und am Telefon gar nicht da. Mit dem Cursor
+ * auf einem der sieben Tage vor heute lag heute in der Spanne, und der Reset
+ * verschwand, obwohl heute nicht der angezeigte Tag war.
  */
 function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#cal-today');
   if (!btn) return;
   const { from, to } = getRangeForView(state.view, state.cursor);
-  // Im geteilten Monat ist „heute" ein TAG, nicht der Monat: steht die Auswahl
-  // auf einem anderen Tag, führt der Reset zu heute zurück und bleibt sichtbar.
-  const isCurrent = (state.view === 'month' && isMonthSplit())
+  // In der Tagesansicht und im geteilten Monat ist „heute" ein TAG, nicht der
+  // Zeitraum: steht die Auswahl auf einem anderen Tag, führt der Reset zu heute
+  // zurück und bleibt sichtbar.
+  const isCurrent = (state.view === 'day' || (state.view === 'month' && isMonthSplit()))
     ? state.cursor === state.today
     : state.today >= from && state.today <= to;
-  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne
-  // DOM stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
-  // schon beim Werteauswerten, bevor `isCurrent` ihn kurzschliessen kann.
-  const active = typeof document !== 'undefined' ? document.activeElement : null;
-  if (isCurrent && active === btn) {
-    (root.querySelector('#cal-prev') || root.querySelector('#cal-next'))?.focus();
-  }
-  btn.classList.toggle('is-current', isCurrent);
-  btn.inert = isCurrent;
+  // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+  syncPeriodReset(root, { reset: '#cal-today', isCurrent, prev: '#cal-prev', next: '#cal-next' });
 }
 
 function getWeekNumber(dateStr) {
@@ -2599,7 +2599,12 @@ function getWeekNumber(dateStr) {
   return 1 + Math.round((target - firstThursday) / (7 * 86400000));
 }
 
-async function navigate(dir) {
+/* PFEILE UND KUERZEL BLAETTERN WIE DER WISCH (R16, Bewegung): der neue
+ * Zeitraum kommt von der Seite, zu der man blaettert (swapPeriod,
+ * utils/period-stepper.js). Bisher glitt nur der Touch-Pfad; Maus und Tastatur
+ * schnitten hart. `swap: false` setzt der Wisch, der sein eigenes Hereingleiten
+ * mitbringt. */
+async function navigate(dir, { swap = true } = {}) {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
@@ -2609,7 +2614,8 @@ async function navigate(dir) {
     : addDays(state.cursor, dir * step.days);
   await reloadForView();
   updateLabel();
-  renderView();
+  if (swap) swapPeriod(_container?.querySelector('#cal-body'), dir, renderView);
+  else renderView();
   if (gridFocus) focusMonthCell(state.cursor);
   // Eingeklappt waehlt der Schritt einen anderen Tag - die Liste darunter
   // wechselt, und das sagt die Ansage wie beim Tipp (announceMonthDay).
@@ -2620,10 +2626,13 @@ async function goToday() {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
+  // Aus welcher Richtung "Heute" kommt: vor oder hinter dem gezeigten Zeitraum.
+  // Tagesschluessel (YYYY-MM-DD) vergleichen sich als Text.
+  const towardsToday = state.today === state.cursor ? 0 : (state.today < state.cursor ? -1 : 1);
   state.cursor = state.today;
   await reloadForView();
   updateLabel();
-  renderView();
+  swapPeriod(_container?.querySelector('#cal-body'), towardsToday, renderView);
   if (gridFocus) focusMonthCell(state.cursor);
   else if (state.view === 'month') announceMonthDay(state.cursor);
 }
@@ -2945,6 +2954,9 @@ function renderView() {
   // 436px leer. Der Container der Schwelle (`module-surface`) steht nur in der
   // Agenda an der Seitenwurzel; die drei Raster bleiben Flaeche.
   page?.classList.toggle('app-page--list-detail', state.view === 'agenda');
+  // Die Tagesansicht fuehrt ab der Split-Schwelle eine Seitenspalte mit den
+  // Folgetagen; dafuer ist die Seitenwurzel derselbe Container (layout.css).
+  page?.classList.toggle('app-page--columns', state.view === 'day');
   if (state.view !== 'agenda') dropAgendaSelection();
   // Monats-Resize-Observer lösen, bevor das alte #month-grid detached wird;
   // nur die Monatsansicht setzt ihn danach wieder auf.
@@ -4812,6 +4824,7 @@ function renderDayView(container) {
   // Kein eigener Datums-Header mehr: die Toolbar zeigt exakt dasselbe Datum
   // bereits als Ansichts-Label (Audit A1-18).
   container.insertAdjacentHTML('beforeend', `
+    <div class="day-layout">
     <div class="day-view">
       ${(allday.length || scheduleChips.length || dayWaste.length || tasksOnDay(state.cursor).length || holidaysOnDay(state.cursor).length) ? `
       <div class="allday-row" style="display:grid;grid-template-columns:var(--cal-gutter-width) 1fr;">
@@ -4854,7 +4867,24 @@ function renderDayView(container) {
         </div>
       </div>
     </div>
+    ${renderDayRail()}
+    </div>
   `);
+
+  // Die Seitenspalte traegt Agenda-Zeilen: dieselbe Aktivierung wie dort.
+  const rail = container.querySelector('.day-rail');
+  rail?.addEventListener('click', (e) => {
+    if (e.target.closest('.day-rail__more')) {
+      _container.querySelector('#cal-view-tab-agenda')?.click();
+      return;
+    }
+    handleDayRowActivation(e);
+  });
+  rail?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target.closest('.day-rail__more')) return;
+    handleDayRowActivation(e, { keyboard: true });
+  });
 
   container.querySelector('.allday-row')?.addEventListener('click', (e) => {
     const taskChip = e.target.closest('.cal-task-chip');
@@ -4910,6 +4940,36 @@ function renderDayView(container) {
   container.querySelector('.day-view').addEventListener('keydown', handleGridKeydown);
 
   scrollToHour(container.querySelector('#day-scroll'), container.querySelector('.day-view__body'));
+}
+
+/**
+ * DIE FOLGETAGE NEBEN DEM TAG (Critique R16, 2026-10-05). Am Desktop war die
+ * Tagesansicht eine einzelne 932px breite Spalte - die Telefonansicht, nur
+ * breiter. Ab der Split-Schwelle steht rechts neben dem Stundenraster, was als
+ * Naechstes kommt: die Tage nach dem gezeigten, in denselben Zeilen wie die
+ * Agenda (dayGroup/dayGroupHtml), mit dem Namen der Agenda als Weg dorthin.
+ * Tage ohne Eintrag fehlen wie in der Agenda; ist die ganze Spanne leer, sagt
+ * die Spalte das. Unter der Schwelle ist sie ausgeblendet (calendar.css) -
+ * mobil bleibt der Tag, wie er war.
+ */
+function renderDayRail() {
+  const days = Array.from({ length: DAY_RAIL_DAYS }, (_, i) => addDays(state.cursor, i + 1));
+  const groups = days.map(dayGroup).filter((g) => !dayGroupIsEmpty(g));
+  const label = VIEW_LABELS().agenda;
+  return `
+    <aside class="day-rail" aria-label="${esc(label)}">
+      <h2 class="day-rail__title u-section-title">
+        <button type="button" class="section-title-link day-rail__more">${esc(label)}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
+      </h2>
+      ${groups.length ? groups.map((group) => `
+        <div class="agenda-day">
+          <h3 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
+            <span class="agenda-day__date">${formatDate(group.date)}</span>
+            <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(group.date + 'T00:00:00').getDay()]}</span>
+          </h3>
+          ${dayGroupHtml(group)}
+        </div>`).join('') : `<p class="agenda-day__empty">${t('calendar.agendaEmpty')}</p>`}
+    </aside>`;
 }
 
 /**
@@ -7853,7 +7913,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
   return `
     <div class="cal-event-form">
     <div class="form-group">
-      <label class="form-label" for="modal-title">${t('calendar.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="modal-title">${t('calendar.titleLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="modal-title" required
              placeholder="${t('calendar.titlePlaceholder')}" value="${esc(isEdit ? event.title : '')}">
     </div>

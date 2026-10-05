@@ -96,6 +96,19 @@
   text-align: center;
 }
 
+/* AB DER REGULAEREN BREITE WAECHST DAS LABEL NICHT MEHR MIT (R16,
+ * Gesamtpruefung). Seit das Modul die breite Bahn belegt, spreizte `flex: 1`
+ * die Pfeile ueber den ganzen Slot (1280: "<" bei x=365, ">" bei 1008, in der
+ * Statistik bei 1119) - der Weiter-Pfeil stand je Reiter woanders. Eine
+ * Mindestbreite haelt die Pfeile beim Blaettern durch die Monate an ihrem
+ * Platz; ein laengerer Wochenbereich darf sie ueberschreiten. */
+@media (min-width: 768px) {
+  .budget-nav__label {
+    flex: 0 0 auto;
+    min-inline-size: calc(var(--space-12) * 3);
+  }
+}
+
 /* Aktion, keine Selektion: bewusst Outline-Grammatik statt getönter Pille, damit
  * „Aktuell" neben der aktiven Tab-Pille nicht wie eine zweite Auswahl aussieht.
  * Das IST .btn--secondary - die Regel stand hier einmal handkopiert, mit dem
@@ -130,11 +143,9 @@
   flex: 1 1 0;
 }
 
-/* Der neue Reiter blendet ein (R14 P11, budget.js `markTabEntering`): nur
- * Deckkraft, kein Versatz - wie der Seitenwechsel. */
-.budget-tab-panel--entering {
-  animation: fade-in var(--duration-md) var(--ease-out);
-}
+/* Der neue Reiter blendet ein: seit R16 ueber swapContent()
+ * (utils/content-swap.js) am Traeger `#budget-body`, wie in jedem Modul - die
+ * eigene Klasse `.budget-tab-panel--entering` ist entfallen. */
 
 /* DER KOPF SPRINGT NICHT (Re-Critique 2026-09-28, A5 P2-9). Die Notiz ist 21px
  * hoch, der Stepper 48px: mobil sprang die Tab-Leiste darunter beim Wechsel
@@ -143,6 +154,55 @@
 .budget-nav__month {
   min-block-size: var(--target-base);
   align-items: center;
+}
+
+/* MOBIL TEILEN SICH TITEL UND ZEITRAUM EINE ZEILE (R16, layout.css
+ * `.page-toolbar--period-inline`). Hier steht nur, was das Label und die Notiz
+ * dafuer hergeben:
+ *
+ * DAS LABEL HAT EINE FESTE BREITE, damit die Pfeile beim Blaettern stehen
+ * („Mai 2026" 71px, „Sept. 2026" 84px), und zeigt die Kurzform des Monats
+ * (`data-short`, budget.js updateLabel): neben „Budget" im Large Title
+ * bleiben ihm 96px, „September 2026" braucht 128. Der volle Text bleibt der
+ * Text des Elements - Schriftgroesse 0, die Kurzform ist reine Malerei
+ * (`/ ""`: kein zweiter Name fuer Screenreader). Ein Wochenbereich der
+ * Statistik bricht in zwei Zeilen; die Zeile haelt 48px.
+ *
+ * DIE NOTIZ der Reiter ohne Zeitraum steht am Zeilenende, wo sonst der
+ * Stepper steht, hoechstens zweizeilig - der Kopf bleibt auf allen sieben
+ * Reitern gleich hoch (A5 P2-9 gilt weiter, jetzt ohne eigene Zeile). */
+@media (max-width: 767px) {
+  .page-toolbar--period-inline .budget-nav__label {
+    flex: 0 0 auto;
+    inline-size: calc(var(--space-12) * 2);
+    font-size: 0;
+  }
+
+  .page-toolbar--period-inline .budget-nav__label::after {
+    content: attr(data-short);
+    content: attr(data-short) / "";
+    display: block;
+    font-size: var(--text-base);
+    line-height: var(--line-height-tight);
+    text-wrap: balance;
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .budget-nav__month:has(.budget-nav__note:not([hidden])) {
+    flex: 1 1 0;
+  }
+
+  .page-toolbar--period-inline .budget-nav__note:not([hidden]) {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-align: end;
+    line-height: var(--line-height-tight);
+  }
+
+  .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group):has(.budget-nav__note:not([hidden])) > .page-toolbar__title {
+    flex: 0 1 auto;
+  }
 }
 
 /* Die Tab-Leiste ist die Bar-Zeile des Kopfs (.page-toolbar__bar, layout.css,
@@ -285,11 +345,20 @@
  * Das Mass steht an den KINDERN des Panels, nicht am Panel: das Panel ist der
  * Scrollport, und ein gekappter Scroller liesse das Mausrad rechts von seiner
  * Kante ins Leere greifen (dieselbe Begruendung wie bei `.list-scroller`). */
-#budget-body {
+/* DIE BAHN STEHT AN DER SEITE, NICHT AM KOERPER (Critique R16, 2026-10-05):
+ * der Kopf muss sie auch lesen. Er endete am Lesemass (720px), waehrend jeder
+ * Reiter ausser dem Plan bis zur Bahn lief - der angedockte Knopf stand bei
+ * 1280 um 276px und bei 1440 um 404px vor der Kante seines Inhalts. Jetzt
+ * endet der Kopf an der Bahn, in jedem Reiter an derselben Stelle. */
+.budget-page {
   --budget-rail-min: 18.75rem;
   --budget-rail-max: 23.75rem;
   --budget-column-gap: var(--space-6);
   --budget-lane: calc(var(--page-measure, var(--layout-reading)) + var(--budget-column-gap) + var(--budget-rail-max));
+}
+
+.budget-page > .page-toolbar {
+  --page-measure: var(--budget-lane);
 }
 
 .budget-tab-panel > * {
@@ -368,16 +437,33 @@
     top: 0;
   }
 
-  /* In der Seitenleiste zwei Karten je Zeile, der Saldo als Summe darunter
-   * ueber die volle Breite - drei Karten in ~380px liessen keinem Betrag
-   * genug Platz. „Nur Ausgaben" bleibt bei seiner einen Karte. */
-  .budget-overview__aside .metric-grid:not(.metric-grid--expenses-only) {
-    --summary-cards: 2;
+  /* In der Seitenleiste EINE Karte je Zeile, im Grad der Kennzahl-Zeilen der
+   * Nachbarreiter (panel.css, "Eine Karte je Zeile traegt Title 1"). Bis R16
+   * standen hier zwei 144px-Karten nebeneinander und der Saldo darunter: in
+   * 144px passt kein Betrag in Title 1, also stand die Leitzahl des Moduls in
+   * 20px, waehrend Konten, Abos und Aufteilung 28px zeigten. Der Trend steht
+   * in der Labelzeile statt unter dem Wert: der Betrag behaelt die volle
+   * Kartenbreite (auch "24.503,00 EUR" in 190px), und drei Karten bleiben bei
+   * 76px statt 104px (gemessen 1280: Kennzahl-Zeile 216 -> 287px samt Bandpolster). */
+  .budget-overview__aside .metric-grid {
+    --summary-cards: 1;
+    --metric-value-size: var(--text-3xl);
+    grid-auto-rows: auto;
   }
 
-  .budget-overview__aside .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child {
-    grid-column: 1 / -1;
+  .budget-overview__aside .metric-grid > .metric-card:has(> .metric-card__trend) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label trend"
+      "value value";
+    align-items: baseline;
+    column-gap: var(--space-3);
   }
+
+  .budget-overview__aside .metric-grid > .metric-card > .metric-card__label { grid-area: label; }
+  .budget-overview__aside .metric-grid > .metric-card > .metric-card__value { grid-area: value; }
+  .budget-overview__aside .metric-grid > .metric-card > .metric-card__trend { grid-area: trend; }
 
   /* Die Kategoriezeilen stapeln in der Seitenleiste wieder (Name und Betrag
    * oben, Bahn darunter ueber die volle Breite). Die Dreispalten-Stufe fragt
@@ -439,6 +525,17 @@
 
 /* .budget-networth ist entfallen: das Nettovermögen ist jetzt eine
  * .metric-card wie jede andere Kennzahl im Modul. */
+
+/* DIE EINE KENNZAHL TRAEGT DIE ZEILE (Critique R16, 2026-10-05). Am Desktop
+ * stand das Nettovermoegen als 232px-Kachel in der ersten von drei Spalten,
+ * daneben 764px leer, und endete am Lesemass ueber einem Kontenraster, das bis
+ * zur Bahn laeuft. Wie die Einzelkarte „Nur Ausgaben" (#504) nimmt sie die
+ * volle Zeile - mobil tat sie das ueber `auto-fit` schon - und endet an
+ * derselben Kante wie die Konten darunter. */
+#budget-body .budget-tab-panel--accounts > .metric-grid {
+  --summary-cards: 1;
+  max-width: var(--budget-lane);
+}
 
 .budget-accounts__list {
   display: grid;
@@ -540,21 +637,34 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   min-width: 0;
 }
 
+/* ZWEI ZEILEN STATT ELLIPSE (Critique 2026-10-05, R16). Bei 390px blieben dem
+ * Namen 118px, und vier von sechs Konten hiessen "Gemeinsames Gi...". Der Name
+ * ist die Identitaet der Zeile; er bricht jetzt einmal um und kuerzt erst
+ * danach. `overflow-wrap: anywhere`, damit ein langes Wort ohne Leerzeichen
+ * nicht unter den (unzerbrechlichen) Saldo laeuft. */
 .budget-account__name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
+  /* Nach der zweiten Zeile kuerzt weiter der NAME, nie der Saldo. */
   text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  /* Ein Wort, das allein breiter ist als die Spalte ("Wertpapierdepot"),
+   * trennt an der Silbe statt vor dem letzten Buchstaben. */
+  hyphens: auto;
   min-width: 0;
 }
 
 .budget-account__badge {
   flex: 0 0 auto;
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
   background: var(--color-surface-3);
   padding: 1px var(--space-2);
@@ -589,9 +699,14 @@
   flex: 0 0 auto;
 }
 
+/* DIE BETRAGSREGEL (Critique 2026-10-05, R16): ein Betrag in einer Zeile oder
+ * Karte steht semibold und in Tabellenziffern - Buchung, Rate, Kontosaldo,
+ * Planwert, geteilte Ausgabe. Gemessen standen 600 (Buchung), 700 (Konto,
+ * Plan) und 900 (Aufteilung) nebeneinander. Fett bleibt der KENNZAHL
+ * (`.metric-card__value`, Title 1) vorbehalten. Guard: test-budget-ui.js. */
 .budget-account__balance {
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
@@ -644,7 +759,7 @@
   margin-top: var(--space-1);
   padding: 2px var(--space-2);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
   background: color-mix(in srgb, var(--module-accent) var(--tint-surface), transparent);
   border: none;
@@ -1041,139 +1156,24 @@
  * Kopfwert oben, der aufgeklappt hier weiter gilt - unter 640px gibt es keine
  * Seitenleiste, die den Container schmaler machte als das Fenster.
  * -------------------------------------------------------- */
-.budget-glance {
-  display: none;
-}
-
+/* Der Traeger selbst (`.budget-glance*`) und der aufklappbare Bereich
+ * (`.budget-glance-details`) stehen seit R16 in panel.css: Inventar und
+ * Haushaltshilfe nutzen dieselbe Zeile, und budget.css laedt nur im Budget.
+ * Hier bleibt, was nur die Budget-Uebersicht betrifft. */
 @media (max-width: 639px) {
-  .budget-glance {
-    display: block;
-    margin-block-end: var(--space-2);
-  }
-
   /* Eingeklappt: weder Karten noch Diagramm. Aufgeklappt stehen sie in
    * ihrer bisherigen Form unter dem Traeger, die Karten mit Trend und
    * „Nur Ausgaben", das Diagramm voll (is-expanded hebt die Top-3-Kuerzung
    * ohnehin auf). Den Knopf im Diagrammkopf braucht es dann nicht - die
    * Zeile im Traeger steuert denselben Zustand. */
   .budget-balance-details:not(.is-expanded),
-  .budget-glance-details:not(.is-expanded),
   .budget-overview .budget-chart-section:not(.is-expanded),
   .budget-overview .budget-chart-more {
     display: none;
   }
 
-  .budget-balance-details.is-expanded,
-  .budget-glance-details.is-expanded {
+  .budget-balance-details.is-expanded {
     margin-block-end: var(--space-2);
-  }
-}
-
-.budget-glance__row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--target-base);
-  padding: var(--space-2) var(--space-4);
-  background: none;
-  font: inherit;
-  color: var(--color-text-primary);
-  text-align: start;
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.budget-glance__row:hover {
-  background-color: var(--color-surface-hover);
-}
-
-/* Der Traeger clippt seine Ecken (overflow: hidden) - ein Ring aussen waere
- * abgeschnitten, deshalb nach innen. */
-.budget-glance__row:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset-inset);
-}
-
-.budget-glance__lead {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.budget-glance__label {
-  font-size: var(--text-xs);
-  line-height: var(--line-height-tight);
-  color: var(--color-text-secondary);
-}
-
-/* Der Saldo traegt die Aussage der Zeile, aber als Zeilenwert, nicht als
- * Kennzahl-Karte: Title 3 waere groesser als der Titel „Transaktionen"
- * darunter. Die Toene sind die der Saldo-Karte (panel.css). */
-.budget-glance__value {
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tight);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.budget-glance__value--positive { color: var(--color-success); }
-.budget-glance__value--negative { color: var(--color-danger); }
-.budget-glance__value--neutral  { color: var(--color-text-primary); }
-.budget-glance__value--forecast { color: var(--color-text-secondary); }
-
-.budget-glance__flows {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-0h);
-  min-width: 0;
-  margin-inline-start: auto;
-  font-size: var(--text-sm);
-  line-height: var(--line-height-tight);
-  color: var(--color-text-secondary);
-}
-
-.budget-glance__flow {
-  white-space: nowrap;
-}
-
-.budget-glance__amount {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary);
-}
-
-/* Ein Nebenwert, der eine Tatsache meldet (Abos ueber Budget, Aufteilung
- * „Du schuldest"), traegt den Ton der Karte, die er vertritt. */
-.budget-glance__flow--negative .budget-glance__amount {
-  color: var(--color-danger);
-}
-
-.budget-glance__title {
-  font-weight: var(--font-weight-medium);
-}
-
-.budget-glance__chevron {
-  flex-shrink: 0;
-  margin-inline-start: auto;
-  color: var(--color-text-tertiary);
-  transition: transform var(--transition-fast);
-}
-
-.budget-glance__flows + .budget-glance__chevron {
-  margin-inline-start: 0;
-}
-
-.budget-glance__row[aria-expanded="true"] .budget-glance__chevron {
-  transform: rotate(180deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .budget-glance__row,
-  .budget-glance__chevron {
-    transition: none;
   }
 }
 
@@ -1249,7 +1249,10 @@
   border-radius: var(--radius-full);
   transform: scaleX(var(--bar-scale, 0));
   transform-origin: left center;
-  transition: transform var(--transition-slow);
+  /* 300ms, nicht 400: die Obergrenze im Arbeitsfluss. Den Startwert setzt
+   * growBars() (utils/ux.js) - ohne ihn entsteht der Balken am Endwert und
+   * diese Transition liefe nie. */
+  transition: transform var(--duration-xl) var(--ease-out);
 }
 
 /* AUSGABEN TRAGEN DEN MODULTON, NICHT DAS ROT (Re-Critique 2026-09-27, C1).
@@ -1322,6 +1325,44 @@
 .budget-loans {
   margin-bottom: var(--space-3);
   flex-shrink: 0;
+}
+
+/* DARLEHEN AUF DER BAHN DER UEBERSICHT (Critique R16, 2026-10-05). Vier
+ * Bloecke, vier Kanten: Filterzeile bis zur Bahn, Kennzahlen am Lesemass,
+ * Karten bis zur Bahn, Transaktionen am Lesemass. Ab 960px Container dieselbe
+ * Zweispalte wie Uebersicht, Statistik und Plan: links Filter, Darlehen und
+ * Transaktionen auf dem Lesemass, rechts die drei Kennzahlen als
+ * Zusammenfassung in der Seitenleiste. Das Markup bleibt in seiner Reihenfolge
+ * (mobil unveraendert). Die Kennzahlen spannen alle Zeilen; die letzte Zeile
+ * ist flexibel, damit eine kurze linke Spalte nicht auseinandergezogen wird,
+ * wenn die Seitenleiste hoeher ist als sie. */
+@container budget-page (min-width: 960px) {
+  .budget-loans {
+    display: grid;
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    grid-template-rows: repeat(5, auto) minmax(0, 1fr);
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  .budget-loans > * {
+    grid-column: 1;
+  }
+
+  .budget-loans > .metric-grid {
+    --summary-cards: 1;
+    --metric-value-size: var(--text-3xl);
+    grid-column: 2;
+    grid-row: 1 / -1;
+    grid-auto-rows: auto;
+    padding-block: 0;
+  }
 }
 
 /* .budget-loans__header trägt jetzt .panel-head (geteilte Panel-
@@ -1501,7 +1542,10 @@
   background: var(--color-success);
   transform: scaleX(var(--bar-scale, 0));
   transform-origin: left center;
-  transition: transform var(--transition-slow);
+  /* 300ms, nicht 400: die Obergrenze im Arbeitsfluss. Den Startwert setzt
+   * growBars() (utils/ux.js) - ohne ihn entsteht der Balken am Endwert und
+   * diese Transition liefe nie. */
+  transition: transform var(--duration-xl) var(--ease-out);
 }
 
 [dir='rtl'] .budget-bar-row__fill,
@@ -1532,7 +1576,13 @@
   margin-top: var(--space-4);
 }
 
-.budget-loan-transactions__title,
+/* Der Abschnittstitel ist `h2.u-section-title` auf der Buehne, wie
+ * "Transaktionen" in der Uebersicht - hier stand ein `div` in Sekundaertinte
+ * ohne Ueberschriftenrolle (Critique 2026-10-05, R16; Persona Sam). */
+.budget-loan-transactions__title {
+  margin: 0 0 var(--space-3);
+}
+
 .loan-report__section-title {
   color: var(--color-text-secondary);
   margin-bottom: var(--space-2);
@@ -1915,7 +1965,10 @@ button.budget-entry__title {
   z-index: 1;
   padding: calc((var(--target-base) - 1lh) / 2) 0;
   margin-block: calc((var(--target-base) - 1lh) / -2);
-  font: inherit;
+  /* KEIN `font: inherit` HIER: reset.css nimmt dem Knopf die UA-Schrift schon,
+   * und die Kurzschrift haette mit (0,1,1) das Gewicht des Zeilentitels
+   * (`.list-row__name`, typography.css) mit zurueckgesetzt - die Buchung stand
+   * als einzige Zeile der App auf 16/400 (Critique 2026-10-05, R16). */
   color: inherit;
   text-align: start;
   cursor: pointer;
@@ -2211,8 +2264,17 @@ button.budget-entry__title {
   }
 }
 
-.budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; }
-.budget-stats__donut { width:160px; height:160px; }
+/* Ring und sein Satz. Einspaltig nebeneinander (Ring klein, der Satz fuellt die
+ * Zeile - vorher 160px Ring neben 198px Leere), in der Seitenspalte
+ * untereinander (Regel in der Container-Query unten). */
+.budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; }
+.budget-stats__donut { width:96px; height:96px; flex:0 0 auto; }
+.budget-stats__donut-note {
+  margin:0;
+  min-width:0;
+  font-size:var(--text-sm);
+  color:var(--color-text-secondary);
+}
 .budget-stats__export { margin-top:var(--space-4); }
 
 /* Statistik auf der Budget-Bahn (Critique 2026-09-26, A5 P2-5): ab 960px
@@ -2239,11 +2301,34 @@ button.budget-entry__title {
     grid-column: 1;
   }
 
-  /* Neben Verlauf UND Vergleich: die Anteile sind die zweite Sicht auf
-   * dieselben Kategorien, die links als Balken stehen. */
+  /* NEBEN DEM VERLAUF, UEBER DEN BALKEN (R16 Schritt 2b). Der Ring stand in
+   * einer Leiste ueber beide Zeilen: ab y=397 war sie leer, und das Anheften
+   * (R16 1a) hielt ihn zwar im Bild, liess die Leiste aber leer. Jetzt endet
+   * die Spalte mit der ersten Zeile; die Balken darunter nehmen die ganze
+   * Bahn und stehen direkt unter dem Ring, der ihre Farben erklaert. */
   .budget-stats__aside {
     grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 1;
+  }
+
+  .budget-stats__main--wide {
+    grid-column: 1 / -1;
+  }
+
+  /* Bis zur Bahn, nicht bis zum Lesemass: sonst stuende unter dem Ring wieder
+   * eine leere Spalte neben den Balken. */
+  .budget-stats__main--wide .budget-chart-section {
+    max-width: none;
+  }
+
+  .budget-stats__aside .budget-stats__donut-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .budget-stats__aside .budget-stats__donut {
+    width: 160px;
+    height: 160px;
   }
 }
 
@@ -2281,6 +2366,45 @@ button.budget-entry__title {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+/* KATEGORIEN | SPARZIEL (Critique R16, 2026-10-05). Der Plan stand als einziger
+ * Reiter auf dem Lesemass (720px) neben 276px (1280) bzw. 404px (1440) leerer
+ * Bahn. Ab 960px Container dieselbe Zweispalte wie Uebersicht und Statistik:
+ * links die Kategorie-Budgets auf dem Lesemass, rechts das Sparziel in der
+ * Breite der Seitenleiste. Im Markup bleibt das Sparziel vorn (mobil ueber der
+ * Liste); `dense` setzt die Liste neben es statt darunter, und der Hinweis
+ * eines vergangenen Monats laeuft ueber beide Spalten. */
+@container budget-page (min-width: 960px) {
+  .budget-tab-panel--plan > .budget-plan {
+    max-width: var(--budget-lane);
+  }
+
+  #budget-plan-body {
+    display: grid;
+    grid-auto-flow: row dense;
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  #budget-plan-body > .budget-plan__historic-note {
+    grid-column: 1 / -1;
+  }
+
+  #budget-plan-body > .budget-plan-savings {
+    grid-column: 2;
+  }
+
+  #budget-plan-body > .budget-plan__section {
+    grid-column: 1;
+  }
 }
 
 /* Sparziel-Karte */
@@ -2445,7 +2569,7 @@ button.budget-entry__title {
 .budget-plan-row__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .budget-plan-row__label { font-weight: var(--font-weight-medium); color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .budget-plan-row__amounts { font-size: var(--text-sm); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.budget-plan-row__amounts strong { color: var(--color-text-primary); }
+.budget-plan-row__amounts strong { color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
 
 .budget-plan-row__track {
   height: var(--space-2);

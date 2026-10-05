@@ -15,7 +15,7 @@ import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { findPageFab } from '/utils/fab.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -237,7 +237,7 @@ export async function render(container, { user, signal }) {
   // Spalten stutzen. Kopf und Koerper enden deshalb beide an der Nutzbreite.
   container.insertAdjacentHTML('beforeend', `
     <div class="notes-page app-page app-page--full" data-composition="full">
-      <div class="page-toolbar notes-toolbar">
+      <div class="page-toolbar page-toolbar--title-tools notes-toolbar">
         <h1 class="page-toolbar__title">${t('notes.title')}</h1>
         ${renderPageSearch({ id: 'notes-search', label: t('notes.searchPlaceholder'), placeholder: t('notes.searchPlaceholder'), value: state.filterQuery, clearLabel: t('common.searchClear'), className: 'notes-toolbar__search page-toolbar__center' })}
         ${/* KATEGORIEN VERWALTEN STEHT IM WERKZEUGMENUE (Kopfregel mobil,
@@ -337,7 +337,7 @@ export async function render(container, { user, signal }) {
   // geteilten Popover-Mechanik, der Klick ueber `data-action` am Kopf.
   installPopoverMenus(_container);
   _container.querySelector('.notes-toolbar')?.addEventListener('click', (e) => {
-    if (e.target.closest('.popover-menu__item[data-action="manage-categories"]') && !readOnly()) {
+    if (pageToolsActionEl(e.target, 'manage-categories') && !readOnly()) {
       // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat;
       // der Dialog gaebe ihn beim Schliessen dorthin zurueck und er fiele aufs
       // Dokument. Also vorher auf den Knopf, der das Menue geoeffnet hat.
@@ -807,17 +807,23 @@ function openNoteModal({ mode, note = null }) {
 
       <div class="note-edit-view" id="note-pane-edit" data-pane="edit" role="tabpanel"
            aria-labelledby="note-tab-edit"${initialView === 'edit' ? '' : ' hidden'}>
-    <div class="form-group">
-      <label class="form-label" for="note-title">${t('notes.titleLabel')}</label>
-      <input type="text" class="form-input" id="note-title"
-             placeholder="${t('notes.titlePlaceholder')}" value="${esc(isEdit && note.title ? note.title : '')}">
+    <!-- DER EDITOR IST EINE ARBEITSFLAECHE (Critique 2026-10-05, R16). Titel
+         und Text standen als zwei Formularfelder mit Label untereinander, das
+         Textfeld sechs Zeilen hoch (160px) und mobil ab y=534 - unter der
+         Tastaturlinie. Der Dialog ist fuer genau dieses Feld da. Die Labels
+         bleiben als Namen (sr-only), der Platzhalter sagt Sehenden dasselbe;
+         das Textfeld traegt die Mindesthoehe der Flaeche (notes.css,
+         .note-editor__text). -->
+    <div class="form-group note-editor__title">
+      <label class="form-label sr-only" for="note-title">${t('notes.titleLabel')}</label>
+      <input type="text" class="form-input note-editor__title-input" id="note-title"
+             placeholder="${t('notes.titleLabel')}" value="${esc(isEdit && note.title ? note.title : '')}">
     </div>
-    <div class="form-group">
-      <label class="form-label" for="note-content">${t('notes.contentLabel')} <span class="form-label__hint">${t('notes.contentMarkdownHint')}</span></label>
+    <div class="form-group note-editor">
+      <label class="form-label sr-only" for="note-content">${t('notes.contentLabel')} <span class="form-label__hint">${t('notes.contentMarkdownHint')}</span></label>
       ${renderMarkdownToolbar()}
-      <textarea class="form-input" id="note-content" rows="6"
-                placeholder="${t('notes.contentPlaceholder')}"
-                style="resize:vertical;">${esc(isEdit ? note.content : '')}</textarea>
+      <textarea class="form-input note-editor__text" id="note-content" rows="12"
+                placeholder="${t('notes.contentPlaceholder')}">${esc(isEdit ? note.content : '')}</textarea>
     </div>
     ${renderCategoryEditor(isEdit ? (note.categories || []).map((category) => category.id) : [])}
     ${advancedSection(`

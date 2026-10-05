@@ -9,7 +9,8 @@
 
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -22,7 +23,7 @@ import {
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateEl } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
@@ -432,10 +433,32 @@ function updateAttentionBadge() {
     'warning');
 }
 
+// Mobil ist die Kennzahl-Zeile EINE Kurzzeile (utils/metric-glance.js), die
+// die Karten aufklappt (R16): drei Kacheln standen als 136px vor der ersten
+// Kategorie, eine davon fuer „0". Der Merker haelt den Zustand ueber den
+// Neuaufbau der Liste.
+let _metricsExpanded = false;
+
 function renderMetrics() {
   const { count, totalValue, needsAttention } = computeMetrics(state.items);
+  // Ein aktiver Filter bleibt sichtbar: seine Kachel ist der Schalter, also
+  // steht die Zeile dann aufgeklappt.
+  const expanded = _metricsExpanded || state.filterAttention;
+  const attentionEmpty = needsAttention === 0 && !state.filterAttention;
   return `
-    <div class="metric-grid">
+    ${metricGlanceHtml({
+    id: 'inventory-glance-more',
+    controls: 'inventory-metrics',
+    expanded,
+    label: t('inventory.metricItemsLabel'),
+    value: String(count),
+    flows: [
+      { label: t('inventory.metricValueLabel'), amount: formatMoney(totalValue, _householdCurrency) },
+      // Eine leere Kennzahl entfaellt in der Kurzzeile.
+      needsAttention > 0 ? { label: t('inventory.metricAttentionLabel'), amount: String(needsAttention) } : null,
+    ],
+  })}
+    <div class="metric-grid budget-glance-details${expanded ? ' is-expanded' : ''}" id="inventory-metrics">
       <div class="metric-card">
         <div class="metric-card__label">${esc(t('inventory.metricItemsLabel'))}</div>
         <div class="metric-card__value">${count}</div>
@@ -444,7 +467,7 @@ function renderMetrics() {
         <div class="metric-card__label">${esc(t('inventory.metricValueLabel'))}</div>
         <div class="metric-card__value">${esc(formatMoney(totalValue, _householdCurrency))}</div>
       </div>
-      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}"
+      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}${attentionEmpty ? ' metric-card--empty' : ''}"
               data-action="toggle-attention-filter" aria-pressed="${state.filterAttention}">
         <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
         <div class="metric-card__value">${needsAttention}</div>
@@ -760,6 +783,7 @@ function renderBrowse(list) {
 
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', renderMetrics());
+  wireMetricGlance(list, 'inventory-glance-more', (expanded) => { _metricsExpanded = expanded; });
   list.querySelector('[data-action="toggle-attention-filter"]')?.addEventListener('click', () => {
     state.filterAttention = !state.filterAttention;
     renderList();
@@ -1840,7 +1864,7 @@ function buildItemForm({ mode, item = null }) {
 
   const content = `
       <div class="form-group">
-        <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}</label>
+        <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
         <input id="inv-name" class="form-input" type="text" required placeholder="${esc(t('inventory.namePlaceholder'))}">
       </div>
       <div class="inventory-form-row">
@@ -2351,7 +2375,7 @@ export async function render(container, { signal } = {}) {
     else _md.clear({ history: 'none' });
   }, { signal });
   toolbar.addEventListener('click', (e) => {
-    const item = e.target.closest('.popover-menu__item[data-action]');
+    const item = pageToolsActionEl(e.target);
     if (!item || item.disabled) return;
     if (item.dataset.action === 'manage-locations') openLocationManager();
     else if (item.dataset.action === 'manage-categories') openCategoryManager();

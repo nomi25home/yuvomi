@@ -206,7 +206,9 @@
   background: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  /* Was wirklich wechselt (Hover, Aktiv-Pille) - `all` nahm jede kuenftige
+   * Eigenschaft mit, auch Layout. */
+  transition: color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: var(--target-lg);
   white-space: nowrap;
 }
@@ -1095,6 +1097,49 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
+
+/* TAG | FOLGETAGE (Critique R16, 2026-10-05). Die Tagesansicht war am Desktop
+ * eine einzelne 932px breite Spalte. Ab der Split-Schwelle der Modulflaeche
+ * (`--layout-split-threshold`, PAGE-019; Container ist die Seitenwurzel mit
+ * `app-page--columns`, die calendar.js nur in dieser Ansicht setzt) steht
+ * rechts eine Seitenspalte in `--layout-rail-min` mit den Folgetagen als
+ * Agenda-Zeilen. Darunter gibt es sie nicht: die Huelle ist dann nur die
+ * Flex-Spalte, die `.day-view` schon war. Die Spalte scrollt fuer sich, damit
+ * das Stundenraster seine Position behaelt. */
+.day-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-rail {
+  display: none;
+}
+
+@container module-surface (min-width: 65rem) {
+  .day-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--layout-rail-min);
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: var(--space-6);
+  }
+
+  .day-rail {
+    display: block;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    /* Luft fuer den Fokusring der Zeilen an der Scrollkante. */
+    padding-inline: var(--space-1);
+  }
+}
+
+.day-rail__title {
+  margin: 0 0 var(--space-2);
+}
+
+/* Der Titel ist der Weg in die Agenda: `.section-title-link` (layout.css). */
 
 /* #cal-body ist mobil randbündig (das Monatsraster ist ein Vollbreiten-Canvas);
  * eine Karte braucht dort ihren eigenen Rand. Ab 1024px stellt ihn

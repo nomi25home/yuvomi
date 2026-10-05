@@ -138,6 +138,8 @@ const APP_SHELL = [
   '/utils/extension-widgets.js',
   '/utils/fab.js',
   '/utils/flip.js',
+  '/utils/list-motion.js',
+  '/utils/content-swap.js',
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',
   '/utils/folder-tree.js',
@@ -192,6 +194,7 @@ const APP_SHELL = [
   '/utils/page-search.js',
   '/utils/search-sections.js',
   '/utils/palette-combobox.js',
+  '/utils/period-stepper.js',
   '/utils/pantry-locations.js',
   '/utils/pantry-status.js',
   '/utils/pantry-units.js',
@@ -321,6 +324,7 @@ const PAGE_MODULES = [
   // Der Bildzuschnitt kommt per dynamischem import() aus mehreren Modulen
   // (Avatare, Geburtstage, Vorrat, Rezepte, Haushaltshilfe, Schnellzugriff).
   // Der Precache-Guard las dynamische Importe bis dahin nicht.
+  '/utils/auth-ui.js',
   '/utils/avatar-crop.js',
   '/utils/lucide-icons.js',
   '/utils/sortable.js',

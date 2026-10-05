@@ -470,7 +470,9 @@ test('Kanon: der Kontext-FAB dockt am Desktop an - Aktions-Slot im Kopf, Nomen j
   // stumm nicht an, und das Nomen waere nur ein Attribut, das niemand zeigt.
   const render = HEALTH_JS.match(/export async function render\(container[\s\S]*?\n}\n/)?.[0];
   assert.ok(render, 'render() nicht gefunden');
-  assert.match(render, /<header class="page-toolbar health-toolbar">[\s\S]*?<div class="page-toolbar__actions"><\/div>[\s\S]*?<\/header>/,
+  // Seit R16 traegt der Slot einen eigenen Traeger fuer das Werkzeug des Kopfs
+  // (CSV-Export); der Router dockt die Pille daneben in denselben Slot.
+  assert.match(render, /<header class="page-toolbar page-toolbar--title-tools health-toolbar">[\s\S]*?<div class="page-toolbar__actions"><span class="health-toolbar__tools" id="health-tools">[^\n]*<\/span><\/div>[\s\S]*?<\/header>/,
     'der Gesundheitskopf braucht den Aktions-Slot, in den der Router die Kopf-Pille legt');
   assert.match(render, /createPageFab\(\{[^}]*dockLabel: t\('newLabel\.\w+'\)/, 'createPageFab ohne Nomen dockt nie an');
 
@@ -668,17 +670,18 @@ test('R14 P8: Verlaufslisten der Gesundheit stehen auf einem Traeger', async () 
   }
 });
 
-// R14 P11 (A6 P2-9): schmal schaltete der Bereichswechsel `hidden` um - die
-// einzige Tiefennavigation im Modul sprang. Jetzt blendet der neue Bereich
-// ein (nur schmal, nur beim Wechsel), mit Tokens.
-test('R14 P11: der Bereichswechsel schmal blendet ein', async () => {
+// R14 P11 (A6 P2-9) / R16 (Bewegung): der Bereichswechsel schaltete `hidden`
+// um - schmal blendete er seit R14, am Desktop schnitt die Detailspalte hart.
+// Jetzt blendet der neue Bereich in JEDER Breite, ueber den geteilten Helfer
+// (Regeln und reduzierte Bewegung: test:motion).
+test('R16: der Bereichswechsel blendet in jeder Breite ueber swapContent', async () => {
   const start = HEALTH_JS.indexOf('function activateArea(');
   const body = HEALTH_JS.slice(start, HEALTH_JS.indexOf('\n}\n', start));
-  assert.match(body, /if \(narrow && previous && previous !== id\) markAreaEntering\(route\);/);
+  assert.match(body, /if \(previous && previous !== id\) markAreaEntering\(route\);/, 'nicht mehr nur schmal');
+  const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function markAreaEntering('), HEALTH_JS.indexOf('function markAreaEntering(') + 400);
+  assert.match(fn, /swapContent\(panel, null\)/, 'Blende ohne Versatz am Panel');
   const { eachRule } = await import('./css-rules.js');
-  const regel = [...eachRule(read('public/styles/health.css'))].find((r) => r.selector.trim() === '.health-panel--entering' && !r.at.length);
-  assert.ok(regel, '.health-panel--entering fehlt');
-  assert.match(regel.body, /animation:\s*fade-in var\(--duration-[a-z0-9]+\) var\(--ease-[a-z-]+\)/);
+  assert.ok(![...eachRule(read('public/styles/health.css'))].some((r) => /health-panel--entering/.test(r.selector)), 'die eigene Klasse ist weg');
 });
 
 // R14 P6 (A8 P2-2, A6 §5): die angedockte Pille hiess in Vorsorge und

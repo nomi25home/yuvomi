@@ -10,7 +10,7 @@ import { openModal as openSharedModal, closeModal, wireBlurValidation, validateA
 import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
@@ -27,7 +27,7 @@ import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
-import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, syncPopoverMenuItem } from '/utils/popover-menu.js';
+import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet } from '/utils/filter-sheet.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -579,7 +579,7 @@ function renderTaskCard(task, opts = {}) {
         </button>
         ` : `
         ${darfAbhaken ? `
-        <button class="task-status-btn task-status-btn--${task.status}"
+        <button class="task-status-btn task-status-btn--${task.status} check-ring"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
@@ -591,7 +591,7 @@ function renderTaskCard(task, opts = {}) {
              Mensch mit Leserecht bekommt keinen Picker, und ohne dieses
              Zeichen verschwaende die Zeile die Auskunft, die der Haken traegt:
              ob die Aufgabe erledigt ist. */''}
-        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static"
+        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static check-ring check-ring--static"
               role="img" aria-label="${esc(`${task.title}: ${statusLabel(task.status)}`)}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </span>
@@ -608,7 +608,7 @@ function renderTaskCard(task, opts = {}) {
         `}
 
         <div class="task-card__body">
-          <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}" data-md-focus>
+          <button type="button" class="task-card__title u-row-title" data-action="open-task" data-id="${task.id}" data-md-focus>
             ${esc(task.title)}
           </button>
           <div class="task-card__meta">
@@ -999,7 +999,7 @@ function wireTagBadgeFilter(container) {
  * unter dem Aufklapper (DESIGN.md: „Weitere Einstellungen nennt, was dahinter
  * liegt"; A3 P1-2). Dieselbe Bauart wie eventAdvancedTopics() im Kalender.
  */
-function taskAdvancedTopics({ privacy = true } = {}) {
+function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = false } = {}) {
   const topics = [
     t('tasks.startDateLabel'),
     t('tasks.pointsLabel'),
@@ -1007,6 +1007,10 @@ function taskAdvancedTopics({ privacy = true } = {}) {
     t('tasks.statusLabel'),
     privacy ? t('common.visibility.label') : null,
     t('tasks.documentsLabel'),
+    // Nur solange sie leer hinter dem Aufklapper liegen (R16) - der Hinweis
+    // nennt, was dahinter IST, nicht was dort sein koennte.
+    recurrence ? t('rrule.labelRepeat') : null,
+    reminder ? t('reminders.sectionTitle') : null,
   ].filter(Boolean);
   try {
     return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(topics);
@@ -1093,7 +1097,32 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const advancedLabel = advancedSummary.length
     ? `${t('modal.moreSettings')} · ${advancedSummary.join(' · ')}`
     : undefined;
-  const advancedHint = taskAdvancedTopics({ privacy: !hidesPrivacyControls('tasks') });
+  /* WIEDERHOLUNG UND ERINNERUNG LIEGEN HINTER DEM AUFKLAPPER, SOLANGE SIE LEER
+   * SIND (Critique 2026-10-05, R16). Beide standen offen unter ihm - eine
+   * Auswahl "Keine" samt Hinweis und ein ausgeschalteter Schalter, zusammen
+   * rund 200px fuer zwei Angaben, die die meisten Aufgaben nicht tragen. Ein
+   * GESETZTER Wert bleibt offen an seinem alten Platz: beim Bearbeiten darf
+   * nichts Gesetztes versteckt sein, und eine Serie in eine Zusammenfassung zu
+   * kuerzen hiesse, ihre Regel zu verschweigen. Der Abschnitt selbst entfaellt
+   * ohne Recht (`renderReminderSection` liefert dann nichts). */
+  const recurrenceHtml = renderRRuleFields('task', task?.recurrence_rule, {
+    allowFromCompletion: true,
+    fromCompletion: !!task?.recurrence_from_completion,
+    // AUSDRUECKLICH FALSE, nicht weggelassen (#960). Eine Aufgabe ist eine
+    // Zeile mit einem Faelligkeitsdatum, das Liste, Ueberfaelligkeit und
+    // Countdown direkt lesen - sie wird nicht wie eine Kalenderserie vom
+    // Startdatum aus expandiert. Der Monatsletzten-Hinweis muss das sagen,
+    // sonst verspricht er einen Termin, den es hier nicht gibt.
+    expandsFromStart: false,
+  });
+  const reminderHtml = renderReminderSection(task, reminder);
+  const recurrenceTucked = !task?.recurrence_rule;
+  const reminderTucked = !reminder && reminderHtml !== '';
+  const advancedHint = taskAdvancedTopics({
+    privacy: !hidesPrivacyControls('tasks'),
+    recurrence: recurrenceTucked,
+    reminder: reminderTucked,
+  });
 
   const advancedFieldsHtml = `
       <div class="modal-grid modal-grid--2">
@@ -1187,7 +1216,9 @@ ${syncTargetFieldHtml(task)}
       ${renderDocumentAttachField({
         attachments: (task?.documents ?? []).map((doc) => ({ document_id: doc.id, name: doc.name, mime_type: doc.mime_type })),
         label: t('tasks.documentsLabel'),
-      })}`;
+      })}
+${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}</div>` : ''}
+${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`;
 
   return `
     <form id="task-form" novalidate>
@@ -1195,7 +1226,7 @@ ${syncTargetFieldHtml(task)}
 
       <div class="form-group">
         <div class="form-field">
-          <label class="label" for="task-title">${t('tasks.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+          <label class="label" for="task-title">${t('tasks.titleLabel')}${REQUIRED_MARK}</label>
           <input class="input" type="text" id="task-title" name="title"
                  value="${esc(task?.title)}" placeholder="${t('tasks.titlePlaceholder')}"
                  required autocomplete="off">
@@ -1207,20 +1238,6 @@ ${syncTargetFieldHtml(task)}
             ${t('common.required')}
           </div>
         </div>
-      </div>
-
-      <!-- Notiz steht beim Titel, nicht hinter dem Aufklapper: sie ist sein
-           Gegenstueck, und eine Zusammenfassung kann Freitext nicht tragen.
-           Genau deshalb sind zwei Zeilen zu wenig gewesen (#731): das Feld war
-           auf die Groesse einer Zusammenfassung gebaut, obwohl der Kommentar
-           darueber das Gegenteil begruendet. -->
-      <div class="form-group">
-        <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
-        ${renderMarkdownToolbar()}
-        <textarea class="input" id="task-description" name="description"
-                  rows="6" placeholder="${t('tasks.descriptionPlaceholder')}"
-                 >${esc(task?.description)}</textarea>
-        <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
       </div>
 
       <div class="modal-grid modal-grid--2">
@@ -1286,20 +1303,27 @@ ${syncTargetFieldHtml(task)}
         </div>
       </div>
 
+      <!-- DIE NOTIZ STEHT NACH DEM, WAS EINE AUFGABE AUSMACHT (Critique
+           2026-10-05, R16). Sie stand direkt unter dem Titel, und mit ihrer
+           Formatierleiste lag die Faelligkeit mobil bei y=700 von 844 - wann,
+           wer und wie wichtig kamen erst nach dem Freitext. Im Hauptteil
+           bleibt sie trotzdem: eine Zusammenfassung kann Freitext nicht
+           tragen (#731), hinter den Aufklapper gehoert sie nicht. Die Leiste
+           erscheint erst mit dem Fokus im Feld (utils/markdown-toolbar.js). -->
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
+        ${renderMarkdownToolbar()}
+        <textarea class="input" id="task-description" name="description"
+                  rows="6" placeholder="${t('tasks.descriptionPlaceholder')}"
+                 >${esc(task?.description)}</textarea>
+        <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
+      </div>
+
       ${advancedSection(advancedFieldsHtml, { label: advancedLabel, hint: advancedHint })}
 
-      ${renderRRuleFields('task', task?.recurrence_rule, {
-        allowFromCompletion: true,
-        fromCompletion: !!task?.recurrence_from_completion,
-        // AUSDRUECKLICH FALSE, nicht weggelassen (#960). Eine Aufgabe ist eine
-        // Zeile mit einem Faelligkeitsdatum, das Liste, Ueberfaelligkeit und
-        // Countdown direkt lesen - sie wird nicht wie eine Kalenderserie vom
-        // Startdatum aus expandiert. Der Monatsletzten-Hinweis muss das sagen,
-        // sonst verspricht er einen Termin, den es hier nicht gibt.
-        expandsFromStart: false,
-      })}
+      ${recurrenceTucked ? '' : recurrenceHtml}
 
-      ${renderReminderSection(task, reminder)}
+      ${reminderTucked ? '' : reminderHtml}
 
       <div id="task-form-error" class="form-error" role="alert" hidden></div>
 
@@ -1320,6 +1344,18 @@ ${syncTargetFieldHtml(task)}
 // --------------------------------------------------------
 // Seiten-State
 // --------------------------------------------------------
+
+/**
+ * Der Ruhezustand des Statusfilters: die Liste zeigt, was zu tun ist.
+ *
+ * EINE QUELLE fuer drei Stellen (Critique 2026-10-05, R16): den Startwert des
+ * Zustands, den Zaehler am Filterknopf und das Zuruecksetzen im Blatt. Sie
+ * liefen auseinander - der Startwert war „Offen", der Zaehler zaehlte ihn als
+ * Filter („Filter 1" im Ruhezustand), und „Alle Filter aufheben" fuehrte in
+ * einen dritten Zustand mit leerem Status, der auch Erledigtes zeigt.
+ */
+const DEFAULT_STATUS_FILTER = Object.freeze(['open']);
+const defaultFilters = () => ({ status: [...DEFAULT_STATUS_FILTER], priority: [], assigned_to: [], category: [], tags: [] });
 
 let state = {
   tasks:           [],
@@ -1363,7 +1399,7 @@ let state = {
   // wie jeder andere Filter in dieser Leiste auch (#586).
   // Status, Priorität und Person halten mehrere Werte (#671); innerhalb einer
   // Achse wirken sie ODER, zwischen den Achsen UND. Tags bleiben UND-verknüpft.
-  filters:         { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] },
+  filters:         defaultFilters(),
   groupMode:       'category',   // 'category' | 'due'
   viewMode:        'list',       // 'list' | 'kanban' | 'history' (resolved at render time)
   // Der Verlauf (#791) hat einen eigenen Bestand, weil er etwas anderes zeigt
@@ -3256,7 +3292,7 @@ function renderDoerPicker(task, isDone, archived) {
     // Handlung, und eines davon fuehrte in eine 403.
     icon: tablett ? 'check' : 'user-round-check',
     triggerClass: tablett
-      ? 'task-status-btn task-status-btn--open task-status-btn--pick'
+      ? 'task-status-btn task-status-btn--open task-status-btn--pick check-ring'
       : 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
@@ -3600,13 +3636,36 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
  * eigener Chip, jetzt nur noch diese Zahl.
  */
 function activeFilterCount() {
-  return (state.viewMode === 'kanban' ? 0 : state.filters.status.length)
+  return statusDeviationCount()
     + state.filters.priority.length
     + state.filters.assigned_to.length
     + state.filters.category.length
     + state.filters.tags.length
     + (state.showFuture ? 1 : 0)
     + (state.dueToday ? 1 : 0);
+}
+
+/**
+ * Wie viele Filter der Statusachse zaehlen: nur eine ABWEICHUNG vom Standard.
+ *
+ * - Der Standard „Offen" zaehlt nicht - er ist der Ruhezustand, und ein Knopf,
+ *   der im Ruhezustand „Filter 1" in Aktiv-Farbe traegt, sagt nichts mehr.
+ * - Im Brett wirkt die Achse nicht (die Spalten SIND der Status).
+ * - Die Weitung, die „Bis heute faellig" selbst gesetzt hat, ist Teil DIESES
+ *   Filters und zaehlt nicht doppelt.
+ * - Sonst jeder gewaehlte Wert; der leere Status („alle") ist eine Abweichung
+ *   und zaehlt als einer.
+ */
+function statusDeviationCount() {
+  if (state.viewMode === 'kanban') return 0;
+  const status = state.filters.status;
+  const isDefault = status.length === DEFAULT_STATUS_FILTER.length
+    && DEFAULT_STATUS_FILTER.every((value) => status.includes(value));
+  if (isDefault) return 0;
+  const widenedByDueToday = state.dueToday && state.dueTodayWidened
+    && status.length === 2 && status.includes('open') && status.includes('in_progress');
+  if (widenedByDueToday) return 0;
+  return Math.max(1, status.length);
 }
 
 /**
@@ -3708,27 +3767,9 @@ function filterSheetGroups() {
     showRows.push(toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
       attrs: { 'data-filter-mine': 'true' } }));
   }
-  showRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
-    attrs: { 'data-filter-future': 'true' } }));
   showRows.push(toggleRowHtml({ label: t('tasks.filterDueToday'), icon: 'calendar-check', checked: state.dueToday,
     attrs: { 'data-filter-due-today': 'true' } }));
   groups.push({ heading: t('tasks.filterGroupShow'), html: showRows.join('') });
-
-  if (state.viewMode === 'list') {
-    const modes = [['category', 'tasks.categoryLabel', 'folder'], ['due', 'tasks.dueDateLabel', 'calendar-clock']];
-    groups.push({
-      heading: t('tasks.groupToggleLabel'),
-      html: `
-        <div class="segmented tasks-group-mode" id="group-mode-toggle" role="radiogroup" aria-label="${esc(t('tasks.groupToggleLabel'))}">
-          ${modes.map(([mode, key, icon]) => {
-            const on = state.groupMode === mode;
-            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
-                    data-tab-id="${mode}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
-              <i data-lucide="${icon}" aria-hidden="true"></i>${esc(t(key))}</button>`;
-          }).join('')}
-        </div>`,
-    });
-  }
 
   if (state.viewMode !== 'kanban') {
     groups.push({ heading: t('tasks.filterGroupStatus'),
@@ -3740,15 +3781,43 @@ function filterSheetGroups() {
     groups.push({ heading: t('tasks.filterGroupPerson'),
       html: chipsHtml('assigned_to', t('tasks.filterGroupPerson'), state.users.map((u) => ({ value: String(u.id), label: u.display_name }))) });
   }
+  // KATEGORIE UND TAG SIND EINGEKLAPPT, SOLANGE NICHTS GEWAEHLT IST (Critique
+  // 2026-10-05, R16). Das Blatt mass 35 Bedienelemente und 1084px in 591px;
+  // die beiden langen Achsen - je Haushalt ein Dutzend Chips und mehr - sind
+  // die seltenen. Eine gesetzte Wahl steht offen: was wirkt, ist nie hinter
+  // einem Aufklapper versteckt (dieselbe Regel wie im Aufgaben-Dialog).
   if (state.categories.length) {
     groups.push({ heading: t('tasks.categoryLabel'),
+      fold: state.filters.category.length ? 'open' : 'closed',
       html: chipsHtml('category', t('tasks.categoryLabel'), state.categories.map((c) => ({ value: c.key, label: catLabel(c.key) }))) });
   }
   // Tags nur, wenn welche vergeben sind - sonst stuende eine leere Gruppe da (#586).
   if (state.allTags.length) {
     groups.push({ heading: t('tasks.filterGroupTag'),
+      fold: state.filters.tags.length ? 'open' : 'closed',
       html: chipsHtml('tag', t('tasks.filterGroupTag'), state.allTags.map((entry) => ({ value: entry.tag, label: entry.tag }))) });
   }
+
+  // ANSICHT, ABGESETZT AM ENDE (R16). „Gruppieren nach" und „Geplante anzeigen"
+  // standen zwischen den Filtern, engen aber nichts ein: das eine ordnet die
+  // Liste, das andere weitet sie um das, was noch nicht dran ist. Sie stehen
+  // jetzt als eigener Abschnitt hinter allen Achsen.
+  const viewRows = [];
+  if (state.viewMode === 'list') {
+    const modes = [['category', 'tasks.categoryLabel', 'folder'], ['due', 'tasks.dueDateLabel', 'calendar-clock']];
+    viewRows.push(`
+        <div class="segmented tasks-group-mode" id="group-mode-toggle" role="radiogroup" aria-label="${esc(t('tasks.groupToggleLabel'))}">
+          ${modes.map(([mode, key, icon]) => {
+            const on = state.groupMode === mode;
+            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+                    data-tab-id="${mode}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
+              <i data-lucide="${icon}" aria-hidden="true"></i>${esc(t(key))}</button>`;
+          }).join('')}
+        </div>`);
+  }
+  viewRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
+    attrs: { 'data-filter-future': 'true' } }));
+  groups.push({ heading: t('tasks.viewToggleLabel'), variant: 'view', html: viewRows.join('') });
   return groups;
 }
 
@@ -3767,6 +3836,15 @@ function syncFilterSheet(panel) {
       : hasFilter(chip.dataset.filter, chip.dataset.value);
     chip.classList.toggle('filter-chip--active', on);
     chip.setAttribute('aria-pressed', String(on));
+    // WAS WIRKT, STEHT OFFEN - auch wenn es NACH dem Oeffnen des Blatts gesetzt
+    // wurde. Ein gemerktes Set ("Zuletzt benutzt") kann Kategorie oder Tag
+    // setzen, waehrend deren Aufklapper zu ist: der Chip wurde aktiv, blieb
+    // aber verborgen. Nur aufklappen, nie zuklappen und nichts neu bauen - der
+    // Fokus steht vielleicht gerade in der Falte.
+    if (on) {
+      const fold = chip.closest('details.filter-sheet__fold');
+      if (fold && !fold.open) fold.open = true;
+    }
   });
   const mine = panel.querySelector('[data-filter-mine]');
   if (mine) mine.checked = isAssignedToMe();
@@ -3802,6 +3880,9 @@ function renderFilters(container) {
 function openTaskFilters(container) {
   const panel = openFilterSheet({
     groups: filterSheetGroups(),
+    // Nicht „Alle Filter aufheben": der Knopf stellt den Standard her (Status
+    // „Offen"), und so heisst er auch.
+    resetLabel: t('common.filtersResetDefault'),
     onChange: (input) => onFilterSheetChange(input, container),
     onReset: () => { resetTaskFilters(container); },
   });
@@ -3872,12 +3953,14 @@ async function onFilterSheetClick(e, container) {
 }
 
 /**
- * „Alle Filter aufheben": alle Achsen leer, und auch „Geplante anzeigen" aus -
- * sonst bliebe nach dem Aufheben eine Zahl am Knopf stehen, die das Blatt
- * gerade weggenommen haben will.
+ * „Filter zuruecksetzen": zurueck auf den STANDARD (Status „Offen", sonst
+ * nichts), und auch „Geplante anzeigen" aus - sonst bliebe nach dem
+ * Zuruecksetzen eine Zahl am Knopf stehen, die das Blatt gerade weggenommen
+ * haben will. Bis R16 leerte der Knopf auch den Status: ein dritter Zustand,
+ * der Erledigtes mitzeigt und weder Ruhezustand noch gewaehlt war.
  */
 async function resetTaskFilters(container) {
-  state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
+  state.filters = defaultFilters();
   state.showFuture = false;
   state.dueToday = false;
   state.dueTodayWidened = false;
@@ -4346,7 +4429,7 @@ function setViewMode(container, mode) {
   if (listEl) listEl.style.opacity = '0.4';
   const restore = () => {
     const el = container.querySelector('#task-list');
-    if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = ''; }
+    if (el) { el.style.transition = 'opacity var(--transition-fast)'; el.style.opacity = ''; }
   };
   requestAnimationFrame(() => {
     // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -
@@ -4380,7 +4463,7 @@ function wireToolbar(container) {
       openTaskFilters(container);
       return;
     }
-    const item = e.target.closest('.popover-menu__item[data-action]');
+    const item = pageToolsActionEl(e.target);
     if (!item || item.disabled) return;
     // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat.
     // Ein Dialog (Kategorien, Tags) gaebe ihn beim Schliessen dorthin zurueck,
@@ -5696,7 +5779,7 @@ export const __test = {
   sortTasks, taskSortNow,
   // `?due=today` (Re-Critique 2026-09-27): was die Adresse setzt, was die
   // Liste daraus zeigt, und dass das Blatt es wieder nimmt - samt Adresse.
-  dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress,
+  dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress, setDueToday,
   // Das Brett als Markup plus seine Spaltenliste (#1250). Beides steht hier,
   // weil die Spaltenzahl eine Zusicherung GEGEN das Stylesheet ist: das Raster
   // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es

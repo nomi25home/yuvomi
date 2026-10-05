@@ -6,7 +6,7 @@ import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit 
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { todayKey } from '/utils/date.js';
 import { setNavBadge, BIRTHDAY_BADGE_DAYS } from '/utils/nav-badges.js';
@@ -26,7 +26,6 @@ import {
   renderPageTitle,
   renderPageBody,
   renderPageActions,
-  renderPageSection,
   renderListSection,
 } from '/utils/page-layout.js';
 
@@ -601,6 +600,7 @@ function renderPage() {
     header: renderPageHeader({
       wrap: true,
       narrow: true,
+      titleTools: true,
       className: 'birthdays-toolbar',
       title: renderPageTitle(t('birthdays.title')),
       center: renderPageSearch({
@@ -618,10 +618,9 @@ function renderPage() {
     }),
     body: renderPageBody({
       content: [
-        renderPageSection({
-          className: 'birthdays-hint-section',
-          content: `<p class="birthdays-hint">${t('birthdays.calendarHint')}</p>`,
-        }),
+        // Der Dauerhinweis „erscheint auch im Kalender" stand hier als 41px
+        // ueber jeder Liste (R16). Er steht wortgleich im Dialog, an der
+        // Stelle, an der die Entscheidung faellt.
         renderListSection({
           className: 'birthdays-list-section',
           content: `
@@ -656,7 +655,7 @@ function bindEvents() {
   // schliesst das Panel in der Capture-Phase, bevor der Dialog aufgeht).
   installPopoverMenus(_container);
   _container.querySelector('.birthdays-toolbar')?.addEventListener('click', (e) => {
-    const item = e.target.closest('.popover-menu__item[data-action="import-contacts"]');
+    const item = pageToolsActionEl(e.target, 'import-contacts');
     if (item && !readOnly()) openImportModal();
   });
 

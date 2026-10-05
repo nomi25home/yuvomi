@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // `panel instanceof HTMLElement` steht als Typwaechter in onToggle.
 global.HTMLElement = class HTMLElement {};
 
-const { installPopoverMenus, pageToolsMenuHtml } = await import('../public/utils/popover-menu.js');
+const { installPopoverMenus, pageToolsMenuHtml, popoverMenuHtml } = await import('../public/utils/popover-menu.js');
 
 /** Kleinstes Element, das die Selektorwege des Moduls bedient. */
 function el(selector, attrs = {}) {
@@ -260,6 +260,28 @@ test('das Werkzeugmenue eines Modulkopfs: ein „..."-Knopf, Eintraege mit Text,
 });
 
 
+test('eine Gruppe traegt ihre Ueberschrift als Namen, die Ueberschrift ist kein Eintrag (R16)', () => {
+  const html = popoverMenuHtml({
+    id: 'g-menu',
+    label: 'Mehr',
+    items: [
+      { group: 'Abgehakt (3)', items: [
+        { action: 'a', label: 'In den Vorrat', icon: 'archive' },
+        { action: 'b', label: 'Abgehakt löschen (3)', icon: 'trash-2', danger: true },
+      ] },
+      { separator: true },
+      { action: 'c', label: 'Umbenennen', icon: 'pencil' },
+    ],
+  });
+  const group = html.match(/<div class="popover-menu__group" role="group" aria-labelledby="([^"]+)">/);
+  assert.ok(group, 'die Gruppe ist role="group" und verweist auf ihre Ueberschrift');
+  assert.match(html, new RegExp(`<div class="popover-menu__label" id="${group[1]}">Abgehakt \\(3\\)</div>`));
+  // Die Ueberschrift traegt die Eintragsklasse nicht: sie faellt aus Pfeiltasten und Fokus.
+  assert.equal((html.match(/class="popover-menu__item[ "]/g) ?? []).length, 3);
+  assert.ok(html.indexOf('data-action="a"') < html.indexOf('popover-menu__separator'));
+  assert.ok(html.indexOf('popover-menu__separator') < html.indexOf('data-action="c"'));
+});
+
 test('top-start: ein Menue am Fuss einer linken Leiste oeffnet ueber dem Ausloeser, an seiner linken Kante', () => {
   // Konto-Menue der Seitenleiste (Critique 2026-09-26, P1-2). Rechtsbuendig
   // am Ausloeser hinge es halb ueber dem Inhalt neben der Leiste, und nach
@@ -308,6 +330,21 @@ test('R14: das Menue waechst von der Ecke am Ausloeser aus', () => {
   assert.equal(below.style.transform, '', 'geschlossen faellt es in die Startgroesse zurueck');
 });
 
+// R16: der Ausgang (layout.css) beginnt mit dem Schliessen. Die Inline-Werte
+// der offenen Lage muessen deshalb schon im `beforetoggle` fallen - das
+// `toggle` kommt erst einen Task spaeter, und bis dahin stuende das Panel in
+// voller Deckung, waehrend die Uhr des Ausgangs schon laeuft.
+test('R16: beim Schliessen fallen Deckkraft und Groesse schon im beforetoggle', () => {
+  const root = makeRoot();
+  const menu = makeMenu();
+  open(root, menu);
+  assert.equal(menu.style.opacity, '1');
+  assert.equal(menu.style.transform, 'none');
+  root.fire('beforetoggle', { target: menu, newState: 'closed' });
+  assert.equal(menu.style.opacity, '', 'die Deckkraft faellt auf das Stylesheet zurueck (0 ausserhalb von :popover-open)');
+  assert.equal(menu.style.transform, '', 'die Groesse ebenso (scale 0.96)');
+});
+
 test('R14: Wachsen mit Token-Kurve, bei reduzierter Bewegung nur die Blende', async () => {
   const { readFile } = await import('node:fs/promises');
   const { eachRule } = await import('./css-rules.js');
@@ -317,9 +354,66 @@ test('R14: Wachsen mit Token-Kurve, bei reduzierter Bewegung nur die Blende', as
   const body = (pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === '.popover-menu')).map((r) => r.body).join(';');
   const base = body((r) => !r.at.length);
   assert.match(base, /transform:\s*scale\(0?\.96\)/, 'die Startgroesse');
-  assert.match(base, /transition:[^;]*transform var\(--duration-md\) var\(--ease-out\)/, 'Dauer und Kurve aus den Tokens');
-  assert.match(base, /transition:[^;]*opacity var\(--duration-md\) var\(--ease-out\)/);
+  // R16: die Grundregel traegt den AUSGANG (kuerzer), `:popover-open` die Einfahrt.
+  const openBody = rules.filter((r) => !r.at.length && r.selector.trim() === '.popover-menu:popover-open').map((r) => r.body).join(';');
+  assert.match(openBody, /transition:[^;]*transform var\(--duration-md\) var\(--ease-out\)/, 'Einfahrt: Dauer und Kurve aus den Tokens');
+  assert.match(openBody, /transition:[^;]*opacity var\(--duration-md\) var\(--ease-out\)/);
+  const transitions = [...base.matchAll(/(?:^|;)\s*transition\s*:\s*([^;]+)/g)].map((m) => m[1]);
+  assert.equal(transitions.length, 2, 'zwei Deklarationen: Rueckfall ohne allow-discrete, dann die mit');
+  assert.doesNotMatch(transitions[0], /allow-discrete/, 'die erste bleibt gueltig, wo allow-discrete fehlt');
+  assert.match(transitions[1], /overlay var\(--duration-xs\) allow-discrete/, 'das Panel bleibt fuer den Ausgang im Top-Layer');
+  assert.match(transitions[1], /display var\(--duration-xs\) allow-discrete/, 'und sichtbar, bis er durch ist');
+  assert.match(transitions[1], /opacity var\(--duration-xs\) var\(--ease-out\)/, 'der Ausgang ist kuerzer als die Einfahrt und ohne Feder');
+  const closed = rules.filter((r) => !r.at.length && r.selector.trim() === '.popover-menu:not(:popover-open)').map((r) => r.body).join(';');
+  assert.match(closed, /opacity:\s*0/, 'Ziel des Ausgangs');
+  assert.match(closed, /pointer-events:\s*none/, 'das ausblendende Menue nimmt keinen Zeiger');
   const still = body(reduce);
   assert.match(still, /transform:\s*none/, 'reduzierte Bewegung: kein Wachsen');
   assert.match(still, /transition:\s*opacity/, 'aber die Blende bleibt');
+});
+
+/* R16-Gesamtpruefung (2026-10-05): seit `pageToolsMenuHtml` EINEN Eintrag als
+ * direkten Knopf baut, gibt es zwei Bauarten desselben Werkzeugs - den
+ * Menue-Eintrag (`.popover-menu__item`) und den Knopf im Kopf
+ * (`.page-tools-btn--direct`). Notizen und Geburtstage hoerten nur auf den
+ * Eintrag: "Kategorien verwalten" und "Aus Kontakten importieren" standen als
+ * Knopf im Kopf und taten nichts. Gefunden von Sonde 24 der Dokument-Guards,
+ * die den Eintrag nicht mehr fand. Gegen den Stand davor rot gelaufen (Helfer
+ * fehlte, fuenf Seiten fragten den Eintrag direkt). */
+test('R16: ein Werkzeug des Kopfs antwortet als Menue-Eintrag UND als direkter Knopf', async () => {
+  const { pageToolsActionEl } = await import('../public/utils/popover-menu.js');
+  assert.equal(typeof pageToolsActionEl, 'function');
+  const asked = [];
+  const hit = { dataset: { action: 'manage-categories' } };
+  const target = { closest: (selector) => { asked.push(selector); return hit; } };
+  assert.equal(pageToolsActionEl(target, 'manage-categories'), hit);
+  assert.equal(asked[0],
+    '.popover-menu__item[data-action="manage-categories"], .page-tools-btn--direct[data-action="manage-categories"]');
+  pageToolsActionEl(target);
+  assert.equal(asked[1], '.popover-menu__item[data-action], .page-tools-btn--direct[data-action]',
+    'ohne Namen: jedes Werkzeug, in beiden Bauarten');
+  assert.equal(pageToolsActionEl({ closest: () => null }, 'x'), null);
+  assert.equal(pageToolsActionEl({}, 'x'), null, 'ein Ziel ohne closest (Textknoten) ist kein Werkzeug');
+
+  // Die Regel statt der fuenf Fundstellen: wer ein Werkzeugmenue baut, fragt den
+  // Klick ueber den Helfer. Ein `closest('.popover-menu__item[data-action...')`
+  // mit vollem Namen oder ganz ohne trifft den direkten Knopf nie; ein
+  // Praefix-Selektor (`^=`) gehoert einem Zeilenmenue und bleibt erlaubt.
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../public/pages/', import.meta.url);
+  const offenders = [];
+  let carriers = 0;
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.js'))) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    if (!/pageToolsMenuHtml\(/.test(src)) continue;
+    carriers += 1;
+    for (const match of src.matchAll(/closest\(\s*['"`]\.popover-menu__item\[data-action(?:="[^"]*")?\]['"`]\s*\)/g)) {
+      offenders.push(`${file}: ${match[0]}`);
+    }
+  }
+  assert.ok(carriers >= 8, `nur ${carriers} Seiten mit Werkzeugmenue gelesen - der Scan hat nichts gesehen`);
+  assert.deepEqual(offenders, [],
+    'Diese Klick-Handler treffen nur den Menue-Eintrag. Baut das Menue einen einzigen Eintrag '
+    + '(von Haus aus oder weil Rechte es kuerzen), steht dort ein Knopf, der nichts tut - '
+    + '`pageToolsActionEl(e.target, name)` aus utils/popover-menu.js nehmen.');
 });

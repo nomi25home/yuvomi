@@ -1848,12 +1848,35 @@ describe('Sonde 5 - eine Wischzeile antwortet, und jede Rolle liegt an ihrer Kan
         if (!hasRows) return;
         listsSeen += 1;
 
+        // WELCHE KANTEN DIE ZEILE TRAEGT, STEHT IM DOKUMENT (R16). Bis dahin
+        // setzte die Sonde voraus, dass jede Wischzeile BEIDE Kanten belegt, und
+        // meldete die Vorratszeile - nur Loeschen am Zeilenende, am Anfang gibt
+        // es dort nichts Positives zu erledigen - als "nicht verdrahtet". Das
+        // war die falsche Diagnose fuer eine richtig verdrahtete Zeile. Gemessen
+        // wird jetzt je Kante, was die Zeile dort zusagt: ein Panel antwortet,
+        // eine Kante ohne Panel deckt nichts auf. Eine Zeile ganz ohne Panel
+        // bleibt ein Befund - sonst waere "keine Geste" wieder gruen.
+        const sides = await page.evaluate(() => {
+          const row = document.querySelector('.swipe-row');
+          return ['leading', 'trailing'].filter((side) => row?.querySelector(`.swipe-reveal--${side}`));
+        });
+        if (!sides.length) {
+          findings.push(`${name}: die erste Wischzeile traegt an keiner Kante ein Panel.`);
+          return;
+        }
+
         // In RTL deckt derselbe Finger die andere Kante auf - die Erwartung
         // spiegelt mit, die Kante bleibt dieselbe.
         for (const [sign, side] of [[1, rtl ? 'trailing' : 'leading'], [-1, rtl ? 'leading' : 'trailing']]) {
           const classes = await uncoveredPanel(page, sign);
           const move = sign > 0 ? 'nach rechts' : 'nach links';
 
+          if (!sides.includes(side)) {
+            if (classes?.length) {
+              findings.push(`${name}: der Wisch ${move} deckt ${classes.join('.')} auf, obwohl die Zeile an der ${side}-Kante kein Panel traegt.`);
+            }
+            continue;
+          }
           if (!classes?.length) {
             findings.push(`${name}: der Wisch ${move} deckt nichts auf - die Zeilen sind nicht verdrahtet.`);
             continue;
@@ -1976,6 +1999,34 @@ async function metricRowHeights(page) {
   });
 }
 
+/**
+ * Klappt jede eingeklappte Kennzahlreihe der Ansicht auf und meldet, wie viele.
+ *
+ * SEIT R16 STEHEN DIE KENNZAHLEN MOBIL HINTER EINER KURZZEILE (metric-glance.js):
+ * ein Knopf mit `aria-expanded="false"` und `aria-controls` auf die Reihe, die
+ * solange `display: none` traegt. Die Sonde sah von dort an mobil vier Reihen
+ * statt sieben und haette die uebrigen nie wieder gemessen - eine Reihe, die
+ * erst nach einem Tipp im Bild steht, ist trotzdem eine Reihe. Gelesen wird die
+ * BEZIEHUNG im Dokument (ein Aufklapper, dessen Bereich Kennzahlkarten traegt),
+ * kein Klassenname: ein neuer Traeger der Kurzzeile ist damit schon gemessen.
+ */
+async function openMetricDisclosures(page) {
+  const opened = await page.evaluate(() => {
+    let n = 0;
+    for (const btn of document.querySelectorAll('[aria-expanded="false"][aria-controls]')) {
+      if (!btn.getClientRects().length) continue;
+      const region = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!region || !region.querySelector('.metric-card')) continue;
+      btn.click();
+      n += 1;
+    }
+    return n;
+  });
+  // Das Aufklappen laeuft als Hoehen-Uebergang; gemessen wird der Endzustand.
+  if (opened) await new Promise((resolve) => { setTimeout(resolve, 700); });
+  return opened;
+}
+
 describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
   for (const device of ['mobile', 'desktop']) {
     test(`Geraet ${device}`, async () => {
@@ -1998,7 +2049,10 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       // Ohne sie saehe die Sonde von sieben Kennzahlreihen genau eine.
       for (const name of sweep('Sonde 6')) {
         await gotoRoute(page, ALL_ROUTES[name]);
-        await visitViews(page, name, async (where) => check(where, await metricRowHeights(page)));
+        await visitViews(page, name, async (where) => {
+          await openMetricDisclosures(page);
+          check(where, await metricRowHeights(page));
+        });
       }
       await page.close();
 
@@ -5377,9 +5431,17 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
     }, { firstName: renamedCategory, secondName: conflictingCategory });
     await gotoRoute(page, '/notes');
 
-    // Seit der Kopfregel mobil (2026-09-26) ein Eintrag im Werkzeugmenue.
-    await page.click('.notes-toolbar .page-tools-btn');
-    await page.click('#notes-tools-menu [data-action="manage-categories"]');
+    // Seit der Kopfregel mobil (2026-09-26) ein Werkzeug des Kopfs - und seit
+    // R16 ein direkter Knopf, solange es das einzige ist (`pageToolsMenuHtml`:
+    // ein Eintrag ist ein Knopf, kein Menue). Die Sonde nimmt die Bauart, die
+    // im Dokument steht; kommt ein zweiter Eintrag dazu, geht sie durchs Menue.
+    const directTool = await page.$('.notes-toolbar .page-tools-btn--direct[data-action="manage-categories"]');
+    if (directTool) {
+      await directTool.click();
+    } else {
+      await page.click('.notes-toolbar .page-tools-btn');
+      await page.click('#notes-tools-menu [data-action="manage-categories"]');
+    }
     await page.waitForSelector(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"]`);
     await page.click(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"] .cat-row__name`);
     await page.waitForSelector('#prompt-modal-input');

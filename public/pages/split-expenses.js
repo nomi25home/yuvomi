@@ -52,7 +52,7 @@ let _container = null;
 // Eingebettet (siehe render) sinkt die ganze Gliederung um eine Stufe: der Tab-Titel
 // ist <h2>, also Gruppenname <h3> und Karten <h4> - Budget > Split-Ausgaben > Gruppe
 // > Abschnitt (Nachtrag aus dem Review von #1148). Die Optik haengt an Klassen
-// (.split-group-name, .split-card-title), nicht am Tag.
+// (.split-group-name, .u-section-title), nicht am Tag.
 let _embedded = false;
 
 /* UEBERGABE AUS DEM BUDGET (#1057).
@@ -76,6 +76,12 @@ let _statusTablist = null;   // wireTablist-Handle des Statusfilters (sync ohne 
 // Eingebettet meldet die Seite dem Budget-Kopf, wenn sich aendert, ob eine neue
 // Ausgabe gerade moeglich ist (Archiv an/aus) - der Kopfknopf gehoert budget.js.
 let _onAddableChange = null;
+
+// Die Gruppenwahl ist schmal EINE Zeile (R16): die aktive Gruppe als Kopf,
+// die Liste samt Suche, „+" und Aktiv/Archiviert klappt darunter auf. Der
+// Merker gilt nur fuer die schmale Bauart (split-expenses.css); breit steht
+// die Liste immer.
+let _groupPickerOpen = false;
 
 /**
  * Darf dieser Nutzer hier schreiben? (#467, #1265 P7)
@@ -169,6 +175,14 @@ export async function render(container, { user, embedded = false, onAddableChang
       <section class="metric-grid budget-glance-details" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
+          <!-- SCHMAL IST DIE GRUPPENWAHL EINE ZEILE (R16, Critique 2026-10-05):
+               Kopf der Liste, Segment und alle Gruppen standen mobil als 284px
+               Verwaltung vor der ersten Ausgabe (y=975). Der Knopf nennt die
+               aktive Gruppe und klappt die Liste auf; breit ist er
+               ausgeblendet und die Liste steht immer (split-expenses.css). -->
+          <button type="button" class="split-group-switch" id="split-group-switch"
+                  aria-expanded="false" aria-controls="split-groups-body"></button>
+          <div class="split-groups-body" id="split-groups-body">
           <!-- Das geteilte Suchfeld (gefuellte Kapsel) statt eines eigenen mit
                sichtbarem Label darueber, das nur den Platzhalter wiederholte
                (Komponenten-Kanon, Critique 2026-09-26 P1). Es steht IM Kopf
@@ -176,7 +190,7 @@ export async function render(container, { user, embedded = false, onAddableChang
                R14 P1): mobil in seiner Icon-Form statt einer eigenen 48px-Zeile
                vor der ersten Gruppe. -->
           <div class="split-panel-head section-toolbar">
-            <div class="split-panel-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></div>
+            <${embedded ? 'h3' : 'h2'} class="split-panel-title u-section-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></${embedded ? 'h3' : 'h2'}>
             ${renderPageSearch({
     id: 'split-group-search',
     label: t('splitExpenses.searchGroups'),
@@ -202,6 +216,7 @@ export async function render(container, { user, embedded = false, onAddableChang
             }).join('')}
           </div>
           <div class="split-groups" id="split-groups"></div>
+          </div>
         </aside>
         <main class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</main>
       </div>${fab}
@@ -420,10 +435,16 @@ function bindShell() {
   // Gleitende Auswahl-Kapsel wie jede Segmentleiste (Kanon, Runde 7 D8).
   const statusBar = _container.querySelector('#split-status-filter');
   if (statusBar) attachSegmentIndicator(statusBar);
+  _container.querySelector('#split-group-switch')?.addEventListener('click', () => {
+    _groupPickerOpen = !_groupPickerOpen;
+    syncGroupSwitch();
+  });
   _container.querySelector('#split-groups')?.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-group-id]');
     if (!btn) return;
     state.activeGroupId = Number(btn.dataset.groupId);
+    // Gewaehlt ist gewaehlt: die Zeile klappt wieder zu, die Ausgaben stehen.
+    _groupPickerOpen = false;
     await loadGroupData();
     renderAll();
   });
@@ -501,12 +522,16 @@ function renderSummary() {
     }));
     wireMetricGlance(glance, 'split-glance-more');
   }
+  // DER TON GILT DEM BETRAG, NICHT DER KARTE (Critique 2026-10-05, R16): „Du
+  // bekommst 0,00 €" stand in Erfolgsgruen, „Du schuldest 0,00 €" in Rot. Null
+  // ist weder Gewinn noch Schuld - die Kurzzeile darueber hielt das schon so
+  // (`tone` nur mit Betrag), die Karten jetzt auch.
   setHtml(summary, `
-    <div class="metric-card metric-card--positive">
+    <div class="metric-card${owed.length ? ' metric-card--positive' : ''}">
       <div class="metric-card__label">${t('splitExpenses.youAreOwed')}</div>
       <div class="metric-card__value">${owedText}</div>
     </div>
-    <div class="metric-card metric-card--negative">
+    <div class="metric-card${owing.length ? ' metric-card--negative' : ''}">
       <div class="metric-card__label">${t('splitExpenses.youOwe')}</div>
       <div class="metric-card__value">${owingText}</div>
     </div>
@@ -517,7 +542,35 @@ function renderSummary() {
   `);
 }
 
+/**
+ * Die eine Zeile der Gruppenwahl (schmal): aktive Gruppe mit Typ und
+ * Mitgliederzahl, dahinter der Aufklapp-Pfeil. Ohne aktive Gruppe (leere
+ * Liste, leeres Archiv, Suche ohne Treffer) steht die Liste offen - sonst
+ * laegen Leerzustand, Suche und „+" hinter einem Knopf ohne Namen.
+ */
+function syncGroupSwitch() {
+  const panel = _container.querySelector('.split-groups-panel');
+  const btn = _container.querySelector('#split-group-switch');
+  // `classList` mitgeprueft, wie beim Aufklapper der Kennzahlen: ein Aufrufer
+  // ohne gebaute Seite (Storno aus dem Verlauf im Test) hat hier nichts zu tun.
+  if (!panel?.classList || !btn) return;
+  const group = state.groups.find((g) => g.id === state.activeGroupId);
+  const open = _groupPickerOpen || !group;
+  panel.classList.toggle('split-groups-panel--open', open);
+  btn.setAttribute('aria-expanded', String(open));
+  setHtml(btn, `
+    <span class="split-group__avatar"><i data-lucide="${group ? groupIcon(group.type) : 'users-round'}" aria-hidden="true"></i></span>
+    <span class="split-group__body">
+      <span class="sr-only">${t('splitExpenses.groups')}: </span>
+      <span class="split-group__name">${group ? esc(group.name) : t('splitExpenses.groups')}</span>
+      ${group ? `<span class="split-group__meta">${t(`splitExpenses.groupType.${group.type}`)} · ${group.member_count} ${t('splitExpenses.members')}${isArchivedView() ? ` · ${t('splitExpenses.statusArchived')}` : ''}</span>` : ''}
+    </span>
+    <i data-lucide="chevron-down" class="icon-md split-group-switch__chevron" aria-hidden="true"></i>`);
+  if (window.lucide) lucide.createIcons({ el: btn });
+}
+
 function renderGroups() {
+  syncGroupSwitch();
   const el = _container.querySelector('#split-groups');
   if (!state.groups.length) {
     setHtml(el, isArchivedView()
@@ -607,11 +660,11 @@ function renderMain() {
   const SectionTag = _embedded ? 'h4' : 'h3';
   setHtml(main, `
     <section class="split-group-header">
-      <div>
+      <div class="split-group-header__text">
         <${GroupTag} class="split-group-name">${esc(group.name)}</${GroupTag}>
         <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
         ${archived ? `<p class="split-archived-badge"><i data-lucide="archive" class="icon-md" aria-hidden="true"></i>${t('splitExpenses.statusArchived')}</p>` : ''}
-        <p>${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
+        <p class="split-group-desc">${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
         ${ro ? groupMetaHtml(group) : ''}
       </div>
       ${/* Bei `budget: read` faellt die ganze Leiste: Bearbeiten, Archivieren,
@@ -630,23 +683,31 @@ function renderMain() {
         ${groupToolsMenuHtml()}`}
       </div>`}
     </section>
+    ${/* ABSCHNITTSTITEL AUF DER BUEHNE, ZEILEN IM TRAEGER (R16 Schritt 2b,
+        * Reiter-Skelett des Budgets). Hier standen drei Karten mit dem Titel
+        * als 17px-Kartentitel IN der Flaeche und den Zeilen in deren Polster -
+        * die vierte Titel- und fuenfte Listenform des Moduls. Jetzt wie
+        * "Transaktionen" in der Uebersicht: `.u-section-title` ueber einem
+        * `.row-carrier`. Die Stufe (h4 eingebettet) bleibt die der Gliederung
+        * Budget > Aufteilung > Gruppe > Abschnitt; die Rolle kommt von der
+        * Klasse. Ein leerer Abschnitt traegt keine Flaeche. */ ''}
     <div class="split-content-grid">
-      <section class="split-card split-card--balances">
-        <div class="split-card-head">
-          <${SectionTag} class="split-card-title">${t('splitExpenses.balances')}</${SectionTag}>
+      <section class="split-section split-section--balances">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.balances')}</${SectionTag}>
           <span>${t('splitExpenses.simplified')}</span>
         </div>
         <div id="split-balances">${renderBalances()}</div>
       </section>
-      <section class="split-card">
-        <div class="split-card-head">
-          <${SectionTag} class="split-card-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
+      <section class="split-section">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
         </div>
         <div id="split-expense-list">${renderExpenses(archived || ro)}</div>
       </section>
-      <section class="split-card">
-        <div class="split-card-head">
-          <${SectionTag} class="split-card-title">${t('splitExpenses.activity')}</${SectionTag}>
+      <section class="split-section">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.activity')}</${SectionTag}>
         </div>
         <div class="split-activity">${renderActivity()}</div>
       </section>
@@ -725,12 +786,12 @@ function groupMetaHtml(group) {
 function renderBalances() {
   const debts = state.balances.simplified_debts || [];
   if (!debts.length) return `<div class="split-muted">${t('splitExpenses.noBalances')}</div>`;
-  return debts.map((debt) => `
+  return `<div class="row-carrier">${debts.map((debt) => `
     <div class="split-debt">
       <span>${esc(debt.from_name)} ${t('splitExpenses.owes')} ${esc(debt.to_name)}</span>
       <strong>${money(debt.amount, debt.currency)}</strong>
     </div>
-  `).join('');
+  `).join('')}</div>`;
 }
 
 // Regel 6 aus utils/module-access.js: der Parameter hiess `readOnly` und meinte
@@ -738,7 +799,7 @@ function renderBalances() {
 // Aufrufer odert Archiv und Modulrecht hinein (renderMain).
 function renderExpenses(asList = false) {
   if (!state.expenses.length) return `<div class="split-muted">${t('splitExpenses.noExpenses')}</div>`;
-  return state.expenses.map((expense) => {
+  return `<div class="row-carrier">${state.expenses.map((expense) => {
     // Beleg-Marke (#583): dass ein Nachweis vorliegt, ist die Information -
     // wie viele es sind, beantwortet keine Frage vor dem Öffnen.
     const receiptCount = expense.attachments?.length ?? 0;
@@ -768,7 +829,7 @@ function renderExpenses(asList = false) {
         ${body}
       </button>
     `;
-  }).join('');
+  }).join('')}</div>`;
 }
 
 /** Die Werte, die Zeile, Knopf und Rueckfrage einer Zahlung nennen (#1309). */
@@ -801,7 +862,7 @@ function renderActivity() {
   const more = state.activityCursor
     ? `<button type="button" class="btn btn--secondary split-activity-more" data-activity-more${busy ? ' aria-disabled="true" aria-busy="true"' : ''}>${esc(t('splitExpenses.loadMoreActivity'))}</button>`
     : '';
-  return `<div class="split-activity-list" tabindex="-1">${items}</div>${more}`;
+  return `<div class="split-activity-list row-carrier" tabindex="-1">${items}</div>${more}`;
 }
 
 /**

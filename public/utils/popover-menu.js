@@ -40,7 +40,7 @@ import { esc } from '/utils/html.js';
  * @param {string}   opts.id             Eindeutige Panel-ID (popovertarget).
  * @param {string}   opts.label          Zugänglicher Name des Triggers.
  * @param {Array<{action: string, label: string, icon: string, id?: string|number, danger?: boolean,
- *   checked?: boolean, disabled?: boolean} | {separator: true}>} opts.items
+ *   checked?: boolean, disabled?: boolean} | {separator: true} | {group: string, items: Array}>} opts.items
  *        `checked` macht aus dem Eintrag einen Schalter (`menuitemcheckbox`,
  *        Haken am Ende) - fuer Ansichts-Schalter wie „Verlauf zeigen", die im
  *        Werkzeugmenue stehen statt als loses Icon im Kopf. `{ separator: true }`
@@ -54,8 +54,20 @@ import { esc } from '/utils/html.js';
  * @returns {string}
  */
 export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--ghost btn--icon', icon = 'ellipsis' }) {
-  const entries = items.map((item) => {
+  const entry = (item, index) => {
     if (item.separator) return '\n    <div class="popover-menu__separator" role="separator"></div>';
+    // EINE GRUPPE MIT NAMEN (Critique 2026-10-05, R16): `{ group, items }`.
+    // Die Ueberschrift ist kein Eintrag - sie traegt die Eintragsklasse nicht
+    // und faellt damit aus Pfeiltasten und Fokus -, die Gruppe verweist per
+    // `aria-labelledby` auf sie (dasselbe Vokabular wie das Sortier-Menue der
+    // Dokumente, layout.css `.popover-menu__group`).
+    if (item.group) {
+      const labelId = `${id}-group-${index}`;
+      return `
+    <div class="popover-menu__group" role="group" aria-labelledby="${esc(labelId)}">
+      <div class="popover-menu__label" id="${esc(labelId)}">${esc(item.group)}</div>${(item.items ?? []).map(entry).join('')}
+    </div>`;
+    }
     const checkable = typeof item.checked === 'boolean';
     const role = checkable ? 'menuitemcheckbox' : 'menuitem';
     const checkedAttr = checkable ? ` aria-checked="${item.checked}"` : '';
@@ -69,7 +81,8 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
       <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
       <span>${esc(item.label)}</span>${trail}
     </button>`;
-  }).join('');
+  };
+  const entries = items.map(entry).join('');
 
   return `
     <button type="button" class="${triggerClass} popover-menu__trigger"
@@ -104,6 +117,23 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
  * @returns {string}
  */
 export function pageToolsMenuHtml({ id, label, items = [] }) {
+  // EIN EINTRAG IST EIN KNOPF, KEIN MENUE (Critique 2026-10-05, R16; DESIGN.md
+  // Kopfregel). Der Vorrat fuehrte "..." mit genau einem Eintrag ("Lagerorte
+  // verwalten"): zwei Tipps und ein Auslassungszeichen fuer eine Handlung.
+  // Ein Menue beginnt bei zwei Eintraegen; darunter steht die Handlung selbst
+  // im Kopf - mit ihrem Icon, ihrem Namen als aria-label/title und demselben
+  // `data-action`, auf das der delegierte Handler der Seite schon hoert. Ein
+  // Schalter (`checked`) bleibt im Menue: sein Zustand braucht den Haken.
+  const real = items.flatMap((item) => (item?.group ? item.items ?? [] : [item])).filter((item) => item && !item.separator);
+  if (real.length === 1 && typeof real[0].checked !== 'boolean') {
+    const [item] = real;
+    return `
+    <button type="button" class="btn btn--secondary btn--icon page-tools-btn page-tools-btn--direct"
+            data-action="${esc(item.action)}"${item.id == null ? '' : ` data-id="${esc(String(item.id))}"`}${item.disabled ? ' disabled' : ''}
+            aria-label="${esc(item.label)}" title="${esc(item.label)}">
+      <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
+    </button>`;
+  }
   return popoverMenuHtml({
     id,
     label,
@@ -111,6 +141,27 @@ export function pageToolsMenuHtml({ id, label, items = [] }) {
     triggerClass: 'btn btn--secondary btn--icon page-tools-btn',
     icon: 'ellipsis',
   });
+}
+
+/**
+ * Das Werkzeug des Kopfs, auf das geklickt wurde - in BEIDEN Bauarten.
+ *
+ * `pageToolsMenuHtml` baut einen einzelnen Eintrag als direkten Knopf
+ * (`.page-tools-btn--direct`) und erst ab zweien ein Menue
+ * (`.popover-menu__item`). Ein Handler, der nur den Eintrag fragt, laesst den
+ * Knopf stumm: so standen "Kategorien verwalten" (Notizen) und "Aus Kontakten
+ * importieren" (Geburtstage) im Kopf und taten nichts. Wie viele Eintraege ein
+ * Menue hat, weiss der Handler nicht - Rechte koennen es kuerzen -, also fragt
+ * er immer beide.
+ *
+ * @param {EventTarget|null} target  `event.target` des delegierten Klicks.
+ * @param {string} [action]          `data-action`; ohne ihn jedes Werkzeug.
+ * @returns {HTMLElement|null}
+ */
+export function pageToolsActionEl(target, action) {
+  if (typeof target?.closest !== 'function') return null;
+  const attr = action ? `[data-action="${action}"]` : '[data-action]';
+  return target.closest(`.popover-menu__item${attr}, .page-tools-btn--direct${attr}`) ?? null;
 }
 
 /**
@@ -132,7 +183,14 @@ export function syncPopoverMenuItem(root, action, checked) {
 function onBeforeToggle(event) {
   const panel = event.target;
   if (!(panel instanceof HTMLElement) || !panel.matches('.popover-menu')) return;
-  if (event.newState === 'open') panel.style.opacity = '0';
+  if (event.newState === 'open') { panel.style.opacity = '0'; return; }
+  // SCHLIESSEN: die Inline-Werte gehen JETZT, nicht erst im `toggle` danach.
+  // Der Ausgang (layout.css: `overlay`/`display` diskret, Blende, Schrumpfen)
+  // beginnt mit dem Schliessen; blieben Deckkraft und Groesse bis zum spaeter
+  // zugestellten `toggle` inline stehen, liefe die Uhr des Ausgangs schon,
+  // waehrend das Panel noch in voller Deckung stuende.
+  panel.style.opacity = '';
+  panel.style.transform = '';
 }
 
 function onToggle(event) {

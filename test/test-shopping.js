@@ -40,6 +40,17 @@ test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () =>
   assert(/button, a, input, select, textarea, \[data-no-row-toggle\]/.test(source), 'Interaktive Controls müssen ignoriert werden');
   assert(/closest\('\.shopping-item'\)/.test(source), 'Klicks müssen auf Einkaufszeilen begrenzt sein');
   assert(/data-item-id/.test(source), 'Zeilen-Toggle muss die Artikel-ID aus data-item-id lesen');
+  // R16 Schritt 2b: ein Zwischenstand hatte den Zeilen-Tipp auf "oeffnen"
+  // umgestellt und den Stift entfernt - das nahm die einhaendige Abhak-Geste
+  // im Laden (Ziel 358px statt 48px). Zurueckgenommen; DESIGN.md "Was eine
+  // Zeile tut" fuehrt die Abhak-Liste des Einkaufs als die eine Ausnahme.
+  const rowSrc = source.match(/function renderItem\(item\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert(/class="row-action" data-action="item-details"[\s\S]{0,200}data-lucide="pencil"/.test(rowSrc),
+    'der Stift bleibt der Bearbeiten-Weg der Einkaufszeile');
+  assert(!/list-row__main--interactive/.test(rowSrc),
+    'der Zeilenkoerper ist kein Oeffnen-Knopf: der Tipp auf die Zeile hakt ab');
+  assert(/await toggleShoppingItem\(Number\(row\.dataset\.itemId\)/.test(source),
+    'der Zeilenklick ohne benanntes Ziel hakt ab');
 });
 
 test('Shopping-Löschaktionen importieren den gemeinsamen Undo-Helper', () => {

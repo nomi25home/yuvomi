@@ -9,11 +9,13 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
-import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, growBars } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { swapContent } from '/utils/content-swap.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
@@ -642,15 +644,13 @@ async function loadBudgetMeta() {
  * statt Quelltext zu lesen.
  */
 function monthNavHtml() {
-  return `
-          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="budget-nav__label" id="budget-label" aria-live="polite"></span>
-          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return `${periodStepperHtml({
+    prev: { id: 'budget-prev', label: t('budget.prevMonth') },
+    value: { id: 'budget-label', className: 'budget-nav__label', live: true },
+    next: { id: 'budget-next', label: t('budget.nextMonth') },
+    reset: { id: 'budget-today', className: 'budget-nav__today', label: t('budget.currentMonth') },
+  })}
           <span class="budget-nav__note" id="budget-period-note" hidden></span>
   `;
 }
@@ -702,15 +702,8 @@ function syncCurrentButton(root = _container) {
   const isCurrent = !caps.month || (state.activeTab === 'reports'
     ? reportShowsToday()
     : state.month === currentMonth());
-  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
-  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
-  // schon beim Werteauswerten.
-  const active = typeof document !== 'undefined' ? document.activeElement : null;
-  if (isCurrent && active === btn) {
-    (root.querySelector('#budget-prev') || root.querySelector('#budget-next'))?.focus();
-  }
-  btn.classList.toggle('is-current', isCurrent);
-  btn.inert = isCurrent;
+  // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+  syncPeriodReset(root, { reset: '#budget-today', isCurrent, prev: '#budget-prev', next: '#budget-next' });
 }
 
 export async function render(container, { user }) {
@@ -757,7 +750,7 @@ export async function render(container, { user }) {
 
   setHtml(container, `
     <div class="budget-page app-page app-page--reading page-measure--narrow" data-composition="reading">
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--period budget-nav">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--period page-toolbar--period-inline budget-nav">
         <h1 class="page-toolbar__title">${t('budget.title')}</h1>
         <!-- Der Kopf-Slot bleibt auf jedem Tab besetzt: entweder Stepper oder
              ein ruhiger Kontexttext. Eine Lücke machte jeden Tabwechsel zur
@@ -841,15 +834,17 @@ function wireNav() {
   // EIN Stepper für alle Tabs mit Zeitbezug. Welche Achse er bewegt, sagt der
   // Tab: Budget und Plan rechnen in Monaten, die Berichte in ihrer gewählten
   // Auflösung. Vorher trugen die Berichte einen zweiten Stepper im Panel.
+  // Der neue Zeitraum kommt von der Seite, zu der man blaettert (swapPeriod,
+  // utils/period-stepper.js) - vorher ein harter Schnitt.
+  const bodyEl = () => _container.querySelector('#budget-body');
   const stepPeriod = async (dir) => {
     if (state.activeTab === 'reports') {
       state.reportAnchor = stepAnchor(state.reportAnchor, state.range, dir);
-      renderBody();
+      swapPeriod(bodyEl(), dir, renderBody);
       return;
     }
     await loadMonth(addMonths(state.month, dir));
-    renderBody();
-    updateLabel();
+    swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
   };
   _container.querySelector('#budget-prev').addEventListener('click', () => stepPeriod(-1));
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
@@ -859,15 +854,17 @@ function wireNav() {
       // ein Klick, waehrend der Anker schon im heutigen Bereich liegt, waere
       // sonst ein sichtbares No-Op, obwohl der Knopf `inert` sein sollte.
       if (reportShowsToday()) return;
+      const back = todayKey() < state.reportAnchor ? -1 : 1;
       state.reportAnchor = todayKey();
-      renderBody();
+      swapPeriod(bodyEl(), back, renderBody);
       return;
     }
     const m = currentMonth();
     if (m === state.month) return;
+    // 'YYYY-MM' vergleicht sich als Text: zurueck zum laufenden Monat oder vor.
+    const back = m < state.month ? -1 : 1;
     await loadMonth(m);
-    renderBody();
-    updateLabel();
+    swapPeriod(bodyEl(), back, () => { renderBody(); updateLabel(); });
   });
   // Ansichts-Scope (Mein Budget / Haushalt) — nur im personal-Modus vorhanden.
   // Dieselbe Verhaltensschicht wie die Haupt-Tabs: Roving-Tabindex ohne
@@ -911,7 +908,7 @@ function wireNav() {
   // Tab (sub-tab--active/aria/tabindex); renderBody übernimmt nur noch den Inhalt.
   _tablist = wireTablist(_container.querySelector('.budget-tabs'), {
     activeId: state.activeTab,
-    onChange: async (id) => {
+    onChange: async (id, { direction = 0 } = {}) => {
       const prev = state.activeTab;
       state.activeTab = id;
       writeTabToUrl(id);
@@ -922,8 +919,9 @@ function wireNav() {
       if (id === 'reports' && prev !== 'reports') {
         state.reportAnchor = anchorForMonth(state.month);
       }
-      renderBody();
-      markTabEntering();
+      // Nur der Reiterwechsel blendet (in Schrittrichtung der Leiste) - ein
+      // Neuaufbau desselben Reiters (Filter, Speichern) nicht.
+      swapContent(_container.querySelector('#budget-body'), renderBody, { direction });
       if (prev === 'reports' && id !== 'reports') {
         const ym = state.reportAnchor.slice(0, 7);
         if (ym !== state.month) {
@@ -948,7 +946,15 @@ function refocusSegmented(barSelector) {
 
 function updateLabel() {
   const lbl = _container.querySelector('#budget-label');
-  if (lbl) lbl.textContent = state.activeTab === 'reports' ? reportPeriodLabel() : formatMonthLabel(state.month);
+  if (!lbl) return;
+  const reports = state.activeTab === 'reports';
+  lbl.textContent = reports ? reportPeriodLabel() : formatMonthLabel(state.month);
+  // Die Kurzform fuer die Titelzeile mobil (layout.css, `--period-inline`):
+  // neben dem Large Title bleiben dem Label rund 96px, „September 2026"
+  // braucht 128. Nur der Monat hat eine; Jahr und Woche stehen wie sie sind.
+  const ym = reports ? (state.range === 'month' ? state.reportAnchor.slice(0, 7) : null) : state.month;
+  const [y, m] = ym ? ym.split('-') : [];
+  lbl.setAttribute('data-short', ym ? formatMonthYear(y, m, { month: 'short' }) : lbl.textContent);
 }
 
 // --------------------------------------------------------
@@ -981,18 +987,6 @@ function watchAsideFit(panel) {
 // --------------------------------------------------------
 // Body
 // --------------------------------------------------------
-
-/* DER NEUE REITER BLENDET EIN (R14 P11, A5 P3). Die Untertabs wechselten per
- * hartem Schnitt, waehrend jeder Seitenwechsel blendet. Nur der Wechsel selbst
- * blendet - ein Neuaufbau desselben Reiters (Filter, Monat, Speichern) nicht;
- * die Klasse faellt nach der Blende. Unter reduzierter Bewegung schneidet die
- * globale Sperre (reset.css) die Animation ab. */
-function markTabEntering() {
-  const panel = _container?.querySelector('#budget-body > .budget-tab-panel');
-  if (!panel) return;
-  panel.classList.add('budget-tab-panel--entering');
-  panel.addEventListener('animationend', () => panel.classList.remove('budget-tab-panel--entering'), { once: true });
-}
 
 function renderBody() {
   const body = _container.querySelector('#budget-body');
@@ -1031,7 +1025,8 @@ function renderBody() {
       anchor: state.reportAnchor,
       onRangeChange: (r) => {
         state.range = r;
-        renderBody();
+        // Woche/Monat/Jahr wechselt die Aufloesung: Blende ohne Richtung.
+        swapContent(body, renderBody);
         refocusSegmented('.budget-stats__ranges');
       },
       // Die Wochengrenzen kennt der Server; das Kopf-Label holt sie sich von dort
@@ -1064,6 +1059,7 @@ function renderBody() {
     setHtml(body, renderLoansPage());
     wireLoansPage();
     if (window.lucide) lucide.createIcons({ el: body });
+    growBars(body, { selector: '.budget-loan-card__progress span', memo: 'budget-loans' });
     return;
   }
   if (state.activeTab === 'accounts') {
@@ -1284,6 +1280,9 @@ function renderBody() {
   `);
 
   if (window.lucide) lucide.createIcons({ el: body });
+  // Die Kategorie-Balken wachsen an ihren Wert (vom letzten gezeigten aus) -
+  // ihre Transition lief nie, weil der Endwert schon im Markup steht (ux.js).
+  growBars(body, { selector: '.budget-bar-row__fill', memo: 'budget-categories' });
   watchAsideFit(body.querySelector('.budget-tab-panel--budget'));
   wirePageSearch(body, { id: 'budget-ledger-search', delay: 250, onQuery: runLedgerSearch });
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
@@ -1678,7 +1677,7 @@ function renderCategoryBars(byCategory) {
             <div class="budget-bar-row${lead && i < CHART_LEAD ? ' budget-bar-row--lead' : ''}">
               <div class="budget-bar-row__label" title="${label}">${label}</div>
               <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-                <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"></div>
+                <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}" data-bar-key="${kind}:${esc(String(r.category))}"></div>
               </div>
               <div class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}</div>
             </div>`;
@@ -1977,7 +1976,15 @@ function renderAccountsPage() {
       ${title}
       <div class="panel-head__actions">${archiveToggle}</div>
     </div>` : title}
-    <div class="metric-grid">
+    ${/* Mobil die Kurzzeile wie in jedem Reiter mit Kennzahlen (R16): hier stand
+       * unter 640px als einzige Stelle des Moduls noch die Karte. EINE Zahl,
+       * also ohne Aufklapper (metric-glance.js) - die Karte bleibt dort aus. */ ''}
+    ${metricGlanceHtml({
+      label: t('budget.netWorth'),
+      value: netWorth.text,
+      tone: Number(state.netWorth) > 0 ? 'positive' : Number(state.netWorth) < 0 ? 'negative' : 'neutral',
+    })}
+    <div class="metric-grid budget-glance-details">
       <div class="metric-card ${netWorth.className}">
         <div class="metric-card__label">${t('budget.netWorth')}</div>
         <div class="metric-card__value">${netWorth.text}</div>
@@ -2099,7 +2106,7 @@ function openAccountModal(account = null) {
 
   const content = `
     <div class="form-group">
-      <label class="form-label" for="am-name">${t('budget.accountNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="am-name">${t('budget.accountNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="am-name" maxlength="100"
              placeholder="${t('budget.accountNamePlaceholder')}" value="${esc(isEdit ? account.name : '')}">
     </div>
@@ -2370,7 +2377,7 @@ function renderLoanTransactions(loans) {
   if (!payments.length) return '';
 
   return `<div class="budget-loan-transactions">
-    <div class="budget-loan-transactions__title">${t('budget.loanTransactions')}</div>
+    <h2 class="budget-loan-transactions__title u-section-title">${t('budget.loanTransactions')}</h2>
     ${/* Traeger wie das Hauptbuch (Re-Critique 2026-09-28 P1-1): vorher lagen
         * die Raten nackt auf der Buehne, der einzige Tab ohne Flaeche. */ ''}
     <div class="row-carrier budget-loan-transactions__list">
@@ -2784,7 +2791,7 @@ function renderLoanCard(loan) {
       <div class="budget-loan-card__progress" role="progressbar"
            aria-valuenow="${paidPct}" aria-valuemin="0" aria-valuemax="100"
            aria-label="${t('budget.loanProgressLabel')}">
-        <span style="--bar-scale:${paidPct / 100}"></span>
+        <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
         <span>${t('budget.loanNextDue', { month: nextDue })}</span>
@@ -3111,7 +3118,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         * Belege), steht hinter „Weitere Angaben" - beim Bearbeiten offen,
         * sobald eines davon einen Wert traegt. */ ''}
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-amount">${t('budget.amountLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="bm-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
       <input type="number" class="form-input budget-amount-input" id="bm-amount"
              placeholder="${amountPlaceholder(state.currency)}"
              step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
@@ -3119,14 +3126,14 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     </div>
 
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-title">${t('budget.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="bm-title">${t('budget.titleLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="bm-title"
              placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}">
     </div>
 
     <div class="form-group js-entry-field">
       <div class="budget-field-header">
-        <label class="form-label" for="bm-category">${t('budget.categoryLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+        <label class="form-label" for="bm-category">${t('budget.categoryLabel')}${REQUIRED_MARK}</label>
         <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-category">${t('budget.addCategory')}</button>
       </div>
       <select class="form-input" id="bm-category" required aria-required="true">${catOpts}</select>
@@ -3141,7 +3148,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     </div>
 
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-date">${t('budget.dateLabel')}</label>
+      <label class="form-label" for="bm-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
       <yuvomi-datepicker type="date" id="bm-date"
              value="${isEdit ? entry.date : defaultDate}"></yuvomi-datepicker>
     </div>
@@ -3783,9 +3790,9 @@ function loanIdentityFieldsHtml(loan) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label" for="lm-borrower" id="lm-borrower-label">${
+      <label class="form-label" for="lm-borrower"><span id="lm-borrower-label">${
         t(borrowed ? 'budget.loanLenderLabel' : 'budget.loanBorrowerLabel')
-      }</label>
+      }</span>${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="lm-borrower" maxlength="100"
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
              value="${esc(loan?.borrower ?? '')}">
@@ -3852,7 +3859,7 @@ function loanInterestFieldsHtml(loan) {
     </div>
     <div id="lm-interest-fields" ${mode === 'none' ? 'hidden' : ''}>
       <div class="form-group">
-        <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}</label>
+        <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-principal"
                step="${amountStep(currency, it?.principal ?? '')}" min="${amountMin(currency, it?.principal ?? '')}"
                placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}">
@@ -4062,7 +4069,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
     ${loanCurrencyFieldsHtml(loan)}
     <div class="form-grid-2" id="lm-manual-fields">
       <div class="form-group">
-        <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}</label>
+        <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-amount"
                step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
                min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
@@ -4070,14 +4077,14 @@ function loanFormFieldsHtml(loan, { startMonth }) {
                value="${loan ? String(loan.total_amount) : ''}">
       </div>
       <div class="form-group">
-        <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}</label>
+        <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360"
                inputmode="numeric" value="${loan?.installment_count ?? ''}">
       </div>
     </div>
     ${loanInterestFieldsHtml(loan)}
     <div class="form-group">
-      <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}</label>
+      <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
       <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}">
     </div>
     ${isEdit ? '' : `
@@ -4497,7 +4504,7 @@ async function openConfirmBookingModal(id) {
              min="${amountMin(state.currency)}" value="${absAmount}">
     </div>
     <div class="form-group">
-      <label class="form-label" for="cb-date">${t('budget.dateLabel')}</label>
+      <label class="form-label" for="cb-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
       <yuvomi-datepicker type="date" id="cb-date" value="${esc(entry.date)}"></yuvomi-datepicker>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
@@ -4931,9 +4938,5 @@ export const __test = {
   toggleBalanceDetailsForTest(container) {
     _container = container;
     toggleBalanceDetails();
-  },
-  markTabEnteringForTest(container) {
-    _container = container;
-    markTabEntering();
   },
 };

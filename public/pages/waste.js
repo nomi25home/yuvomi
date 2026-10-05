@@ -13,20 +13,21 @@
 
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import {
   renderAppPage, renderPageHeader, renderPageTitle, renderPageBody,
-  renderPageActions, renderListSection,
+  renderPageActions, renderListSection, renderPageColumns,
 } from '/utils/page-layout.js';
 import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { USER_COLORS } from '/utils/color.js';
+import { redrawList } from '/utils/list-motion.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -330,9 +331,19 @@ function deepLinkNeedsExpand(occurrences, { typeId, date }) {
   return splitUpcomingByType(occurrences).rest.some((occ) => occ.type_id === typeId && occ.date_key === date);
 }
 
+/* DIE DREI LISTEN DER SEITE BAUEN SICH BEI JEDER AENDERUNG NEU (R16, Bewegung).
+ * Jede hat ihren eigenen Traeger, der das Neuzeichnen ueberlebt - redrawList()
+ * (utils/list-motion.js) haelt davor die Lage fest und bewegt danach, was sich
+ * geaendert hat: der erste Aufbau nach dem Skelett blendet gestaffelt ein, eine
+ * neue Abholung, Abfallart oder Quelle zieht auf, und was nachrueckt oder die
+ * Reihenfolge wechselt (Abfallart hoch/runter), gleitet an seine Stelle. */
 function renderUpcoming() {
   const host = _container.querySelector('#waste-upcoming-list');
   if (!host) return;
+  redrawList(host, () => drawUpcoming(host), { selector: '.waste-occurrence-row[data-key]', keyAttr: 'data-key' });
+}
+
+function drawUpcoming(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
@@ -601,6 +612,10 @@ function applyPageMode() {
 function renderTypes() {
   const host = _container.querySelector('#waste-types-list');
   if (!host) return;
+  redrawList(host, () => drawTypes(host), { selector: '.waste-type-card[data-type-id]', keyAttr: 'data-type-id' });
+}
+
+function drawTypes(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3, lines: 2 }));
@@ -682,6 +697,10 @@ function sourceRowHtml(source) {
 function renderSources() {
   const host = _container.querySelector('#waste-sources-list');
   if (!host) return;
+  redrawList(host, () => drawSources(host), { selector: '.waste-source-row[data-source-id]', keyAttr: 'data-source-id' });
+}
+
+function drawSources(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 2 }));
@@ -878,7 +897,7 @@ function openTypeModal(type = null) {
       </select>
     </div>`}
     <div class="form-group">
-      <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="wtm-name" maxlength="100" value="${esc(isEdit ? type.name : '')}">
     </div>
     <div class="form-group">
@@ -1960,11 +1979,17 @@ async function restoreOccurrence(occurrenceKey) {
 function renderPage() {
   _container.replaceChildren();
   _container.insertAdjacentHTML('beforeend', renderAppPage({
-    mode: 'reading',
-    className: 'waste-page',
+    // Flaeche mit Spalten (DESIGN.md, Breitenregel, R16): der Kopf endet an
+    // der Modulkante, die Abholungen stehen links auf dem Lesemass, Abfallarten
+    // und Quellen ab der Split-Schwelle rechts daneben.
+    mode: 'dashboard',
+    className: 'waste-page app-page--columns',
     legacyAlias: false,
     header: renderPageHeader({
       narrow: true,
+      // Mobil stehen die Werkzeuge am Ende der Titelzeile (Kopfregel mobil 1a):
+      // dort traegt der Kopf nur das „..." - siehe den Menue-Eintrag unten.
+      titleTools: true,
       title: renderPageTitle(t('waste.title')),
       // ALLE VIER schreiben, auch die Erinnerungen: das zentrale Gate an
       // /api/v1 entscheidet nach METHODE, und `PUT /waste/reminder-settings/:id`
@@ -2026,6 +2051,11 @@ function renderPage() {
           id: 'waste-page-menu',
           label: t('waste.moreActions'),
           items: [
+            // NUR UNTER 768px SICHTBAR (waste.css): dort hat der beschriftete
+            // Kopfknopf keine Zeile mehr und wird nach der Label-Verlust-Regel
+            // zum Eintrag seines Menues. Ab 768px steht der Knopf, und der
+            // Eintrag ist ausgeblendet - es bleibt je Breite EIN Weg.
+            { action: 'add-type', label: t('waste.addType'), icon: 'plus' },
             { action: 'open-import', label: t('waste.importFileAction'), icon: 'upload' },
             { action: 'open-url-source', label: t('waste.addUrlSourceAction'), icon: 'link' },
             { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
@@ -2038,20 +2068,22 @@ function renderPage() {
       ].join('\n')),
     }),
     body: renderPageBody({
-      content: [
-        renderListSection({
+      content: renderPageColumns({
+        main: renderListSection({
           className: 'waste-upcoming-section',
           content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="row-carrier" id="waste-upcoming-list"></div>`,
         }),
-        renderListSection({
-          className: 'waste-types-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
-        }),
-        renderListSection({
-          className: 'waste-sources-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="row-carrier" id="waste-sources-list"></div>`,
-        }),
-      ].join('\n'),
+        rail: [
+          renderListSection({
+            className: 'waste-types-section',
+            content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
+          }),
+          renderListSection({
+            className: 'waste-sources-section',
+            content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="row-carrier" id="waste-sources-list"></div>`,
+          }),
+        ].join('\n'),
+      }),
     }),
     trailing: `
       <button class="page-fab" id="waste-fab-new-pickup" aria-label="${esc(t('waste.addPickup'))}" data-dock-label="${t('newLabel.waste')}">

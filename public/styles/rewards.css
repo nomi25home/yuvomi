@@ -35,33 +35,6 @@
   gap: var(--space-1);
 }
 
-/* DER KATALOG-KOPF ENDET AM RASTER (R10 L7, rewards.js syncToolbarMeasure).
- * Der Kopf bleibt `--narrow` - sonst passte die gekappte Reiterleiste neben
- * Titel und Pille in die erste Zeile -, gibt aber im Katalog der Aktionszeile
- * die regulaere Kante zurueck: Polster wie jeder Kopf, kein Rest-Slot
- * (`::after`, layout.css), und die Reiterleiste darf ihre volle Zeile nehmen,
- * damit sie weiter umbricht. Gemessen 1440: Pille endet 1408 wie das Raster.
- *
- * DAS MASS DIESES KOPFS IST DIE SPALTE, UND DAS SAGT ER AUCH. Ohne die
- * Angabe erbte er `--page-measure` der Seite (720px) und behauptete damit ein
- * Lesemass, an dem er bewusst nicht endet - die Kanten-Pruefung der
- * gedeckelten Koepfe (Sonde 19 der Dokument-Guards) las 996px statt 720px bei
- * 1280. `100%` ist der Wert der Kompositionen ohne Mass (`full`/`split`):
- * die Deckel-Formeln in layout.css fallen damit von selbst auf den
- * regulaeren Abstand, den die beiden Regeln hier ausdruecklich setzen. */
-.rewards-page > .rewards-toolbar.page-toolbar--narrow.rewards-toolbar--wide {
-  --page-measure: 100%;
-  padding-inline-end: var(--page-inline-pad);
-}
-
-.rewards-page > .rewards-toolbar.page-toolbar--narrow.rewards-toolbar--wide::after {
-  content: none;
-}
-
-.rewards-page > .rewards-toolbar--wide > .rewards-tabs {
-  max-width: none;
-}
-
 .rewards-content__inner {
   display: flex;
   flex-direction: column;
@@ -78,14 +51,28 @@
    -------------------------------------------------------- */
 .rw-section { display: flex; flex-direction: column; gap: var(--space-4); }
 
-/* ZEILENLISTEN AUF DEM LESEMASS, DAS RASTER DARF BREIT (Re-Critique
- * 2026-09-27, A3 P2-5 / R10 L7). Gemessen bei 1440x900: der Punktestand endete
- * bei 972, sein Kopfknopf „Teilnehmer verwalten" bei 1408; das Verlaufs-Ledger
- * lief 1156px breit, und der Punktwert stand 1100px von seinem Grund entfernt.
- * Jeder Abschnitt ausser dem Katalograster (`--wide`) endet jetzt mit dem
- * Lesemass der Seite - samt seines Kopfs, der sonst die Kante verliesse. */
-.rewards-page .rw-section:not(.rw-section--wide) {
+/* JEDER ABSCHNITT ENDET AN DER MODULKANTE (Critique R16, 2026-10-05). Die
+ * Seite fuehrt das breite Mass; Uebersicht und Verlauf stehen im Spaltenraster
+ * (`.page-columns`, layout.css), das die Zeilenlisten auf dem Lesemass haelt
+ * und die Seitenspalte bis zur Kante fuehrt. Das Katalograster nimmt die volle
+ * Breite des Masses. Vorher endeten Zeilenlisten samt Kopf bei 720px und das
+ * Raster an der Spalte - zwei Kanten in einem Modul. */
+.rewards-page .rw-section {
   max-width: var(--page-measure, none);
+}
+
+/* Die Spalten und ihre Abschnitte teilen den Abstand der Seite. */
+.rewards-content__inner {
+  --page-columns-gap: var(--space-8);
+}
+
+/* Der Abschnittstitel als Weg in den Reiter (Seitenspalte der Uebersicht) ist
+ * `.section-title-link` (layout.css) - derselbe Knopf wie „Agenda >" in der
+ * Tagesansicht des Kalenders. */
+
+/* Punktestand in Kurzform (Seitenspalte des Verlaufs): nur Person und Punkte. */
+.rw-standing--compact {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .rw-section__head {
@@ -194,12 +181,12 @@
  * schon in derselben Zeile und ist handlungsfaehig. */
 .rw-standing__idtext { min-width: 0; display: flex; flex-direction: column; }
 .rw-standing__name {
-  font-weight: 600;
+  /* Schnitt aus der Rolle Zeilentitel (typography.css). */
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 140ms ease;
+  transition: color var(--transition-fast);
 }
 .rw-standing__points { font-size: var(--text-sm); color: var(--color-text-secondary); }
 /* Der Punktestand ist die Hauptaussage seiner Zeile und trägt Label-Farbe: der
@@ -453,36 +440,20 @@
  * hier stand bis zur Re-Critique 2026-09-28 ein eigener `.rw-chip` mit 31px
  * Hoehe und ohne Zustand fuer den Screenreader. */
 
-/* Verlaufsliste: EIN Träger (Zeilenlisten-Regel, tokens.css). Der Träger endet
- * mit der Liste, deshalb trennt der +-Kombinator statt border-bottom je Zeile. */
+/* Verlaufsliste: Traeger und Zeile kommen aus list-row.css (`.row-carrier` +
+ * `.list-row`) - Flaeche, Radius, Trennlinie, Polster und der Schnitt des
+ * Grundes (`.list-row__name`) standen hier ein zweites Mal (Critique
+ * 2026-10-05, R16). Hier bleibt nur der Listen-Reset. */
 .rw-ledger {
   list-style: none;
   margin: 0;
   padding: 0;
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.rw-ledger-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.rw-ledger-row + .rw-ledger-row {
-  border-top: 1px solid var(--color-border-subtle);
 }
 /* Der Träger entscheidet (tokens.css): im Modal ist der Grund schon
  * --color-surface, eine zweite weisse Karte darauf wäre unsichtbar. Die
- * Kurzfassung der Liste bleibt deshalb trägerlos, nur mit Haarlinien. */
-.rw-ledger--compact {
-  background: none;
-  border-radius: 0;
-  box-shadow: none;
-  overflow: visible;
-}
-.rw-ledger-row--compact { padding: var(--space-2) 0; }
+ * Kurzfassung der Liste bleibt deshalb trägerlos, nur mit Haarlinien
+ * (`.row-divided`), und ohne seitliches Polster - der Dialog polstert. */
+.rw-ledger-row--compact { padding-inline: 0; }
 .rw-ledger-row__icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -516,10 +487,9 @@
  * zwei stumm neutral. Die Scheibe bleibt deshalb bei der neutralen Basis oben;
  * ein Vollton-Siegel je Zeile wäre die Gegenrichtung desselben Fehlers und
  * streute die Modulmarke durch die Liste ihres eigenen Moduls. */
-.rw-ledger-row__text { flex: 1 1 auto; min-width: 0; }
-.rw-ledger-row__reason { margin: 0; font-weight: 500; color: var(--color-text-primary); }
-.rw-ledger-row__meta { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-secondary); }
-.rw-delta { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rw-ledger-row__reason,
+.rw-ledger-row__meta { margin: 0; }
+.rw-delta { flex: 0 0 auto; font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
 /* Die Richtung der Buchung ist eine WERT-Aussage, keine Modul-Aussage: sie
  * nimmt den Zuwachs-Ton der App (Geld-Vokabular des Budgets), nicht den Ton des
  * Aufgabenmoduls, aus dem der Punkt zufällig stammte. */
@@ -608,7 +578,31 @@
 
 @media (max-width: 639px) {
   .rewards-content__inner { gap: var(--space-6); padding-top: var(--space-4); }
-  .rw-reward-grid { grid-template-columns: 1fr; }
+  .rw-reward-grid { grid-template-columns: 1fr; gap: var(--space-2); }
+  /* DIE PRAEMIE IST MOBIL EINE KOMPAKTE KARTE (R16, Critique 2026-10-05 P1).
+   * Als gestapelte Kachel mass sie 358x218 - zweieinhalb je Bildschirm, mit
+   * dem Zeichen allein auf einer eigenen Zeile. Jetzt stehen Zeichen und Text
+   * nebeneinander, Preis und Aktion darunter ueber die ganze Breite: rund
+   * 130px, fuenf je Bildschirm. Ab 640px bleibt die Kachel. */
+  .rw-reward-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+  .rw-reward-card__foot {
+    grid-column: 1 / -1;
+    margin-top: 0;
+    padding-top: 0;
+  }
+  /* Die Uebersicht endet seit R16 mit den letzten Buchungen (am Desktop die
+   * Seitenspalte, sechs Zeilen). Mobil stehen sie UNTER den Punktestaenden:
+   * drei reichen als Blick, der Titel fuehrt in den Reiter Verlauf. */
+  .rw-recent .rw-ledger > :nth-child(n + 4) {
+    display: none;
+  }
   /* Schmaler Viewport ⇒ mit hoher Wahrscheinlichkeit Touch: 44-pt-Ziele. */
   .rw-setup-step__go { min-height: var(--target-base); }
   /* EINE ZEILE JE PERSON (Re-Critique 2026-09-28, P5 / A3 P2-5). Hier fiel
