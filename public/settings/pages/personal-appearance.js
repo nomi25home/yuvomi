@@ -205,10 +205,27 @@ function clearError(element) {
 
 // Minutes in the UI language (CLDR via formatUnit), so the five steps need no
 // plural keys of their own in 26 locales.
+function screensaverIdleText(seconds) {
+  return formatUnit(seconds / 60, 'minute', { unitDisplay: 'long' });
+}
+
 function screensaverIdleOptions() {
   const current = getScreensaverIdleSeconds();
   return SCREENSAVER_IDLE_STEPS.map((seconds) => `
-    <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(formatUnit(seconds / 60, 'minute', { unitDisplay: 'long' }))}</option>`).join('');
+    <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(screensaverIdleText(seconds))}</option>`).join('');
+}
+
+/**
+ * Device-local like wall mode: no server request, no preference. The
+ * screensaver watches the attribute this sets, so the new delay applies without
+ * a reload, and the toast confirms it like the wall-mode toggle above it.
+ * Exported so test:screensaver-idle can drive the real handler.
+ */
+export function bindScreensaverIdleSelect(select) {
+  select?.addEventListener('change', () => {
+    const seconds = setScreensaverIdleSeconds(Number(select.value));
+    window.yuvomi?.showToast(t('settings.screensaverIdleSaved', { delay: screensaverIdleText(seconds) }), 'success');
+  });
 }
 
 function renderLoadError(container) {
@@ -561,12 +578,7 @@ function bindEvents(container, user) {
     );
   });
 
-  // Device-local as well; the screensaver watches the attribute this sets, so
-  // the new delay applies without a reload.
-  const idleSelect = container.querySelector('#screensaver-idle-select');
-  idleSelect?.addEventListener('change', () => {
-    setScreensaverIdleSeconds(Number(idleSelect.value));
-  });
+  bindScreensaverIdleSelect(container.querySelector('#screensaver-idle-select'));
 
   const localeSelect = container.querySelector('#locale-select');
   localeSelect?.addEventListener('change', async () => {

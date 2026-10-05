@@ -71,3 +71,18 @@ export function setScreensaverIdleSeconds(value) {
   document.documentElement.setAttribute('data-screensaver-idle', String(seconds));
   return seconds;
 }
+
+/**
+ * Follows a change made in another tab or window of the same browser.
+ *
+ * `setScreensaverIdleSeconds()` sets the attribute only in the page it runs
+ * in; the `storage` event reaches every other page of this origin, and
+ * re-applying the attribute there is all it takes, because the component
+ * already reacts to it. `key === null` is `localStorage.clear()`.
+ *
+ * @param {StorageEvent} event
+ */
+export function syncScreensaverIdleFromStorage(event) {
+  if (event?.key !== SCREENSAVER_IDLE_KEY && event?.key !== null) return;
+  document.documentElement.setAttribute('data-screensaver-idle', String(getScreensaverIdleSeconds()));
+}

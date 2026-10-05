@@ -973,6 +973,9 @@ test('die Suche findet einzelne Optionen, nicht nur Blaetter', async () => {
   assert.ok(optionOn('mealie', 'modules-kitchen'), 'Produktnamen stehen als terms im Index');
   assert.ok(optionOn('Zwei-Faktor', 'personal-account'));
   assert.ok(optionOn('Wand', 'personal-appearance'), 'Wand findet den Wand-Modus, nicht nur die Wandtabletts');
+  // #1665-Review: ein Mitglied, das "Bildschirmschoner" sucht, landet bei der
+  // Wartezeit unter Darstellung - nicht im Immich-Blatt, wo sie nicht steht.
+  assert.ok(optionOn('Bildschirmschoner', 'personal-appearance', { role: 'member' }), 'Bildschirmschoner findet die Wartezeit');
   // Diakritika und Gross-/Kleinschreibung zaehlen nicht.
   assert.ok(optionOn('wahrung', 'personal-appearance'), 'waehrung ohne Umlaut findet Waehrung');
 
@@ -2251,7 +2254,7 @@ test('Standard-Erinnerungsliste: eine gescheiterte Abfrage ist ein Fehler mit Au
 
 const PRE_R10_LEAVES = Object.freeze({
   '/settings/personal/account': { id: 'personal-account', adminOnly: false, labelKey: 'settings.pageAccount', options: ['settings.displayNameLabel', 'settings.colorLabel', 'settings.contactDetailsLegend', 'settings.changePassword', 'settings.twoFactorTitle', 'settings.otherSessionsTitle', 'settings.oidcLinkTitle'] },
-  '/settings/personal/appearance': { id: 'personal-appearance', adminOnly: false, labelKey: 'settings.pageAppearance', options: ['settings.sectionDesign', 'settings.wallModeLabel', 'settings.localeLabel', 'settings.dataLanguageLabel', 'settings.regionLabel', 'settings.currencyLabel', 'settings.timezoneLabel', 'settings.dateFormatLabel', 'settings.timeFormatLabel'] },
+  '/settings/personal/appearance': { id: 'personal-appearance', adminOnly: false, labelKey: 'settings.pageAppearance', options: ['settings.sectionDesign', 'settings.wallModeLabel', 'settings.screensaverIdleLabel', 'settings.localeLabel', 'settings.dataLanguageLabel', 'settings.regionLabel', 'settings.currencyLabel', 'settings.timezoneLabel', 'settings.dateFormatLabel', 'settings.timeFormatLabel'] },
   '/settings/personal/device': { id: 'personal-device', adminOnly: false, labelKey: 'settings.pageDevice', options: ['settings.pwaInstallTitle'] },
   '/settings/personal/notifications': { id: 'personal-notifications', adminOnly: false, labelKey: 'settings.pageNotifications', options: ['settings.pushToggleTitle', 'settings.notificationChannelsTitle'] },
   '/settings/personal/calendar': { id: 'personal-calendar', adminOnly: false, labelKey: 'settings.pageCalendarDefaults', options: ['settings.calendarAssignMeLabel', 'settings.calendarDefaultTargetLabel', 'settings.calendarDefaultRemindersLabel'] },

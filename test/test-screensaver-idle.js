@@ -6,10 +6,11 @@
  *          the attribute before any module loads (and only for a valid step),
  *          and the component reads the attribute on every arming and re-arms
  *          when it changes - so a new value applies without a reload.
- * Run: node --test test/test-screensaver-idle.js
+ * Run: npm run test:screensaver-idle (needs test/test-browser-loader.mjs for
+ *      the component's /api.js and /i18n.js)
  */
 
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -127,24 +128,207 @@ test('theme-init.js sets the delay before any module loads - and only a valid st
   }
 });
 
-test('the component reads the delay on every arming and re-arms when it changes', () => {
-  const source = read('../public/components/photo-screensaver.js');
+// --------------------------------------------------------
+// The component, driven - not read as text (#1665 review)
+// --------------------------------------------------------
+//
+// One page for the rest of the suite: the component arms its timer and
+// registers its listeners when it loads, so the stubs below exist before the
+// import and stay in place. Each case starts with a gesture, which is what
+// resets the component on a real device too.
 
-  // Read once at module load (the state before #885) would freeze the value
-  // theme-init.js happened to set and ignore every later change.
-  assert.ok(!/const IDLE_MS\s*=/.test(source), 'no delay frozen at load');
-  assert.match(source, /function idleMs\(\)\s*\{[^}]*dataset\.screensaverIdle/,
-    'the delay is read from the attribute when the timer is armed');
-  assert.match(source, /Math\.max\(30,/, 'the 30 second floor stays');
-  const armings = source.match(/idleTimer\s*=\s*setTimeout\(\s*start,\s*([^)]+\))/g) || [];
-  assert.ok(armings.length >= 3, `every arming found (${armings.length})`);
-  for (const arming of armings) assert.match(arming, /idleMs\(\)/, `${arming} uses the current delay`);
+const listeners = {};
+const toasts = [];
+const requests = [];
+const observers = [];
+const pageStorage = makeStorage();
 
-  // A changed attribute re-arms the timer at once.
-  const observer = source.slice(source.indexOf('new MutationObserver'));
-  assert.match(observer, /attributeFilter:\s*\[\s*'data-screensaver-idle'\s*\]/,
-    'the component watches exactly the attribute the setting writes');
-  assert.match(observer, /idleTimer\s*=\s*setTimeout\(\s*start,\s*idleMs\(\)\s*\)/);
+function makeElement(tag) {
+  return {
+    tag,
+    className: '',
+    dataset: {},
+    children: [],
+    classList: { add() {}, remove() {} },
+    setAttribute() {},
+    append(...nodes) { this.children.push(...nodes); },
+    remove() {},
+  };
+}
+
+const body = {
+  children: [],
+  append(node) {
+    this.children.push(node);
+    node.remove = () => { this.children = this.children.filter((child) => child !== node); };
+  },
+};
+
+// setAttribute notifies the observers like the browser does, so the select
+// below reaches the component through the same path as on a real page.
+const pageRoot = {
+  dataset: {},
+  attrs: new Map(),
+  hasAttribute(name) { return this.attrs.has(name); },
+  getAttribute(name) { return this.attrs.has(name) ? this.attrs.get(name) : null; },
+  setAttribute(name, value) {
+    this.attrs.set(name, String(value));
+    if (name === 'data-screensaver-idle') this.dataset.screensaverIdle = String(value);
+    for (const { callback, filter } of observers) if (filter.includes(name)) callback([{ attributeName: name }]);
+  },
+};
+
+const overlays = () => body.children.filter((node) => node.className === 'photo-screensaver').length;
+const gesture = () => {
+  for (const handler of listeners.pointerdown) handler({ preventDefault() {}, stopImmediatePropagation() {} });
+};
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+const PHOTOS = { data: { enabled: true, photos: [{ id: 'p1' }] } };
+
+let component;
+async function page() {
+  if (component) return component;
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  globalThis.window = {
+    addEventListener: (name, handler) => { (listeners[name] ||= []).push(handler); },
+    yuvomi: { showToast: (message, type) => toasts.push({ message, type }) },
+  };
+  globalThis.document = {
+    documentElement: pageRoot,
+    body,
+    hidden: false,
+    createElement: makeElement,
+    addEventListener() {},
+    querySelectorAll: () => [],
+  };
+  globalThis.localStorage = pageStorage;
+  globalThis.MutationObserver = class {
+    constructor(callback) { this.callback = callback; }
+    observe(target, options) {
+      assert.equal(target, pageRoot, 'the component watches <html>');
+      observers.push({ callback: this.callback, filter: options.attributeFilter });
+    }
+  };
+  globalThis.__apiStub = {
+    get: (path) => new Promise((resolve) => { requests.push({ path, resolve }); }),
+  };
+  component = await import('../public/components/photo-screensaver.js');
+  return component;
+}
+
+async function freshCase() {
+  await page();
+  gesture();
+  await flush();
+  assert.equal(overlays(), 0, 'every case starts without a screensaver');
+  requests.length = 0;
+  toasts.length = 0;
+}
+
+test('a changed delay re-arms the timer from the moment of the change', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '900');
+  mock.timers.tick(100_000);
+  assert.equal(requests.length, 0);
+
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(59_999);
+  assert.equal(requests.length, 0, 'not before the new delay has passed');
+  mock.timers.tick(1);
+  assert.equal(requests.length, 1, '60 s after the change, not 900 s after arming');
+  assert.equal(requests[0].path, '/screensaver/photos');
+});
+
+test('a change while the photos are loading retires that start - exactly one overlay later', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 1, 'start() is waiting for its photos');
+
+  pageRoot.setAttribute('data-screensaver-idle', '120');
+  requests[0].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 0, 'the late answer opens nothing');
+
+  mock.timers.tick(120_000);
+  assert.equal(requests.length, 2, 'the re-armed timer asks again');
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1, 'one overlay - none orphaned under it');
+
+  gesture();
+  assert.equal(overlays(), 0, 'and a gesture removes it');
+});
+
+test('a change while the admin preview is open leaves the preview alone', async () => {
+  const { preview } = await page();
+  await freshCase();
+  const opened = preview();
+  assert.equal(requests.length, 1);
+  requests[0].resolve(PHOTOS);
+  assert.equal(await opened, true);
+  assert.equal(overlays(), 1);
+
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  assert.equal(overlays(), 1, 'the preview stays until dismissed');
+  mock.timers.tick(15 * 60_000);
+  assert.equal(requests.length, 1, 'no second request behind the preview');
+  assert.equal(overlays(), 1);
+  gesture();
+});
+
+test('the select stores the delay, confirms it and re-arms the component', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '900');
+  const { bindScreensaverIdleSelect } = await import('../public/settings/pages/personal-appearance.js');
+  const select = { value: '60', handlers: {}, addEventListener(name, handler) { this.handlers[name] = handler; } };
+  bindScreensaverIdleSelect(select);
+  select.handlers.change();
+
+  assert.equal(pageStorage.getItem(idle.SCREENSAVER_IDLE_KEY), '60');
+  assert.equal(pageRoot.getAttribute('data-screensaver-idle'), '60');
+  assert.equal(toasts.length, 1, 'the change is confirmed like the wall-mode toggle');
+  assert.equal(toasts[0].type, 'success');
+  assert.match(toasts[0].message, /^settings\.screensaverIdleSaved/);
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 1, 'the component follows the select without a reload');
+  gesture();
+
+  // bindEvents wires exactly this handler to the rendered select.
+  assert.match(read('../public/settings/pages/personal-appearance.js'),
+    /bindScreensaverIdleSelect\(container\.querySelector\('#screensaver-idle-select'\)\)/);
+});
+
+test('a delay chosen in another tab reaches this page through the storage event', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '900');
+  pageStorage.setItem(idle.SCREENSAVER_IDLE_KEY, '120');
+  for (const handler of listeners.storage) handler({ key: 'yuvomi-theme' });
+  assert.equal(pageRoot.getAttribute('data-screensaver-idle'), '900', 'other keys are ignored');
+  for (const handler of listeners.storage) handler({ key: idle.SCREENSAVER_IDLE_KEY });
+  assert.equal(pageRoot.getAttribute('data-screensaver-idle'), '120');
+
+  pageStorage.removeItem(idle.SCREENSAVER_IDLE_KEY);
+  for (const handler of listeners.storage) handler({ key: idle.SCREENSAVER_IDLE_KEY });
+  assert.equal(pageRoot.getAttribute('data-screensaver-idle'), '300', 'back to the default in the other tab');
+  gesture();
+});
+
+test('a junk attribute falls back to five minutes, and the 30 s floor stays', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', 'abc');
+  mock.timers.tick(299_999);
+  assert.equal(requests.length, 0, 'junk is not an immediate start');
+  mock.timers.tick(1);
+  assert.equal(requests.length, 1);
+
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '5');
+  mock.timers.tick(29_999);
+  assert.equal(requests.length, 0, 'below the floor waits for the floor');
+  mock.timers.tick(1);
+  assert.equal(requests.length, 1);
+  gesture();
 });
 
 test('the setting sits next to wall mode in Appearance, not under the Immich connection', () => {

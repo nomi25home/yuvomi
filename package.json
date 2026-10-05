@@ -46,7 +46,7 @@
     "test:dashboard-clarity": "node --test test/test-dashboard-clarity.js",
     "test:dashboard-rewards": "node --experimental-sqlite --test test/test-dashboard-rewards.js",
     "test:screensaver": "node --test test/test-screensaver.js",
-    "test:screensaver-idle": "node --test test/test-screensaver-idle.js",
+    "test:screensaver-idle": "node --loader ./test/test-browser-loader.mjs --test test/test-screensaver-idle.js",
     "test:multi-assignment": "node --experimental-sqlite test/test-multi-assignment.js",
     "test:visibility": "node --experimental-sqlite test/test-visibility.js",
     "test:sync-default-assignee": "DB_PATH=:memory: node --experimental-sqlite test/test-sync-default-assignee.js",

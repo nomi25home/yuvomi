@@ -87,6 +87,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     options: [
       { key: 'settings.sectionDesign', also: ['settings.themeSystem', 'settings.themeLight', 'settings.themeDark'] },
       'settings.wallModeLabel',
+      'settings.screensaverIdleLabel',
       'settings.localeLabel',
       'settings.dataLanguageLabel',
       'settings.regionLabel',

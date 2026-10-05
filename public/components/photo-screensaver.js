@@ -1,5 +1,6 @@
-import { api } from '../api.js';
-import { formatDate } from '../i18n.js';
+import { api } from '/api.js';
+import { formatDate } from '/i18n.js';
+import { syncScreensaverIdleFromStorage } from '/utils/screensaver-idle.js';
 
 // Read on every arming, not once at load: the delay is a per-device choice
 // (utils/screensaver-idle.js, #885) that theme-init.js applies before this
@@ -129,4 +130,7 @@ new MutationObserver(() => {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(start, idleMs());
 }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-screensaver-idle'] });
+// A delay chosen in another tab of this browser reaches this page through the
+// storage event and then takes the same path as above.
+window.addEventListener('storage', syncScreensaverIdleFromStorage);
 resetIdle();

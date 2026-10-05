@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mode, because the devices in one household want different delays: a photo frame on the wall
   wants its pictures back after a minute, a kitchen tablet people work on should wait longer, and a
   household value would also reach every phone. The value is applied before the page renders, so
-  the first idle period already uses it, and a change takes effect at once without a reload. The
-  component had read a `data-screensaver-idle` attribute since #693 that nothing ever set.
+  the first idle period already uses it, and a change takes effect at once without a reload, in
+  other open tabs too. The settings search finds it under "screensaver", and the Immich page no
+  longer promises five minutes.
 
 ### Changed
 
