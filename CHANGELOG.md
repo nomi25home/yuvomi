@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Sign-in pages no longer stack inside each other.** Going from one page without sign-in to
+  the next inside the app - "Back to sign in" on the forgotten-password page, or the back button
+  between them - put the new page inside the old one. The card then shrank to the width of its
+  content (338px on the sign-in page, 307px on the reset page, instead of 380px), and a screen
+  reader met two nested main regions. Each of these pages now replaces the one before it.
 - **A module switched off for the household no longer works in the background** (#1660). With
   Health switched off, the medication scheduler kept creating the due doses and sending their
   reminders - as a push and on notification channels, to the person and to their caregivers - and
@@ -41,6 +46,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   take the birthday tile along. A module that is switched off is still not locked: its own
   pages, API routes and exports answer as before, and what a member may not reach is decided by
   permissions. The rule is written down in `docs/DECISIONS.md`, entry 11.
+- **A time stored with a fraction of a second keeps its exact moment** (#1658). A time saved
+  without a time zone and with milliseconds - which only happens to rows brought in by hand, the
+  app itself never writes one - was read up to two seconds late, because the fraction was added
+  two or three times. Just before midnight that was enough to move an event, a reminder or a
+  housekeeping visit to the next day, and on the last of a month into the next month. Such a
+  value is now read as the moment it says, in every time zone and across the nights the clocks
+  change. Nothing stored is rewritten.
+- **The loan dialog checks "Installments already paid" at the field and reports errors in your
+  language** (#1656). Typing more paid installments than the loan has, a negative number or a
+  fraction used to be sent off, refused by the server, and shown as a short English message at
+  the bottom of the screen, whatever language the app was set to. The field is now checked
+  before saving, in both places a loan can be created: it is marked, says what is wrong, and the
+  dialog stays open with everything you typed. For a loan with interest the number is compared
+  with the term the server works out, the same one the preview shows. When the server does
+  refuse a loan, the message appears at the field it belongs to and in the app's language. The
+  name, title and notes fields no longer accept more text than can be saved. For the API:
+  `POST /budget/loans` and `PUT /budget/loans/:id` now add a `reason` code to a 400 answer; the
+  `error` text is unchanged.
 
 ## [2.73.0] - 2026-10-04
 
