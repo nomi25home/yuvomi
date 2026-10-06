@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A household can put its members in an order of its own, and every list of people follows it**
+  (#1644, from D#1605, asked by @ChaCha500). Until now members were listed alphabetically
+  everywhere, so "parents first" or "oldest first" was not possible. Under Settings, Family, an
+  administrator now drags the members into the wanted order - or focuses a handle and presses
+  the arrow keys. There is one order per household, the same for everyone who looks: the
+  calendar's person filter, the timetable, the assignee pickers in tasks, budget and shared
+  expenses, rewards, the family card and the wall display all use it. A member who has not been
+  placed (a new one, and everyone in a household that never touches the setting) comes after
+  the placed ones, sorted by name, so a household that leaves it alone sees the order it had.
+  Not by age, as first suggested: birth dates are optional, and "parents first, then the
+  children" cannot be read from a date. Two things changed for everyone, placed or not. Lists
+  that sorted names by the language of the device now sort them the way the server does, so
+  two devices of one household agree; and a few lists that put a lower-case name after all
+  capitalised ones (the account list, the task filter and the overview among them) now ignore
+  letter case like the others. Housekeeping staff, guests of shared expenses, wall tablets and deactivated
+  accounts have no place in the order. For API clients: `PATCH /api/v1/family/members/reorder`
+  with `{ order }`, administrators only; `sort_order` on `GET /api/v1/family/members` and
+  `GET /api/v1/auth/users`, and `is_household_member` on every user object (migration 232).
+
 - **Each device chooses how long it waits before the photo screensaver starts** (#885). Settings →
   Appearance, next to wall mode, offers 1, 2, 5, 10 or 15 minutes; five stays the default, so
   nothing changes on a device that never touches it. The choice is stored in the browser like wall
@@ -18,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the first idle period already uses it, and a change takes effect at once without a reload, in
   other open tabs too. The settings search finds it under "screensaver", and the Immich page no
   longer promises five minutes.
+
 - **Revoked and expired API tokens can be removed from the list** (D#1672, asked by @torbenvanassche). Under
   Settings, API access, a revoked token stayed in the list for good, with a greyed-out button
   next to it. The list now has two parts: the tokens that work, each with "Revoke", and below
@@ -44,7 +64,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   means 5. "Set as household default" now shows the result at once when a tile option changed
   what the overview asks for; until now the tile kept its old list until the next refresh.
 
+- **A loan can carry a due day, and "Mark paid" dates the installment on it** (#1631, D#1481, asked
+  by @iHatim1). A loan knew the month an installment is due but no day, so "Mark paid" dated the
+  entry on the day you tapped it: with a debit on the 27th, marking it on the 25th put it two days
+  early, and marking it on 2 November put October's installment into November's budget. The loan
+  dialog now has an optional "Due day" field, 1 to 31. With it set, the installment is dated on that
+  day in the month it is due, whether you mark it early or late, and a month that is shorter takes
+  its last day (the 31st becomes 30 April, or 28 or 29 February). The confirmation names the date
+  that was used, because the entry is booked without a dialog, and the loan card shows the full
+  date of the next installment instead of only the month. "Installments already paid" on a new
+  loan use the day as well. Nothing changes for a loan without a due day, and nothing that is
+  already booked is moved: setting or changing the day later leaves existing installments and
+  their budget entries where they are. Marking early books an entry dated a few days ahead; it
+  counts in that month's totals at once and in the account's current balance from its date on. For
+  API clients: loans accept and return `due_day`, and return `next_due_date` next to
+  `next_due_month` (`null` without a due day). `POST /api/v1/budget/loans/{id}/payments` is
+  unchanged, `paid_date` stays required and is stored as sent.
+
 ### Changed
+
+- **Overlapping events in the day and week view are placed by person, not by start time**
+  (D#1605, #1633). Events at the same time used to be packed by the clock alone: whoever
+  started first stood on the left, so the same person could be left at nine and right at
+  eleven, and two events with the same start and end could swap places from one load to the
+  next. Now every person in a group of overlapping events gets a column of their own, in the
+  order in which the household's members are listed - the order of the people filter. An event with several people stands where the first of them in
+  that order stands; events of people who are not household members follow after the members,
+  and an event with nobody assigned comes last. Two events of the same person at the same
+  time stand next to each other. Nothing is reserved: an event that overlaps nothing keeps
+  the full width, and a person who is not part of a group takes no room in it. The price is
+  width in a chain: with 9:00-10:00, 9:30-11:00 and 10:30-12:00 for three people, the third
+  used to take the place the first had left and the group was two columns wide; now it is
+  three, because the third may not stand in the first one's column, and a longer chain of
+  different people grows by a column per person. Schedule blocks, the all-day row, the month
+  and the agenda are unchanged.
 
 - **Two people with the same initials no longer look the same** (#1464). Linda Johnson and Leo
   Johnson both showed "LJ" on their avatars, in the people picker, in avatar stacks and on the
@@ -268,6 +321,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Holiday countries and regions are named in your language, and the delete button of the task
+  selection is no longer announced as a question** (#1723). Under Settings, Calendar, the list of
+  countries for public holidays showed English names in every language, in English order. The
+  names now follow the language of the app and the list is sorted in it; a country the browser
+  cannot name keeps the name it had. The regions below a country (federal states, cantons) come
+  from the holiday service, which carries them in several languages: the app now asks for yours
+  and falls back to English where the service has none. The three nations of the United Kingdom
+  stay in English. In Tasks, with several tasks selected, a screen reader read the delete button
+  as "Delete 3 tasks?" where the screen says "Delete" - the question belongs to the confirmation
+  step that follows. The button is now called "Delete 3 tasks". That name is new in all 26
+  languages; in Vietnamese, Hindi, Arabic, Persian, Korean, Japanese, Chinese and Filipino it was
+  not written by a native speaker. For API clients:
+  `GET /api/v1/preferences/holidays/subdivisions/{countryCode}` takes an optional `lang`; without
+  it the answer is in English, as before.
+- **A monthly shared expense on the 29th, 30th or 31st no longer skips a month** (#1721). A
+  recurring shared expense only knew its next date, not the day it was meant for. After a
+  booking on 31 January the next date overflowed to 3 March: February got no booking at all,
+  nothing said so, and the series stayed on the 3rd from then on (on the 2nd or 1st when it
+  started on the 30th or 29th, or after a 30-day month). A series now remembers its day. In a
+  shorter month it books on the last day and returns to its day afterwards: 31 January,
+  28 February (29 in a leap year), 31 March. A yearly series from 29 February books on
+  28 February and on 29 February again in a leap year, instead of moving to 1 March for good.
+  Resuming a paused series counts the same way. Weekly series were not affected.
+  **Existing series that demonstrably drifted off the 29th-31st return to their day; the month
+  that was skipped is not booked afterwards.** The evidence is the first expense the series
+  booked: if it lies on the 29th, 30th or 31st and the next date sits on the 1st, 2nd or 3rd
+  where the overflow left it, the next date moves to that day (or the last day) of the same
+  month. If the skipped month is still ahead at the time of the update - the series booked on
+  31 October and waits for 1 December, and it is 10 November - the date moves into that month
+  instead (30 November), so it is not left empty; that is a date in the future, not a booking
+  made up afterwards. A series that was really created on the 1st to 3rd stays there. So does
+  one whose first expense has been deleted or was ever edited, because then nothing shows
+  reliably where the series started: an edit can have changed the date, and the app does not
+  record what an edit changed, so an edit of the title alone counts as well. Two more cases
+  keep the date where it is. If the series already has an expense in that month, the series
+  returns with the following booking. And no date is ever moved into the past, where the next
+  run would book it at once: a paused series whose date already lies behind returns when it is
+  resumed. A yearly series that stands on 1 March and cannot be moved back for one of these
+  reasons stays on 1 March. If a month is missing in your group, add that expense by hand.
+  Shared expenses only: subscriptions and tasks keep their own rules. For API clients:
+  recurring expenses carry `anchor_day` (migration 234).
+
+- **Meal plan and recipes with read-only access: no more buttons that end in an error message**
+  (#1265). A member who may only read the Kitchen still saw every control on both tabs: the plus
+  buttons and the empty slots, the edit dialog with Save and Delete, the bin on a meal, the drag
+  handle, "Fill plan at random", the recipe column, and on a recipe Edit, Duplicate, Delete and
+  "Add to meal plan". Each of them ended in "no permission"; a dragged meal jumped back, and a
+  deleted one came back after the undo window. Those controls are now gone for such a member.
+  What the plan and the list show stays, and is readable in full: tapping a meal opens a
+  read-only view with everything the form shows - date, meal, ingredients with their shopping
+  category, the saved recipe, notes, the recipe link and whether it repeats. A recipe opens its
+  details as before, which now also name the meals it is meant for and the category of each
+  ingredient. An empty week or an empty recipe list only says so, instead of inviting you to add
+  something. "Add to shopping list" on a recipe keeps following the right it needs: it stays
+  for a member who may read the Kitchen and edit Shopping. Assigning a recipe ingredient to a
+  pantry row needs write access to both the Kitchen and the Pantry, as the server requires; with
+  only the Pantry right the button used to be offered and the save was refused.
+
 - **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
   placeholder text under a `.pdf` name, so the built-in preview could not open them and
   every screenshot of an opened document showed an error. Each one is now a one-page PDF with
@@ -288,6 +399,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hint above the module order under Settings, Navigation listed groups that no longer exist
   ("Overview, Plan, Home") and now simply says the modules are sorted within their group. In
   German, the empty waste page read "Papier -, um".
+
+- **Wording: one word for the housekeeper, a pink that is called pink, "Square (2×2)", and a
+  real sentence when weather coordinates are missing** (#1723). In Housekeeping the person had
+  four names: the tab said "Staff", its heading "Housekeeping staff", the add button
+  "Housekeeper", and in German the short add label just "Person". It is "Housekeeper"
+  ("Haushaltshilfe") everywhere now; the tab and its heading read "Housekeepers", and a
+  housekeeper's account under Settings, Family carries that word as its role instead of
+  "Staff". The module keeps its name. In the waste type dialog the swatch called "Magenta" is a
+  pink and is now called that - only the name a screen reader announces changes, saved waste
+  types keep their colour. On the overview, the largest of the four tile sizes was called
+  "Standard (2×2)" although no tile starts in it; it is "Square (2×2)", saved layouts are
+  untouched. And in the weather settings, saving without valid coordinates showed the two
+  field names, "Latitude / Longitude", as the error; it now says "Enter valid coordinates."
+  The new wording is in all 26 languages; in Vietnamese, Hindi, Arabic, Persian, Korean,
+  Japanese, Chinese and Filipino it was not written by a native speaker.
 
 - **Resuming a paused recurring shared expense no longer books every date it missed** (#1647).
   A recurring expense that was paused for six months and then resumed got six expenses within
@@ -506,6 +632,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plus and minus buttons. A read-only row has no such buttons, so the date stays visible
   there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
   rows with one shared building block instead of three copies.
+
+- **Every chart leaves its axis values the room they need, not only the Budget trend**
+  (#1722). The Health charts (vitals, lab values, activity, and the cycle trends) and the
+  odometer chart of an inventory item kept a fixed margin sized for short numbers. The
+  severity trend of a cycle symptom writes words on that axis, and their length depends on
+  the language: in Polish, "Umiarkowane" started to the left of its chart and ended up one
+  pixel from the edge of its card on a phone; Filipino and Russian stuck out as well. Each
+  of these charts is now measured the moment it appears, the same way the Budget trend
+  already was, so a long word or a seven-digit odometer reading stays inside its chart. A
+  chart with short values looks exactly as before.
 
 ## [2.73.0] - 2026-10-04
 

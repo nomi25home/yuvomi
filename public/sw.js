@@ -178,6 +178,7 @@ const APP_SHELL = [
   '/utils/markdown-toolbar.js',
   '/utils/master-detail.js',
   '/utils/meal-types.js',
+  '/utils/member-order.js',
   '/utils/mentions.js',
   '/utils/module-accent.js',
   '/utils/module-access.js',
@@ -245,6 +246,7 @@ const APP_SHELL = [
   '/utils/wall-mode.js',
   '/utils/web-share.js',
   '/utils/week-strip.js',
+  '/utils/overlap-lanes.js',
   '/offline.html',
   // offline.html laedt theme-init.js, damit die Huelle dieselbe Farbwelt
   // trifft wie die App (gespeicherter Wunsch schlaegt Systemeinstellung).
