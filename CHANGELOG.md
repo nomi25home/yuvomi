@@ -46,6 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Two people with the same initials no longer look the same** (#1464). Linda Johnson and Leo
+  Johnson both showed "LJ" on their avatars, in the people picker, in avatar stacks and on the
+  overview, and colour was the only difference. Whoever shares their initials with somebody
+  else in the household now gets the first letter of their first name and the next letter of
+  it that nobody carries yet: "LI" and "LE". If that letter is taken as well - by Lisa Imhof,
+  "LI" - the next one is used ("LN"), and after the first name the letters of the last name.
+  Everybody whose initials are theirs alone keeps them, it stays at two characters, and the
+  result is the same in every view and for everyone who looks, because it is worked out from
+  the names of all accounts and not from the list a page happens to show. A deactivated
+  account still counts, so nobody's initials change when somebody leaves; they can change
+  when a new person joins or somebody is renamed. Names written without a space in Hangul,
+  Han or Kana take the family name's first character and the given name's last (김민수 and
+  박민수 become 김수 and 박수). Two accounts with exactly the same name stay the same. For
+  API clients: `GET /api/v1/auth/me` and the login answer carry `initialsRoster`, the display
+  names of all accounts; a shared-expenses guest gets an empty list.
+
 - **Removing a member no longer takes their entries with it** (#1381). Deleting someone under
   Settings, Family used to delete everything that person had created as well - appointments,
   tasks, notes, documents, and payments they had recorded for others, which silently changed
@@ -252,6 +268,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An avatar never shows more than one character per name part** (#1464). A name starting
+  with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
+  letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
+  disc now keeps one character each ("SS"). Along with it: brackets, quotation marks and
+  other punctuation at the start of a name are skipped ("(Grandma) Erika" shows "GE", not
+  "(E"), and a name part made of punctuation only does not count; an invisible direction
+  mark in front of an Arabic or Hebrew name no longer leaves the disc empty; two Arabic
+  initials stand side by side instead of joining into a word; Georgian letters stay as
+  typed instead of turning into a capital form most fonts cannot draw; the flags of England,
+  Scotland and Wales stay whole on browsers without `Intl.Segmenter`; and two half-width
+  katakana fit the small disc, so they are no longer cut to one. Capitals are formed the
+  same way in every language of the interface, so a person does not show different initials
+  depending on who looks: "ipek" gives "I", and whoever types "İpek" keeps the "İ".
+
 - **Documents: Esc closes the viewer again when the PDF took the focus by itself.** Opened by
   keyboard, a file whose preview fails - one that claims to be a PDF and is not one - left the
   focus inside the browser's built-in PDF viewer without anyone having touched it, and from
@@ -382,6 +412,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now shows its quantity without the buttons, and a tap opens a read-only view with everything
   the dialog shows - quantity, location, category, best-before date, minimum stock and note.
   The cart button stays for members who may write to the shopping list.
+
+- **The budget shows the whole list again when you come back to it** (#1593). Tapping a
+  person's avatar on an entry narrows the list to what that person is responsible for. That
+  filter survived leaving the budget: you opened another page, came back, and still saw only
+  those entries. It now falls back when the budget is opened, like the account filter and the
+  loan filters always did. Within the budget it stays as it was, also across months.
+
+- **The budget page answers a refused action in your language, at the field it is about**
+  (#1668). Outside the loan dialog the page still showed whatever the server answered - in
+  English, or for an account that no longer exists in German ("Konto nicht gefunden.") - as a
+  toast, in every language. Saving an entry, a series or an account, booking an expected
+  entry, adding a category, ticking off or deleting an installment, and deleting an entry, a
+  series, an account or a loan now say it in the app's own sentence. Where the refusal is
+  about one field of an open dialog, the sentence stands at that field: an account that was
+  deleted in the meantime at "Account", an amount above what is left of a loan at "Amount".
+  The loan dialog got more precise as well: a loan that would run too long says so, with the
+  limit of 600 months, instead of "does not amortize" - in the preview and on saving; 361
+  installments are answered with the allowed range of 1 to 360; too many installments
+  already paid names how many the loan has; and title, notes, currency and account each have
+  a sentence of their own instead of the general "could not be saved". For API clients:
+  every 400 and 409 of the write routes for entries, series, accounts, categories and loans
+  now carries a `reason` next to `error`, three of them with `max` (the limit the refusal is
+  about); budget plans are unchanged. A refused `POST /api/v1/budget/loans/preview` says why
+  (`reason`, `max`). An unknown `account_id` was answered in German and now reads "Account
+  not found." or "account_id must be a valid account id."; the other German `error` sentences
+  of the budget routes are the next entry.
+
+- **Budget API: the `error` sentences are English throughout.** For API clients only - the app
+  does not show these sentences, it reads `reason`. Some refusals of the budget routes were
+  still German or half German, because a German field name was put into an English sentence:
+  "month muss YYYY-MM sein", "Betrag muss größer als 0 sein.", "Titel is required.", "Kontotyp
+  must be one of: ...". They now read "month must be in YYYY-MM format.", "Amount must be
+  greater than zero.", "Title is required.", "Account type must be one of: ...", and the same
+  goes for the other field names: Amount, Category, Date, Interval, Interval count, Starting
+  balance, Credit limit, Color, Type, and `recurrence_rule` for an invalid rule. Affected are
+  entries, series, booking an expected entry, accounts, categories, budget plans, and the
+  `month`, `q`, `range` and `anchor` parameters of the list, the summary, the search and the
+  statistics. Status codes and every `reason` are exactly as before; `reason` is the stable
+  key, so a client that compared the `error` text should switch to it. Where a sentence lists
+  the allowed category keys, the keys of the built-in income categories are still German
+  words - they are stored keys, not wording. Other modules are unchanged (#1668).
 
 ## [2.73.0] - 2026-10-04
 
