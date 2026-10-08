@@ -2341,13 +2341,25 @@ interactive sessions carry `authScopes = null`. A paired display now carries the
 `dashboard:read`, `calendar:read`, `tasks:read`, `rewards:read`, `weather:read` (`DISPLAY_SCOPES`,
 not stored and not configurable - what a display may do is a product decision, not a field an admin
 can widen). Weather is on the list for the obvious reason a tablet ends up on a kitchen wall at all,
-and it carries no household data: a forecast for a location the household already set. Beyond the scopes, a display may read the photo screensaver's two image routes (#1766, `DISPLAY_READ_ROUTES`): `GET /screensaver/photos` exactly and `GET /screensaver/photos/{uuid}`. `/screensaver` is not a module, so without them the scope gate refused both and the screensaver never ran on the wall it was built for (#693); they return the same admin-chosen album previews every member device shows when idle, while `/screensaver/config` and `/screensaver/test` stay refused.
+and it carries no household data: a forecast for a location the household already set.
 The global gate in `server/index.js` therefore asks about the **scopes**, not the sign-in method:
 that condition read `authMethod !== 'api_token' || authScopes == null`, of which only the second
 half was ever the rule. Sessions are unaffected. The auth router, mounted ahead of the gates, refuses
 a valid display credential at its own entry with 403, the same way it refuses a scoped token
 (GHSA-xcv5-6w6x-x5q2). The display branch runs **before** the session branch: the narrower
 credential wins, so a tablet somebody once signed in on does not quietly stay a full account.
+
+**The screensaver on a display (#1766).** Beyond the scopes, a display may read the photo
+screensaver's two image routes, `GET /screensaver/photos` exactly and `GET /screensaver/photos/{id}`
+with the same UUID the route requires (`DISPLAY_READ_ROUTES`, `SCREENSAVER_PHOTO_ID`) - but only
+when an administrator has switched it on for that display (`display_accounts.show_screensaver`,
+migration 237, off by default; `PATCH /api/v1/displays/{id}`). The flag is read with the credential
+on every request and handed to both gates; with it off, both routes are refused at the scope gate.
+A display changes no settings itself, and its delay has no "never", so without the switch every
+paired tablet in a household with Immich would start covering its wall. What it reads is no narrower
+than on a member device: a random selection from the configured album or, without one, from
+everything the key can read, with date, city and country, and `/screensaver/photos/{id}` proxies
+any asset id without checking the album. `/screensaver/config` and `/screensaver/test` stay refused.
 
 Visibility needs no special case. A display creates nothing and is assigned nothing, so
 `visibilityWhere()` leaves it exactly the rows marked `all`.

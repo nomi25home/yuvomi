@@ -289,10 +289,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A paired wall tablet shows the photo screensaver** (#1766). Its account could not read the
-  screensaver photos, so the screensaver never started on the one device it was built for. A wall
-  tablet now reads the photos of the album the administrators chose, the same ones every signed-in
-  device shows; the Immich connection and the album choice stay out of its reach.
+- **A paired wall tablet can show the photo screensaver** (#1766). Its account could not read the
+  screensaver photos, so the screensaver never started on the one device it was built for. An
+  administrator now switches it on per tablet under Settings → Household → Wall tablets; it is off
+  until then, so a wall that shows the calendar today keeps showing it after the update. A tablet
+  that has it on reads the same photos every signed-in device shows - with their date, city and
+  country - and nothing else of the screensaver: the Immich connection stays out of its reach.
 
 ## [2.75.0] - 2026-10-07
 
