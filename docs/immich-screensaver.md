@@ -36,6 +36,12 @@ exists. Leaving the field empty preserves the saved key.
 The album UUID is the UUID portion of an Immich album URL. Only image assets are selected; videos
 are not shown by the screensaver.
 
+## Wall tablets
+
+A paired wall tablet (Settings → Household → Wall tablets) shows the screensaver too. Its account can
+read the photos and nothing else of the screensaver: the connection, the album choice and the
+connection test stay with the administrators.
+
 ## Delay on each device
 
 How long a device waits before the screensaver starts is chosen on that device, under

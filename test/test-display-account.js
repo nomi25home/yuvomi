@@ -243,6 +243,35 @@ test('das Display darf genau die drei Geruestpfade LESEN, und nur lesend', async
   assert.equal((await display('PATCH', '/preferences', { week_start: 1 })).status, 403);
 });
 
+test('das Display liest die Fotos des Bildschirmschoners, aber nicht die Verbindung (#1766)', async () => {
+  // Ohne diese Ausnahme lief der Schoner auf genau dem Geraet nie, fuer das er
+  // gebaut wurde: `/screensaver` ist kein Modul, das Scope-Gate sperrte, und
+  // `start()` schluckt das 403. In dieser Suite ist Immich nicht verbunden -
+  // die Liste antwortet deshalb 200 mit `enabled: false`, und ein Foto 404 aus
+  // der Route. Beides heisst: das Gate hat durchgelassen.
+  const display = asDisplay(displayToken);
+  const list = await display('GET', '/screensaver/photos');
+  assert.equal(list.status, 200, `die Fotoliste muss lesbar sein, war ${list.status}`);
+  assert.deepEqual(list.body, { data: { enabled: false, photos: [] } });
+  const photo = await display('GET', '/screensaver/photos/3f2504e0-4f89-41d3-9a0c-0305e82c3301');
+  assert.equal(photo.status, 404, `ein Foto muss die Route erreichen, war ${photo.status}`);
+
+  // Eng, nicht bequem: keine UUID, ein Praefix, eine andere Methode, und die
+  // Verwaltung des Haushalts scheitern am Gate.
+  for (const [method, path] of [
+    ['GET', '/screensaver/photos/keine-uuid'],
+    ['GET', '/screensaver/photos-irgendwas'],
+    ['POST', '/screensaver/photos'],
+    ['GET', '/screensaver/config'],
+    ['PUT', '/screensaver/config'],
+    ['POST', '/screensaver/test'],
+  ]) {
+    const res = await display(method, path);
+    assert.equal(res.status, 403, `${method} ${path} muss gesperrt sein, war ${res.status}`);
+    assert.match(String(res.body?.error), /scope/i, `${method} ${path} muss am Scope-Gate scheitern`);
+  }
+});
+
 test('die Rechte-Nutzlast traegt die Scope-Liste als Modulrechte', async () => {
   // DIE OBERFLAECHE HAENGT DARAN, NICHT AN EINER ZWEITEN LISTE IM FRONTEND. Die
   // Uebersicht bot dem Tablett Kacheln fuer Geburtstage, Budget und Notizen an,

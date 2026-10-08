@@ -2341,7 +2341,7 @@ interactive sessions carry `authScopes = null`. A paired display now carries the
 `dashboard:read`, `calendar:read`, `tasks:read`, `rewards:read`, `weather:read` (`DISPLAY_SCOPES`,
 not stored and not configurable - what a display may do is a product decision, not a field an admin
 can widen). Weather is on the list for the obvious reason a tablet ends up on a kitchen wall at all,
-and it carries no household data: a forecast for a location the household already set.
+and it carries no household data: a forecast for a location the household already set. Beyond the scopes, a display may read the photo screensaver's two image routes (#1766, `DISPLAY_READ_ROUTES`): `GET /screensaver/photos` exactly and `GET /screensaver/photos/{uuid}`. `/screensaver` is not a module, so without them the scope gate refused both and the screensaver never ran on the wall it was built for (#693); they return the same admin-chosen album previews every member device shows when idle, while `/screensaver/config` and `/screensaver/test` stay refused.
 The global gate in `server/index.js` therefore asks about the **scopes**, not the sign-in method:
 that condition read `authMethod !== 'api_token' || authScopes == null`, of which only the second
 half was ever the rule. Sessions are unaffected. The auth router, mounted ahead of the gates, refuses

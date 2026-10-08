@@ -121,6 +121,30 @@ export const DISPLAY_READ_PATHS = Object.freeze([
 ]);
 
 /**
+ * Die Fotos des Bildschirmschoners, die ein Display LESEN darf (#1766).
+ *
+ * WARUM ES SIE BRAUCHT. `components/photo-screensaver.js` laedt auf jeder Seite
+ * aus `index.html`, also auch auf dem Tablett - aber `/screensaver` ist kein
+ * Modul, das Scope-Gate in server/index.js lehnte beide Abrufe ab, und `start()`
+ * schluckt das 403. Die Wand, fuer die der Schoner gegen Einbrennen gebaut
+ * wurde (#693), war das eine Geraet, auf dem er nie lief.
+ *
+ * WARUM DAS KEINE AUFWEICHUNG IST. Es sind dieselben Fotos, die jedes
+ * angemeldete Geraet im Haushalt zeigt, sobald es ruht: das Album, das ein
+ * Administrator ausgewaehlt hat, als Vorschau, mit Datum und Ort als Text.
+ * Der Immich-Schluessel verlaesst den Server auch hier nicht. Verbindung,
+ * Test und Album (`/screensaver/config`, `/screensaver/test`) bleiben gesperrt.
+ *
+ * MUSTER STATT EXAKTER PFADE, ABER ENG - DIESELBE BAUART WIE DISPLAY_WRITE_ROUTES.
+ * Das Foto traegt seine Kennung im Pfad; eine Kennung ist hier eine UUID, und
+ * was keine ist, faellt schon am Gate durch, nicht erst in der Route. Nur GET.
+ */
+export const DISPLAY_READ_ROUTES = Object.freeze([
+  /^\/screensaver\/photos$/,
+  /^\/screensaver\/photos\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+]);
+
+/**
  * Was ein Display aus `/preferences` sehen darf.
  *
  * DIE AUSNAHME OBEN TRAEGT IHRE EIGENE VERENGUNG. `/preferences` steht in
@@ -161,8 +185,8 @@ export function pickDisplayPreferences(data) {
 }
 
 /**
- * Darf ein Display diesen Pfad mit dieser Methode lesen? Exakter Vergleich,
- * ausschliesslich GET.
+ * Darf ein Display diesen Pfad mit dieser Methode lesen? Exakter Vergleich gegen
+ * DISPLAY_READ_PATHS, enge Muster fuer DISPLAY_READ_ROUTES, ausschliesslich GET.
  *
  * DER PFAD IST IMMER `/api/v1`-RELATIV, und der Aufrufer schuldet das. Express
  * setzt `req.path` relativ zum MOUNT: im Gate von server/index.js (montiert auf
@@ -175,7 +199,8 @@ export function pickDisplayPreferences(data) {
  */
 export function displayMayRead(method, path) {
   if (String(method || '').toUpperCase() !== 'GET') return false;
-  return DISPLAY_READ_PATHS.includes(String(path || ''));
+  const p = String(path || '');
+  return DISPLAY_READ_PATHS.includes(p) || DISPLAY_READ_ROUTES.some((pattern) => pattern.test(p));
 }
 
 /**
