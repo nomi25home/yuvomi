@@ -89,8 +89,9 @@ test('a junk value and a blocked storage fall back to the defaults without throw
 // The component, driven. Same stubs as test:screensaver-idle: the module is a
 // singleton that registers its listeners at load, so the stubs exist before
 // the import and stay. `Date` is mocked as well, so the clock can be watched
-// turning on the full minute. The loader's formatTime is `String(d)`, which
-// makes the shown text the mocked instant itself.
+// turning on the full minute. The loader's formatTime is `String(d)` unless a
+// case sets globalThis.__formatTime: one case records the call, one plugs in
+// the real formatTime with a display zone and the 12h preference.
 
 const listeners = {};
 const toasts = [];
@@ -144,8 +145,10 @@ const PHOTOS = { data: { enabled: true, photos: [{ id: 'p1' }, { id: 'p2' }, { i
 let component;
 async function page() {
   if (component) return component;
-  // 09:13:20 - twenty seconds into a minute, so the first turn is 40 s away.
-  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: new Date(2026, 9, 8, 9, 13, 20) });
+  // 03:43:20 UTC, which is 09:13:20 in Kolkata (+05:30, no daylight saving):
+  // twenty seconds into a minute, so the first turn is 40 s away, and an hour
+  // that differs between the zone and UTC.
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.UTC(2026, 9, 8, 3, 43, 20) });
   globalThis.window = {
     addEventListener: (name, handler) => { (listeners[name] ||= []).push(handler); },
     yuvomi: { showToast: (message, type) => toasts.push({ message, type }) },
@@ -181,11 +184,21 @@ async function openScreensaver() {
   return node;
 }
 
-test('the clock shows the household time, diagonally opposite the caption', async () => {
-  const node = await openScreensaver();
+test('the clock shows formatTime of now, diagonally opposite the caption', async () => {
+  const calls = [];
+  globalThis.__formatTime = (date) => { calls.push(date); return `formatted-${calls.length}`; };
+  let node;
+  try {
+    node = await openScreensaver();
+  } finally {
+    delete globalThis.__formatTime;
+  }
   const clock = clockOf(node);
   assert.ok(clock, 'on by default');
-  assert.equal(clock.textContent, String(new Date()), 'formatTime of now - the household format and zone');
+  assert.equal(calls.length, 1, 'formatTime is what the clock shows');
+  assert.ok(calls[0] instanceof Date, 'called with a Date, not a string');
+  assert.equal(calls[0].getTime(), Date.now(), 'and with now');
+  assert.equal(clock.textContent, 'formatted-1');
   const opposite = (position) => String((Number(position) + 2) % 4);
   assert.equal(clock.dataset.position, opposite(caption(node).dataset.position));
 
@@ -195,6 +208,32 @@ test('the clock shows the household time, diagonally opposite the caption', asyn
   assert.equal(node.classList.contains('photo-screensaver--cover'), false, 'cover stays off by default');
   gesture();
   assert.equal(overlay(), undefined);
+});
+
+test('the clock is the household time: the display zone and the 12h preference', async () => {
+  await page();
+  // The real formatTime, not the loader's: same module graph as the page, so
+  // setDisplayTimeZone() below is the zone it reads.
+  const { formatTime } = await import('../public/i18n.js');
+  const { setDisplayTimeZone } = await import('../public/utils/timezone.js');
+  setDisplayTimeZone('Asia/Kolkata');
+  pageStorage.setItem('yuvomi-time-format', '12h');
+  globalThis.__formatTime = formatTime;
+  try {
+    const node = await openScreensaver();
+    const clock = clockOf(node);
+    const now = new Date();
+    assert.equal(now.getUTCHours() === 9, false, 'the case only measures the zone while UTC is another hour');
+    const kolkata = new Date(now.getTime() + 5.5 * 3_600_000);
+    const hour = kolkata.getUTCHours();
+    const expected = `${hour % 12 || 12}:${String(kolkata.getUTCMinutes()).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+    assert.equal(clock.textContent, expected, 'Kolkata wall time, written in 12h');
+    gesture();
+  } finally {
+    delete globalThis.__formatTime;
+    setDisplayTimeZone(null);
+    pageStorage.removeItem('yuvomi-time-format');
+  }
 });
 
 test('the clock turns on the full minute and stops with the screensaver', async () => {
@@ -273,6 +312,27 @@ test('the switches under Appearance store the choice and confirm it', async () =
   const registry = read('../public/settings/registry.js');
   assert.match(registry, /'settings\.screensaverClockLabel'/);
   assert.match(registry, /'settings\.screensaverCoverLabel'/);
+});
+
+test('positions two apart are opposite corners in the stylesheet', () => {
+  // The component puts the clock at (caption + 2) % 4. Whether that is really
+  // the opposite corner is decided here, in the four caption rules.
+  const css = read('../public/styles/screensaver.css');
+  const corners = {};
+  for (const [, position, body] of css.matchAll(/\.photo-screensaver p\[data-position="(\d)"\] \{([^}]*)\}/g)) {
+    corners[position] = {
+      horizontal: /\bleft:/.test(body) ? 'left' : /\bright:/.test(body) ? 'right' : null,
+      vertical: /\btop:/.test(body) ? 'top' : /\bbottom:/.test(body) ? 'bottom' : null,
+    };
+  }
+  assert.deepEqual(Object.keys(corners).sort(), ['0', '1', '2', '3'], 'one rule per position');
+  for (let position = 0; position < 4; position++) {
+    const here = corners[position];
+    const there = corners[(position + 2) % 4];
+    assert.ok(here.horizontal && here.vertical, `position ${position} is a corner`);
+    assert.notEqual(there.horizontal, here.horizontal, `${position} and ${(position + 2) % 4} sit on different sides`);
+    assert.notEqual(there.vertical, here.vertical, `${position} and ${(position + 2) % 4} sit on different edges`);
+  }
 });
 
 test('the stylesheet keeps contain as the default and crops only with the cover class', () => {
