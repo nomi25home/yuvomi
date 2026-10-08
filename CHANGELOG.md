@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The screensaver can show the time and fill the screen, chosen on each device** (#1766, from
+  D#885). Two switches under Settings → Account → Appearance, below the delay: the current time,
+  on unless switched off, in the household's time format and zone, turning on the full minute and
+  sitting in the corner opposite the photo caption, moving with it so no text stays in one place;
+  and photos that fill the whole screen instead of fitting inside it, off unless chosen, because it
+  crops portrait photos. Both are stored in the browser like wall mode and the delay, so the frame
+  in the hallway and the kitchen tablet decide for themselves, and both apply from the next start
+  of the screensaver without a reload.
+
 ## [2.75.0] - 2026-10-07
 
 ### Added
