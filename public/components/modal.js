@@ -18,6 +18,8 @@
  *   mountFooter(panel)             → hebt eine neu gerenderte Fußzeile ans Panel
  *   decorateFooterDelete(footer)   → erkennt Löschen im Fuß (mobil Icon-Knopf)
  *   refreshDirtySnapshot()         → Dirty-Basis auf den jetzigen Stand setzen
+ *   swapFieldsKeepingDirtyBase(panel, swap) → Felder im offenen Formular
+ *                                    tauschen, ohne dass der Tausch als Eingabe zählt
  *   focusFirstField(panel)         → Fokus nach dem Pane-Wechsel, touch-bewusst
  *   updateHeaderAction(panel, …)   → Beschriftung/Handler des Kopf-Buttons tauschen
  */
@@ -27,6 +29,7 @@ import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import { iconElement } from '/utils/lucide-icons.js';
+import { expandIn, durationToken } from '/utils/ux.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -34,7 +37,13 @@ let previouslyFocused = null;
 // zurueck, wenn die Seite erst nach einem `await` fertig gerendert hat.
 let _lastRestore = null;
 let focusTrapHandler = null;
+// Die Dirty-Basis des offenen Formulars: `{ fields, entries }` - die Felder vom
+// Snapshot und je Feld sein Eintrag (siehe _takeDirtyBase).
 let _initialFormSnapshot = null;
+// Dieselbe Basis, auffindbar ueber ihr Panel - auch waehrend das Formular unter
+// einer Rueckfrage geparkt ist und `_initialFormSnapshot` dem Dialog darueber
+// gehoert (swapFieldsKeepingDirtyBase).
+const _dirtyBaseByPanel = new WeakMap();
 let _initialFormTimeout = null;
 let _modalFormSeq = 0;
 // Monotone Kennung des zuletzt tatsaechlich eingesetzten Shared-Modals. Ein
@@ -417,10 +426,13 @@ export function focusFirstField(panel) {
 // fieldsets: a real field that starts disabled/hidden (e.g. a conditional
 // fieldset a mode enables) must still count once it holds typed content.
 function serializeForm(container) {
-  const inputs = container.querySelectorAll(
+  return formFields(container).map(serializeField).join('&');
+}
+
+function formFields(container) {
+  return Array.from(container.querySelectorAll(
     'input:not([type="file"]):not([data-dirty-ignore]), select:not([data-dirty-ignore]), textarea:not([data-dirty-ignore])'
-  );
-  return Array.from(inputs).map(serializeField).join('&');
+  ));
 }
 
 // EIN HAKEN IST SEIN ZUSTAND, NICHT SEIN WERT (#1775). Eine Checkbox traegt
@@ -439,12 +451,24 @@ function isFormDirty(container) {
   // Ein Ansichtsblatt hat nichts Ungespeichertes - siehe _dirtyGuardEnabled.
   if (!_dirtyGuardEnabled) return false;
   if (_initialFormSnapshot === null) return false;
-  return serializeForm(container) !== _initialFormSnapshot;
+  return serializeForm(container) !== _initialFormSnapshot.entries.join('&');
+}
+
+// Die Basis steht JE FELD da, nicht als ein Text, und merkt sich das ELEMENT
+// zu jedem Eintrag: nur so laesst sich spaeter sagen, welcher Eintrag zu
+// welchem Feld gehoert, egal wie viele Felder inzwischen dazukamen oder
+// gingen (swapFieldsKeepingDirtyBase). Verglichen wird weiter der eine Text -
+// fuer jeden Dialog, der nie Felder tauscht, ist das der Vergleich von immer.
+function _takeDirtyBase(panel) {
+  const fields = formFields(panel);
+  const base = { fields, entries: fields.map(serializeField) };
+  _dirtyBaseByPanel.set(panel, base);
+  return base;
 }
 
 function _snapshotNow() {
   if (!activeOverlay) return;
-  _initialFormSnapshot = serializeForm(activeOverlay.querySelector('.modal-panel') ?? activeOverlay);
+  _initialFormSnapshot = _takeDirtyBase(activeOverlay.querySelector('.modal-panel') ?? activeOverlay);
 }
 
 /**
@@ -463,6 +487,78 @@ export function refreshDirtySnapshot() {
   _snapshotNow();
   if (_initialFormTimeout) clearTimeout(_initialFormTimeout);
   _initialFormTimeout = setTimeout(_snapshotNow, 150);
+}
+
+/**
+ * Tauscht Felder im offenen Formular, ohne dass der Tausch als Eingabe zaehlt
+ * (#1784).
+ *
+ * Wer einem offenen Dialog Felder NACHREICHT (eine Auswahl, deren Optionen erst
+ * jetzt geladen sind), veraendert, was `serializeForm` liest - und das
+ * Schliessen fragt "Aenderungen verwerfen?", obwohl niemand etwas angefasst
+ * hat. `refreshDirtySnapshot()` waere hier die falsche Antwort: es friert den
+ * JETZIGEN Stand ein und damit auch, was der Nutzer inzwischen getippt hat -
+ * das Schliessen ginge ohne Frage durch, und die Eingabe waere still weg.
+ *
+ * Deshalb je ELEMENT. Die Basis kennt zu jedem Eintrag sein Feld:
+ *   - was der Tausch ENTFERNT, faellt aus der Basis;
+ *   - was er NEU bringt, geht mit dem Stand hinein, den `swap` ihm gegeben hat,
+ *     an der Stelle, an der es im Formular steht;
+ *   - alles andere bleibt, wie es war. Eine getippte Eingabe bleibt eine
+ *     Aenderung, und wer sie zuruecknimmt, ist wieder sauber. Eine Zeile, die
+ *     der Nutzer vor dem Tausch hinzugefuegt hat, bleibt ebenfalls eine - sie
+ *     war schon da und kommt deshalb NICHT in die Basis; nimmt er sie wieder
+ *     weg, steht der Dialog im Oeffnungszustand.
+ *
+ * Die Basis wird ueber das Panel gefunden und AN ORT UND STELLE geaendert. Sie
+ * ist dasselbe Objekt, das ein geparktes Formular in seinem Token traegt - der
+ * Tausch erreicht es also auch unter einer Rueckfrage, und das Zurueckholen
+ * bringt die nachgefuehrte Basis mit.
+ *
+ * `swap` laeuft synchron und IMMER - auch fuer ein Panel ohne Basis.
+ *
+ * @param {Element} panel - das `.modal-panel`, das `onSave` bekommen hat
+ * @param {() => void} swap - der Tausch samt allem, was die neuen Felder
+ *   programmatisch setzt (Vorauswahl), bevor der Nutzer sie zu sehen bekommt
+ */
+export function swapFieldsKeepingDirtyBase(panel, swap) {
+  const base = _dirtyBaseByPanel.get(panel) ?? null;
+  const before = base ? new Set(formFields(panel)) : null;
+  swap();
+  if (!base) return;
+  const after = formFields(panel);
+  const present = new Set(after);
+  // Vom Tausch entfernt: vorher da, jetzt weg. Was schon VOR dem Tausch
+  // fehlte, hat der Nutzer entfernt - das bleibt als Aenderung in der Basis.
+  const swappedOut = (el) => before.has(el) && !present.has(el);
+  const rows = base.fields.map((el, i) => [el, base.entries[i]]).filter(([el]) => !swappedOut(el));
+  const known = new Set(rows.map(([el]) => el));
+  // Neu ist, was weder vorher da war noch in der Basis steht. Was vorher da
+  // war und nicht in der Basis steht, hat der Nutzer hinzugefuegt.
+  const added = after.filter((el) => !known.has(el) && !before.has(el));
+  const gap = base.fields.findIndex(swappedOut);
+  if (gap >= 0) {
+    // Der Tausch ERSETZT: das Neue nimmt den Platz dessen ein, was er entfernt
+    // hat - gezaehlt in der Basis, nicht im Formular, denn dort koennen Zeilen
+    // des Nutzers dazwischenstehen oder fehlen.
+    // `gap` ist das ERSTE Entfernte - davor steht also nichts, was fehlt.
+    rows.splice(gap, 0, ...added.map((el) => [el, serializeField(el)]));
+  } else {
+    // Der Tausch fuegt nur HINZU: hinter das naechste Feld davor, das die
+    // Basis kennt.
+    const fresh = new Set(added);
+    let anchor = null;
+    for (const el of after) {
+      if (known.has(el)) { anchor = el; continue; }
+      if (!fresh.has(el)) continue;
+      const at = anchor ? rows.findIndex(([row]) => row === anchor) + 1 : 0;
+      rows.splice(at, 0, [el, serializeField(el)]);
+      known.add(el);
+      anchor = el;
+    }
+  }
+  base.fields = rows.map(([el]) => el);
+  base.entries = rows.map(([, entry]) => entry);
 }
 
 // --------------------------------------------------------
@@ -554,7 +650,7 @@ function _suspendActiveModal() {
     // hier: das gleich folgende openModal löscht den ausstehenden Timer, und ein
     // null-Snapshot schaltet isFormDirty() für die restliche Lebensdauer des
     // Formulars ab - der Dirty-Guard wäre danach still tot.
-    snapshot: _initialFormSnapshot ?? (panel ? serializeForm(panel) : null),
+    snapshot: _initialFormSnapshot ?? (panel ? _takeDirtyBase(panel) : null),
     // Mit demselben Grund wie der Snapshot daneben: der Dialog, der sich gleich
     // darüberlegt, läuft selbst durch openModal() und setzt den Wächter dabei
     // auf seinen Standardwert. Ohne dieses Merken käme ein geparktes
@@ -1200,7 +1296,34 @@ export function mountFooter(panel) {
 
   panel.appendChild(bodyFooter);
   decorateFooterDelete(bodyFooter);
+  collapseEmptyBody(panel);
   return bodyFooter;
+}
+
+/**
+ * EIN RUMPF OHNE INHALT IST KEIN RUMPF (R18).
+ *
+ * Eine Rückfrage ohne `detail` besteht nur aus Frage (Titel) und Fuß. Nach dem
+ * Anheben der Fußzeile blieb ihr Rumpf als leerer Kasten stehen: zweimal 16px
+ * Polster zwischen der Linie des Kopfs und der des Fußes (Abmelden, gemessen
+ * 32px Leere zwischen zwei Haarlinien). Das trifft jede Rückfrage ohne
+ * Erklärtext, nicht eine bestimmte.
+ *
+ * Der Rumpf wird dafür nur WIRKLICH leer gemacht - übrig waren die
+ * Leerzeichen des Template-Literals, und an denen scheitert `:empty`. Den
+ * Rest trägt das Stylesheet (`.modal-panel__body:empty`, layout.css): keine
+ * Klasse, die jemand wieder abnehmen müsste, wenn ein Aufrufer den Rumpf
+ * später füllt - dann ist er nicht mehr `:empty` und steht von selbst wieder.
+ *
+ * @param {HTMLElement} panel
+ * @returns {boolean} true, wenn der Rumpf geleert wurde
+ */
+export function collapseEmptyBody(panel) {
+  const body = panel?.querySelector?.('.modal-panel__body');
+  if (!body) return false;
+  if (body.children.length > 0 || body.textContent.trim() !== '') return false;
+  body.replaceChildren();
+  return true;
 }
 
 /**
@@ -1980,6 +2103,23 @@ export const askOverModal = createAskOverModal();
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   serializeForm,
+  // #1784: die Dirty-Basis als Programm - ein Overlay ohne openModal() zum
+  // offenen Formular erklaeren (Basis sofort, ohne den 150-ms-Nachlauf), den
+  // Waechter fragen und wieder aufraeumen.
+  isFormDirty,
+  adoptOverlayForTest(overlay) {
+    activeOverlay = overlay;
+    _dirtyGuardEnabled = true;
+    _snapshotNow();
+  },
+  releaseOverlayForTest() {
+    activeOverlay = null;
+    _initialFormSnapshot = null;
+  },
+  // Das echte Parken und Zurueckholen (confirmOverModal/askOverModal), ohne
+  // den Dialog dazwischen: die Basis wandert im Token mit.
+  suspendActiveModal: _suspendActiveModal,
+  resumeSuspendedModal: _resumeSuspendedModal,
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
   createAskOverModal,
@@ -2063,10 +2203,18 @@ function _focusField(input) {
 function _validateField(input) {
   const group = input.closest('.form-field') ?? input.parentElement;
   const hasValue = input.value.trim().length > 0;
+  const wasShown = Boolean(group?.classList.contains?.('form-field--error'));
   if (group) _ensureFieldError(group, input);
   group?.classList.toggle('form-field--error', !hasValue);
   group?.classList.toggle('form-field--valid', hasValue);
   input.setAttribute('aria-invalid', String(!hasValue));
+  // Die Meldung zieht auf, statt zu erscheinen: sie ist eine Zeile hoch, und
+  // alles darunter rueckte in einem Frame um rund 24px - auch der Knopf, auf
+  // den der Zeiger gerade zielt (R18). `expandIn` ist der Baustein dafuer.
+  if (!hasValue && !wasShown) {
+    const el = typeof group?.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
+    if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
+  }
 
   if (!hasValue && group) {
     const count = parseInt(group.dataset.errorCount ?? '0', 10) + 1;
@@ -2084,12 +2232,32 @@ function _validateField(input) {
   return hasValue;
 }
 
+/**
+ * Felder, in die schon jemand geschrieben hat - je Knoten, ohne Spur im DOM.
+ *
+ * EIN UNBERUEHRTES PFLICHTFELD RUEGT NICHT (R18). Der Dialog oeffnet mit dem
+ * Fokus im ersten Feld; der erste Tab, der Griff zum Datumswaehler, ein Klick
+ * daneben - alles ein `blur` auf einem leeren Titel, und jedes davon meldete
+ * "Dieses Feld ist erforderlich.", bevor irgendwer etwas versaeumt hatte
+ * ("Neuer Termin", zwei Laeufe). Geruegt wird, wo eine Eingabe FEHLT: nach
+ * dem Absenden (`validateAll`) oder wenn jemand das Feld beschrieben und
+ * wieder geleert hat. Wer es nur durchquert, hat nichts falsch gemacht.
+ */
+const _touchedFields = new WeakSet();
+
 export function wireBlurValidation(formContainer) {
   formContainer.querySelectorAll('input[required], select[required], textarea[required]').forEach((input) => {
-    input.addEventListener('blur', () => _validateField(input));
+    input.addEventListener('blur', () => {
+      const pristineEmpty = input.value.trim().length === 0
+        && !_touchedFields.has(input)
+        && input.getAttribute('aria-invalid') !== 'true';
+      if (pristineEmpty) return;
+      _validateField(input);
+    });
     // Sofortige Entwarnung: ist das Feld bereits als fehlerhaft markiert,
     // räumt die nächste Eingabe den Fehler ohne erneuten Blur auf.
     input.addEventListener('input', () => {
+      _touchedFields.add(input);
       if (input.getAttribute('aria-invalid') === 'true') _validateField(input);
     });
   });
@@ -2122,9 +2290,15 @@ export function reportFieldError(input, message) {
   const group = (typeof input.closest === 'function' ? input.closest('.form-field') : null) ?? input.parentElement;
   if (!group) return false;
 
+  const wasShown = Boolean(group.classList?.contains?.('form-field--error'));
   _ensureFieldError(group, input, message);
   group.classList?.add('form-field--error');
   group.classList?.remove('form-field--valid');
+  // Dieselbe Bewegung wie in _validateField: die Meldung zieht auf.
+  if (!wasShown && typeof group.querySelector === 'function') {
+    const el = group.querySelector('.form-field__error');
+    if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
+  }
   input.setAttribute?.('aria-invalid', 'true');
   _focusField(input);
 

@@ -82,6 +82,65 @@ test('die Signatur bleibt: fuenf Positionsargumente plus optionaler Siegel-Slug'
   assert.ok(!/widget__link/.test(html), 'ohne Ziel weiterhin kein Link');
 });
 
+// R18: DER SLUG DES SIEGELS IST EIN MODUL, KEIN STUECK ADRESSE. Das Budget-Widget
+// verlinkt auf `/budget?tab=budget`; der Slug wurde am ersten `/` geschnitten und
+// ergab `var(--module-budget?tab=budget, ...)` - ungueltig, das Siegel stand im
+// geerbten Violett. Der Text-Guard „wer ein Markensiegel baut, benennt eine
+// Herkunft" (test-frontend-audit.js) sah die Zeichenkette `--seal-accent` und
+// war gruen. Deshalb hier der AUFRUF: jedes Ziel, das dashboard.js einem
+// Widget-Kopf gibt, laeuft durch widgetHeader, und der Ton muss ein Token sein,
+// das tokens.css kennt.
+test('jedes Widget-Siegel nennt einen Modulton, den tokens.css kennt (R18)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const known = new Set([...read('../public/styles/tokens.css').matchAll(/--module-([a-z-]+)\s*:/g)].map((m) => m[1]));
+  assert.ok(known.has('budget') && known.has('health'), 'Reichweite: die Modulliste wurde gelesen');
+
+  const src = read('../public/pages/dashboard.js');
+  const constants = Object.fromEntries(
+    [...src.matchAll(/^const ([A-Z_]+_ROUTE) = '([^']+)';/gm)].map((m) => [m[1], m[2]]));
+  const slugOf = (html) => html.match(/--seal-accent: var\(--module-([^,)]*)/)?.[1];
+
+  // Jeder Aufruf mit seinen Argumenten - ueber die Klammern, nicht ueber ein
+  // Muster: `t('nav.budget')` schliesst vor dem Ziel schon einmal.
+  const calls = [];
+  for (const m of src.matchAll(/(?<!function )widgetHeader\('([a-z-]+)'/g)) {
+    let depth = 0;
+    let end = m.index + 'widgetHeader'.length;
+    do {
+      if (src[end] === '(') depth += 1;
+      else if (src[end] === ')') depth -= 1;
+      end += 1;
+    } while (depth > 0);
+    calls.push([src.slice(m.index, end), m[1]]);
+  }
+  assert.ok(calls.length >= 30, `Reichweite: ${calls.length} Aufrufe gefunden`);
+
+  const offenders = [];
+  let viaConstant = 0;
+  for (const [text, id] of calls) {
+    const route = text.match(/'(\/[^']*)'/)?.[1];
+    const constant = text.match(/\b([A-Z_]+_ROUTE)\b/)?.[1];
+    const seal = text.match(/,\s*'([a-z-]+)'\)$/)?.[1] ?? null;
+    if (constant) viaConstant += 1;
+    const href = route ?? (constant ? constants[constant] : null);
+    if (constant) assert.ok(href, `${constant} ist aufloesbar`);
+    // Ohne Ziel und ohne benannte Herkunft bleibt nur, was der Aufruf selbst
+    // mitgibt (das Familie-Widget rechnet sein Ziel zur Laufzeit, nennt aber
+    // die Herkunft).
+    const slug = slugOf(widgetHeader(id, 'Titel', null, href, null, seal));
+    if (!slug) offenders.push(`${id}: kein Modulton (weder Ziel noch sealSlug) in ${text}`);
+    else if (!known.has(slug)) offenders.push(`${id}: --module-${slug} gibt es nicht (${text})`);
+  }
+  assert.ok(viaConstant >= 2, 'Reichweite: der Budget-Kopf (Route mit Query) ist dabei');
+  assert.deepEqual(offenders, []);
+
+  // Und die Regel selbst, an den Formen, die eine Adresse haben kann.
+  for (const href of ['/budget?tab=budget', '/budget#monat', '/budget/', '/budget/x?y=1']) {
+    assert.equal(slugOf(widgetHeader('budget', 'Budget', null, href)), 'budget', href);
+  }
+});
+
 test('das Raster hat eine eigene h2 - die Widgets haengen nicht unter „Heute wichtig"', () => {
   const html = renderDashboardLayout([{ id: 'clock', visible: true, size: '1x1' }], {}, null, 'EUR');
   const gridAt = html.indexOf('dashboard__grid');
@@ -191,6 +250,30 @@ test('die globale Suche ist von der Uebersicht mit einem Tipp erreichbar, und ni
     'ein benannter Icon-Knopf wie die zwei daneben');
   const editing = renderDashboardOverview(user, true, null, { followsDefault: true, canPublish: false });
   assert.doesNotMatch(editing, /id="dashboard-search"/, 'im Anpassen-Modus zaehlt nur Abbrechen oder Speichern');
+});
+
+test('am Wandtablett bietet der Kopf weder Anpassen noch die Suche an (#1808)', () => {
+  // Beide Knoepfe enden an einer Route, die ein Display nicht erreicht:
+  // `PUT /preferences` und `GET /search` antworten ihm mit 403 (gemessen am
+  // echten Server in test:display-account). Der Melder ordnete sein Brett um
+  // und bekam beim Speichern den englischen Rohtext der Scope-Sperre.
+  global.window ??= { yuvomi: null };
+  const mensch = renderDashboardOverview({ display_name: 'Linda' }, false, null, {});
+  // BEIM MENSCHEN ZUERST: eine Zusicherung ueber eine Abwesenheit braucht den
+  // Gegenfall, sonst ist sie auch gruen, wenn der Kopf die Knoepfe gar nicht
+  // mehr zeichnet.
+  assert.match(mensch, /id="dashboard-customize-btn"/, 'der Mensch behaelt den Einstieg');
+  assert.match(mensch, /id="dashboard-search"/, 'und die Suche');
+
+  const tablett = renderDashboardOverview({ display_name: 'Kueche', access_scope: 'display' }, false, null, {});
+  assert.doesNotMatch(tablett, /id="dashboard-customize-btn"/, 'kein Einstieg in eine Anordnung, die sich nicht speichern laesst');
+  assert.doesNotMatch(tablett, /id="dashboard-search"/, 'keine Suche, die nur 403 antworten kann');
+  // Der Wandmodus bleibt: er ist ein Zustand der Seite und schreibt nichts.
+  assert.match(tablett, /id="dashboard-wall-enter"/, 'der Wandmodus gehoert gerade an dieses Geraet');
+  // Ein Ausgaben-Gast oder ein anderes enges Konto ist nicht mitgemeint:
+  // `/preferences` steht ihnen offen.
+  const gast = renderDashboardOverview({ display_name: 'Gast', access_scope: 'split_guest' }, false, null, {});
+  assert.match(gast, /id="dashboard-customize-btn"/, 'die Regel haengt am Display, nicht an jedem engen Konto');
 });
 
 test('Abbrechen fragt nur, wenn es etwas zu verlieren gibt (H2)', () => {

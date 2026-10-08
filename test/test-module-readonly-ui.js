@@ -414,28 +414,34 @@ test('der Kaskadenloeser selbst: Zustands-Suffix und :not() zaehlen mit', () => 
     'der bedienbare Knopf reagiert weiter');
 });
 
+// R18: die Quittung haengt gar nicht mehr am Stylesheet. `acknowledgeCheck`
+// (utils/ux.js) startet sie im Klick-Handler des Knopfs; das Zeichen ist ein
+// `span` ohne `data-action` und erreicht den Handler nie. Damit gilt die
+// Zusicherung staerker als vorher: KEINE Kombination der Zustandsklassen traegt
+// eine Animation - weder das Zeichen noch der bedienbare Knopf, der sie frueher
+// bei jedem Neuzeichnen mitspielte. (Blattuebergreifend: test:motion.)
+const ANIMIERT_NICHT = [null, 'none'];
+const TASKS_JS = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+
 test('eine erledigte Aufgabe im Zustandszeichen animiert nicht', () => {
-  assert.equal(
+  assert.ok(ANIMIERT_NICHT.includes(
     effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'animation'),
-    'none',
-    'check-pop quittiert eine Beruehrung - hier hat niemand etwas beruehrt',
-  );
-  // Der bedienbare Knopf behaelt sie: die Quittung gehoert zum gedrueckten Haken.
-  assert.match(
-    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'animation') ?? '',
-    /check-pop/,
-  );
+  ), 'die Quittung gehoert einer Beruehrung - hier hat niemand etwas beruehrt');
+  assert.ok(ANIMIERT_NICHT.includes(
+    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'animation'),
+  ), 'auch der Knopf traegt sie nicht als Zustand: sie liefe bei jedem Neuzeichnen');
+  // Der bedienbare Knopf behaelt seine Quittung - im Handler.
+  assert.match(TASKS_JS, /const settled = acknowledgeCheck\(target, \{ checked: nextStatus === 'done' \}\);/);
 });
 
 test('dieselbe Zusicherung fuer die Teilaufgabe (#1209 und #467 teilen sich das Zeichen)', () => {
-  assert.equal(
+  assert.ok(ANIMIERT_NICHT.includes(
     effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done', 'subtask-item__checkbox--static'], 'animation'),
-    'none',
-  );
-  assert.match(
-    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'animation') ?? '',
-    /check-pop/,
-  );
+  ));
+  assert.ok(ANIMIERT_NICHT.includes(
+    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'animation'),
+  ));
+  assert.match(TASKS_JS, /const settled = acknowledgeCheck\(target, \{ checked: subtaskDone \}\);/);
 });
 
 // -------------------------------------------------------------------------
@@ -3113,6 +3119,51 @@ test('R8 H9: eine Messung oeffnet sich mit Bestand, Loeschen steht links im Dial
   assert.doesNotMatch(neu.content, /id="vital-type" disabled/);
 });
 
+test('R18: "Messwert erfassen" spricht in Formularzeilen - der Blutdruck ist EIN Feld mit Einheit', () => {
+  const neu = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal())).content;
+  // Reihenfolge der Felder wie vorher: Art, Wert, Zeitpunkt, Sichtbarkeit, Notiz.
+  const order = ['id="vital-type"', 'id="vital-value-fields"', 'id="vital-measured-at"', 'id="vital-visibility"', 'id="vital-note"'].map((id) => neu.indexOf(id));
+  assert.ok(order.every((at) => at >= 0), 'alle fuenf Felder stehen im Dialog');
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'in der alten Reihenfolge');
+  assert.doesNotMatch(neu, /modal-grid/, 'kein Feldraster mehr: Zeilen');
+  // Jede Auswahl haengt an ihrem Etikett.
+  for (const id of ['vital-type', 'vital-visibility', 'vital-measured-at']) {
+    assert.match(neu, new RegExp(`<label class="form-row__label" for="${id}">`), `${id} hat ein verknuepftes Etikett`);
+  }
+  assert.match(neu, /<div class="form-rows" id="vital-value-fields">/, 'die Wertefelder sind ein eigener Traeger - der Typwechsel tauscht nur ihn');
+  // Die Notiz bleibt ein freies Feld ohne Zeilenraster.
+  assert.match(neu, /<div class="form-field">\s*<label class="form-label" for="vital-note">/);
+
+  const bp = health.valueFieldsMarkup('bp', { id: 1, type: 'bp', value_num: 128, value_num2: 84, value_num3: 66 });
+  assert.match(bp, /<span class="form-row__label" id="vital-pair-label">health\.vitals\.metric\.bp<\/span>/, 'die Zeile heisst "Blutdruck"');
+  assert.match(bp, /<span class="form-composite" role="group" aria-labelledby="vital-pair-label">/);
+  assert.match(bp, /id="vital-sys" aria-label="health\.vitals\.field\.systolic" placeholder="120" value="128">/);
+  assert.match(bp, /<span class="form-composite__sep" aria-hidden="true">\/<\/span>/);
+  assert.match(bp, /id="vital-dia" aria-label="health\.vitals\.field\.diastolic" aria-describedby="vital-dia-unit" placeholder="80" value="84">/);
+  assert.match(bp, /<span class="form-composite__unit" id="vital-dia-unit">mmHg<\/span>/, 'die Einheit steht als Suffix am Paar');
+  assert.match(bp, /<label class="form-row__label" for="vital-pulse">health\.vitals\.field\.pulse<\/label>/, 'der Puls ist eine eigene Zeile daneben');
+  assert.match(bp, /id="vital-pulse" aria-describedby="vital-pulse-suffix" placeholder="72" value="66">/);
+  assert.ok(bp.indexOf('id="vital-sys"') < bp.indexOf('id="vital-dia"') && bp.indexOf('id="vital-dia"') < bp.indexOf('id="vital-pulse"'),
+    'Tastaturfolge: systolisch, diastolisch, Puls');
+  // Ein leeres Paar traegt Beispielwerte als Platzhalter, keinen Bestand.
+  const leer = health.valueFieldsMarkup('bp');
+  assert.match(leer, /id="vital-sys"[^>]*placeholder="120">/);
+  assert.doesNotMatch(leer, /id="vital-sys"[^>]*value=/);
+
+  // Einfacher Wert: Zahl und Einheit sind ein Feld; die Einheit ist Auswahl oder Text.
+  const gewicht = health.valueFieldsMarkup('weight');
+  assert.match(gewicht, /<label class="form-row__label" for="vital-value">health\.vitals\.metric\.weight<\/label>/);
+  assert.match(gewicht, /<select class="form-input" id="vital-unit" aria-label="health\.vitals\.field\.unit">/, 'die Einheitenauswahl hat einen eigenen Namen');
+  // Dauer: die Worte hinter den Zahlen sind die Etiketten der Teilfelder.
+  const schlaf = health.valueFieldsMarkup('sleep');
+  assert.match(schlaf, /id="vital-hours"><label class="form-composite__unit" for="vital-hours">health\.vitals\.field\.hours<\/label>/);
+  assert.match(schlaf, /id="vital-minutes"[^>]*><label class="form-composite__unit" for="vital-minutes">health\.vitals\.field\.minutes<\/label>/);
+  // Stimmung: gestapelte Zeile, die Skala ist nach dem Zeilenetikett benannt.
+  const stimmung = health.valueFieldsMarkup('mood');
+  assert.match(stimmung, /class="form-row form-row--stacked form-field"/);
+  assert.match(stimmung, /data-group="mood" role="group"\s+aria-labelledby="vital-mood-label"/);
+});
+
 test('R8 H9: PATCH einer Messung leert, was der Dialog nicht mehr zeigt', () => {
   assert.deepEqual(
     health.vitalPatchBody({ type: 'bp', value_num: 120, value_num2: 80, visibility: 'private', measured_at: '2026-06-15T08:30' }),
@@ -4901,8 +4952,12 @@ test('Kanon R5: Geburtstagszeile nennt die Person an Bearbeiten und Loeschen', (
       id: 5, name: 'Oma Ingrid', birth_date: '1955-03-01', next_birthday: '2027-03-01',
       days_until: 156, age_next: 72,
     });
-    assert.match(html, /class="row-action" data-action="edit" aria-label="common\.editNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
-    assert.match(html, /class="row-action row-action--danger" data-action="delete" aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+    // Seit R18 (2026-10-07) traegt die Zeile EINEN Mehr-Knopf; er nennt die
+    // Person, Bearbeiten und Loeschen sind seine Eintraege mit Wort.
+    assert.match(html, /class="row-action row-action--more popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+    assert.match(html, /role="menuitem"\s+class="popover-menu__item"\s+data-action="edit" data-id="5">/);
+    assert.match(html, /role="menuitem"\s+class="popover-menu__item popover-menu__item--danger"\s+data-action="delete" data-id="5">/);
+    assert.equal((html.match(/class="row-action[\s"]/g) ?? []).length, 1, 'kein Stift und kein Papierkorb daneben');
   });
 });
 
@@ -4934,9 +4989,13 @@ test('Kanon R5: Aufgabenkarte nennt die Aufgabe an Bearbeiten, Ablegen und Teila
   withAccess({ tasks: 'write' }, () => {
     const html = tasks.renderTaskCard(aufgabe({ title: 'Muell rausbringen' }));
     const titel = '\\{&quot;title&quot;:&quot;Muell rausbringen&quot;\\}';
-    assert.match(html, new RegExp(`class="row-action task-card__inline-action" data-action="edit-task"[^>]*aria-label="common\\.editNamed\\{&quot;name&quot;:&quot;Muell rausbringen&quot;\\}"`));
-    assert.match(html, new RegExp(`data-action="archive-task"[^>]*aria-label="tasks\\.archiveNamed${titel}"`));
-    assert.match(html, new RegExp(`data-action="add-subtask"[^>]*aria-label="tasks\\.subtaskAddNamed${titel}"`));
+    // Seit R18 (2026-10-07) traegt die Karte EINEN Mehr-Knopf; er nennt die
+    // Aufgabe, die drei Handlungen sind seine Eintraege mit Wort.
+    void titel;
+    assert.match(html, /class="row-action row-action--more task-card__inline-action popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Muell rausbringen&quot;\}"/);
+    assert.match(html, /class="popover-menu__item"\s+data-action="edit-task" data-id="7">[\s\S]{0,160}common\.edit</);
+    assert.match(html, /class="popover-menu__item"\s+data-action="add-subtask" data-parent="7">[\s\S]{0,160}tasks\.subtaskAdd</);
+    assert.match(html, /class="popover-menu__item"\s+data-action="archive-task" data-id="7">[\s\S]{0,160}tasks\.archiveButton</);
   });
 });
 

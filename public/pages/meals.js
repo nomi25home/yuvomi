@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, swapFieldsKeepingDirtyBase } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -1270,11 +1270,12 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             data-meal-id="${meal.id}"
             aria-label="${esc(t('common.toShoppingListNamed', { title: meal.title }))}"
           ><i data-lucide="shopping-cart" class="icon-md" aria-hidden="true"></i></button>` : ''}
-          ${ro ? '' : `<button class="meal-card__action-btn meal-card__action-btn--delete"
-            data-action="delete-meal"
-            data-meal-id="${meal.id}"
-            aria-label="${esc(t('meals.deleteMealNamed', { title: meal.title }))}"
-          ><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>`}
+${/* KEIN PAPIERKORB AUF DER KARTE (Entscheidung 2026-10-07, benannte
+               Ausnahme vom Mehr-Knopf): 27 Karten trugen als einziges
+               wiederkehrendes Zeichen einen Papierkorb. Loeschen lebt im
+               Dialog der Mahlzeit, links im Fuss - einen Tipp auf die Karte
+               entfernt und mobil seit R8 der einzige Weg. Ein Mehr-Knopf mit
+               einem Eintrag waere dieselbe Dichte fuer denselben Weg. */ ''}
         </div>
       </div>
     `;
@@ -1418,11 +1419,6 @@ async function onGridClick(e) {
     const mealId = parseInt(btn.dataset.mealId, 10);
     const meal   = state.meals.find((m) => m.id === mealId);
     if (meal) openMealModal({ mode: 'edit', meal, date: meal.date, mealType: meal.meal_type });
-    return;
-  }
-
-  if (action === 'delete-meal') {
-    await deleteMeal(parseInt(btn.dataset.mealId, 10));
     return;
   }
 
@@ -2318,6 +2314,13 @@ function showCookForScope(panel, meal) {
  * Oeffnen leer war (gescheiterter Abruf, siehe loadMembers()). Ersetzt wird nur,
  * wenn derselbe Dialog noch offen ist und niemand gewaehlt hat - eine Wahl aus
  * der unvollstaendigen Liste ("Niemand") ueberschriebe das neue Markup sonst.
+ *
+ * DER TAUSCH IST KEINE EINGABE (#1784). Die neuen Checkboxen kennt die Basis
+ * des Verwerfen-Waechters nicht: das Schliessen des unberuehrten Dialogs
+ * fragte "Aenderungen verwerfen?". Die Basis einfach neu aufzunehmen waere die
+ * andere Luege - sie froere mit ein, was bis dahin getippt wurde. Der Tausch
+ * laeuft deshalb ueber swapFieldsKeepingDirtyBase(), samt der Vorauswahl aus
+ * showCookForScope(): sie gehoert zum Ausgangsstand der neuen Felder.
  */
 async function refreshCookPicker(panel, meal) {
   const opened = state.modal;
@@ -2325,10 +2328,12 @@ async function refreshCookPicker(panel, meal) {
   if (!state.members.length || state.modal !== opened || opened.cookTouched) return;
   const old = panel.querySelector('.meal-modal__cook');
   if (!old) return;
-  old.insertAdjacentHTML('afterend', cookPickerHtml(meal));
-  old.remove();
-  wireCookPicker(panel);
-  showCookForScope(panel, meal);
+  swapFieldsKeepingDirtyBase(panel, () => {
+    old.insertAdjacentHTML('afterend', cookPickerHtml(meal));
+    old.remove();
+    wireCookPicker(panel);
+    showCookForScope(panel, meal);
+  });
 }
 
 /** Beschriftung des Zutaten-Aufklappers: "Zutaten · 6" (wie "Geplant · n" im Budget). */

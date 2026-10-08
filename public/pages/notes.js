@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
-import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
@@ -200,6 +200,7 @@ async function toggleCheck(noteId, box) {
   }
 
   paintCheck(noteId, line, checked);
+  acknowledgeCheck(box, { checked });
   vibrate(10);
 
   try {
@@ -1013,7 +1014,13 @@ function openNoteModal({ mode, note = null }) {
         // Im Lese-Modus steht rechts "Bearbeiten" als Primaerknopf: sonst war
         // "Loeschen" die einzige und damit lauteste Fussaktion (Critique
         // 2026-09-26) - die zerstoerende Handlung als Hauptweg.
+        // Der Umschalter verschwindet in der Leseansicht (notes.css, EIN Weg
+        // zum Bearbeiten). Stand der Fokus auf seinem Reiter "Lesen", fiele
+        // er mit dem Reiter auf <body> - er geht auf den Knopf, der jetzt
+        // der Weg zurueck ist.
+        const focusWasOnSwitch = view === 'read' && modeSwitch?.contains(document.activeElement);
         syncFooter(view);
+        if (focusWasOnSwitch) (panel.querySelector('#note-modal-edit') ?? readPane).focus();
         modeTabs.forEach((b) => {
           const on = b.dataset.view === view;
           b.classList.toggle('sub-tab--active', on);

@@ -18,6 +18,286 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the hallway and the kitchen tablet decide for themselves, and both apply from the next start
   of the screensaver without a reload.
 
+### Changed
+
+- **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
+  deleting and anything further sit behind one "more" button per row that is always visible and
+  names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
+  and the five lists of the shift planner, where "Edit" and a red-outlined "Delete" stood on
+  every row. Deleting stays undoable or asks first, exactly as before, and swiping still works.
+  Meal cards no longer show a bin at all: open the meal to delete it.
+- **Shopping rows are one line.** The amount now stands at the end of the line with the name
+  instead of underneath it, so amounts line up in a column and the list shows more at once. A
+  long name still wraps instead of being cut off.
+- **Fields are quieter and all look alike.** A field used to be drawn twice - a fill plus a
+  heavy outline - and in dark mode it was a near-black box with a bright edge. Fields now have
+  one skin everywhere: a thin outline that still meets the contrast needed to find it, on a fill
+  that carries it; in dark mode the field is a soft well instead of a black hole. Dropdowns are
+  as tall as the text fields beside them and show the same small arrow on every browser, number
+  fields no longer show the tiny up/down arrows, and the quick-add row of the shopping list
+  focuses in violet like every other field.
+- **Settings read like a list, not like a form.** A choice in a settings row was a bordered
+  box at the end of the line, anywhere between a third and the full width of the row. It is now
+  the plain value with a small arrow, the way phone settings show it - "Language ... German".
+- **Recording a measurement is quicker to read and fill in.** Blood pressure was three wide
+  boxes named "Systolic", "Diastolic" and "Pulse", none with a unit. It is now written the way
+  it is said: "120 / 80 mmHg", with the pulse on the line below, each with an example value and
+  its unit. Type, time and visibility stand as rows with the label on the left and the value on
+  the right; the note keeps its own field. Screen readers still announce every part by name, and
+  in right-to-left languages the reading keeps its order.
+- **Documents look like documents.** The preview shows the whole page as a sheet on a quiet
+  background instead of the cropped top of a white rectangle, and in dark mode it is no longer
+  the brightest thing on the screen. Cards are as tall as their content, with their buttons
+  right below the text, and there is room between the filter bar and the first row. The list
+  view shows the category symbol instead of a preview too small to read. On a desktop, opening a
+  PDF no longer shows the browser's own toolbar inside the viewer; "Open in new tab" and
+  "Download" remain the way to zoom and print (Safari keeps its toolbar).
+- **Reading a note looks like the note.** The text stood in a tinted box with a coloured edge,
+  which above the red "Delete" read like an error message. The whole reading view now takes the
+  colour of the note. "Edit" is one button instead of a button and a tab.
+- **One empty-state message per page.** Waste collection and the shift planner stacked two or
+  three large "nothing here yet" blocks. The main section keeps its message; the sections below
+  say it in one line with their button.
+- **The task board has depth.** Columns were as bright as the cards on them; they are now a
+  recessed lane with the cards lying on top, and an empty column no longer shows a dashed box.
+- **Opening an event, a task or a birthday shows what matters first.** The reading view listed
+  everything as rows of equal weight, people as a comma-separated line, under a thin colour
+  strip. An event now opens with its time in words ("Today, 20:00 - 22:00") beside a dot in the
+  calendar colour and the people as avatars with names. A task opens with its due date and its
+  people, and "Done" is the one main button. A birthday opens with the picture, "turns 41" and
+  "in 26 days". The popover on a desktop carries the title in the same size as the sheet on a
+  phone.
+- **A recipe without a picture opens with a head of its own.** Its details began with a list of
+  ingredients and nothing that said "recipe". They now open with a flat band in the kitchen
+  colour that carries the sign of the meal the recipe is for. Recipes with a picture keep it,
+  and the list stays as it is.
+- **Ingredient amounts line up.** "200 g", "1 tbsp" and "2" stood inside the same text as the
+  ingredient, so every line started somewhere else. Amounts now have their own right-aligned
+  column in front of the names.
+- **The agenda names its days in words.** "Today - Thursday, 8 October" and "Saturday, 10
+  October" instead of "08.10.2026 Thursday".
+- **Each money screen has one number that leads.** On a phone the largest thing on every budget
+  tab was the word "Budget"; the balance stood beside it in small type. Now one figure per tab
+  carries the screen: the balance in the overview, net worth in accounts, the remaining debt in
+  loans, the monthly cost in subscriptions. Income and expenses stand as a quiet line below it.
+  On a desktop the same figure leads its column and the others step back. Long amounts and long
+  currency signs take a smaller size instead of breaking.
+- **The budget trend reads at a glance.** The area under income is tinted, today carries a dot
+  with both values, and what has not happened yet is dotted - for both lines, where expenses
+  used to be dashed as well. "Today" no longer sits on a grid line, the axis says "1.", "16.",
+  "31." instead of three full dates under a header that names the month, and three grid lines
+  replace up to seven. Trend and ring now sit on a card like the lists beside them.
+- **The spending ring shows its total in the middle.** The sentence next to it ("7 segments,
+  largest: ...") is still read out by screen readers.
+- **Account balances are no longer green.** Nearly every balance and the net worth above them
+  were green merely for being above zero. A balance now stands in the text colour and only a
+  negative one is red; green is kept for income and for changes.
+- **Figure tiles line up.** In the vitals row the dates stood at three different heights. Label,
+  value, trend line and date now share the same four rows across a row of tiles, value and unit
+  share a baseline, and labels are written normally instead of in spaced capitals, so a long one
+  such as oxygen saturation fits on one line. On the vitals page "116/74 mmHg" stands on one
+  line; in the narrower tiles of the health overview the unit still moves below the value. This
+  holds for every tile of this kind: budget, health, housekeeping, inventory and the overview.
+- **The small trend lines in the vitals tiles are visible.** They were grey hairlines; they now
+  carry the colour of the health area with a soft fill, and the latest reading is marked.
+- **Hovering a figure tile no longer looks like selecting it.** The tile lifts slightly; the
+  coloured ring is kept for the selected one.
+- **The week of activity is easier to read.** Bars have a round top and a flat foot, today's
+  bar stands in full colour with its value while the other days step back, and three grid
+  lines replace five. On a phone the chart is taller, and the weekdays no longer run into the
+  feet of the bars.
+- **The overview uses fewer type sizes.** Weather, birthdays, rewards and the budget tile mixed
+  sizes one pixel apart; their content now reads on four steps.
+- **Numbers no longer jump sideways.** On the overview, times, amounts and counters now use
+  digits of equal width everywhere, not only in some tiles.
+- **Everything that floats has one shape, and the sidebar floats too.** Dialogs, the "More"
+  sheet and the search palette had tighter corners (16 px) than the event popover and the
+  toasts (26 px); they now share the larger radius, with fields, tiles and menu rows rounded to
+  match, and catch a fine line of light at the top. The dialog header is no longer a grey strip
+  above a white body. On a desktop the sidebar is a glass panel 8 px off the window edge instead
+  of a full-height bar; the content keeps its width. Light glass takes the warm tone of the
+  page instead of a cool white, and the icon wells in the sidebar are visible in the light
+  theme (they were 1.007:1 against the bar).
+- **Login, setup, invitation and password reset have a place.** The form stood as a small card
+  on a plain page. It is now a glass panel in front of a still field of soft light in the
+  colours of the Yuvomi mark, which also stands behind the loading screen. Everything on these
+  pages sits on the panel, where text keeps its contrast (label 5.4:1 light, 6.2:1 dark, in the
+  worst spot); with "reduce transparency" or "increase contrast" the light is off and the panel
+  is solid. A form taller than the window can now be scrolled by hand - on a small phone or in
+  landscape its lower end could only be reached with the Tab key.
+- **The app no longer animates a backdrop nobody could see.** Four blurred colour fields drifted
+  behind the content the whole time the app was open, and the content covered them completely.
+  They are gone, together with a gradient that was covered the same way. Nothing looks
+  different; the browser has four large layers less to carry.
+- **Rows and cards answer a tap.** List rows, task cards, the cards on the overview and the rows
+  in the settings now show that they are being pressed, instead of doing nothing until the next
+  screen arrives.
+- **"New task" closes right away.** After saving, the dialog showed a check mark for about
+  three quarters of a second before it closed. It now closes with the save, and the new task
+  pulls open in the list: visible after about 0.2 seconds instead of 0.9.
+- **A sheet you flick away travels out of the screen.** Dragging a sheet down and letting go made
+  it dissolve where the finger had left it. It now leaves the screen from there, as fast as the
+  flick was; let go too early and it springs back just as briskly. Behind the "More" sheet the
+  dimming fades with the pull.
+- **Going one level deeper has a direction.** On a phone, opening a settings page or a health
+  area slides in from the side you are heading to, and going back comes from the other; both
+  used to cut or only fade. Switching between light and dark fades instead of flipping, the
+  blood pressure and weight curves draw themselves once, and a few menus that appeared or
+  vanished in one frame now fade.
+- **The app starts faster on a slow connection.** Before the overview asked for its data, the
+  start made five requests one after the other, two of them twice. What does not depend on each
+  other now runs at the same time, and the second copy is served from the first. Measured on a
+  throttled phone (4x CPU, "Fast 4G"), three runs each, before and after: the overview asked for
+  its data after about 0.8 seconds instead of 1.3, and the greeting appeared after about 1.0
+  seconds instead of 1.5.
+- **Health loads in three steps instead of six.** The overview asked for vitals and medication,
+  then for the cycle history, then for the cycle settings, each only after the previous answer
+  had arrived. These now go out together; who may see what is decided as before. Measured on the
+  same throttled phone: the last answer arrived 747 ms after the first health request instead of
+  1119 ms.
+- **A weak connection no longer holds up the start.** With a network that is neither offline nor
+  answering - on a train, in a lift, at the edge of the Wi-Fi - the app waited for it although
+  everything it needed was already stored on the device. It now waits 1.5 seconds once, then
+  uses the stored copies and picks up the fresh ones in the background for the next start.
+  Measured with a server that accepts connections and never answers: the app's own files were
+  loaded after 1.6 seconds instead of never. Signing in and loading data still need the network.
+- **An update no longer downloads every language.** Each release fetched all 26 language files,
+  of which a device uses one. Only German, the language the app falls back to, is stored in
+  advance now; the language of the device is stored the first time it is used and stays
+  available offline. A language that was never used on a device needs a connection once.
+- **An update transfers only the files that changed.** After every release the app fetched all
+  of its roughly 300 files again. It now asks the server which of them differ and loads only
+  those; the server answers from the content of each file, so a changed file always arrives and
+  an unchanged one never does, also after a new image was installed.
+- **The app's files travel smaller.** The server compresses each script, stylesheet and language
+  file once at the highest Brotli level and keeps the result in memory, instead of compressing
+  at a low level on every request: 4.9 MB instead of 5.9 MB for all of them, about 5 MB of
+  memory, and some 25 seconds of background work on one core spread over the first requests
+  after a start. The files themselves are unchanged. `STATIC_BROTLI=off` restores the previous
+  behaviour.
+
+### Fixed
+
+- **A wall tablet no longer offers to rearrange the overview or to search** (#1808). A paired
+  display showed the "Customise" button, let you rearrange the tiles, and answered "Done" with
+  "Token scope does not permit this operation." - a display changes no settings, and that
+  includes its own board. The search button beside it failed the same way. Both are gone on a
+  display. To decide what the tablet shows, arrange the overview as an administrator and choose
+  "Set as household default" while customising: a display never stores an arrangement of its
+  own, so it always follows that default.
+- **Waste: a calendar URL whose provider renames every entry on each download can be imported**
+  (#1795). Some providers hand out a new internal ID for every pickup each time the calendar is
+  fetched (limburg.net does). Yuvomi fetches the address once for the preview and once more to
+  apply it, took the new IDs for new content and refused every time with "The file content
+  changed since you last previewed it". The check now compares what the preview shows - which
+  waste type on which day, and how many - so the import goes through, and a calendar that really
+  changed in between is still refused. Later refreshes of such an address no longer report every
+  pickup as removed and added again. The refusal itself is now shown in the app's language.
+- **SSO sign-in no longer fails when `OIDC_REDIRECT_URI` is written differently from how a URL
+  is normally printed.** The first request to the provider sent the value exactly as written,
+  the second one - the code exchange - a rebuilt form of it, with the path of the incoming
+  request. The two differed with a default port written out (`https://host:443/...`), capital
+  letters in the host name, a query of its own, or a path the reverse proxy rewrites. A provider
+  has to refuse such an exchange, so the sign-in failed with `invalid_grant` after the login at
+  the provider had looked successful. Both requests now carry the same value, character for
+  character; the same goes for linking an account under Settings. Nothing changes for an
+  installation whose value was already in its plain form. A sign-in that is under way while the
+  update is installed is refused once and works on the second click (#1768).
+- **The installation guide says what `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` does not do.** It
+  covers a provider that leaves `email_verified` out, not one that sends `email_verified: false`,
+  which authentik does by default since 2025.10. The guide and `.env.example` now name the fix
+  on the provider side (#1780).
+- **Blood pressure and its unit stay on one line in the health tiles.** In a narrow tile "mmHg"
+  dropped below "116/74". The size of the value used to follow the width of the whole row of
+  tiles, which says little where the row fills itself with as many tiles as fit; it now follows
+  the tile. A narrow tile shows the value one step smaller, the narrowest one also a smaller
+  unit, and on a very small phone the vitals page shows one tile per line instead of two that are
+  too narrow. Tiles in budget, housekeeping and inventory are unchanged.
+- **Screen readers name the field picker in the shift type dialog.** Under "Custom fields" the
+  dropdown next to "Add" had no name, so it was announced as an unnamed combo box with the first
+  field as its value. It is now announced as "Field to attach". Nothing changes on screen.
+- **In the shift planner "To" follows "From".** When adding an exception or an extra shift,
+  moving "From" past "To" left "To" where it was; "Add" then failed, and the message was the
+  server's English sentence in whatever language the app was set to. "To" now moves along with
+  "From", in the add dialog and in the two dialogs that edit an existing range. A range that is
+  still the wrong way round is named at the "To" field, in the language of the app, before
+  anything is sent. For API clients the refusal keeps its sentence and gains
+  `reason: "range_reversed"`.
+- **The first visit no longer reloads itself and empties the login form.** One to four seconds
+  after the very first load the page reloaded, and whatever had been typed into the login form
+  was gone. The reload was meant for an update of the app, but it also fired when the app was
+  installed in the browser for the first time.
+- **An update of the app no longer interrupts what you are doing.** When a new version arrived,
+  the page reloaded 200 ms later - with a dialog open, a half-filled form or an unsaved overview
+  layout. Now it reloads right away only when nothing is open and nobody is typing. Otherwise a
+  notice with a "Reload" button appears, and the new version loads with the next page change or
+  when the app goes to the background. The notice says the same in every language; in German,
+  Persian, Indonesian, Korean and Polish it used to announce a reload that was already over.
+- **Switching the language without a connection no longer leaves the app half switched.** If the
+  language file could not be loaded, texts stayed in the old language while numbers and dates
+  followed the new one, the setting showed a parser error, and the next start fell back to
+  German without a word. A switch that cannot load its file now changes nothing: the selection
+  returns to the language in use and the line below says that there is no connection.
+- **Health on a phone no longer jumps while it loads** (cause of #1770). The block above the list
+  of areas - person, "Due today", "Quick add" - appeared only once its data had arrived and
+  pushed the list down by almost 500 px, under the finger; each row then grew again when its
+  status came in. The block now holds its place from the first frame with a placeholder in its
+  final shape, and the rows have their two-line height from the start. Measured layout shift at
+  390x844: 0.58 before, below 0.01 after. The areas themselves load with a placeholder in the
+  shape of their content instead of the word "Loading".
+- **A required field no longer complains before anything was entered.** In "New event" the title
+  showed "This field is required." on the first Tab or when reaching for the date picker, and
+  everything below it jumped down by a line. An untouched empty field now stays quiet until the
+  form is submitted or until something was typed into it and removed again, and the message
+  slides in instead of pushing the form. This applies to every dialog that marks required fields
+  (events, tasks, meals, recipes, pantry, inventory, contact sync).
+- **Checked items no longer twitch when the list changes.** Adding or deleting an item in the
+  shopping list, or opening a group, replayed the little "checked" animation on every item that
+  had been ticked off long ago. It now plays once, on the box you touch - also when you take a
+  tick back - and has become calmer. The same applies to tasks, subtasks, the housekeeping
+  list and checklists in notes.
+- **The tab bar keeps its glass while you change pages.** On a phone the bar at the bottom went
+  see-through for a moment on every tab change, and the round "+" button popped in again each
+  time. Both now stand still while the page underneath changes; the "+" only arrives with an
+  entrance when the page before had none.
+- **A tapped row no longer stays highlighted on a phone.** After a tap, list rows, task cards and
+  the cards on the overview kept the look they have under a mouse pointer until something else
+  was tapped.
+- **Overview on a desktop: opening "New" no longer tips the button over.** The plus turns into
+  a cross by rotating - and it was the whole button that rotated, label included, so the capsule
+  stood diagonally at 45 degrees and turned grey while its menu was open. Only the icon turns
+  now, and the capsule keeps its colour. The round button on a phone looks as before.
+- **Swiping a row shows its whole label at the point where the swipe takes effect.** Icon and
+  word sat in the middle of a panel half the row wide, while the action triggers after 80 px -
+  at that moment a phone showed "Che" and half a tick. They now stand inside the strip the swipe
+  uncovers, on both sides and in right-to-left languages, in every list that swipes.
+- **Dark theme: the selected segment and the switch knob are the lighter surface again.** The
+  selected tab of a segmented control was darker than its track and read as a dent, and the knob
+  of a switch was a dark dot on a light rail. The thumb now sits one step above its track
+  (module-coloured labels on it keep at least 4.5:1), and the knob is white in both themes; a
+  switch that is on uses the same violet as a primary button, so the knob stands at 5.7:1 instead
+  of 2.7:1.
+- **The budget tile on the overview wears the budget colour.** Its mark was violet, the colour of
+  the overview itself, because the colour was derived from the tile's link and that link carries
+  a `?tab=` part. The fasting tile, which had no colour of its own either, now wears the health
+  colour like the other health tiles.
+- **The login pages show the Yuvomi mark as it is.** In the dark theme the mark on login,
+  invitation and password reset was three dark dots on a lilac tile, and the circles filled less
+  than a third of it. Sidebar and login pages now draw the same mark - the gradient tile with
+  the three light circles of the app icon - and it no longer changes with the theme.
+- **A confirmation without an explanation has no empty gap.** Dialogs such as "Log out of this
+  device?" showed an empty band between two hairlines, between the question and its buttons.
+- **A meal dialog you did not touch no longer asks "Discard changes?".** If the household members
+  could not be loaded with the page, the meal dialog fetches them when it opens and fills in the
+  cook selection a moment later. Closing the dialog after that asked whether to discard changes,
+  although nothing had been changed. What you typed before the selection arrived still counts as
+  a change, as it should.
+- **Fast clicks on the month arrows in the budget land on the right month.** Clicking "next"
+  twice while a month was still loading moved one month instead of two, and going forward and
+  straight back could leave the wrong month on screen - whichever answer arrived last won. Each
+  click now counts from the month you asked for, and a late answer for a month you already left
+  is ignored. The same holds for "Current" and for swiping.
+
 ## [2.75.0] - 2026-10-07
 
 ### Added

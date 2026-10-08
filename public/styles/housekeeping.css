@@ -400,13 +400,29 @@
 .housekeeping-field select {
   width: 100%;
   min-height: var(--target-lg);
-  border: 1.5px solid var(--color-border-control);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  background-color: var(--color-field-bg);
   color: var(--color-text-primary);
   font: inherit;
   font-size: var(--text-base);
   padding: 0 var(--space-3);
+}
+
+/* Das Zeichen der Auswahl wie am Feldkanon (select.form-input, layout.css). */
+.housekeeping-field select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-inline-end: var(--space-8);
+  text-overflow: ellipsis;
+  background-image: var(--field-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: var(--icon-md) var(--icon-md);
+}
+
+[dir="rtl"] .housekeeping-field select {
+  background-position: left var(--space-3) center;
 }
 
 .housekeeping-field textarea {
@@ -620,17 +636,13 @@
 
 /* Die Quittung des Tipps (completeTask()), dieselbe wie beim Abhaken einer
  * Aufgabe (`.task-status-btn--done`, tasks.css): der Ring fuellt sich in der
- * Erfolgsfarbe, der Haken steht darauf, und `check-pop` quittiert die
- * Beruehrung. Kein Zustand - das Neuzeichnen nach dem Roundtrip nimmt die
+ * Erfolgsfarbe, der Haken steht darauf, und `acknowledgeCheck` (utils/ux.js)
+ * quittiert die Beruehrung aus dem Handler. Kein Zustand - das Neuzeichnen nach dem Roundtrip nimmt die
  * Klasse wieder weg, der Kreis heisst weiter „jetzt erledigt".
  *
  * ZWEI KLASSEN IM SELEKTOR: der Finger (oder Zeiger) steht nach dem Tipp noch
  * auf dem Knopf, und `:hover` hat (0,2,0) bzw. (0,2,1) - mit einer Klasse
  * gewaenne die Hover-Toenung ueber die Fuellung. */
-.housekeeping-task__check.housekeeping-task__check--done {
-  animation: check-pop var(--duration-md) var(--ease-out);
-}
-
 .housekeeping-task__check.housekeeping-task__check--done::after {
   border-color: var(--color-success);
 }
@@ -644,14 +656,6 @@
   border-radius: var(--radius-full);
   background: var(--color-success);
   color: var(--color-ink-on-vivid);
-}
-
-/* Unter reduzierter Bewegung traegt der Farbwechsel die Quittung allein
- * (wie tasks.css, Audit F-07). */
-@media (prefers-reduced-motion: reduce) {
-  .housekeeping-task__check.housekeeping-task__check--done {
-    animation: none;
-  }
 }
 
 /* Titel als Zeilenname: die h2 behaelt ihre Rolle fuer die Ueberschriften-

@@ -418,10 +418,13 @@
   inset: calc(-1 * var(--space-2)) 0;
 }
 
-.widget__link:hover {
-  opacity: 1;
-  color: var(--widget-accent, var(--color-accent));
-  background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) var(--tint-state), transparent);
+/* Nur am echten Zeiger (R18) - auf Touch blieb "Alle" nach dem Tipp getoent. */
+@media (hover: hover) {
+  .widget__link:hover {
+    opacity: 1;
+    color: var(--widget-accent, var(--color-accent));
+    background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) var(--tint-state), transparent);
+  }
 }
 
 .widget__badge {
@@ -1338,10 +1341,10 @@
 
 /* DER LICHTHAUCH - und warum er kein Rückfall in den Verlauf ist, den Runde 3
  * entfernt hat. Der alte Verlauf WAR die Karte: eine deckende Fläche von Kante
- * zu Kante, im globalen Akzent, unter dem jeder Text stand. Das hier ist die
- * Gattung der Backdrop-Blobs hinter dem Glas - ein weiches, kreisrundes Feld
+ * zu Kante, im globalen Akzent, unter dem jeder Text stand. Das hier ist ein
+ * Lichtfeld (DESIGN.md, "Colors") - ein weiches, kreisrundes Feld
  * HINTER der Glyphe, das aus der Glyphe zu kommen scheint und lange vor dem
- * Text ausläuft. Es teilt deshalb die Ausschalter der Blobs
+ * Text ausläuft. Es teilt deshalb die Ausschalter seiner Gattung
  * (--weather-glow-opacity, in prefers-reduced-transparency und
  * prefers-contrast auf 0) und trägt den Ton der LAGE, nicht den der App.
  *
@@ -1503,7 +1506,8 @@
 .weather-widget__range {
   display: flex;
   gap: var(--space-1);
-  font-size: var(--text-sm);
+  /* Footnote (13px), nicht 14: siehe "VIER LESESTUFEN" am Dateiende. */
+  font-size: var(--type-caption);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   margin-bottom: var(--space-0h);
@@ -1519,8 +1523,8 @@
 }
 
 .weather-widget__desc {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
   text-transform: capitalize;
   margin-bottom: 1px;
   overflow: hidden;
@@ -1529,8 +1533,8 @@
 }
 
 .weather-widget__city {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-1);
   overflow: hidden;
@@ -2050,13 +2054,35 @@ svg.weather-forecast__icon {
 /* Plus wird zum X. Der Zustand steht schon im `aria-expanded`, das der
  * Speed-Dial ohnehin pflegen muss - eine Klasse daneben wäre eine zweite
  * Wahrheit über denselben Zustand, und die beiden liefen bisher schon
- * auseinander, wenn eine von ihnen vergessen wurde. */
-.page-fab[aria-expanded="true"] {
+ * auseinander, wenn eine von ihnen vergessen wurde.
+ *
+ * ES DREHT DAS ICON, NIE DER KNOPF (R18). Die Drehung stand am `.page-fab`
+ * selbst, und derselbe Selektor trifft am Desktop die beschriftete Kapsel
+ * `.page-fab--docked` ("+ Neu", Popover-Auslöser): sie kippte samt Wort um
+ * 45 Grad (gemessen `matrix(0.707, 0.707, ...)`, Bounding-Box 92x92 statt
+ * 92x40). Am runden FAB sieht die Icon-Drehung aus wie die alte - ein Kreis
+ * in einer Farbe hat keine Lage -, nur der Schatten wandert nicht mehr mit.
+ * Guard in test-motion.js: keine Drehung auf einem Knoten, der Text trägt. */
+.page-fab[aria-expanded="true"] > svg,
+.page-fab[aria-expanded="true"] > i {
   transform: rotate(45deg);
-  /* Hier ist das Nachfedern die Aussage, nicht Zierrat - es quittiert den
-     Zustandswechsel. Über das Token statt als Literal, damit die Kurve eine
-     benannte Entscheidung bleibt (tokens.css §g). */
+}
+
+/* Hier ist das Nachfedern die Aussage, nicht Zierrat - es quittiert den
+ * Zustandswechsel. Über das Token statt als Literal, damit die Kurve eine
+ * benannte Entscheidung bleibt (tokens.css §g). Am Icon in BEIDEN Zuständen,
+ * damit auch der Rückweg federt. */
+.page-fab[aria-expanded] > svg,
+.page-fab[aria-expanded] > i {
   transition: transform var(--transition-glass);
+}
+
+/* Das Grau gehört dem schwebenden Speed-Dial: sein offener Zustand heisst
+ * "Schliessen", und das Backdrop dahinter nimmt der Seite die Farbe. Die
+ * angedockte Kapsel bleibt die violette Primäraktion - ihr Menü ist ein
+ * Popover ohne Backdrop, und ein ergrauter Primärknopf läse sich dort als
+ * deaktiviert. */
+.page-fab[aria-expanded="true"]:not(.page-fab--docked) {
   background-color: var(--neutral-600);
 }
 
@@ -2076,11 +2102,34 @@ svg.weather-forecast__icon {
    * und Modal bleibt die Reihenfolge, die die Gruppe selbst hat. */
   z-index: -1;
   pointer-events: none;
+  /* EIN- UND AUSGANG (Critique R18): das Backdrop sprang in einem Frame, samt
+   * seinem Blur (glass.css). Jetzt das Muster des Popover-Menues: `display`
+   * geht diskret mit (`allow-discrete`), `@starting-style` gibt der Einfahrt
+   * ihren Start. In RUHE bleibt es `display: none` - #166 gilt weiter, es liegt
+   * nur fuer die Dauer des Ausgangs (--duration-xs) noch im Baum.
+   * ZWEI DEKLARATIONEN: ein Browser ohne `allow-discrete` verwirft die zweite
+   * und behaelt die erste - dort schliesst es hart wie bisher. */
+  opacity: 0;
+  transition: opacity var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    display var(--duration-xs) allow-discrete;
 }
 
 .fab-backdrop--visible {
   display: block;
+  opacity: 1;
   pointer-events: auto;
+  transition: opacity var(--duration-md) var(--ease-out);
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    display var(--duration-md) allow-discrete;
+}
+
+@starting-style {
+  .fab-backdrop--visible {
+    opacity: 0;
+  }
 }
 
 .fab-actions--visible {
@@ -2557,9 +2606,16 @@ svg.weather-forecast__icon {
  * links zeigt es); ein neutraler Hover warf diese Auskunft im Moment der
  * Beruehrung weg. --tint-state (12%) ist die Skalenstufe fuer genau das:
  * „Zustand auf einer ungetoenten Flaeche". */
-.today-cockpit-card[data-route]:hover,
 .today-cockpit-card[data-route]:focus-visible {
   background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+}
+
+/* Der Zeiger-Zwilling steht fuer sich unter (hover: hover) (R18): auf Touch
+ * klebte er nach dem Tipp. Der Fokus oben bleibt in jeder Eingabeart. */
+@media (hover: hover) {
+  .today-cockpit-card[data-route]:hover {
+    background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+  }
 }
 
 /* Der Träger clippt per overflow:hidden (Radius-Schnitt der Zeilenliste) -
@@ -2652,10 +2708,16 @@ svg.weather-forecast__icon {
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.today-cockpit__more--link:hover,
 .today-cockpit__more--link:focus-visible {
   background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), var(--color-surface));
   color: var(--color-text-primary);
+}
+
+@media (hover: hover) {
+  .today-cockpit__more--link:hover {
+    background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), var(--color-surface));
+    color: var(--color-text-primary);
+  }
 }
 
 .today-cockpit__more--link:focus-visible {
@@ -2689,9 +2751,14 @@ button.today-cockpit__more--link {
  * Sie ist ein Aufklapp-Knopf ohne Route, zeigt aber dieselbe Beruehrung wie
  * jede Zeile mit Ziel - im Ton ihres Raums. Am Ende stehen die gestapelten
  * Avatare und das Chevron, wo sonst die Zeit steht. */
-.today-cockpit-card--group:hover,
 .today-cockpit-card--group:focus-visible {
   background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+}
+
+@media (hover: hover) {
+  .today-cockpit-card--group:hover {
+    background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+  }
 }
 
 .today-cockpit-card--group:focus-visible {
@@ -3757,6 +3824,9 @@ button.today-cockpit__more--link {
 
 .birthday-widget-item__name {
   color: var(--color-text-primary);
+  /* Zeilentitel der Uebersicht: 15px semibold wie der Notiztitel daneben
+   * (vorher geerbte 16px - siehe "VIER LESESTUFEN" am Dateiende). */
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3790,8 +3860,9 @@ button.today-cockpit__more--link {
   white-space: nowrap;
   background: var(--color-fill-well);
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-bold);
+  /* Footnote semibold statt 14px fett ("VIER LESESTUFEN" am Dateiende). */
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Countdown-Kachel (#647). Bewusst dieselbe Zeilenform wie die Geburtstage
@@ -4189,14 +4260,16 @@ button.today-cockpit__more--link {
 
 .budget-widget__savings span {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
 }
 
+/* Headline (17px semibold) statt 18px fett: die Stuetzmetrik steht auf der
+ * Stufe der Kacheltitel, eine unter dem Saldo darueber. */
 .budget-widget__savings strong {
   color: var(--module-budget);
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-title);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Sparziel-Fortschritt im Budget-Widget (#468) */
@@ -4264,7 +4337,8 @@ button.today-cockpit__more--link {
 }
 
 .budget-widget__flow-item > strong {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4557,7 +4631,9 @@ button.today-cockpit__more--link {
 
 .rewards-member__name {
   color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
+  /* Zeilentitel: 15px semibold (vorher geerbte 16px medium). */
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6224,8 +6300,11 @@ button.today-cockpit__more--link {
   transition: background var(--transition-fast);
 }
 
-.quick-link-tile:hover,
 .quick-link-tile:focus-visible { background: var(--color-surface-hover); }
+
+@media (hover: hover) {
+  .quick-link-tile:hover { background: var(--color-surface-hover); }
+}
 
 .quick-link-tile__face {
   display: grid;
@@ -6476,3 +6555,50 @@ button.today-cockpit__more--link {
   .nutrition-widget__row { grid-template-columns: minmax(5rem, 8rem) 1fr auto; }
   .nutrition-widget__bar { grid-column: auto; grid-row: auto; }
 }
+
+/* ZAHLEN STEHEN IN GLEICH BREITEN ZIFFERN - auf der ganzen Uebersicht, an EINER
+ * Stelle (Critique R18, 2026-10-07). Gemessen trugen 20 von 62 Textknoten mit
+ * Ziffern `tabular-nums` (im ersten Lauf 19 von 36): der Budgetsaldo ja, die
+ * beiden Betraege darunter nicht; die Uhrzeit des Termins ja, die der
+ * Familienkarte nicht. Untereinander stehende Zeiten, Betraege und Zaehler
+ * springen sonst je nach Ziffernform ("11" ist schmaler als "08").
+ *
+ * Die Liste nennt die Traeger von GELD, ZEIT und ZAEHLERN, `font-variant-numeric`
+ * erbt auf ihre Kinder. Fliesstext mit Zahlen (Notizen) bleibt bei den
+ * Proportionalziffern der Schrift - dort ist eine Zahl ein Wort im Satz.
+ * Guard: test-dashboard-clarity.js haelt die Liste gegen das Markup. */
+.dashboard-overview__date,
+.today-cockpit-card__value,
+.today-cockpit-card__sub,
+.today-cockpit__more,
+.family-member__status,
+.family-widget__footer,
+.budget-widget__savings,
+.budget-widget__flow-item,
+.widget__badge,
+.widget-list-more,
+.birthday-widget-item__meta,
+.birthday-widget-item__age,
+.rewards-widget__footer {
+  font-variant-numeric: tabular-nums;
+}
+
+/* VIER LESESTUFEN AUF DEN INHALTSFLAECHEN (Critique R18, 2026-10-07).
+ *
+ * Gemessen standen auf der Uebersicht 11 bis 14 Schriftgroessen, in
+ * 1-px-Schritten von 12 bis 18. Inhalt liest auf vier Stufen: 17 (Headline,
+ * Kacheltitel und Leitwert einer Zeile), 15 (Subheadline, Zeilentitel und
+ * Fliesstext), 13 (Footnote, Nebenzeile) und 12 (Caption, Meta und Badge).
+ * 14 und 16 bleiben den Bedienelementen (Knopf, Link, Feld), die Display-
+ * Werte (28, 34) den Kennzahlen.
+ *
+ * Umgestellt ist, was dabei KLEINER oder gleich breit wird - so entsteht kein
+ * neuer Umbruch: Wetter (Spanne, Lage, Ort 14 -> 13), Budget (Sparquote
+ * 18 fett -> 17 semibold, ihr Label und die beiden Fluesse 14 -> 13),
+ * Geburtstage (Name geerbte 16 -> 15, "wird 41" 14 fett -> 13 semibold),
+ * Belohnungen (Name 16 medium -> 15 semibold). Die Regeln stehen bei ihren
+ * Kacheln weiter oben; dieser Absatz ist ihr gemeinsamer Grund. Gemessen
+ * (1440, hell): 22 -> 16 Groesse/Gewicht-Paare; bei 390px in `fi` und `de`
+ * weder Umbruch noch Ellipse an den umgestellten Klassen.
+ * Guard: test-dashboard-clarity.js (die genannten Klassen stehen auf
+ * Leiter-Tokens). */

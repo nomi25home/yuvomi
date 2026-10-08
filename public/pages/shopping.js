@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
@@ -19,6 +19,7 @@ import { mayImportMealPlan, mayTransferShoppingToPantry } from '/utils/kitchen-t
 import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { rowMenuHtml } from '/utils/row-action.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
@@ -550,6 +551,11 @@ function settleIntents(items, listId, { fromCache = false, startedAt = 0 } = {})
   }
 }
 
+/** Der Haken einer Artikelzeile - das Element, das die Quittung traegt. */
+function checkOf(container, id) {
+  return container.querySelector(`.swipe-row[data-swipe-id="${id}"] .item-check`);
+}
+
 async function toggleShoppingItem(id, checked, container) {
   // Dritte Linie hinter Markup und Handler-Riegel: auch ein Aufruf, den ein
   // Rechtewechsel ueberholt hat, schickt nichts.
@@ -586,6 +592,11 @@ async function toggleShoppingItem(id, checked, container) {
     // Nur die betroffene Zeile aktualisieren — kein Komplett-Re-Render,
     // damit die Scroll-Position der Liste erhalten bleibt (Issue #276).
     updateItemRow(container, item);
+    // DIE QUITTUNG GEHOERT DIESEM TIPP (R18). Sie hing als CSS-Animation an
+    // `.item-check--checked` und lief deshalb bei jedem Neuzeichnen auf allen
+    // abgehakten Zeilen. `updateItemRow` selbst quittiert nichts: es laeuft
+    // auch fuer fremde Aenderungen und beim Zuruecksetzen nach einem Fehler.
+    acknowledgeCheck(checkOf(container, id), { checked: newVal === 1 });
     // userChecked NUR beim Abhaken selbst (#1039): das Zurueckholen eines
     // Artikels eroeffnet keinen neuen Feedback-Batch.
     updateCheckedActions(container, { userChecked: newVal === 1 });
@@ -1398,19 +1409,19 @@ function renderItem(item) {
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
           </button>
-          <button class="row-action" data-action="item-details" data-id="${item.id}"
-                  aria-label="${t('shopping.detailsLabel', { name: esc(item.name) })}">
-            <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="row-action row-action--danger" data-action="delete-item" data-id="${item.id}"
-                  aria-label="${t('shopping.deleteItemLabel', { name: esc(item.name) })}">
-            ${/* trash-2 statt x: das Kreuz heisst app-weit „Schliessen"
-                 (Modals, Chips), Loeschen traegt ueberall den Papierkorb
-                 (Aufgaben, Geburtstage, Mahlzeiten). Der Einkauf war die eine
-                 Zeile, die fuer dieselbe Tat ein anderes Zeichen sprach
-                 (Critique 2026-08-27, P3). */ ''}
-            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-          </button>`}
+${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
+               utils/row-action.js): Stift und Papierkorb standen in jeder der
+               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
+               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
+               widerrufbar (Undo-Toast) und per Wischen erreichbar. */ ''}
+          ${rowMenuHtml({
+            id: `shopping-item-menu-${item.id}`,
+            label: t('common.moreActionsNamed', { name: item.name }),
+            items: [
+              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
+              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+            ],
+          })}`}
         </div>
       </div>
     </div>`;
