@@ -102,7 +102,7 @@
    *
    * --color-border-control ist die vorhandene Rampenstufe --neutral-500 und
    * haelt 3:1 auf jedem Grund, auf dem ein Feld gemessen stand: light 3,53 auf
-   * Weiss, 3,42 auf -raised, 3,18 auf der Buehne; dark 4,51 auf -surface, 3,86
+   * Weiss, 3,38 auf -raised, 3,18 auf der Buehne; dark 4,51 auf -surface, 3,86
    * auf -raised, 5,46 auf der Buehne (die Dark-Bloecke setzen --_neutral-500,
    * das Token zieht mit). Die knappere Alternative (#938E85 / #7A746B) fiel auf
    * der hellen Buehne auf 2,93 und auf dem dunklen -raised auf 2,71.
@@ -133,6 +133,15 @@
    * Schalterbahn haelt 3:1". Der Installer traegt dieselben Werte inline. */
   --_color-switch-off:    #88847C;
   --color-switch-off:     var(--_color-switch-off);
+  /* DER KNOPF IST HELL, IN BEIDEN THEMES (R18). Er trug --color-surface und
+   * war damit im Dark ein dunkler Punkt (#2B2825) auf heller Bahn - der
+   * Schalter las sich invertiert, und sein Glanz (--glass-inset-thumb) lag auf
+   * Kohle. Ein Knopf ist kein Stueck Flaeche, das mit dem Theme kippt: Weiss,
+   * immer. Gegen die Aus-Bahn 3,72:1 hell und 3,25:1 dunkel. Die An-Bahn
+   * traegt die FLAECHEN-Rolle der Stimme (--color-btn-primary, dieselbe wie
+   * der Primaerknopf, weil beide Weiss tragen): 6,06:1 hell, 5,70:1 dunkel.
+   * Der Text-Akzent (dunkel #A78BFA) truege den weissen Knopf nur mit 2,72. */
+  --color-switch-knob:    #FFFFFF;
   /* ZURUECKGENOMMEN IST EIN MUSTER, KEINE DECKUNG (#1230, Entscheidung Ulas
    * 2026-09-15). Erledigte und abgelegte Aufgaben, archivierte Konten,
    * pausierte und abgeschlossene Abos, inaktive Medikamente und Praemien,
@@ -205,9 +214,14 @@
    * glass = rein dekorative/leichte Glass-Bereiche. */
   --_color-surface-work:      #FFFFFF;
   --color-surface-work:       var(--_color-surface-work);
-  --_color-surface-raised:    #FBFBFD;
+  /* raised und glass tragen den Ton von --neutral-50 (#FBFAF7), nicht mehr
+   * Apples kuehles #FBFBFD / rgb(250,250,252) - Begruendung und Rechnung am
+   * Glas, Abschnitt 16 a). Auf -raised gemessen: Sekundaertext 5,93:1 (vorher
+   * 5,99), Tertiaertext 5,39 (5,45), Akzent 5,81 (5,86), Feldkante 3,38
+   * (3,42). */
+  --_color-surface-raised:    #FBFAF7;
   --color-surface-raised:     var(--_color-surface-raised);
-  --_color-surface-glass:     rgba(250, 250, 252, 0.62);
+  --_color-surface-glass:     rgba(251, 250, 247, 0.62);
 
   /* KASTEN-IN-KASTEN-VOKABULAR (HIG-Rollout Runde 2, 2026-08-06).
    * Karten sind randlos auf dem Grouped-Grund. Was IN einer Karte liegt, bekommt
@@ -248,6 +262,61 @@
    * tragen Lupe und Platzhalter. Der Platzhalter steht darauf in
    * --color-text-secondary (tertiaer faellt hell auf 4.27:1). */
   --color-fill-field:         var(--neutral-200);
+
+  /* DIE EINE FELDHAUT (R18, Entscheidung Ulas 2026-10-07: "leiser - 1 px, auf
+   * das 3:1-Minimum, die Fuellung traegt"). Bis dahin gab es zwei Fuellungen
+   * (--color-surface-work auf der Seite, --color-surface-2 im Dialog) und eine
+   * 1,5-px-Kante. Im Dark war --color-surface-2 das Fast-Schwarz #0F0E0D mit
+   * der hellen Kante #948E85 darum (4,51:1 gegen den Dialog #2B2825): ein
+   * Drahtgitter, in dem die Kante lauter war als der Inhalt.
+   *
+   * Hell bleibt die Arbeitsflaeche (Weiss): sie traegt auf der Buehne (1,12:1)
+   * und im Glas des Dialogs. Dunkel ist das Feld eine MULDE in der Stufe von
+   * --color-fill-well (#37332E): 1,17:1 UEBER dem Dialog und der Karte
+   * (#2B2825), 1,42:1 ueber der Buehne; Text darauf primaer 11,3:1, sekundaer
+   * 5,69:1, Platzhalter (tertiaer) 5,01:1.
+   *
+   * Die Kante ist 1 px in --color-border-control. Gerechnet gegen die UMGEBUNG
+   * (WCAG 1.4.11, die Grenze des Bedienelements gegen das, was daneben liegt):
+   *   hell   #8C8880: 3,53 auf Weiss, 3,38 auf -raised/-2, 3,18 auf der Buehne
+   *   dunkel #857F76: 3,69 auf -surface, 3,16 auf -raised, 4,47 auf der Buehne
+   * Hell steht das Token seit #1230 auf dem Minimum (3,18). Dunkel lag es mit
+   * der Rampenstufe #948E85 bei 3,86 bis 5,46 - die Dark-Bloecke setzen es
+   * deshalb selbst (#857F76; #807A71 fiele auf -raised auf 2,95).
+   *
+   * --field-chevron ist das Zeichen eines select mit appearance: none - der
+   * Lucide-Pfad chevron-down als Bild, weil ein select kein Pseudo-Element
+   * traegt, an dem eine Maske haengen koennte. Die Farbe steht deshalb IM Bild
+   * und hat einen Dark-Zwilling: hell #63615B (6,19:1 auf Weiss), dunkel
+   * #B4AEA5 (5,69:1 auf der Mulde, 6,66:1 auf -surface) - das Zeichen traegt
+   * die 3:1 als Erkennungsmerkmal auch dort, wo die Auswahl selbst keine Kante
+   * hat (die randlose Auswahl der Formularzeile, .form-row in layout.css).
+   * Guard: test-frontend-audit.js, "R18: eine Feldhaut". */
+  --_color-field-bg:          var(--_color-surface-work);
+  --color-field-bg:           var(--_color-field-bg);
+
+  /* DAS BLATT IN DER VORSCHAU (R18, 2026-10-07; documents.css
+   * `.document-thumb__img`). Ein gescanntes Dokument ist reinweiss. Hell liegt
+   * es voll auf der Mulde; dunkel scheint die Mulde (#37332E) zu 18 % durch:
+   * Weiss wird #DBDAD9 (L 0,70) und liegt damit unter der Primaertinte
+   * #F5F3ED (L 0,89) - das Blatt ist nicht mehr die hellste Flaeche des
+   * Bildschirms. Schwarzer Text darauf haelt 15,0:1 (statt 21). */
+  --_media-sheet-opacity:     1;
+  --media-sheet-opacity:      var(--_media-sheet-opacity);
+
+  /* DIE MULDE EINER BRETTSPALTE (R18, 2026-10-07; tasks.css `.kanban-col`).
+   * Eine Spalte steht auf der BUEHNE und traegt Karten (--color-surface) - sie
+   * braucht eine Stufe, die in beiden Themes UNTER der Karte liegt. Der
+   * Inset-Well (--color-fill-well) kann das nur hell: dunkel ist er #37332E
+   * und damit heller als die Karte (#2B2825), die Karten laegen als Loecher
+   * darin. Hell deshalb die Stufe des Wells (#EDEAE3: Karte 1,20:1 darueber,
+   * Buehne 1,08:1 darueber), dunkel die Stufe unter der Buehne (#0F0E0D:
+   * Karte 1,32:1 darueber, Buehne 1,09:1 darueber). Text auf der Spalte:
+   * sekundaer 5,15 / 8,76, tertiaer 4,69 / 7,71:1. */
+  --_color-board-well:        var(--_neutral-150);
+  --color-board-well:         var(--_color-board-well);
+  --_field-chevron:           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2363615B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --field-chevron:            var(--_field-chevron);
 
   /* DIE ZEILENLISTEN-REGEL (HIG-Rollout Runde 3, 2026-08-06).
    * Die Kasten-in-Kasten-Regel sagt, wie eine Zeile INNEN aussieht. Diese hier
@@ -358,6 +427,88 @@
    * Tageszeit spricht seither allein über den Grusstext. Nach dem Umbau stand
    * die Reihe in drei Blöcken (Light, Dark, forced-dark) ohne einen einzigen
    * Nutzer im CSS oder JS. */
+  /* DIE BILDMARKE (utils/brand-mark.js): der Verlauf ihrer Kachel, von oben
+   * links nach unten rechts - die Werte von docs/logo.svg und den App-Icons.
+   * BEWUSST OHNE DARK-ZWILLING: eine Marke kippt nicht mit dem Theme. Solange
+   * der Verlauf an --color-accent hing, stand sie im Dark als Weiss auf
+   * Flieder (#A78BFA nach #C4B5FD) in der Seitenleiste und als dunkle Punkte
+   * auf Flieder auf den Zugangsseiten (R18). Die Kreise sind Weiss mit 0,82
+   * Deckung; auf dem dunkleren Ende 4,6:1, auf dem helleren 3,4:1 - ein
+   * Zeichen, kein Text. */
+  --brand-mark-from:   #8B5CF6;
+  --brand-mark-to:     #6C3AED;
+  --brand-mark-ink:    #FFFFFF;
+
+  /* DAS MARKEN-LICHTFELD (R18, 2026-10-07): drei weiche Kreise in den beiden
+   * Farben der Bildmarke, in der Anordnung ihrer drei Kreise (zwei oben, einer
+   * unten). Es steht als Raumlicht HINTER der Glastafel der Zugangsseiten und
+   * im Ladebild - den beiden Orten, an denen nichts Opakes darueber liegt. In
+   * der App gibt es kein Lichtfeld hinter dem Inhalt mehr (glass.css,
+   * Abschnitt 40).
+   *
+   * STEHEND UND OHNE FILTER: drei radiale Verlaeufe, kein blur(), keine
+   * Animation - der Browser malt sie einmal. Die Weichheit kommt aus der
+   * Stoppfolge, nicht aus einer Unschaerfe: elf Stuetzen auf cos² (100, 98,
+   * 90, 79, 65, 50, 35, 21, 10, 2, 0 % der Staerke), also ohne Steigung im
+   * Kern und am Rand. Weniger reicht nicht: zwei Stopps haben in der Mitte
+   * eine Spitze (im Dark ein heller Punkt), sechs zeichnen im Ladebild, wo
+   * keine Tafel davor blurrt, sichtbare Ringe an jedem Knick.
+   *
+   * KEIN TEXT STEHT DIREKT DARAUF. Schon bei 10 % Staerke faellt
+   * Sekundaertext auf der getoenten Buehne unter AA (3,99:1 im Kern); deshalb
+   * steht auf den Zugangsseiten ALLES auf der Tafel (auth.css), auch Marke,
+   * Name und Versionszeile. Gerechnet ist der schlechteste denkbare Grund
+   * unter der Tafel - alle drei Kreise mit vollem Kern uebereinander, ohne den
+   * Blur der Tafel - und darauf jede Tinte, die sie traegt:
+   *   hell  (0,20): Label/Sekundaertext 5,43:1, Tertiaer 4,93, Akzent-Link
+   *                 5,31, Feldkante 3,09 (Grenze 3:1); direkt auf dem Feld
+   *                 stuende Sekundaertext bei 2,96
+   *   dunkel (0,26): Sekundaertext 6,20:1, Tertiaer 5,46, Akzent 5,02,
+   *                 Feldkante 4,21
+   * Die Rechnung laeuft in test:material aus diesen Tokens mit.
+   *
+   * Der Schalter ist die Staerke: prefers-reduced-transparency und
+   * prefers-contrast setzen sie auf 0, dann sind alle Stopps transparent -
+   * dieselbe Kopplung wie beim Wetter-Lichthauch (--weather-glow-opacity). */
+  --_brand-field-opacity: 0.20;
+  --brand-field-opacity:  var(--_brand-field-opacity);
+  --brand-field:
+    radial-gradient(circle 24rem at calc(50% - 13rem) calc(50% - 12rem),
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 98%), transparent) 10%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 79%), transparent) 30%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 50%), transparent) 50%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 21%), transparent) 70%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 2%), transparent) 90%,
+      transparent 100%),
+    radial-gradient(circle 22rem at calc(50% + 15rem) calc(50% - 1rem),
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 98%), transparent) 10%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 79%), transparent) 30%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 50%), transparent) 50%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 21%), transparent) 70%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 2%), transparent) 90%,
+      transparent 100%),
+    radial-gradient(circle 23rem at calc(50% - 1rem) calc(50% + 17rem),
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 80%), transparent) 0%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 78%), transparent) 10%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 72%), transparent) 20%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 64%), transparent) 30%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 52%), transparent) 40%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 40%), transparent) 50%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 28%), transparent) 60%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 16%), transparent) 70%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 8%), transparent) 80%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 2%), transparent) 90%,
+      transparent 100%);
   --_color-accent-secondary:  #8B5CF6;
   --color-accent-secondary:   var(--_color-accent-secondary);  /* Violett-hell — Sekundärer Akzent für Logo-Gradient */
   --_color-accent-light:      #F3EFFE;
@@ -798,13 +949,13 @@
   --weather-band-hot:   var(--_weather-band-hot);
 
   /* Der Lichthauch hinter der Glyphe - und der Grund, warum er ein TOKEN ist
-   * und keine Zahl in dashboard.css: er ist dieselbe Gattung wie die
-   * Backdrop-Blobs hinter dem Glas (Abschnitt 14b, `--lg-blob-opacity`), also
+   * und keine Zahl in dashboard.css: er ist ein Lichtfeld, also
    * eine weiche Atmosphäre HINTER dem Inhalt, kein chromatischer Verlauf AUF
-   * ihm. Weil er dieselbe Gattung ist, hat er dieselben Ausschalter: in
-   * prefers-reduced-transparency und prefers-contrast steht er wie sein
-   * Vorbild auf 0. Ein Wert in der Komponente hätte diese Kopplung nicht
-   * mitgebracht. */
+   * ihm - dieselbe Gattung wie das Marken-Lichtfeld der Zugangsseiten
+   * (`--brand-field-opacity`, bei der Bildmarke). Weil es dieselbe Gattung ist,
+   * hat es dieselben Ausschalter: in prefers-reduced-transparency und
+   * prefers-contrast stehen beide auf 0. Ein Wert in der Komponente hätte
+   * diese Kopplung nicht mitgebracht. */
   --weather-glow-opacity: 1;
 
   /* --------------------------------------------------------
@@ -982,7 +1133,21 @@
    * ist überall dieselbe Pille" in test/test-frontend-audit.js - eine geteilte
    * Regel ohne Guard ist eine wandernde Annahme.
    * -------------------------------------------------------- */
-  --seg-active-bg:     var(--color-surface);
+  /* DER DAUMEN IST DIE HELLERE FLAECHE, IN BEIDEN THEMES (R18). Hier stand
+   * `var(--color-surface)`. Hell stimmt das: Weiss auf der Bahn #EDEAE3,
+   * 1,20:1. Dunkel ist --color-surface (#2B2825) aber die Stufe UNTER der
+   * Bahn (--color-fill-well / --color-surface-3, #37332E) - der gewaehlte
+   * Daumen lag als Mulde in seiner Bahn (gemessen Bahn rgb(55,51,46), Daumen
+   * rgb(43,40,37)), und der Schatten darunter ist auf Kohle wirkungslos.
+   * Dunkel traegt er deshalb die Stufe UEBER der Bahn (--_neutral-250,
+   * #443E37): 1,19:1, derselbe Abstand wie hell, nur nach oben. Tinte darauf:
+   * Text 9,51:1; die Modulton-Tinte (70 % Ton in --color-text-primary) haelt
+   * AA ueber alle neun Familien, knappster Wert Gesundheit 4,51:1, Kontakte
+   * 5,05, Dokumente 5,08, Uebersicht 5,16. Heller geht nicht: --_neutral-300
+   * druckte Gesundheit auf 3,68. Guard: test-frontend-audit.js, "der
+   * Segmentdaumen ist heller als seine Bahn". */
+  --_seg-active-bg:    var(--_color-surface);
+  --seg-active-bg:     var(--_seg-active-bg);
   --seg-active-shadow: var(--shadow-xs);
 
   /* --------------------------------------------------------
@@ -1363,6 +1528,16 @@
   --viewport-height: 100vh;
   --sidebar-width: 56px;             /* Fallback (mobile: sidebar hidden) */
   --sidebar-width-expanded: 220px;   /* full sidebar (≥1024px), max 240px laut Spec */
+  /* DIE SEITENLEISTE SCHWEBT (R18, 2026-10-07): Abstand der Tafel zur
+   * Fensterkante, oben, unten und an der Startkante - derselbe Wert wie die
+   * Luft um die mobile Tab-Kapsel (`--nav-bottom-height`, darueber).
+   * --sidebar-width bleibt die Breite der TAFEL und zugleich der Rand, den
+   * `.app-content` freihaelt: die Tafel ragt um diesen Abstand in den
+   * Seitenrand des Inhalts (32px Gutter, es bleiben 24px Luft). Die
+   * Inhaltsbreite aendert sich dadurch nicht - jede Schwelle, die gegen
+   * "Fenster minus 220px" gerechnet ist (`--layout-split-threshold`,
+   * `--layout-rail-min`), gilt unveraendert. */
+  --sidebar-float-gap: var(--space-2);
   /* Zeilenhoehe der Seitenleiste (Critique 2026-09-26, P1-2): 15 Module,
    * vier Sektionslabels, Einstellungen und das Konto muessen auf 1280x800
    * ohne Scrollen stehen - mit 40px-Zeilen fehlten dort ~270px. Die Zeilen
@@ -1474,6 +1649,11 @@
    * begruendet hat, stellt sich dort nicht - unter ihm liegt Chrome, kein
    * Inhalt. Auf dem Desktop (keine Bottom-Nav) schwebt er weiter frei und
    * behaelt seine Zone. */
+  /* Der Weg, nach dem eine Wischzeile ausloest - derselbe Wert wie
+   * SWIPE_THRESHOLD in utils/swipe-row.js (ein Guard haelt beide zusammen).
+   * Das Reveal-Panel stellt Icon und Etikett in genau diesen Streifen: was
+   * beim Ausloesen aufgedeckt ist, ist dann auch vollstaendig zu lesen. */
+  --swipe-threshold: 80px;
   --fab-size: 52px;
   --fab-gap: var(--space-6);
   /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. */
@@ -1594,8 +1774,38 @@
    *       g) Glass-Übergänge
    * -------------------------------------------------------- */
 
-  /* a) Glass-Hintergründe */
-  --_glass-bg-elevated: rgba(250, 250, 252, 0.86);
+  /* a) Glass-Hintergründe
+   *
+   * DAS HELLE GLAS TRAEGT DEN TON SEINER BUEHNE (R18, 2026-10-07). Hier stand
+   * `rgba(250, 250, 252, ...)` - Apples kuehles Systemweiss, ein Rest der
+   * Rampe, die 2026-08-10 warm zurueckgeholt wurde (Abschnitt 1). Auf der
+   * warmen Buehne rgb(245,243,237) las sich jede Glasflaeche als blaeulicher
+   * Fremdkoerper. Der neue Ton ist --neutral-50 (#FBFAF7 = 251,250,247), die
+   * hellste Stufe derselben Rampe; Dark war schon warm (45,42,39) und bleibt.
+   *
+   * DIE LUMINANZ IST GEHALTEN: L 0,9572 -> 0,9560. Damit verschiebt sich jeder
+   * Text-auf-Glas-Kontrast um hoechstens 0,02. Nachgerechnet (sRGB, deckend
+   * gemischt, OHNE den Blur, der fremde Tinte unter dem Glas zusaetzlich
+   * mittelt - die Zahlen sind also die untere Grenze):
+   *
+   *   Seitenleiste (0.86 ueber der Buehne -> 250,249,246)
+   *     Zeilenlabel   --color-text-secondary    5,88:1   (vorher 5,89)
+   *     Gruppenlabel  --color-text-tertiary     5,35:1   (5,35)
+   *     Kontoname     --color-text-primary     16,33:1   (16,35)
+   *     aktives Label (70 % Akzent in Tinte) auf der Pille   6,93:1   (6,94)
+   *   Seitenleiste ueber Inhalt (Overlay-Zustand, weisse Karte darunter)
+   *     Zeilenlabel 5,97:1, Gruppenlabel 5,43:1
+   *   Tab-Kapsel (0.66): Label --color-text-primary ueber Buehne 16,14:1,
+   *     ueber einer Tintenzeile 7,77:1, ueber mittelgrauem Foto 11,21:1 (je
+   *     -0,01 gegen vorher); die Messung am gerenderten Pixel in a1) gilt
+   *     weiter, sie liegt wegen des Blurs darueber.
+   *   Dialogkopf: traegt kein Glas mehr (layout.css, `.modal-panel__header`),
+   *     der Titel steht auf --color-surface, 17,3:1.
+   *
+   * Die Rechnung laeuft in test:material mit (aus diesen Tokens, nicht aus
+   * einer Kopie der Zahlen): wer einen Glaswert oder eine Tinte anfasst,
+   * sieht dort, was unter 4,5:1 faellt. */
+  --_glass-bg-elevated: rgba(251, 250, 247, 0.86);
   --glass-bg-elevated:  var(--_glass-bg-elevated);
   /* a1) Die schwebende Tab-Bar-Kapsel: duenneres Glas als die uebrigen
    * Chrome-Flaechen (Entscheid von Ulas 2026-10-01: "mehr Glas im Hintergrund,
@@ -1620,7 +1830,7 @@
    * misst alle neu. Ohne backdrop-filter bleibt --glass-bg-elevated (glass.css,
    * Abschnitt 1); prefers-reduced-transparency und prefers-contrast: more
    * kippen die Toenung auf --color-surface (Bloecke unten). */
-  --_glass-bg-capsule:   rgba(250, 250, 252, 0.66);
+  --_glass-bg-capsule:   rgba(251, 250, 247, 0.66);
   --glass-bg-capsule:    var(--_glass-bg-capsule);
   --_glass-capsule-tone: brightness(1);
   --glass-capsule-tone:  var(--_glass-capsule-tone);
@@ -1640,7 +1850,7 @@
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
   --glass-bg-card:        var(--_glass-bg-card);
-  --_glass-bg-card-hover: rgba(250, 250, 252, 0.74);
+  --_glass-bg-card-hover: rgba(251, 250, 247, 0.74);
   --glass-bg-card-hover:  var(--_glass-bg-card-hover);
 
   /* a3) Tint: Modul-Akzentfarbe als subtile Glass-Tonung */
@@ -1683,7 +1893,7 @@
    * DER FAKTOR IST DER SCHALTER. glass.css sagt in Abschnitt 40 zu, dass
    * "Opazität/Specular in prefers-reduced-transparency / prefers-contrast über
    * die Tokens auf 0 gesetzt" werden - bis 2026-08-09 galt das nur für
-   * --lg-specular, während diese siebzehn Leser hier mit statischem rgba an
+   * das damalige --lg-specular, während diese siebzehn Leser hier mit statischem rgba an
    * beiden a11y-Blöcken vorbeiliefen. Gleiches Konzept, gegensätzliche
    * Behandlung: --glass-highlight, -subtle und --glass-sheen fallen dort auf
    * `transparent`, der Inset-Specular blieb stehen.
@@ -1768,18 +1978,16 @@
   --sheet-out:  var(--duration-md) var(--ease-out);
   --sheet-lift: 24px;
 
-  /* h) Liquid-Glass-Backdrop (Section 17) — driftende Blobs + Specular.
-   *    --lg-blob-opacity bleibt bewusst niedrig, damit Inhalte dominieren.
-   *    In prefers-reduced-transparency / prefers-contrast wird sie auf 0
-   *    gesetzt (siehe unten). */
-  --_app-backdrop-accent-strength: 2%;
-  --app-backdrop-accent-strength:  var(--_app-backdrop-accent-strength);
-  --_app-backdrop-secondary-strength: 1%;
-  --app-backdrop-secondary-strength: var(--_app-backdrop-secondary-strength);
-  --lg-blob-opacity:   0.16;
+  /* h) Liquid Glass - Saettigung.
+   *    Hier standen bis R18 (2026-10-07) drei Werte fuer einen Backdrop, den
+   *    die opake Inhaltsflaeche vollstaendig verdeckte (Blob-Deckung und zwei
+   *    Verlaufsstaerken der Shell). Sie sind mit ihm gestrichen. */
   --lg-glass-saturate: 200%;    /* Backdrop-Sättigung erhöhter Glass-Flächen */
   --lg-capsule-saturate: 220%;  /* Tab-Bar-Kapsel: duenneres Glas, sattere Durchsicht (a1) */
-  --lg-specular:       0.22;    /* Stärke des Inset-Top-Highlights */
+  /* --lg-specular (0.22, die Staerke EINES freien Highlights) ist mit R18
+   * entfallen: sein letzter Leser, die Seitenleiste, nimmt als schwebende
+   * Tafel `--glass-inset-elevated` wie Dialog und Blatt. Es gibt damit nur
+   * noch eine Schreibweise fuer einen Specular: die Inset-Tokens (d2). */
 
   /* i) Maskenstopp — voll deckend. KEIN FARBWERT.
    *
@@ -1998,9 +2206,17 @@
     --color-border-subtle: #3E3933;  /* Trenner, ruhige Kartenkante */
     --color-border:        #47423B;  /* Standardkante (Karten, Gruppen); Feldkanten: --color-border-control */
     --color-border-strong: #6F6A61;  /* Hover, betonte Rahmen (~2.7:1) */
+    /* Feldkante und Feldmulde (R18, Rechnung im :root-Block bei --color-field-bg). */
+    --color-border-control: #857F76;
+    --_color-field-bg:      #37332E;  /* = Stufe von --color-fill-well */
+    --_media-sheet-opacity: 0.82;
+    --_color-board-well:    #0F0E0D;  /* = --_neutral-50, unter der Buehne */
+    --_field-chevron:       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B4AEA5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     /* Bahn des ausgeschalteten Schalters (#1572, Werte im :root-Block). Als Hex,
      * nicht als var(): die Naht zum Installer-Fallback vergleicht Wert fuer Wert. */
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
+    /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
+    --_seg-active-bg:      #443E37;  /* = --_neutral-250 */
 
     --_sidebar-bg:           #221F1D;
     --_sidebar-shadow-light: rgba(255, 255, 255, 0.04);
@@ -2217,9 +2433,7 @@
     --_glass-bg-card:          var(--_color-surface-glass);
     --_glass-bg-card-hover:    rgba(43, 40, 37, 0.80);
     --_glass-tint-strength:    6%;
-    --_app-backdrop-accent-strength: 1.5%;
-    --_app-backdrop-secondary-strength: 0.75%;
-    --lg-blob-opacity:         0.20;
+    --_brand-field-opacity:    0.26;
   }
 }
 
@@ -2270,7 +2484,15 @@
     --color-border-subtle: #3E3933;
     --color-border:        #47423B;
     --color-border-strong: #6F6A61;
+    /* Feldkante und Feldmulde (R18, Rechnung im :root-Block bei --color-field-bg). */
+    --color-border-control: #857F76;
+    --_color-field-bg:      #37332E;  /* = Stufe von --color-fill-well */
+    --_media-sheet-opacity: 0.82;
+    --_color-board-well:    #0F0E0D;  /* = --_neutral-50, unter der Buehne */
+    --_field-chevron:       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B4AEA5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
+    /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
+    --_seg-active-bg:      #443E37;  /* = --_neutral-250 */
 
     /* Sidebar */
     --_sidebar-bg:           #221F1D;
@@ -2441,9 +2663,7 @@
     --_glass-bg-card:         var(--_color-surface-glass);
     --_glass-bg-card-hover:   rgba(43, 40, 37, 0.80);
     --_glass-tint-strength:   6%;
-    --_app-backdrop-accent-strength: 1.5%;
-    --_app-backdrop-secondary-strength: 0.75%;
-    --lg-blob-opacity:        0.20;
+    --_brand-field-opacity:   0.26;
   }
 }
 
@@ -2470,12 +2690,10 @@
     --blur-md:  blur(0px);
     --blur-lg:  blur(0px);
     --opacity-glass-elevated: 1;
-    --lg-blob-opacity: 0;     /* Backdrop-Blobs aus */
-    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus - gleiche Gattung (5b) */
-    /* Specular aus - beide Schreibweisen. --lg-specular ist die Stärke des
-     * einen freien Highlights, --glass-inset-strength der Faktor der
-     * abgestuften Inset-Tokens; sie sind dasselbe Konzept und fallen zusammen. */
-    --lg-specular: 0;
+    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus (5b) */
+    --brand-field-opacity: 0;  /* Marken-Lichtfeld aus - gleiche Gattung */
+    /* Specular aus: --glass-inset-strength ist der Faktor aller abgestuften
+     * Inset-Tokens (d2). */
     --glass-inset-strength: 0;
   }
 }
@@ -2515,10 +2733,9 @@
      * Ein Hochkontrast-Block, der den Kontrast senkt, ist schlimmer als keiner.
      * Ohne Eintrag gilt der regulaere Modul-Tint, und der haelt seine Zusage. */
 
-    --lg-blob-opacity: 0;     /* Backdrop-Blobs aus */
-    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus - gleiche Gattung (5b) */
-    /* Specular aus - beide Schreibweisen, siehe der Schwesterblock oben. */
-    --lg-specular: 0;
+    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus (5b) */
+    --brand-field-opacity: 0;  /* Marken-Lichtfeld aus - gleiche Gattung */
+    /* Specular aus, siehe der Schwesterblock oben. */
     --glass-inset-strength: 0;
   }
 }

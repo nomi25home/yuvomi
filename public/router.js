@@ -4,11 +4,11 @@
  * Abhängigkeiten: api.js
  */
 
-import { api, auth } from '/api.js';
+import { api, auth, isAbortError } from '/api.js';
 import { canAccessNavModule, navModuleAccess, setExtensionNavMap } from '/permissions.js';
 import { setExtensionModules, selectThirdPartyModuleList } from '/utils/extension-widgets.js';
 import { initExtensionI18n, moduleDisplayLabel, reloadExtensionLocales } from '/utils/extension-i18n.js';
-import { clearApiCache } from '/sw-register.js';
+import { clearApiCache, onServiceWorkerUpdate, UPDATE_RELOAD_DELAY_MS } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -31,8 +31,9 @@ import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
-import { swapPage } from '/utils/view-transition.js';
+import { swapPage, swapTheme } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
+import { brandMarkSvg } from '/utils/brand-mark.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
@@ -44,10 +45,12 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { wirePaletteCombobox } from '/utils/palette-combobox.js';
 import { triggerPageFab } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
+import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
+import { createStartHandoff } from '/utils/start-handoff.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
-  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled,
+  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled, hasOpenOverlay,
 } from '/utils/overlay-history.js';
 import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
@@ -636,6 +639,14 @@ function createFocusTrap(container) {
   };
 }
 
+// Was der Start schon angefragt hat, reicht er weiter (utils/start-handoff.js):
+// `/auth/me` an den Auth-Guard, `/version` an syncPreferencesOnce(), das
+// laufende `/preferences` an die Seite, die gleich zeichnet.
+const startHandoff = createStartHandoff({
+  auth,
+  dispatchExpired: () => window.dispatchEvent(new CustomEvent('auth:expired')),
+});
+
 /**
  * Navigiert zu einem Pfad und rendert die entsprechende Seite. Die Funktion
  * selbst steht in utils/router-navigate.js (#1657), damit Tests sie importieren
@@ -647,79 +658,109 @@ const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
-  auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
+  auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
   rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
   focusMainContentAfterNavigation, showToast, t,
 });
 
+/**
+ * Laedt, was jede Sitzung vor ihrer ersten Seite braucht: Praeferenzen,
+ * Versionsangaben, Erweiterungsmodule.
+ *
+ * DIE DREI LAUFEN GLEICHZEITIG (Critique R18). Sie hingen nie voneinander ab,
+ * liefen aber nacheinander: am gedrosselten Telefon (CPU 4x, Fast 4G) drei
+ * Rundreisen von je rund 175 ms, bevor die Uebersicht ihre Daten ueberhaupt
+ * anfragte. Was BLEIBT, ist die Reihenfolge nach aussen: navigate() wartet auf
+ * alle drei, bevor es die Route aufloest - die Erweiterungsrouten aus
+ * `/modules` und die abgeschalteten Module aus `/preferences` muessen dann
+ * stehen (takeDetour, Modul-Guard).
+ */
 async function syncPreferencesOnce() {
   if (routerState._preferencesLoaded) return;
   routerState._preferencesLoaded = true;
-  try {
-    const res = await api.get('/preferences');
-    const dateFormat = res?.data?.date_format;
-    if (dateFormat) {
-      localStorage.setItem('yuvomi-date-format', dateFormat);
-    }
-    const timeFormat = res?.data?.time_format;
-    if (timeFormat) {
-      localStorage.setItem('yuvomi-time-format', timeFormat);
-    }
-    // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
-    // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
-    // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,
-    // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
-    // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
-    setDisplayTimeZone(res?.data?.timezone ?? null);
-    // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
-    // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
-    // Skelett und schiebt nichts nach.
-    rememberZonePrefs(res?.data);
-    // Region als Formatier-Locale für Zahlen/Währung spiegeln (z. B. de-CH →
-    // 123'456.78). getFormatLocale() in i18n.js liest diesen Wert.
-    const numberLocale = numberLocaleFor({
-      region: res?.data?.region,
-      currency: res?.data?.currency,
-      date_format: res?.data?.date_format,
-      time_format: res?.data?.time_format,
-    });
-    if (numberLocale) {
-      localStorage.setItem('yuvomi-number-locale', numberLocale);
-    } else {
-      localStorage.removeItem('yuvomi-number-locale');
-    }
-    if (res?.data?.app_name) {
-      setAppName(res.data.app_name);
-      updateBranding();
-    }
-    if (Array.isArray(res?.data?.disabled_modules)) {
-      routerState._disabledModules = new Set(res.data.disabled_modules);
-    }
-    if (Array.isArray(res?.data?.hidden_modules)) {
-      _hiddenModules = new Set(res.data.hidden_modules);
-    }
-    if (Array.isArray(res?.data?.module_order)) {
-      _moduleOrder = res.data.module_order;
-    }
-    if (Array.isArray(res?.data?.mobile_nav_order)) {
-      _mobileNavOrder = res.data.mobile_nav_order;
-    }
-  } catch {
+  // Wessen Sitzung ist das? Eine Antwort, die nach einem Sitzungsende eintrifft
+  // (401 auf einem der Nachbarn -> auth:expired -> forgetSessionState), darf
+  // nichts mehr setzen: sonst erbte das naechste Mitglied am selben Geraet die
+  // ausgeblendeten Module. Nacheinander konnte das nicht passieren, gleichzeitig
+  // schon.
+  const session = routerState.currentUser;
+  const sameSession = () => routerState.currentUser === session;
+
+  const preferences = api.get('/preferences');
+  // Die Uebersicht braucht dieselbe Antwort fuer ihre Kacheln und holte sie ein
+  // zweites Mal (gemessen: zweimal `/preferences` je Kaltstart).
+  startHandoff.holdPreferences(preferences);
+  const preferencesApplied = preferences
+    .then((res) => { if (sameSession()) applyStartPreferences(res); })
     // Non-critical. The settings page can refresh this later.
-  }
-  try {
-    const res = await api.get('/version');
-    if (res?.version) setAppVersion(res.version);
-    if (res?.app_name) setAppName(res.app_name);
-    // Die Upload-Grenze kommt vom Server, damit Hinweis und Pruefung im Browser
-    // dieselbe Zahl nennen wie er (#806).
-    setMaxUploadBytes(res?.max_upload_bytes);
-    updateBranding();
-  } catch {
+    .catch(() => {});
+
+  // Die Versionsangaben NACH den Praeferenzen anwenden, wie bisher: beide
+  // tragen `app_name`, und die Reihenfolge soll nicht vom Netz abhaengen.
+  const versionApplied = Promise.all([startHandoff.takeVersion() ?? api.get('/version'), preferencesApplied])
+    .then(([res]) => {
+      if (res?.version) setAppVersion(res.version);
+      if (res?.app_name) setAppName(res.app_name);
+      // Die Upload-Grenze kommt vom Server, damit Hinweis und Pruefung im Browser
+      // dieselbe Zahl nennen wie er (#806).
+      setMaxUploadBytes(res?.max_upload_bytes);
+      updateBranding();
+    })
     // Non-critical. The login page and settings page can refresh branding later.
+    .catch(() => {});
+
+  await Promise.all([preferencesApplied, versionApplied, syncThirdPartyModules()]);
+}
+
+function applyStartPreferences(res) {
+  const dateFormat = res?.data?.date_format;
+  if (dateFormat) {
+    localStorage.setItem('yuvomi-date-format', dateFormat);
   }
-  await syncThirdPartyModules();
+  const timeFormat = res?.data?.time_format;
+  if (timeFormat) {
+    localStorage.setItem('yuvomi-time-format', timeFormat);
+  }
+  // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
+  // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
+  // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,
+  // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
+  // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
+  setDisplayTimeZone(res?.data?.timezone ?? null);
+  // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
+  // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
+  // Skelett und schiebt nichts nach.
+  rememberZonePrefs(res?.data);
+  // Region als Formatier-Locale für Zahlen/Währung spiegeln (z. B. de-CH →
+  // 123'456.78). getFormatLocale() in i18n.js liest diesen Wert.
+  const numberLocale = numberLocaleFor({
+    region: res?.data?.region,
+    currency: res?.data?.currency,
+    date_format: res?.data?.date_format,
+    time_format: res?.data?.time_format,
+  });
+  if (numberLocale) {
+    localStorage.setItem('yuvomi-number-locale', numberLocale);
+  } else {
+    localStorage.removeItem('yuvomi-number-locale');
+  }
+  if (res?.data?.app_name) {
+    setAppName(res.data.app_name);
+    updateBranding();
+  }
+  if (Array.isArray(res?.data?.disabled_modules)) {
+    routerState._disabledModules = new Set(res.data.disabled_modules);
+  }
+  if (Array.isArray(res?.data?.hidden_modules)) {
+    _hiddenModules = new Set(res.data.hidden_modules);
+  }
+  if (Array.isArray(res?.data?.module_order)) {
+    _moduleOrder = res.data.module_order;
+  }
+  if (Array.isArray(res?.data?.mobile_nav_order)) {
+    _mobileNavOrder = res.data.mobile_nav_order;
+  }
 }
 
 async function syncThirdPartyModules() {
@@ -1481,6 +1522,11 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
     // also keinen leeren Frame mehr dazwischen. Die Daten wartet er NICHT ab:
     // das Bild stuende sonst fuer die Dauer eines Abrufs.
     const swap = () => {
+      // ZUERST festhalten, ob die alte Seite einen FAB hatte - schwebend in der
+      // Ebene oder (Desktop) angedockt in ihrem Kopf, der mit dem Inhalt gleich
+      // faellt: der naechste poppt dann nicht neu herein, und die Kapsel haelt
+      // seine Reserve (holdFabAcrossSwap).
+      holdFabAcrossSwap();
       // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
       pageWrapper = document.createElement('div');
       pageWrapper.className = 'page-transition';
@@ -1601,6 +1647,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
 
     // FAB Long Loop: Einstiegsanimation nach FAB_SEEN_MAX Views pro Modul deaktivieren
     const pageFab = adoptPageFab();
+    releaseFabHold();
     if (pageFab) {
       // Shortcut-Discoverability (Audit P3): der 'n'-Chord öffnet den FAB — als
       // Tooltip-Titel + aria-keyshortcuts sichtbar bzw. vorlesbar machen.
@@ -1631,6 +1678,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
 
   } catch (err) {
     document.documentElement.classList.remove('navigating');
+    releaseFabHold();
     console.error('[Router] Seiten-Render-Fehler:', err);
     if (route.thirdPartyModule?.id) {
       await disableFailedThirdPartyModule(route.thirdPartyModule.id);
@@ -1641,6 +1689,9 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
     // die Seite ist dann nur noch per Reload verlassbar. Erst wenn noch keine
     // Shell steht (Auth-Seiten, früher Fehler), ist #app der richtige Ort.
     renderError(document.getElementById('main-content') ?? app, err);
+  } finally {
+    // Die Uebergabe gilt der Seite, die DIESER Start zeichnet (utils/start-handoff.js).
+    startHandoff.expirePage();
   }
 }
 
@@ -1670,45 +1721,12 @@ function renderAppShell(container) {
   const sidebarLogo = document.createElement('div');
   sidebarLogo.className = 'nav-sidebar__logo';
 
-  // SVG-Logomark aus docs/logo.svg — Gradient via CSS-Tokens
+  // Die Bildmarke kommt aus EINER Quelle (utils/brand-mark.js) - dieselbe wie
+  // auf den Zugangsseiten, in beiden Themes dieselbe.
   const logomark = document.createElement('div');
   logomark.className = 'nav-sidebar__logomark';
   logomark.setAttribute('aria-hidden', 'true');
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-  const logoSvg = document.createElementNS(SVG_NS, 'svg');
-  logoSvg.setAttribute('viewBox', '0 0 160 160');
-  logoSvg.setAttribute('fill', 'none');
-  const defs = document.createElementNS(SVG_NS, 'defs');
-  const grad = document.createElementNS(SVG_NS, 'linearGradient');
-  const gradId = `yuvomi-logo-bg-${Math.random().toString(36).slice(2, 7)}`;
-  grad.setAttribute('id', gradId);
-  grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
-  grad.setAttribute('x2', '160'); grad.setAttribute('y2', '160');
-  grad.setAttribute('gradientUnits', 'userSpaceOnUse');
-  const stop0 = document.createElementNS(SVG_NS, 'stop');
-  stop0.setAttribute('offset', '0%');
-  stop0.style.stopColor = 'var(--color-accent)';
-  const stop1 = document.createElementNS(SVG_NS, 'stop');
-  stop1.setAttribute('offset', '100%');
-  stop1.style.stopColor = 'var(--color-accent-secondary)';
-  grad.appendChild(stop0); grad.appendChild(stop1);
-  defs.appendChild(grad);
-  logoSvg.appendChild(defs);
-  const bgRect = document.createElementNS(SVG_NS, 'rect');
-  bgRect.setAttribute('width', '160'); bgRect.setAttribute('height', '160');
-  bgRect.setAttribute('rx', '36'); bgRect.setAttribute('fill', `url(#${gradId})`);
-  logoSvg.appendChild(bgRect);
-  // Drei transluzente, ineinander übergehende Kreise (Familie); kein Sheen in der Sidebar
-  const marks = document.createElementNS(SVG_NS, 'g');
-  marks.setAttribute('fill', 'white');
-  marks.setAttribute('fill-opacity', '0.82');
-  for (const [cx, cy, r] of [[64, 72, 27], [100, 78, 25], [80, 106, 24]]) {
-    const c = document.createElementNS(SVG_NS, 'circle');
-    c.setAttribute('cx', String(cx)); c.setAttribute('cy', String(cy)); c.setAttribute('r', String(r));
-    marks.appendChild(c);
-  }
-  logoSvg.appendChild(marks);
-  logomark.appendChild(logoSvg);
+  logomark.insertAdjacentHTML('beforeend', brandMarkSvg());
   sidebarLogo.appendChild(logomark);
 
   const sidebarBrandText = document.createElement('div');
@@ -2049,26 +2067,6 @@ function renderAppShell(container) {
   routeAnnouncer.setAttribute('aria-live', 'polite');
   routeAnnouncer.setAttribute('aria-atomic', 'true');
 
-  // Lebender Backdrop — driftende, getönte Blobs (Liquid Glass).
-  // Erstes Shell-Kind: liegt via z-index: -1 (glass.css Section 40) hinter
-  // dem transluzenten Content, aber über dem app-shell-Basis-Gradient.
-  // Blob 1 folgt --active-module-accent → rekoloriert pro Sektion.
-  const lgBackdrop = document.createElement('div');
-  lgBackdrop.className = 'lg-backdrop';
-  lgBackdrop.setAttribute('aria-hidden', 'true');
-  // Zwei Knoten je Blob: die Hülle driftet, die Farbwolke darin steht still und
-  // trägt den Blur. Solange beides auf EINEM Element sass, rasterte der Browser
-  // den blur(90px) pro Frame neu - im Leerlauf 60 → 20 fps (Issue #716). Die
-  // Begründung samt Messung steht bei .lg-blob in glass.css.
-  for (let i = 1; i <= 4; i++) {
-    const blob = document.createElement('div');
-    blob.className = `lg-blob lg-blob--${i}`;
-    const ink = document.createElement('div');
-    ink.className = 'lg-blob__ink';
-    blob.appendChild(ink);
-    lgBackdrop.appendChild(blob);
-  }
-
   // `bottomStack` steht VOR der Nav und nicht am Ende der Shell (Critique
   // 2026-08-13). Die Pille darin ist eine Bedienung für die Liste, die gerade
   // darüber steht - in der Tabfolge lag sie aber hinter der Liste, hinter dem
@@ -2083,7 +2081,7 @@ function renderAppShell(container) {
   //
   // Sichtbar ändert das nichts: der Stapel ist `position: fixed` und trägt
   // `--z-toast`, seine Lage kommt aus der Regel, nicht aus der Reihenfolge.
-  const shellNodes = [skipLink, lgBackdrop, sidebar, main, fabLayer, bottomStack, bottomNav];
+  const shellNodes = [skipLink, sidebar, main, fabLayer, bottomStack, bottomNav];
   if (backdrop)   shellNodes.push(backdrop);
   if (moreSheet)  shellNodes.push(moreSheet);
   shellNodes.push(searchOverlay, routeAnnouncer);
@@ -2398,6 +2396,33 @@ function wirePageToolbars() {
 /** FAB der alten Seite abräumen - zusammen mit deren Inhalt, nicht später. */
 function clearPageFab() {
   document.getElementById('fab-layer')?.replaceChildren();
+}
+
+/**
+ * DER FAB STEHT UEBER DEN SEITENWECHSEL (Critique R18, Bewegung). Der Knopf ist
+ * je Seite ein neuer Knoten - gemessen poppte er deshalb bei JEDEM Tab-Wechsel
+ * neu herein (`fab-in`, 4 von 4), und Seiten, die ihn erst nach den Daten
+ * anlegen, liessen die FAB-Reserve der Kapsel dazwischen fallen: die Tabs
+ * sprangen zweimal um rund 11px.
+ *
+ * Gefragt wird VOR `clearPageFab()` - danach gibt es den Vorgaenger nicht mehr:
+ *   - `fab-steady`: irgendwo stand ein sichtbarer FAB (schwebend oder im Kopf
+ *     angedockt). Der naechste faehrt nicht ein, er steht (layout.css). Gilt,
+ *     bis der naechste Wechsel neu fragt - also auch fuer einen Nachzuegler.
+ *   - `fab-holding`: der FAB schwebte in der Ebene, die Kapsel haelt seine
+ *     Reserve. Faellt mit `releaseFabHold()`, sobald die neue Seite gebaut ist
+ *     und ihre eigene `:has()`-Bedingung wieder die Wahrheit sagt.
+ * Beim Kaltstart steht kein Vorgaenger: beide Klassen fallen, der FAB faehrt ein.
+ */
+function holdFabAcrossSwap() {
+  const root = document.documentElement;
+  const floating = document.querySelector('#fab-layer .page-fab:not([hidden])');
+  root.classList.toggle('fab-steady', Boolean(floating || document.querySelector('#main-content .page-fab:not([hidden])')));
+  root.classList.toggle('fab-holding', Boolean(floating));
+}
+
+function releaseFabHold() {
+  document.documentElement.classList.remove('fab-holding');
 }
 
 const FAB_SEEN_KEY = (module) => `yuvomi:fabSeen:${module}`;
@@ -3135,6 +3160,8 @@ function initMoreSheet(container, openSearch) {
     scroller: () => sheet.querySelector('.more-sheet__body'),
     onDismiss: () => closeSheet(),
     resetAfterDismiss: true,
+    // Die Abdunklung folgt dem Zug (R18): der Backdrop ist ein eigenes Element.
+    dim: () => backdrop,
   });
 
   sheet.addEventListener('click', (e) => {
@@ -4391,26 +4418,44 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   // Auth-Fehler werden bereits von auth:expired behandelt
   if (e.reason?.status === 401) return;
+  // Ein Abruf, den sein Aufrufer selbst abgebrochen hat (`api.get(path,
+  // { signal })`), ist kein Fehler und bekommt weder Toast noch Konsolenzeile.
+  if (isAbortError(e.reason)) {
+    e.preventDefault();
+    return;
+  }
   console.error('[Yuvomi] Unbehandeltes Promise-Rejection:', e.reason);
   showToast(friendlyError(e.reason), 'danger');
   e.preventDefault(); // Konsolenfehler unterdrücken (bereits geloggt)
 });
 
-// SW-Update: neue Version im Hintergrund installiert → Toast anzeigen
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (e) => {
-    if (e.data?.type === 'SW_UPDATED') {
-      // Ab hier keine Seitenmodule mehr nachladen. Früher wurde an dieser Stelle
-      // der Modul-Cache dieses Routers geleert, damit die nächste Navigation
-      // frische Module lädt - wirkungslos: geleert wurde nur die eigene Map,
-      // während die Modul-Map des Dokuments die alten Abhängigkeiten weiter
-      // auflöst. Genau daraus entstand der Mischzustand aus #616.
-      shellStale = true;
-      showToast(t('common.updateAvailable'), 'default', 8000);
-      setTimeout(() => location.reload(), 8000);
-    }
-  });
-}
+// SW-Update: EIN Weg (utils/app-update.js). sw-register.js meldet den Wechsel
+// von einem alten auf einen neuen Controller, hier wird die Shell als alt
+// markiert und neu geladen, sobald es niemanden unterbricht.
+//
+// Ab `onStale` keine Seitenmodule mehr nachladen. Früher wurde an dieser Stelle
+// der Modul-Cache dieses Routers geleert, damit die nächste Navigation frische
+// Module lädt - wirkungslos: geleert wurde nur die eigene Map, während die
+// Modul-Map des Dokuments die alten Abhängigkeiten weiter auflöst. Genau
+// daraus entstand der Mischzustand aus #616.
+//
+// Die Nachricht `SW_UPDATED` des Workers liest hier niemand mehr: sie kommt
+// auch beim Erstinstall, und ihr Hinweis kündigte 8 s lang einen Reload an,
+// den sw-register.js längst nach 200 ms gefahren hatte (Critique R18). Der
+// Worker schickt sie weiter, für Shells bis v2.75, die beim Update noch laufen.
+const updateFlow = createUpdateFlow({
+  document,
+  isBusy: () => isUserBusy({ document, hasLeaveGuard, hasOpenOverlay }),
+  reload: reloadOnce,
+  onStale: () => { shellStale = true; },
+  // Der Knopf lädt ohne Schleifenbremse: wer ihn drückt, hat entschieden.
+  notify: () => showToast(t('common.updateAvailable'), 'default', 8000, {
+    label: t('common.reload'),
+    onClick: () => location.reload(),
+  }),
+  delayMs: UPDATE_RELOAD_DELAY_MS,
+});
+onServiceWorkerUpdate(() => updateFlow.announce());
 
 // Browser zurück/vor
 //
@@ -4782,17 +4827,42 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
       refreshThemeColorForTheme();
     });
 
+    // GLEICHZEITIG MIT DEN SPRACHDATEIEN (Critique R18): `/version`, die
+    // Sitzungsfrage und das Seitenmodul haengen weder von der Sprache noch
+    // voneinander ab. Vorher lief alles nacheinander - am gedrosselten Telefon
+    // fuenf Rundreisen, rund 870 ms, bevor die Uebersicht ihre Daten anfragte.
+    // Die Sitzungsfrage nur fuer eine Adresse, die eine Sitzung verlangt: die
+    // Anmeldeseite hat nie `/auth/me` gefragt und tut es weiter nicht.
+    const version = api.get('/version');
+    // Der Abnehmer steht SOFORT: zwischen hier und dem Warten auf die Antwort
+    // weiter unten liegt das Warten auf die Sprachdateien. Scheitert `/version` in dieser Zeit, haette
+    // das Versprechen sonst keinen - der Browser meldet `unhandledrejection`,
+    // und der globale Behandler zeigt einen roten Toast fuer einen Abruf, den
+    // der catch unten ausdruecklich als unkritisch behandelt. Wer spaeter auf
+    // die Antwort wartet, sieht den Fehler trotzdem.
+    version.catch(() => {});
+    const startRoute = ROUTES.find((r) => r.path === location.pathname);
+    if (!startRoute || startRoute.requiresAuth) {
+      startHandoff.askSession();
+    }
+    // Nur ein Hinweis an den Browser (modulepreload): ausgefuehrt wird nichts,
+    // und nach einem angekuendigten Update unterlaesst prefetchRoute() ihn (#616).
+    prefetchRoute(location.pathname);
+
     await initI18n();
     initExtensionI18n();
     try {
-      const v = await api.get('/version');
+      const v = await version;
       routerState._setupRequired = v?.setup_required === true;
       if (v?.version) setAppVersion(v.version);
       if (v?.app_name) setAppName(v.app_name);
+      startHandoff.holdVersion(v);
     } catch {
       routerState._setupRequired = false; // Fail-safe: kein Setup erzwingen
     }
-    navigate(location.pathname, false);
+    // Was die erste Navigation nicht abgeholt hat, verfaellt mit ihr: eine
+    // spaetere Anmeldung faende sonst die Antwort einer frueheren Sitzung vor.
+    navigate(location.pathname, false).finally(() => startHandoff.expireStart());
   } catch (err) {
     console.error('[Router] Initialisierung fehlgeschlagen:', err);
     // renderError ersetzt den Inhalt von #app und nimmt den Ladebildschirm mit.
@@ -4825,6 +4895,9 @@ window.yuvomi = {
   // Die Uebersichtsseite reicht ihre `/dashboard`-Antwort herein, statt sie ein
   // zweites Mal holen zu lassen. Begruendung an `primeModuleCountsFrom`.
   primeModuleCountsFrom,
+  // Umgekehrt reicht der Router der Seite sein `/preferences` des Starts.
+  // Begruendung in utils/start-handoff.js.
+  takeStartPreferences: () => startHandoff.takePreferences(),
   // Fuer eine Seite, die sich SELBST neu aufbaut, ohne dass der Router
   // navigiert - die Uebersicht beim Betreten und Verlassen des Wand-Modus, nach
   // „erneut versuchen" oder einer Aenderung aus einer Kachel. renderPage()
@@ -4849,21 +4922,27 @@ window.yuvomi = {
     return fab;
   },
   applyTheme: (value) => {
-    if (value === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else if (value === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-    // Der Modul-Akzent liegt als aufgelöste Farbe im Inline-Style von <html> und
-    // folgt der CSS-Kaskade daher NICHT. Ohne dieses Nachziehen behielte die
-    // ganze Shell (Buttons, Fokusringe, FAB, aktive Nav-Pille) den Akzent des
-    // vorherigen Themes. Begründung an applyModuleAccentForRoute.
-    applyModuleAccentForRoute(currentRoute());
-    // Die Statusbar im Standalone-Modus trägt dieselbe eingefrorene
-    // Momentaufnahme, siehe refreshThemeColorForTheme.
-    refreshThemeColorForTheme();
+    // DER GEWAEHLTE WECHSEL BLENDET (Critique R18): alles Sichtbare laeuft im
+    // Callback von swapTheme - als Blende ueber die Wurzel, wo der Browser sie
+    // kann, sonst synchron wie bisher. Der Nachtwechsel des Wandmodus ruft
+    // diese Funktion nie (utils/wall-mode.js) und bleibt ohne Blende.
+    swapTheme(() => {
+      if (value === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else if (value === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      // Der Modul-Akzent liegt als aufgelöste Farbe im Inline-Style von <html> und
+      // folgt der CSS-Kaskade daher NICHT. Ohne dieses Nachziehen behielte die
+      // ganze Shell (Buttons, Fokusringe, FAB, aktive Nav-Pille) den Akzent des
+      // vorherigen Themes. Begründung an applyModuleAccentForRoute.
+      applyModuleAccentForRoute(currentRoute());
+      // Die Statusbar im Standalone-Modus trägt dieselbe eingefrorene
+      // Momentaufnahme, siehe refreshThemeColorForTheme.
+      refreshThemeColorForTheme();
+    });
     // Persistenz zuletzt und fehlertolerant: ein werfendes localStorage (Safari
     // Privatmodus, Quota) darf das sichtbare Anwenden nicht abbrechen. Vorher
     // stand diese Zeile zuerst - warf sie, fiel der Aufrufer in den

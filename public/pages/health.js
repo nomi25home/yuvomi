@@ -14,8 +14,8 @@
 import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
-import { scheduleUndoableDelete, expandIn } from '/utils/ux.js';
+import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
+import { scheduleUndoableDelete, expandIn, drawChartOnce } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -25,6 +25,7 @@ import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
 import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
 import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -62,6 +63,7 @@ import {
 } from '/utils/health-tabs.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { hoistPlan, applyHoistPlan } from '/utils/health-hoist.js';
+import { renderSkeletonList, renderSkeletonChart } from '/utils/skeleton.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -691,13 +693,77 @@ function syncDetailHead() {
 /* DER NEUE BEREICH BLENDET EIN - IN JEDER BREITE (R14 P11, R16 Bewegung).
  * Schmal schaltete der Wechsel nur `hidden` um; seit R14 blendete er dort,
  * am Desktop schnitt die Detailspalte weiter hart. Jetzt ueber den geteilten
- * Helfer (utils/content-swap.js): nur Deckkraft, kein Versatz - die Bereiche
+ * Helfer (utils/content-swap.js). Zwischen zwei Bereichen nur Deckkraft: sie
  * stehen untereinander in einer Liste, eine Seitwaertsrichtung gibt es nicht.
+ *
+ * SCHMAL IST DER BEREICH EINE EBENE TIEFER (R18): dort ersetzt er die
+ * Uebersicht, und Zurueck fuehrt zu ihr. Hinein gleitet er deshalb von der
+ * Seite, zu der man geht (`direction` +1), zurueck die Uebersicht von der
+ * anderen (-1) - 8px, in RTL gespiegelt, unter reduzierter Bewegung nur die
+ * Blende. In der Split-Ansicht steht die Liste daneben, es bleibt bei 0.
+ *
  * Der Tausch selbst ist das Umschalten von `hidden` davor; hier laeuft nur
- * die Blende, und ein zweiter Wechsel bricht sie ab. */
-function markAreaEntering(route) {
+ * die Bewegung, und ein zweiter Wechsel bricht sie ab. */
+function markAreaEntering(route, direction = 0) {
   const panel = [..._container.querySelectorAll('[data-health-panel]')].find((p) => p.dataset.healthPanel === route);
-  if (panel) swapContent(panel, null);
+  if (panel) swapContent(panel, null, { direction });
+}
+
+/* DIE "HEUTE"-REGION SPRINGT NICHT INS BILD (R18, Ursache zu #1770).
+ *
+ * Die Region vor der Bereichsliste war leer und per `:has()` auf
+ * `display: none`, bis die Uebersicht geladen und ihre Karten umgezogen waren
+ * (health-hoist.js). Dann erschien sie mit rund 480px auf einmal: die
+ * Bereichsliste rutschte bei 390x844 von y=81 auf y=577, Layout-Shift 0,58
+ * (drei Laeufe). Wer in dem Moment eine Bereichszeile antippen wollte, traf
+ * eine andere.
+ *
+ * Auf dem Telefon steht die Region deshalb vom ersten Bild an, mit einem
+ * Skelett in der Form dessen, was kommt: Personen-Pille, "Heute faellig",
+ * "Schnell erfassen". Die Hoehe der Karten haengt an den Daten (wie viele
+ * Einnahmen heute faellig sind), also merkt sich das Modul die zuletzt
+ * gemessene Hoehe - beim zweiten Aufruf der Sitzung passt das Skelett genau,
+ * beim ersten steht die Liste ohnehin schon unter dem Falz.
+ *
+ * `_priorityPending` gilt nur, solange Inhalt ERWARTET wird: am Tablet und am
+ * Desktop zieht nichts in die Region, dort bleibt sie weg (keine leere
+ * Landmarke), und nach einem Ladefehler faellt die Marke ebenfalls. */
+let _priorityPending = false;
+let _priorityHeight = 0;
+
+function prioritySkeletonMarkup() {
+  return `<div class="health-priority-skeleton" data-health-priority-skeleton aria-hidden="true">
+              <div class="skeleton health-priority-skeleton__pill"></div>
+              <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--due">
+                <div class="skeleton skeleton-line skeleton-line--title"></div>
+                <div class="skeleton skeleton-line skeleton-line--medium"></div>
+                <div class="skeleton skeleton-line skeleton-line--full"></div>
+              </div>
+              <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--quick">
+                <div class="skeleton skeleton-line skeleton-line--title"></div>
+                <div class="skeleton skeleton-line skeleton-line--full"></div>
+              </div>
+            </div>`;
+}
+
+/** Die Marke an der Region nachfuehren und die Hoehe des Inhalts merken. */
+function syncPriorityRegion() {
+  const region = _container?.querySelector('.health-priority-region');
+  const slot = region?.querySelector('[data-health-priority]');
+  if (!region || !slot) return;
+  const filled = slot.children.length > 0;
+  const overviewActive = (_activeArea ?? HEALTH_OVERVIEW_ID) === HEALTH_OVERVIEW_ID;
+  if (filled || !overviewActive || !isPhone()) _priorityPending = false;
+  region.toggleAttribute('data-health-priority-pending', _priorityPending);
+  const skeleton = region.querySelector('[data-health-priority-skeleton]');
+  if (skeleton && _priorityPending && _priorityHeight > 0) skeleton.style.minBlockSize = `${_priorityHeight}px`;
+  if (filled && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      if (!slot.isConnected || slot.children.length === 0) return;
+      const height = slot.getBoundingClientRect().height;
+      if (height > 0) _priorityHeight = Math.round(height);
+    });
+  }
 }
 
 /* Personenwahl und „Heute" an ihren Ort je Darstellung (health-hoist.js). */
@@ -715,6 +781,7 @@ function syncHoists() {
       priority: _container.querySelector('[data-health-priority]'),
     },
   });
+  syncPriorityRegion();
   // Die eigenen Umzuege sind keine Neubauten der Panels.
   _hoistObserver?.takeRecords();
 }
@@ -757,7 +824,8 @@ function activateArea(id) {
   for (const panel of _container.querySelectorAll('[data-health-panel]')) {
     panel.hidden = panel.dataset.healthPanel !== route;
   }
-  if (previous && previous !== id) markAreaEntering(route);
+  const drill = !narrow ? 0 : id === HEALTH_OVERVIEW_ID ? -1 : previous === HEALTH_OVERVIEW_ID ? 1 : 0;
+  if (previous && previous !== id) markAreaEntering(route, drill);
   rememberHealthRoute(route);
   syncHealthHeader();
   updateHealthFab(route);
@@ -1006,6 +1074,11 @@ export async function render(container, ctx = {}) {
   }
   const panels = PANELS().filter((panel) => (cycleEnabled || panel.route !== '/health/cycle') && (fastingEnabled || panel.route !== '/health/fasting'));
 
+  // Auf dem Telefon kommt vor der Bereichsliste gleich Inhalt (health-hoist.js):
+  // die Region steht deshalb vom ersten Bild an, mit Skelett (R18, #1770).
+  _priorityPending = activeRoute === '/health' && isPhone();
+  const priorityPending = _priorityPending;
+
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="health-page app-page app-page--dashboard app-page--list-detail" data-composition="dashboard">
@@ -1032,9 +1105,10 @@ export async function render(container, ctx = {}) {
                VOR der Bereichsliste (health-hoist.js, R14 P3). Die h2 steht
                vor dem Umzugsziel, nicht darin: die Karten bringen ihre h3 mit,
                ohne sie folgten sie direkt auf das h1. -->
-          <section class="health-priority-region" aria-labelledby="health-priority-title">
+          <section class="health-priority-region" aria-labelledby="health-priority-title"${priorityPending ? ' data-health-priority-pending' : ''}>
             <h2 class="sr-only" id="health-priority-title">${esc(t('common.today'))}</h2>
             <div class="health-priority" data-health-priority></div>
+            ${prioritySkeletonMarkup()}
           </section>
           ${areasNavMarkup()}
           <div class="health-stage" data-health-stage></div>
@@ -1184,7 +1258,7 @@ async function loadHealthMembers(view, user) {
 async function mountVitals() {
   vitals.root.replaceChildren();
   vitals.root.insertAdjacentHTML('beforeend',
-    `<div class="health-vitals__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('vitals', 'chart'));
 
   try {
     await loadHealthMembers(vitals, healthUser);
@@ -1224,7 +1298,7 @@ function renderVitalsShell() {
             data-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
       </div>
     </div>
-    <div class="health-vitals__cards" id="health-vitals-cards"></div>
+    <div class="health-vitals__cards metric-rows" id="health-vitals-cards"></div>
     <div class="health-vitals__more" id="health-vitals-more"></div>
     <div class="health-vitals__detail" id="health-vitals-detail"></div>
   `);
@@ -1505,6 +1579,9 @@ function watchPhoneQuery() {
     if (vitals.root?.isConnected && vitals.loaded && !vitals.error) renderCards();
     // Die Uebersicht ordnet ihre Karten je Breite anders (overviewGridMarkup).
     if (overview.root?.isConnected && overview.loaded && !overview.error) renderOverviewShell();
+    // Das Aktivitaets-Diagramm rechnet je Breite auf einer anderen Flaeche
+    // (activityChartGeometry) - sonst bliebe nach dem Drehen die alte stehen.
+    if (activity.root?.isConnected && activity.loaded && !activity.error) renderActivityShell();
     syncHoists();
   });
 }
@@ -1571,12 +1648,22 @@ function sparklineMarkup(points, key, metric) {
   const pts = withVal.map((o, idx) => `${x(idx).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
   const lastX = x(n - 1).toFixed(1);
   const lastY = y(withVal[n - 1].v).toFixed(1);
-  // Farbe steht in panel.css am geteilten Bauteil, nicht hier: sie ist eine
-  // Aussage über den WERT und gehört deshalb der Karte, nicht dem Modul.
+  // Farbe steht in panel.css am geteilten Bauteil, nicht hier (R18: Modulton
+  // mit Flaechenverlauf, Begruendung dort). Die Flaeche schliesst die Linie
+  // unten; ihr Verlauf braucht eine Kennung je Metrik, weil mehrere Trendlinien
+  // im selben Dokument stehen. Der letzte Punkt ist eine Linie der Laenge null
+  // mit runder Kappe: ein `<circle>` wurde von `preserveAspectRatio="none"`
+  // zur Ellipse gestreckt (gemessen 100x26 auf 176x22).
+  const fillId = `metric-spark-${String(metric?.type ?? key).replace(/[^a-z0-9_-]/gi, '')}`;
+  const end = `x1="${lastX}" x2="${lastX}" y1="${lastY}" y2="${lastY}" vector-effect="non-scaling-stroke"`;
   return `<svg class="metric-card__spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
+        <stop class="metric-card__spark-from" offset="0" /><stop class="metric-card__spark-to" offset="1" />
+      </linearGradient></defs>
+      <polygon class="metric-card__spark-area" fill="url(#${fillId})" points="${x(0).toFixed(1)},${H} ${pts} ${lastX},${H}" />
       <polyline points="${pts}" fill="none" stroke-width="1.5"
         stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-      <circle cx="${lastX}" cy="${lastY}" r="2" vector-effect="non-scaling-stroke" />
+      <line class="metric-card__spark-ring" ${end} /><line class="metric-card__spark-end" ${end} />
     </svg>`;
 }
 
@@ -1617,6 +1704,12 @@ function renderDetail() {
     </div>
     ${recentMeasurementsMarkup(metric)}`);
   if (window.lucide) window.lucide.createIcons({ el: host });
+  // DIE KURVE ZEICHNET SICH EINMAL EIN (Critique R18): die Vitaldiagramme
+  // standen fertig da, waehrend die Berichte im Budget sich einzeichnen. Einmal
+  // je Messgroesse und Sitzung - wer den Zeitraum blaettert, vergleicht und
+  // wartet nicht noch einmal 300ms (drawChartOnce, utils/ux.js). Raster und
+  // Achse stehen; der Beschnitt haengt an der Gruppe aus Flaeche und Kurven.
+  drawChartOnce(`health-vitals-${metric.type}`, { lines: host.querySelector('.health-chart__lines') });
 
   host.querySelectorAll('[data-step]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -1787,6 +1880,7 @@ function renderVitalSheet(host) {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', vitalSheetMarkup(metric));
   if (window.lucide) window.lucide.createIcons({ el: host });
+  drawChartOnce(`health-vital-sheet-${metric.type}`, { lines: host.querySelector('.health-chart__lines') });
   wireTablistKeys(host);
   attachSegmentIndicator(host.querySelector('.health-vital-sheet__ranges'), { key: 'health-vital-sheet-range' });
 
@@ -1925,8 +2019,10 @@ function chartMarkup(metric, series, geo = CHART) {
     <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${ratio}
          aria-label="${esc(t(metric.labelKey))}">
       ${grid}
-      ${area}
-      ${seriesSvg}
+      <g class="health-chart__lines">
+        ${area}
+        ${seriesSvg}
+      </g>
       ${xLabels}
     </svg>
     ${table}
@@ -1944,6 +2040,11 @@ function localDateTimeValue(date) {
   return `${key}T${hh}:${mm}`;
 }
 
+// Beispielwerte als Platzhalter des Blutdruck-Paars und die Einheit des
+// Pulses. Zahlen und ein Einheitenzeichen, keine Texte - wie `metric.units`.
+const PAIR_EXAMPLE = Object.freeze({ systolic: 120, diastolic: 80, pulse: 72 });
+const PULSE_UNIT = '/min';
+
 function valueFieldsMarkup(type, row = null) {
   const metric = vitalMetric(type) || VITAL_METRICS[0];
   // Bearbeiten (R8 H9): der Bestand steht im Markup, nicht erst nach einem
@@ -1955,17 +2056,24 @@ function valueFieldsMarkup(type, row = null) {
   // ist eine Rechnung, die der Erfassende sonst im Kopf machen müsste.
   if (metric.format === 'duration') {
     const parts = row && has(row.value_num) ? splitDuration(row.value_num) : null;
-    return `
-      <div class="modal-grid modal-grid--2">
-        <div class="form-field">
-          <label class="label" for="vital-hours">${esc(t('health.vitals.field.hours'))}</label>
-          <input class="input" id="vital-hours" type="number" inputmode="numeric" step="1" min="0" max="24" required${parts ? ` value="${esc(String(parts.hours))}"` : ''}>
-        </div>
-        <div class="form-field">
-          <label class="label" for="vital-minutes">${esc(t('health.vitals.field.minutes'))}</label>
-          <input class="input" id="vital-minutes" type="number" inputmode="numeric" step="1" min="0" max="59" value="${esc(String(parts ? parts.minutes : 0))}">
-        </div>
-      </div>
+    // EIN zusammengesetztes Feld: "7 Stunden 30 Minuten". Die Worte hinter den
+    // Zahlen SIND die Etiketten der Teilfelder (`<label for>`).
+    return `${formRowHtml({
+      label: t(metric.labelKey),
+      labelId: 'vital-duration-label',
+      field: true,
+      control: formCompositeHtml({
+        labelledBy: 'vital-duration-label',
+        parts: [
+          { id: 'vital-hours', label: t('health.vitals.field.hours'), suffix: t('health.vitals.field.hours'), suffixIsLabel: true,
+            value: parts ? parts.hours : null,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', max: '24', required: true } },
+          { id: 'vital-minutes', label: t('health.vitals.field.minutes'), suffix: t('health.vitals.field.minutes'), suffixIsLabel: true,
+            value: parts ? parts.minutes : 0,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', max: '59' } },
+        ],
+      }),
+    })}
       <input type="hidden" id="vital-unit" value="${esc(metric.units[0] || '')}">`;
   }
 
@@ -1973,37 +2081,60 @@ function valueFieldsMarkup(type, row = null) {
   // Auswahl-Chip wie Flow und Symptome im Zyklus-Tagebuch (.health-choice).
   if (metric.format === 'scale') {
     const chosen = row && has(row.value_num) ? moodStep(row.value_num)?.value : null;
-    return `
-      <div class="form-field">
-        <span class="label">${esc(t('health.vitals.field.mood'))}</span>
-        <div class="health-choices health-choices--scale" data-group="mood" role="group"
-             aria-label="${esc(t('health.vitals.field.mood'))}">
+    // Eine Skala steht neben keinem Etikett: gestapelte Zeile.
+    return `${formRowHtml({
+      label: t('health.vitals.field.mood'),
+      labelId: 'vital-mood-label',
+      stacked: true,
+      field: true,
+      control: `<div class="health-choices health-choices--scale" data-group="mood" role="group"
+             aria-labelledby="vital-mood-label">
           ${MOOD_SCALE.map((step) => `
             <button type="button" class="health-choice" data-mood="${esc(step.value)}" aria-pressed="${step.value === chosen ? 'true' : 'false'}">
               <i data-lucide="${esc(step.icon)}" aria-hidden="true"></i>
               <span class="health-choice-label">${esc(t(step.labelKey))}</span>
             </button>`).join('')}
-        </div>
-      </div>
+        </div>`,
+    })}
       <input type="hidden" id="vital-unit" value="">`;
   }
 
   if (metric.format === 'pair') {
-    return `
-      <div class="modal-grid modal-grid--3">
-        <div class="form-field">
-          <label class="label" for="vital-sys">${esc(t('health.vitals.field.systolic'))}</label>
-          <input class="input" id="vital-sys" type="number" inputmode="numeric" step="1" min="0" required${valueAttr(row?.value_num)}>
-        </div>
-        <div class="form-field">
-          <label class="label" for="vital-dia">${esc(t('health.vitals.field.diastolic'))}</label>
-          <input class="input" id="vital-dia" type="number" inputmode="numeric" step="1" min="0" required${valueAttr(row?.value_num2)}>
-        </div>
-        <div class="form-field">
-          <label class="label" for="vital-pulse">${esc(t('health.vitals.field.pulse'))}</label>
-          <input class="input" id="vital-pulse" type="number" inputmode="numeric" step="1" min="0"${valueAttr(row?.value_num3)}>
-        </div>
-      </div>`;
+    // DER BLUTDRUCK IST EIN WERT, KEINE DREI KAESTEN (R18, 2026-10-07): bis
+    // dahin drei gleich breite Felder "Systolisch", "Diastolisch", "Puls" ohne
+    // Einheit. Jetzt steht er, wie man ihn sagt - "120 / 80 mmHg" -, der Puls
+    // als eigene Zeile darunter. Die Teilfelder behalten ihre ids und Namen
+    // (Screenreader: Gruppe "Blutdruck", "Systolisch", "Diastolisch, mmHg").
+    // Die Platzhalter sind Beispielwerte, keine Vorgaben.
+    return formRowHtml({
+      label: t(metric.labelKey),
+      labelId: 'vital-pair-label',
+      field: true,
+      control: formCompositeHtml({
+        labelledBy: 'vital-pair-label',
+        unit: metric.units[0],
+        parts: [
+          { id: 'vital-sys', label: t('health.vitals.field.systolic'), value: has(row?.value_num) ? row.value_num : null,
+            placeholder: PAIR_EXAMPLE.systolic,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', required: true } },
+          { separator: '/' },
+          { id: 'vital-dia', label: t('health.vitals.field.diastolic'), value: has(row?.value_num2) ? row.value_num2 : null,
+            placeholder: PAIR_EXAMPLE.diastolic,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', required: true } },
+        ],
+      }),
+    }) + formRowHtml({
+      label: t('health.vitals.field.pulse'),
+      labelFor: 'vital-pulse',
+      field: true,
+      control: formCompositeHtml({
+        parts: [
+          { id: 'vital-pulse', suffix: PULSE_UNIT,
+            value: has(row?.value_num3) ? row.value_num3 : null, placeholder: PAIR_EXAMPLE.pulse,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0' } },
+        ],
+      }),
+    });
   }
   /* EINE UNBEKANNTE EINHEIT WURDE STILL ZUR ERSTEN (Codex an #1485): stand
    * die gespeicherte Einheit nicht in der Liste (per API oder Import erfasst,
@@ -2012,23 +2143,24 @@ function valueFieldsMarkup(type, row = null) {
    * Einheit steht deshalb als eigene Option da und ist gewaehlt. */
   const orphanUnit = row?.unit && !metric.units.includes(row.unit) ? row.unit : null;
   const unitOptions = orphanUnit ? [orphanUnit, ...metric.units] : metric.units;
-  const unitField = vitalUnitEditable(metric)
-    ? `
-      <div class="form-field">
-        <label class="label" for="vital-unit">${esc(t('health.vitals.field.unit'))}</label>
-        <select class="input" id="vital-unit">
+  // WERT UND EINHEIT SIND EIN FELD: die Einheit steht als Suffix hinter der
+  // Zahl - als randlose Auswahl, wo es mehrere gibt (kg / lb), sonst als Text.
+  // Das versteckte Einheitenfeld bleibt, wo die Metrik nur eine fuehrt:
+  // collectVitalBody() liest `#vital-unit` in beiden Faellen.
+  const unitChoice = vitalUnitEditable(metric);
+  const unitControl = unitChoice
+    ? `<select class="form-input" id="vital-unit" aria-label="${esc(t('health.vitals.field.unit'))}">
           ${unitOptions.map((u) => `<option value="${esc(u)}"${row?.unit === u ? ' selected' : ''}>${esc(u)}</option>`).join('')}
-        </select>
-      </div>`
-    : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`;
-  return `
-    <div class="modal-grid modal-grid--2">
-      <div class="form-field">
-        <label class="label" for="vital-value">${esc(t('health.vitals.field.value'))}</label>
-        <input class="input" id="vital-value" type="number" inputmode="decimal" step="any" required${valueAttr(row?.value_num)}>
-      </div>
-      ${unitField}
-    </div>`;
+        </select>`
+    : '';
+  const staticUnit = !unitChoice && metric.units[0] ? metric.units[0] : '';
+  const valueInput = `<input class="form-input form-composite__part form-composite__part--wide" id="vital-value" type="number" inputmode="decimal" step="any" required${staticUnit ? ' aria-describedby="vital-value-unit"' : ''}${valueAttr(row?.value_num)}>`;
+  return `${formRowHtml({
+    label: t(metric.labelKey),
+    labelFor: 'vital-value',
+    field: true,
+    control: `<span class="form-composite">${valueInput}${unitControl}${staticUnit ? `<span class="form-composite__unit" id="vital-value-unit">${esc(staticUnit)}</span>` : ''}</span>`,
+  })}${unitChoice ? '' : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`}`;
 }
 
 /**
@@ -2063,27 +2195,36 @@ function openVitalModal(opts = {}) {
     onClose: opts.onClose,
     content: `
       <form id="vital-form" class="form-stack">
-        <div class="form-field">
-          <label class="label" for="vital-type">${esc(t('health.vitals.field.type'))}</label>
-          <select class="input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>
-        </div>
-        <div id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>
-        <div class="modal-grid modal-grid--2">
-          <div class="form-field">
-            <label class="label" for="vital-measured-at">${esc(t('health.vitals.field.measuredAt'))}</label>
-            <yuvomi-datepicker id="vital-measured-at" type="datetime" value="${esc(measuredValue)}"></yuvomi-datepicker>
-          </div>
-          <div class="form-field">
-            <label class="label" for="vital-visibility">${esc(t('health.vitals.field.visibility'))}</label>
-            <select class="input" id="vital-visibility">
+        ${/* GRUPPIERTE ZEILEN (R18, 2026-10-07, utils/form-row.js): Etikett
+             links, Wert rechts. Reihenfolge, ids und Verhalten der Felder
+             sind die alten - Art, Wert, Zeitpunkt, Sichtbarkeit, Notiz. Die
+             Notiz bleibt ein freies Feld ohne Zeilenraster. */ ''}
+        ${formRowsHtml(formRowHtml({
+          label: t('health.vitals.field.type'),
+          labelFor: 'vital-type',
+          control: `<select class="form-input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>`,
+        }))}
+        <div class="form-rows" id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.vitals.field.measuredAt'),
+            labelFor: 'vital-measured-at',
+            wide: true,
+            field: true,
+            control: `<yuvomi-datepicker id="vital-measured-at" type="datetime" value="${esc(measuredValue)}"></yuvomi-datepicker>`,
+          }),
+          formRowHtml({
+            label: t('health.vitals.field.visibility'),
+            labelFor: 'vital-visibility',
+            control: `<select class="form-input" id="vital-visibility">
               <option value="private"${visibilityValue === 'family' ? '' : ' selected'}>${esc(t('health.vitals.visibility.private'))}</option>
               <option value="family"${visibilityValue === 'family' ? ' selected' : ''}>${esc(t('health.vitals.visibility.family'))}</option>
-            </select>
-          </div>
-        </div>
+            </select>`,
+          }),
+        ])}
         <div class="form-field">
-          <label class="label" for="vital-note">${esc(t('health.vitals.field.note'))}</label>
-          <textarea class="input" id="vital-note" rows="2" maxlength="2000">${esc(isEdit && row.note ? row.note : '')}</textarea>
+          <label class="form-label" for="vital-note">${esc(t('health.vitals.field.note'))}</label>
+          <textarea class="form-input" id="vital-note" rows="2" maxlength="2000">${esc(isEdit && row.note ? row.note : '')}</textarea>
         </div>
         ${disclaimerMarkup(true)}
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -2415,7 +2556,7 @@ function maybeMountMeds(activeRoute) {
 async function mountMeds() {
   meds.root.replaceChildren();
   meds.root.insertAdjacentHTML('beforeend',
-    `<div class="health-meds__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('meds', 'list'));
 
   try {
     await loadHealthMembers(meds, healthUser);
@@ -3614,7 +3755,7 @@ function maybeMountLabs(activeRoute) {
 async function mountLabs() {
   labs.root.replaceChildren();
   labs.root.insertAdjacentHTML('beforeend',
-    `<div class="health-labs__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('labs', 'list'));
 
   try {
     await loadHealthMembers(labs, healthUser);
@@ -4339,7 +4480,7 @@ function maybeMountActivity(activeRoute) {
 async function mountActivity() {
   activity.root.replaceChildren();
   activity.root.insertAdjacentHTML('beforeend',
-    `<div class="health-activity__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('activity', 'chart'));
 
   try {
     await loadHealthMembers(activity, healthUser);
@@ -4462,28 +4603,48 @@ function activityChartMarkup(summary) {
     return emptyHintHTML(t('health.activity.noData'), { className: 'health-chart-empty' });
   }
 
-  const { W, H } = CHART;
-  const { left, right, top, bottom } = chartScales();
+  // MOBIL EINE HOEHERE FLAECHE MIT MEHR FUSS (Critique R18, 2026-10-07).
+  // Gemessen bei 390px: das Diagramm stand 324x96, und weil die Geometrie
+  // skaliert, die Achsenschrift aber nicht, war der Fuss (PAD_B = 26
+  // Einheiten) nur 14px hoch - die Wochentage standen 3px IN den Balkenfuessen
+  // und neben der "0" der Werteachse. Unter 640px rechnet das Diagramm auf
+  // 600x320 mit 44 Einheiten Fuss (24px bei 324px Breite): die Flaeche steht
+  // bei rund 170px, die Wochentage frei unter der Grundlinie.
+  const geo = activityChartGeometry();
+  const { W, H } = geo;
+  const { left, right, top, bottom } = chartScales(geo);
   const n = buckets.length;
   const chartH = bottom - top;
   const slot = (right - left) / n;
-  const barW = slot * 0.6;
-  // Runde Achse (C4): die Balken messen gegen die gerundete Obergrenze.
-  const { max, steps } = niceDomain(0, peak);
+  // SCHLANKE BALKEN (hoechstens ~24px am Bildschirm, der Rest der Spalte ist
+  // Luft): die Breite steht in viewBox-Einheiten und folgt deshalb der
+  // Geometrie - 40 Einheiten sind auf dem Telefon 22px, 18 am Desktop 22-26px.
+  const barW = Math.min(slot * 0.6, geo === ACTIVITY_CHART_NARROW ? 40 : 18);
+  // Ruhige Achse (R18): Grundlinie, Mitte, Obergrenze - die Werte stehen am
+  // heutigen Balken, in den Kacheln darueber und in der Tabelle.
+  const { max, steps } = calmDomain(peak, { integer: true });
+  const today = todayKey();
 
   const bars = buckets.map((b, i) => {
     const h = (b.durationMin / max) * chartH;
     const x = left + i * slot + (slot - barW) / 2;
     const y = bottom - h;
+    const isToday = b.date === today;
     const label = t(ACTIVITY_WEEKDAY_LABEL_KEYS[b.weekday ?? i]);
-    const rect = b.durationMin > 0
-      ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="var(--module-health)"><title>${esc(`${label}: ${t('health.activity.unit.min', { value: fmtNum(b.durationMin) })}`)}</title></rect>`
+    const minutes = t('health.activity.unit.min', { value: fmtNum(b.durationMin) });
+    const bar = b.durationMin > 0
+      ? `<path class="health-activity-chart__bar${isToday ? ' health-activity-chart__bar--today' : ''}" d="${activityBarPath(x, y, barW, bottom)}"><title>${esc(`${label}: ${minutes}`)}</title></path>`
       : '';
-    return `${rect}
-      <text x="${(x + barW / 2).toFixed(1)}" y="${H - 8}" class="chart__axis" text-anchor="middle">${esc(label)}</text>`;
+    // Der Wert steht nur am heutigen Balken (R18): eine Zahl an jedem Balken
+    // waere eine zweite Achse; alle sieben stehen in der Tabelle darunter.
+    const value = isToday && b.durationMin > 0
+      ? `<text x="${(x + barW / 2).toFixed(1)}" y="${y.toFixed(1)}" dy="-0.5em" class="chart__axis health-activity-chart__value" text-anchor="middle">${esc(minutes)}</text>`
+      : '';
+    return `${bar}${value}
+      <text x="${(x + barW / 2).toFixed(1)}" y="${H - 8}" class="chart__axis${isToday ? ' health-activity-chart__day--today' : ''}" text-anchor="middle">${esc(label)}</text>`;
   }).join('');
 
-  const grid = chartGridFor(0, max, undefined, undefined, steps);
+  const grid = chartGridFor(0, max, undefined, geo, steps);
 
   const tableRows = buckets.map((b, i) => [
     t(ACTIVITY_WEEKDAY_LABEL_KEYS[b.weekday ?? i]),
@@ -4495,13 +4656,35 @@ function activityChartMarkup(summary) {
     tableRows,
   );
 
+  // `.chart` traegt 600 / 200 als Seitenverhaeltnis (panel.css); die hoehere
+  // Flaeche sagt ihres selbst an (wie der Budget-Verlauf).
+  const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;
   return `
-    <svg class="chart health-chart health-activity-chart" viewBox="0 0 ${W} ${H}" role="img"
+    <svg class="chart health-chart health-activity-chart" viewBox="0 0 ${W} ${H}"${ratio} role="img"
          aria-label="${esc(t('health.activity.chartTitle'))}">
       ${grid}
       ${bars}
     </svg>
     ${table}`;
+}
+
+/** Die Flaeche des Aktivitaets-Diagramms unter 640px (siehe activityChartMarkup). */
+const ACTIVITY_CHART_NARROW = Object.freeze({ ...CHART, H: 320, PAD_B: 44 });
+
+function activityChartGeometry() {
+  return isPhone() ? ACTIVITY_CHART_NARROW : CHART;
+}
+
+/**
+ * Ein Balken, OBEN VOLL GERUNDET und unten gerade auf der Grundlinie: der
+ * Radius ist die halbe Breite, bei sehr kleinen Werten die Balkenhoehe (ein
+ * flacher Bogen statt einer Kappe, die ueber den Wert hinausragte). Ein
+ * `<rect rx>` rundete auch die Fuesse - der Balken schwebte ueber der Achse.
+ */
+function activityBarPath(x, y, width, bottom) {
+  const r = Math.min(width / 2, bottom - y);
+  const f = (v) => v.toFixed(1);
+  return `M${f(x)},${f(bottom)} V${f(y + r)} A${f(width / 2)},${f(r)} 0 0 1 ${f(x + width)},${f(y + r)} V${f(bottom)} Z`;
 }
 
 function activityLogMarkup(rows) {
@@ -4789,7 +4972,7 @@ function maybeMountPrevention(activeRoute) {
 async function mountPrevention() {
   prevention.root.replaceChildren();
   prevention.root.insertAdjacentHTML('beforeend',
-    `<div class="health-prevention__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('prevention', 'list'));
 
   try {
     await loadHealthMembers(prevention, healthUser);
@@ -5218,7 +5401,7 @@ function maybeMountNutrition(activeRoute) {
 async function mountNutrition() {
   nutrition.root.replaceChildren();
   nutrition.root.insertAdjacentHTML('beforeend',
-    `<div class="health-nutrition__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('nutrition', 'chart'));
 
   try {
     await loadHealthMembers(nutrition, healthUser);
@@ -5709,13 +5892,23 @@ function maybeMountOverview(activeRoute) {
 async function mountOverview() {
   overview.root.replaceChildren();
   overview.root.insertAdjacentHTML('beforeend',
-    `<div class="health-overview__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('overview', 'list'));
 
   try {
-    await loadHealthMembers(overview, healthUser);
     const today = todayKey();
     overview.exportRange = { from: addLocalDays(today, -(OVERVIEW_EXPORT_DAYS - 1)), to: today };
-    await loadOverview();
+    // EINE WELLE STATT ZWEI (Critique R18). Die Mitgliederliste bestimmt die
+    // gezeigte Person nur, wenn noch keine feststeht und auch die eigene nicht
+    // bekannt ist (loadHealthMembers). Sonst haengt loadOverview() nicht an ihr -
+    // die Person steht dann hier schon fest, und beide laufen gleichzeitig.
+    const person = overview.personId ?? overview.meId;
+    if (person) {
+      overview.personId = person;
+      await Promise.all([loadHealthMembers(overview, healthUser), loadOverview()]);
+    } else {
+      await loadHealthMembers(overview, healthUser);
+      await loadOverview();
+    }
     overview.error = false;
   } catch (err) {
     console.error('[Health] overview mount error:', err);
@@ -5727,14 +5920,6 @@ async function mountOverview() {
 
 async function loadOverview() {
   const query = overview.personId ? `?user_id=${encodeURIComponent(overview.personId)}` : '';
-  const [vRes, mRes] = await Promise.all([
-    api.get(`/health/vitals${query}`),
-    api.get(`/health/medications${query}`),
-  ]);
-  overview.vitals = vRes.data || [];
-  overview.meds = mRes.data || [];
-  overview.schedulesByMed = {};
-  overview.logsByMed = {};
 
   // Nur laden, wenn der Zyklus-Tab fuer DIESEN Betrachter ueberhaupt
   // erreichbar waere (cycleEnabled, siehe Dateikopf) - sonst zwei zusaetzliche
@@ -5742,24 +5927,32 @@ async function loadOverview() {
   // Einstellungen (privat) nur in der eigenen Ansicht, exakt wie loadCycle()
   // im Zyklus-Tab selbst - fuer eine fremde Person bleibt es bei der aus
   // ihrer Perioden-Historie abgeleiteten Standardvorhersage.
-  if (cycleEnabled) {
-    const [cpRes, clRes] = await Promise.all([
-      api.get(`/health/cycle/periods${query}`),
-      api.get(`/health/cycle/logs${query}`),
-    ]);
-    overview.cyclePeriods = cpRes.data || [];
-    overview.cycleLogs = clRes.data || [];
-    if (overview.personId === overview.meId) {
-      try { overview.cycleSettings = (await api.get('/health/cycle/settings')).data || {}; }
-      catch { overview.cycleSettings = {}; }
-    } else {
-      overview.cycleSettings = null;
-    }
-  } else {
-    overview.cyclePeriods = [];
-    overview.cycleLogs = [];
-    overview.cycleSettings = null;
-  }
+  const ownView = overview.personId === overview.meId;
+  const empty = { data: [] };
+
+  // EINE WELLE (Critique R18). Vitalwerte, Medikamente und die drei
+  // Zyklus-Abrufe haengen nicht voneinander ab, liefen aber in drei Wellen
+  // hintereinander (gemessen am gedrosselten Telefon: 1698, 1880, 2055 ms nach
+  // dem Start, je rund 175 ms Rundreise). WER was laden darf, entscheidet
+  // weiter dieselbe Regel wie oben - sie waehlt nur noch, welche Abrufe in der
+  // Welle stehen. Ein Fehler bei den Einstellungen bleibt folgenlos (leere
+  // Einstellungen), jeder andere bricht das Laden ab wie vorher.
+  const [vRes, mRes, cpRes, clRes, cycleSettings] = await Promise.all([
+    api.get(`/health/vitals${query}`),
+    api.get(`/health/medications${query}`),
+    cycleEnabled ? api.get(`/health/cycle/periods${query}`) : empty,
+    cycleEnabled ? api.get(`/health/cycle/logs${query}`) : empty,
+    cycleEnabled && ownView
+      ? api.get('/health/cycle/settings').then((res) => res.data || {}, () => ({}))
+      : null,
+  ]);
+  overview.vitals = vRes.data || [];
+  overview.meds = mRes.data || [];
+  overview.schedulesByMed = {};
+  overview.logsByMed = {};
+  overview.cyclePeriods = cpRes.data || [];
+  overview.cycleLogs = clRes.data || [];
+  overview.cycleSettings = cycleSettings;
 
   const today = todayKey();
   await Promise.all(overview.meds.map(async (m) => {
@@ -5825,6 +6018,9 @@ function renderOverviewShell() {
 
   if (overview.error) {
     mountAreaLoadError(overview, 'overview', mountOverview);
+    // Es kommt nichts mehr, das vor die Liste zieht - das Skelett geht.
+    _priorityPending = false;
+    syncPriorityRegion();
     return;
   }
 
@@ -6176,7 +6372,7 @@ function overviewVitalsMarkup() {
   const cards = entries
     .map(({ metric, series }) => overviewVitalCardMarkup(metric, series, { extra: !core.has(metric.type) }))
     .join('');
-  return `<div class="health-overview__vitals-grid">${cards}</div>`;
+  return `<div class="health-overview__vitals-grid metric-rows">${cards}</div>`;
 }
 
 function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
@@ -6420,6 +6616,25 @@ function maybeMountFasting(activeRoute) {
     root.replaceChildren();
     root.insertAdjacentHTML('beforeend', `<div class="fasting-panel__error" role="alert"><h3>${esc(t('health.fasting.loadError'))}</h3><p>${esc(error?.message || '')}</p></div>`);
   });
+}
+
+/**
+ * DER LADEZUSTAND EINES BEREICHS IST EIN SKELETT, KEIN WORT (R18). Sieben der
+ * acht Bereiche luden mit "Lade..." in Sekundaerschrift, der Zyklus mit seiner
+ * Silhouette (cycleSkeletonMarkup). Die Form folgt dem, was kommt: `chart`
+ * fuer Bereiche, die mit Kennzahlen und Kurven oeffnen, `list` fuer
+ * Zeilenlisten. Der Text bleibt fuer Screenreader (`role="status"`), das
+ * Skelett selbst ist `aria-hidden` (utils/skeleton.js).
+ *
+ * @param {string} area - Bereichsname der Klasse (`health-<area>__loading`)
+ * @param {'list'|'chart'} shape
+ */
+function areaLoadingMarkup(area, shape) {
+  const skeleton = shape === 'chart' ? renderSkeletonChart({ charts: 2 }) : renderSkeletonList({ rows: 3, lines: 2 });
+  return `<div class="health-${area}__loading" role="status">
+    <span class="sr-only">${esc(t('common.loading'))}</span>
+    ${skeleton}
+  </div>`;
 }
 
 function cycleSkeletonMarkup() {
@@ -8985,6 +9200,8 @@ export const __test = {
   recentMeasurementsMarkup,
   // R8 H9: Bearbeiten von Messung und Analyt.
   openVitalModal,
+  // R18: die Wertefelder des Dialogs als Formularzeilen (Paar, Dauer, Skala).
+  valueFieldsMarkup,
   // Re-Critique 2026-09-27 (M3): das mobile Detailblatt und die Zeile der
   // leeren Metriken.
   openVitalSheet,
@@ -8997,6 +9214,8 @@ export const __test = {
   // C7: Kalender und Trends als Paar.
   cyclePairMarkup,
   VITAL_SHEET_CHART,
+  // R18: die Balken der Aktivitaet (Flaeche, Balkenform, heute im Vollton).
+  activityChartMarkup, activityBarPath, ACTIVITY_CHART_NARROW,
   CYCLE_TREND_CHART,
   backToVitalSheetForTest: (type) => backToVitalSheet(type),
   vitalPatchBody,

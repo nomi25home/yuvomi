@@ -6,13 +6,13 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
-import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -640,22 +640,26 @@ function renderTaskCard(task, opts = {}) {
         ${/* Bleibt auch mit vorhandenen Unteraufgaben: bis D#1017 verschwand der
               Einstieg nach der ersten, und der zweite Einstieg lag am Ende der
               eingeklappten Liste - gelesen als "nur eine Unteraufgabe je Aufgabe". */ ''}
-        ${!selecting && canEdit && !archived && !task.parent_task_id ? `
-        <button type="button" class="row-action task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
-                aria-label="${esc(t('tasks.subtaskAddNamed', { title: task.title }))}" title="${t('tasks.subtaskAdd')}">
-          <i data-lucide="list-plus" class="icon-md" aria-hidden="true"></i>
-        </button>` : ''}
-        ${!selecting && canEdit ? `
-        <button type="button" class="row-action task-card__inline-action" data-action="edit-task" data-id="${task.id}"
-                aria-label="${esc(t('common.editNamed', { name: task.title }))}">
-          <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="row-action task-card__inline-action"
-                data-action="${archived ? 'unarchive-task' : 'archive-task'}" data-id="${task.id}"
-                aria-label="${esc(t(archived ? 'tasks.unarchiveNamed' : 'tasks.archiveNamed', { title: task.title }))}"
-                title="${archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton')}">
-          <i data-lucide="${archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
-        </button>` : ''}
+        ${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07, utils/row-action.js): die
+              Zeile trug drei Dauer-Aktionen (Unteraufgabe, Stift, Archiv)
+              neben Haken und Avataren. Der Tipp auf den Titel oeffnet die
+              Aufgabe; Bearbeiten, Unteraufgabe und Archivieren sind Eintraege
+              mit Wort. Die Eintraege tragen dieselben data-Attribute wie die
+              Knoepfe vorher - der delegierte Handler liest sie unveraendert. */ ''}
+        ${!selecting && canEdit ? rowMenuHtml({
+          id: `task-menu-${task.id}`,
+          label: t('common.moreActionsNamed', { name: task.title }),
+          className: 'task-card__inline-action',
+          items: [
+            { action: 'edit-task', id: task.id, icon: 'pencil', label: t('common.edit') },
+            !archived && !task.parent_task_id
+              ? { action: 'add-subtask', icon: 'list-plus', label: t('tasks.subtaskAdd'), attrs: { 'data-parent': task.id } }
+              : null,
+            { action: archived ? 'unarchive-task' : 'archive-task', id: task.id,
+              icon: archived ? 'archive-restore' : 'archive',
+              label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton') },
+          ],
+        }) : ''}
       </div>
 
       ${progress !== null ? `
@@ -2652,23 +2656,46 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
       }
     }
 
-    btnSuccess(submitBtn, originalLabel);
-    setTimeout(() => closeModal({ force: true }), 700);
+    // DER DIALOG SCHLIESST SOFORT (Critique R18, Bewegung). Hier stand ein
+    // gruener Haken im Knopf und 700ms spaeter das Schliessen: gemessen begann
+    // der Ausgang 739-750ms nach dem Klick, die neue Zeile war nach 887-901ms
+    // zu sehen (Notizen: 25ms). Die Quittung ist die Zeile, die aufzieht, dazu
+    // der Toast oben - ein Knopf, hinter dem beides wartet, haelt nur auf.
+    // `btnSuccess` bleibt der Baustein fuer Formulare, die offen bleiben.
+    closeModal({ force: true });
     // Erst die Tag-Liste, dann neu zeichnen: ein gerade vergebener Tag soll
     // sofort in Filterleiste und Vorschlägen stehen (#586).
-    await refreshTags();
-    await onChanged();
+    //
+    // EIGENER catch: der Dialog ist zu. Der aeussere schreibt an Knopf und
+    // Fehlerzeile des Formulars - die gibt es hier nicht mehr, und oben steht
+    // schon der gruene Toast. Scheitert das Neuladen, ist die Aufgabe trotzdem
+    // gespeichert; die Liste ist nur alt, und das muss man auf der Seite lesen.
+    try {
+      await refreshTags();
+      await onChanged();
+      // Der Dialog ist jetzt VOR dem Neuzeichnen zu: sein Fokus-Rueckweg (der
+      // Stift der bearbeiteten Zeile) wird mit der Liste ersetzt. Im selben
+      // Block wie das Neuzeichnen: ohne neue Liste steht das alte Ziel noch.
+      refocusAfterRender();
+    } catch (err) {
+      console.error('[Tasks] reload after save failed:', err);
+      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      return;
+    }
     // Angelegt, nicht bearbeitet: die neue Zeile zeigen (siehe revealCreatedTask).
     // ERST WENN DER DIALOG WEG IST und die History wieder der Seite gehoert:
-    // er schliesst 700ms nach dem Haken und gibt dabei seinen Marker per
-    // `history.back()` zurueck. Eine Auswahl davor schriebe `?open=` auf den
+    // er gibt beim Schliessen seinen Marker per `history.back()` zurueck. Eine Auswahl davor schriebe `?open=` auf den
     // Marker-Eintrag, und das `back()` truege die alte Adresse wieder herein
     // (gemessen: rechts die neue Aufgabe, in der Adresse die alte). Und die
     // Zeile zieht so ein, wenn man sie sieht, nicht hinter dem Dialog.
     if (!taskId && savedTaskId) {
       whenModalClosed()
         .then(() => whenHistorySettled())
-        .then(() => revealCreatedTask(container, savedTaskId));
+        .then(() => {
+          // Kann die Gruppe aufklappen und dabei die Liste noch einmal zeichnen.
+          revealCreatedTask(container, savedTaskId);
+          refocusAfterRender();
+        });
     }
   } catch (err) {
     resetSubmit(err.message);
@@ -4818,7 +4845,7 @@ function handleBulkDelete(taskIds, container) {
  * Abhaken mit benannter Person (#1205) - der zweite Weg zu demselben Uebergang.
  *
  * ER NIMMT DIE OPTIMISTISCHE ANIMATION BEWUSST NICHT MIT. Die gehoert zum
- * gedrueckten Haken („check-pop" quittiert genau diese Beruehrung); hier wurde
+ * gedrueckten Haken (die Quittung gehoert genau dieser Beruehrung); hier wurde
  * ein Menueeintrag gewaehlt, und der Haken hat niemand angefasst. Was bleibt,
  * ist der Teil, der die Bedienung traegt: Neuladen und dieselbe Quittung mit
  * Rueckweg wie Tipp und Wisch - mit dem Namen darin, weil sonst nichts auf dem
@@ -5019,9 +5046,11 @@ function wireTaskList(container) {
       target.classList.toggle('task-status-btn--open', nextStatus !== 'done');
       target.closest('.task-card')?.classList.toggle('task-card--done', nextStatus === 'done');
       // Die Quittung startet JETZT und läuft neben dem Roundtrip, nicht danach:
-      // `loadTasks()` ersetzt den Knopf, und ohne dieses Warten war `check-pop`
-      // (tasks.css:703) in 0 von 6 Messungen zu sehen. Siehe animationSettled().
-      const settled = animationSettled(target);
+      // `loadTasks()` ersetzt den Knopf, und ohne dieses Warten war sie in 0
+      // von 6 Messungen zu sehen. Seit R18 loest sie dieser Handler aus, nicht
+      // mehr die Zustandsklasse (siehe acknowledgeCheck()) - auch beim
+      // Zuruecknehmen.
+      const settled = acknowledgeCheck(target, { checked: nextStatus === 'done' });
       // Die Haltezeit laeuft ab dem Tipp, neben dem Roundtrip - ein langsames
       // Netz verlaengert sie nicht noch einmal (EXIT_HOLD_MS).
       const holdUntil = performance.now() + EXIT_HOLD_MS;
@@ -5063,10 +5092,19 @@ function wireTaskList(container) {
       // des Servers. Zwei Zeilen fuer eine Zusicherung, die sonst an einem
       // Attribut haengt.
       if (actingAsDisplay()) return;
+      // Wie der grosse Haken: Zustand und Quittung im Moment des Tipps, das
+      // Neuzeichnen wartet auf beides (R18 - vorher kam der Haken erst mit der
+      // Antwort, und die Quittung spielte auf JEDER erledigten Teilaufgabe).
+      const subtaskDone = target.dataset.status !== 'done';
+      target.classList.toggle('subtask-item__checkbox--done', subtaskDone);
+      const settled = acknowledgeCheck(target, { checked: subtaskDone });
       try {
         await toggleSubtaskStatus(id, target.dataset.status);
+        await settled;
         await loadTasks(container);
       } catch (err) {
+        // Der vorgezogene Haken geht zurueck - der Server kennt ihn nicht.
+        target.classList.toggle('subtask-item__checkbox--done', !subtaskDone);
         window.yuvomi.showToast(err.message, 'danger');
       }
     }

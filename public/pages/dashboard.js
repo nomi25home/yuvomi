@@ -966,7 +966,10 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
   // Guard „wer ein Markensiegel baut, benennt eine Herkunft" liest ein Fenster
   // von acht Zeilen um das `module-seal` herum, und der Link-Block dazwischen
   // hat sie beim ersten Anlauf genau daraus herausgeschoben.
-  const slug = sealSlug ?? ((linkHref || '').split('/')[1] || '');
+  // Query und Hash gehoeren nicht zum Slug: `/budget?tab=budget` ergab
+  // `var(--module-budget?tab=budget, ...)`, eine ungueltige Deklaration - das
+  // Budget-Siegel stand im geerbten Violett der Uebersicht (R18).
+  const slug = sealSlug ?? ((linkHref || '').split(/[?#]/)[0].split('/')[1] || '');
   const seal = slug ? ` style="--seal-accent: var(--module-${slug}, var(--color-accent))"` : '';
   // Vollton statt Toenung (Widget-Kopf-Kur 2026-08-17): das Siegel ist seit
   // dem Rueckbau des Absenderbands der EINZIGE Farbtraeger des Kopfes. Die
@@ -2964,7 +2967,7 @@ function renderFastingWidget(fasting) {
   if (!fasting) throw new Error('fasting widget slice failed to load');
   const active = fasting.active;
   const writable = moduleAccess('health') === 'write';
-  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null)}
+  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
     <div class="fasting-widget">
       <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content">
         <span class="fasting-widget__meta" data-fasting-clock-label></span>
@@ -3954,6 +3957,19 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
   // bei initFab) kein Anlegen in Module, deren Daten nicht geladen sind.
   const { followsDefault = true, canPublish = false, offerNew = true } = scope;
   const dateLabel = mastheadDateLabel();
+  // EIN WANDTABLETT BEKOMMT ZWEI KNOEPFE NICHT, WEIL BEIDE NUR SCHEITERN
+  // KOENNEN (#1808). "Anpassen" endet in `PUT /preferences`, und ein Display
+  // schreibt genau zwei Routen (`DISPLAY_WRITE_ROUTES`, server/display-scopes.js)
+  // - die gehoert nicht dazu, mit Absicht: wer an der Kuechenwand vorbeigeht,
+  // hat das Geraet bedient, und "aendert keine Einstellungen" ist seit #1209
+  // zugesagt. Der Melder ordnete sein Brett um, tippte "Fertig" und bekam eine
+  // 403 - die Oberflaeche bot eine Handlung an, die der Server zu Recht
+  // verweigert. Die Suche daneben ist derselbe Fall (`search` steht nicht in
+  // DISPLAY_SCOPES); die Seitenleiste laesst sie am Display schon weg
+  // (router.js), dieser Kopf tat es nicht. Das Brett eines Tabletts ordnet ein
+  // Administrator ueber die Haushaltsvorgabe: ein Display speichert nie etwas
+  // Eigenes und folgt ihr deshalb immer.
+  const onDisplay = user?.access_scope === 'display';
 
   return `
     <section class="dashboard-overview">
@@ -4013,21 +4029,21 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                ein sechstes Ziel (gemessen: 52px je Slot, "Übersicht" und
                "Aufgaben" brechen), also steht sie hier, wo man ankommt - ein
                Icon-Knopf wie die zwei daneben. -->
-          <button class="dashboard-icon-btn" id="dashboard-search"
+          ${onDisplay ? '' : `<button class="dashboard-icon-btn" id="dashboard-search"
                   aria-label="${t('nav.search')}"
                   title="${t('nav.search')}" aria-haspopup="dialog">
             <i data-lucide="search" aria-hidden="true"></i>
-          </button>
+          </button>`}
           <button class="dashboard-icon-btn" id="dashboard-wall-enter"
                   aria-label="${t('dashboard.wallEnter')}"
                   title="${t('dashboard.wallEnter')}">
             <i data-lucide="maximize-2" aria-hidden="true"></i>
           </button>
-          <button class="dashboard-icon-btn" id="dashboard-customize-btn"
+          ${onDisplay ? '' : `<button class="dashboard-icon-btn" id="dashboard-customize-btn"
                   aria-label="${t('dashboard.customize')}"
                   title="${t('dashboard.customize')}">
             <i data-lucide="settings-2" aria-hidden="true"></i>
-          </button>
+          </button>`}
           ${offerNew && onDesktopStage() ? renderNewPill() : ''}`}
         </div>
       </div>
@@ -6217,7 +6233,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
       api.get(layoutHintQuery('/dashboard')),
       api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
-      api.get('/preferences').catch(() => ({ data: {} })),
+      // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
+      // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
+      // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
+      (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
       loadPendingReminders(),
     ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):
