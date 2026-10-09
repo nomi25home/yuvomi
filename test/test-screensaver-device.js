@@ -195,6 +195,9 @@ test('the clock shows formatTime of now, diagonally opposite the caption', async
   }
   const clock = clockOf(node);
   assert.ok(clock, 'on by default');
+  // It takes its corner from the caption's `p[data-position]` rules (checked
+  // against the stylesheet below) only because it is a `p` too.
+  assert.equal(clock.tag, 'p', 'the clock is a p, so the four corner rules reach it');
   assert.equal(calls.length, 1, 'formatTime is what the clock shows');
   assert.ok(calls[0] instanceof Date, 'called with a Date, not a string');
   assert.equal(calls[0].getTime(), Date.now(), 'and with now');
@@ -332,6 +335,21 @@ test('positions two apart are opposite corners in the stylesheet', () => {
     assert.ok(here.horizontal && here.vertical, `position ${position} is a corner`);
     assert.notEqual(there.horizontal, here.horizontal, `${position} and ${(position + 2) % 4} sit on different sides`);
     assert.notEqual(there.vertical, here.vertical, `${position} and ${(position + 2) % 4} sit on different edges`);
+  }
+});
+
+test('the clock rule adds size, never a place of its own', () => {
+  // A clock pinned to one corner would be a fixed bright area again - the
+  // burn-in the moving caption exists to avoid. Its corner must come only
+  // from the shared `p[data-position]` rules.
+  const css = read('../public/styles/screensaver.css');
+  const rules = [...css.matchAll(/([^{}]*\.photo-screensaver__clock[^{}]*)\{([^}]*)\}/g)];
+  assert.ok(rules.length >= 1, 'the clock has a rule');
+  for (const [, selector, body] of rules) {
+    for (const property of ['top', 'right', 'bottom', 'left', 'inset', 'inset-block', 'inset-inline', 'position']) {
+      assert.doesNotMatch(body, new RegExp(`(^|[;\\s])${property}(-[a-z-]+)?\\s*:`),
+        `${selector.trim()} must not set ${property}`);
+    }
   }
 });
 
