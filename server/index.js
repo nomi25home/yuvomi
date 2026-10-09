@@ -677,6 +677,11 @@ app.use('/api/v1', (req, res, next) => {
   // Anlegen-, Bearbeiten- und Loeschen-Knoepfe, die der Server hinterher
   // abweist. Die Erlaubnis ist keine Modulstufe, sondern genau zwei Routen, und
   // beide Gates fragen dieselbe Liste.
+  // Die Bildschirmschoner-Wahl geht auch hier mit, damit beide Gates dieselbe
+  // Frage stellen - entscheidend ist sie an dieser Stelle nicht, und kein Test
+  // misst sie hier: das Scope-Gate davor hat ein ausgeschaltetes Display
+  // schon abgewiesen, und `/screensaver` ist kein Modul, das dieses Gate
+  // sperren koennte (#1766). Die Regel steht im Scope-Gate.
   if (req.authMethod === 'display'
     && displayMayAct(req.method, req.path, { screensaver: req.displayShowsScreensaver === true })) return next();
   const { moduleKey: scopedModuleKey, access: scopedAccess } =

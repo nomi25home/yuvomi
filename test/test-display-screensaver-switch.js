@@ -110,6 +110,26 @@ test('a change sends exactly that display\'s choice and confirms it', async () =
   assert.equal(patches.length, 0);
 });
 
+test('the switch is locked while its request runs, and a new change clears an old error', async () => {
+  const list = makeList();
+  const error = { textContent: 'Display not found.', hidden: false };
+  page.bindDisplayScreensaverSwitches(list, error);
+  let release;
+  patchResult = () => new Promise((resolve) => { release = resolve; });
+  try {
+    const toggle = makeToggle({ checked: true });
+    const pending = fire(list, changeOn(toggle));
+    assert.equal(toggle.disabled, true, 'a second flip cannot race the first request');
+    assert.equal(error.hidden, true, 'the error from before is gone');
+    assert.equal(error.textContent, '');
+    release({ data: {} });
+    await pending;
+    assert.equal(toggle.disabled, false);
+  } finally {
+    patchResult = () => Promise.resolve({ data: {} });
+  }
+});
+
 test('a failed request puts the switch back and says why', async () => {
   const list = makeList();
   const error = errorEl();

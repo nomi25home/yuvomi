@@ -89,8 +89,13 @@ export function renderDisplay(display) {
       <!-- Ob dieses Tablett den Foto-Bildschirmschoner zeigt (#1766). Ein
            Display aendert keine Einstellungen, also entscheidet es hier ein
            Administrator, je Display und standardmaessig aus; der Server
-           sperrt die Fotos bei "aus" am Gate. -->
-      <div class="row-carrier settings-group">
+           sperrt die Fotos bei "aus" am Gate. row-divided, nicht
+           row-carrier: die Zeile liegt schon in der Karte, ein eigener
+           Traeger waere eine Karte in der Karte (DESIGN.md, "Folge
+           gleichartiger Zeilen"). settings-group gibt ihr nur das Raster
+           der Einstellungszeile, keine Flaeche. Keine Backticks in diesem
+           Kommentar - er steht im Template-Literal. -->
+      <div class="row-divided settings-group">
       ${settingSwitchRowHtml({
         label: t('settings.displayScreensaverLabel'),
         checked: display.show_screensaver === true,

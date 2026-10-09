@@ -265,9 +265,22 @@ test('die Fotos des Bildschirmschoners nur, wenn ein Administrator sie fuer dies
   await refusedAtGate('/screensaver/photos', 'ist ohne Schalter gesperrt');
   await refusedAtGate(photoPath, 'ist ohne Schalter gesperrt');
 
-  // Das Tablett schaltet sich nicht selbst ein.
+  // Das Tablett schaltet sich nicht selbst ein - das haelt schon das
+  // Scope-Gate. Die eigentliche Regel dieser Route ist aber "nur ein
+  // Administrator": ein angemeldetes Mitglied kommt am Scope-Gate vorbei und
+  // muss an `requireAdmin` scheitern, ohne dass sich etwas aendert.
   const self = await display('PATCH', `/displays/${displayId}`, { show_screensaver: true });
   assert.equal(self.status, 403, `das Display darf sich nicht selbst einschalten, war ${self.status}`);
+  const neu = await admin('POST', '/auth/users', {
+    username: 'nora', display_name: 'Nora', password: 'norapass12345', role: 'member',
+  });
+  assert.equal(neu.status, 201, `Mitglied anlegen: ${JSON.stringify(neu.body)}`);
+  const nora = as(await login('nora', 'norapass12345'));
+  const byMember = await nora('PATCH', `/displays/${displayId}`, { show_screensaver: true });
+  assert.equal(byMember.status, 403, `ein Mitglied darf das Display nicht einschalten, war ${byMember.status}`);
+  assert.equal((await admin('GET', '/displays')).body.data.find((d) => d.id === displayId).show_screensaver, false,
+    'nach dem Versuch des Mitglieds weiter aus');
+  await refusedAtGate('/screensaver/photos', 'bleibt nach dem Versuch des Mitglieds gesperrt');
 
   // Nur ein echter Boolean, nur ein echtes Display.
   assert.equal((await admin('PATCH', `/displays/${displayId}`, { show_screensaver: 'true' })).status, 400);
@@ -292,6 +305,7 @@ test('die Fotos des Bildschirmschoners nur, wenn ein Administrator sie fuer dies
   // scheitern am Gate.
   for (const [method, path] of [
     ['GET', '/screensaver/photos/keine-uuid'],
+    ['GET', '/screensaver/photos/3f2504e0-4f89-41d3-9a0c-0305e82c3301/x'],
     ['GET', '/screensaver/photos/3f2504e0-4f89-01d3-9a0c-0305e82c3301'],
     ['GET', '/screensaver/photos-irgendwas'],
     ['POST', '/screensaver/photos'],
