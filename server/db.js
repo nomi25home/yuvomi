@@ -17,7 +17,7 @@
  *   unverschlüsselte Datenbank wird dabei einmalig migriert.
  */
 
-import Database from 'better-sqlite3-multiple-ciphers';
+import Database from './utils/sqlite-driver.js';
 import path from 'path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
@@ -10453,6 +10453,14 @@ const MIGRATIONS = [
         updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
       );
       CREATE INDEX idx_reward_allowances_next_run ON reward_allowances(next_run_date, paused_at);
+    `,
+  },
+  {
+    version: 237,
+    description: 'Subscriptions: optional payment reminder (#1708, from D#1226)',
+    up: `
+      ALTER TABLE budget_subscriptions ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 1
+        CHECK(reminder_enabled IN (0,1));
     `,
   },
 ];

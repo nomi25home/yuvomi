@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
+  in the subscription dialog while keeping the subscription active and its cost in the budget.
+  Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
+- **Loans can be put in order by interest rate or by remaining balance** (#1706, from D#935). The
+  loans tab has a sort menu: highest rate first, smallest balance first, or by start as before.
+  Each loan now also names the month it is projected to end, which follows the payments you
+  actually booked and counts from today if instalments have not been recorded up to date. A loan in another currency is compared at its stored rate, a loan without
+  interest counts as 0 %, and paid-off loans stay at the end. In these two orders the loans you
+  took out come first and the money you lent follows as its own group. While the list is not in
+  its default order, a line above it says which order applies; tap it to change. The order is a calculation to read:
+  Yuvomi does not suggest which loan to pay first and does not move payments between loans.
+- **Choose which shopping lists the overview shows** (#1818, from D#1624). The shopping tile now
+  has options in "Customize": tick the lists you want on it. With nothing ticked it shows every
+  list with open items, as before. A list you picked stays on the tile even when everything on it
+  is bought, so it is one tap away when you want to add the first item. The tile shows up to
+  three lists; a further one you picked is named as "+1 more list". The choice is yours alone,
+  does not change what anyone else in the household sees, and only applies to the tile: the
+  today sheet, the wall and the menu keep counting every list.
 - **The screensaver can show the time and fill the screen, chosen on each device** (#1766, from
   D#885). Two switches under Settings → Account → Appearance, below the delay: the current time,
   on unless switched off, in the household's time format and zone, turning on the full minute and
@@ -178,6 +196,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
+  A paired display follows the household default of the overview. If that default had the calendar
+  tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
+  showed none - in the event list and in the week strip; tasks and the other tiles were not
+  affected. On a display the option now means all events; for members it works as before. The
+  hint under Settings > Wall tablets now says where a tablet takes its overview from and names
+  what it shows: calendar, tasks, rewards and weather.
+- **A locked field looks locked.** A field you cannot change looked exactly like one you can -
+  same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
+  did. Text, number and date fields, dropdowns and text areas now all show it the same way,
+  everywhere in the app: the fill goes, the outline turns quiet and the value steps back to grey
+  while staying easy to read. Settings and the reminder section used to fade such fields, which
+  made the value hard to read in light mode, and a locked date was close to invisible in both
+  modes; both now follow the one look. A locked dropdown drops its small arrow, so it reads as a
+  value rather than something to open, and a locked field no longer shows its example text: an
+  empty locked share in a split expense showed a grey "30" that looked like a value of 30. The
+  calendar button of a locked date also steps back when a whole group of fields is locked, not
+  only when the date itself is.
+- **A row on the overview opens what it shows** (#1821). A note on the overview opened the notes
+  page instead of the note, and so did a note found through search: the notes page now opens the
+  note it is asked for. A birthday row opens that birthday, on the phone as well, and so does a
+  birthday found through search. A bin without
+  an upcoming pickup leads to that bin, and "n open" for shopping in the today sheet opens the
+  list when only one list has open items.
+- **The keyboard focus stays on an overview row.** When the overview refreshed quietly - on
+  coming back to the tab, every quarter of an hour, at a day boundary - the focused row lost the
+  focus and Enter did nothing. Tabbing into a row in the instant after the page appeared could
+  lose it the same way. Both keep the focus now, and a dialog that a link opens directly keeps
+  it too.
+- **Overview rows that lead to one item open as fast as the others.** A row for an event, a
+  shopping list or a pantry filter did not preload the page behind it on hover or press, so its
+  first tap was slower than on any other row.
+- **"n open" for shopping counts every list.** With more than three lists that still had open
+  items, the today sheet and the wall added up only three of them and showed a smaller number
+  than the shopping page.
+- **A shopping list on the overview opens that list.** The shopping tile shows up to three lists,
+  the most recently changed first, but tapping any of them opened the shopping page on its first
+  list - tap "Drugstore" and you got "Weekly shop". Each row now opens its own list, by tap, click
+  and keyboard. The "All" link in the tile header still opens the shopping page as before.
+- **Starting on an older Node.js 22 says what is wrong instead of dying silently** (reported in
+  #1728). Without Docker, Yuvomi claimed to run on any Node.js 22, but before 22.14 the
+  server stopped right at startup without a single line of output, and so did the demo seed
+  script. The required version is now stated correctly as Node.js 22.14 or newer, and an older
+  one gets a one-line message that names the running version, what is needed, and that updating
+  Node.js fixes it. The Docker image ships its own Node.js 24 and was never affected.
 - **A wall tablet no longer offers to rearrange the overview or to search** (#1808). A paired
   display showed the "Customise" button, let you rearrange the tiles, and answered "Done" with
   "Token scope does not permit this operation." - a display changes no settings, and that
