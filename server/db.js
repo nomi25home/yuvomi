@@ -17,7 +17,7 @@
  *   unverschlüsselte Datenbank wird dabei einmalig migriert.
  */
 
-import Database from 'better-sqlite3-multiple-ciphers';
+import Database from './utils/sqlite-driver.js';
 import path from 'path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
@@ -10457,6 +10457,14 @@ const MIGRATIONS = [
   },
   {
     version: 237,
+    description: 'Subscriptions: optional payment reminder (#1708, from D#1226)',
+    up: `
+      ALTER TABLE budget_subscriptions ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 1
+        CHECK(reminder_enabled IN (0,1));
+    `,
+  },
+  {
+    version: 238,
     description: 'Displays: the photo screensaver is switched on per display by an administrator (#1766)',
     // OB EIN WANDTABLETT DEN FOTO-SCHONER ZEIGT, ENTSCHEIDET EIN ADMINISTRATOR,
     // JE DISPLAY (#1766, PR #1793). Ohne diese Spalte haette jedes gekoppelte

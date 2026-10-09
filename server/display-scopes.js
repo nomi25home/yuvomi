@@ -86,6 +86,20 @@ export const DISPLAY_SCOPE_MODULES = Object.freeze(
 );
 
 /**
+ * Die BEREICHE, die ein Display zeigt (#1808): seine Lesemodule ohne die
+ * Uebersicht selbst. `dashboard` ist der Ort, an dem die anderen stehen, kein
+ * Bereich daneben. Der Hinweis unter Einstellungen > Wandtabletts zaehlt genau
+ * diese Liste auf - er bekommt sie mit `GET /displays`, damit es keine zweite
+ * Handliste im Browser gibt, die beim naechsten Scope stehen bleibt.
+ */
+export const DISPLAY_AREA_MODULES = Object.freeze(
+  DISPLAY_SCOPES
+    .filter((scope) => scope.endsWith(':read'))
+    .map((scope) => scope.split(':')[0])
+    .filter((key) => key !== 'dashboard'),
+);
+
+/**
  * Die Geruestpfade, die ein Display LESEN darf, zusaetzlich zu seinen Modulen.
  *
  * WARUM ES SIE BRAUCHT, gemessen im Browser: die App beantwortet beim Start
@@ -142,7 +156,7 @@ export const DISPLAY_READ_PATHS = Object.freeze([
  * bleiben gesperrt.
  *
  * NUR WENN EIN ADMINISTRATOR ES FUER DIESES DISPLAY EINGESCHALTET HAT
- * (`display_accounts.show_screensaver`, Migration 237, Standard aus). Ein
+ * (`display_accounts.show_screensaver`, Migration 238, Standard aus). Ein
  * Display aendert keine Einstellungen: die Wartezeit kennt kein "nie", und die
  * Display-Oberflaeche hat keine Einstellungen. Ohne den Schalter faenge jedes
  * gekoppelte Tablett nach fuenf Minuten an, Fotos ueber den Kalender zu legen.

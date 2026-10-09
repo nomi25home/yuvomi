@@ -369,7 +369,7 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   // (#1431): kein `last_seen_at` und keine Auffrischung, deren Frist sich
   // nicht festhalten liesse. Das Tablett bleibt angemeldet wie zuvor.
   // `showScreensaver` ist die Wahl des Administrators fuer dieses Display
-  // (#1766, Migration 237); die Gates in server/index.js lassen die Fotos des
+  // (#1766, Migration 238); die Gates in server/index.js lassen die Fotos des
   // Bildschirmschoners nur damit durch.
   const showScreensaver = row.show_screensaver === 1;
   if (dbModule.isRestoreRunning()) return { userId: row.user_id, deviceId: row.id, refreshCookie: false, showScreensaver };
