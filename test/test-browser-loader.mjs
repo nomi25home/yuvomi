@@ -125,10 +125,9 @@ const STUBS = {
       const [first = ''] = text;
       return first.toLocaleUpperCase(locale) + text.slice(first.length);
     };
-    // Wer pruefen will, OB und MIT WELCHEM Zeitpunkt formatTime gerufen wurde,
-    // oder das echte formatTime samt Zone und 12h-Einstellung fahren will
-    // (test:screensaver-device), setzt globalThis.__formatTime - dasselbe
-    // Muster wie __formatDayMonth. Keine Backticks in diesem Kommentar.
+    // Wer pruefen will, DASS ein Wert durch den Formatierer geht und wie er
+    // danach aussieht, setzt globalThis.__formatTime (etwa auf das Original
+    // aus public/i18n.js) - dasselbe Muster wie __formatDayMonth.
     export const formatTime = (d) => (globalThis.__formatTime ?? String)(d);
     export const getTimeFormat = () => '24h';
     // Das Uhrzeit-Suffix der Locale („Uhr"): leer wie in den meisten Sprachen,
