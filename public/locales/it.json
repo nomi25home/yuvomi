@@ -392,7 +392,7 @@
         "nutritionEntries": "{{count}} voci oggi",
         "nutritionEntries_one": "{{count}} voce oggi",
         "weatherUnavailable": "Meteo al momento non disponibile",
-        "wallScreensaverNone": "Nessuna foto da mostrare.",
+        "wallScreensaverNone": "Salvaschermo non disponibile.",
         "wallScreensaverStart": "Salvaschermo"
     },
     "tasks": {

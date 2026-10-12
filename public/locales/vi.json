@@ -392,8 +392,8 @@
         "nutritionEntries": "{{count}} mục hôm nay",
         "nutritionEntries_one": "{{count}} mục hôm nay",
         "weatherUnavailable": "Hiện không có dữ liệu thời tiết",
-        "wallScreensaverNone": "Không có ảnh để hiển thị.",
-        "wallScreensaverStart": "Màn hình chờ"
+        "wallScreensaverNone": "Trình bảo vệ màn hình không khả dụng.",
+        "wallScreensaverStart": "Trình bảo vệ màn hình"
     },
     "tasks": {
         "resetOrder": "Sắp xếp tự động",

@@ -392,7 +392,7 @@
         "nutritionEntries": "Bugün {{count}} kayıt",
         "nutritionEntries_one": "Bugün {{count}} kayıt",
         "weatherUnavailable": "Hava durumu şu anda kullanılamıyor",
-        "wallScreensaverNone": "Gösterilecek fotoğraf yok.",
+        "wallScreensaverNone": "Ekran koruyucu kullanılamıyor.",
         "wallScreensaverStart": "Ekran koruyucu"
     },
     "tasks": {

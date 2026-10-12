@@ -6074,6 +6074,12 @@ button.today-cockpit__more--link {
   justify-self: end;
 }
 
+.wall__foot-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* Eine Zeile braucht Platz fuer beides: fuenf Startknoepfe (340px) und je
  * Aussenspalte einen wachen Ausstieg samt Beschriftung (220px, de). Fehlt er,
  * werden die Aussenspalten ungleich und die Mitte rutscht wieder (gemessen: bei

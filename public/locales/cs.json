@@ -431,7 +431,7 @@
         "nutritionEntries_one": "Dnes {{count}} záznam",
         "nutritionEntries_few": "Dnes {{count}} záznamy",
         "weatherUnavailable": "Počasí momentálně není k dispozici",
-        "wallScreensaverNone": "Žádné fotografie k zobrazení.",
+        "wallScreensaverNone": "Spořič obrazovky není dostupný.",
         "wallScreensaverStart": "Spořič obrazovky"
     },
     "tasks": {

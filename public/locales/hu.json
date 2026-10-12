@@ -392,7 +392,7 @@
         "nutritionEntries": "Ma {{count}} bejegyzés",
         "nutritionEntries_one": "Ma {{count}} bejegyzés",
         "weatherUnavailable": "Az időjárás jelenleg nem érhető el",
-        "wallScreensaverNone": "Nincs megjeleníthető fotó.",
+        "wallScreensaverNone": "A képernyőkímélő nem érhető el.",
         "wallScreensaverStart": "Képernyőkímélő"
     },
     "tasks": {

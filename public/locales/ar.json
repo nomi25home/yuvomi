@@ -509,8 +509,8 @@
         "nutritionEntries_two": "سجلان اليوم",
         "nutritionEntries_many": "{{count}} سجلًا اليوم",
         "weatherUnavailable": "الطقس غير متاح حاليًا",
-        "wallScreensaverNone": "لا توجد صور للعرض.",
-        "wallScreensaverStart": "مشغّل الشاشة"
+        "wallScreensaverNone": "شاشة التوقف غير متاحة.",
+        "wallScreensaverStart": "شاشة التوقف"
     },
     "tasks": {
         "resetOrder": "الترتيب التلقائي",

@@ -484,7 +484,7 @@
         "nutritionEntries_few": "Dzisiaj {{count}} wpisy",
         "nutritionEntries_many": "Dzisiaj {{count}} wpisów",
         "weatherUnavailable": "Pogoda jest obecnie niedostępna",
-        "wallScreensaverNone": "Brak zdjęć do wyświetlenia.",
+        "wallScreensaverNone": "Wygaszacz ekranu jest niedostępny.",
         "wallScreensaverStart": "Wygaszacz ekranu"
     },
     "tasks": {

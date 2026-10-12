@@ -392,8 +392,8 @@
         "nutritionEntries": "{{count}} items vandaag",
         "nutritionEntries_one": "{{count}} item vandaag",
         "weatherUnavailable": "Weer momenteel niet beschikbaar",
-        "wallScreensaverNone": "Geen foto’s om te tonen.",
-        "wallScreensaverStart": "Screensaver"
+        "wallScreensaverNone": "Schermbeveiliging niet beschikbaar.",
+        "wallScreensaverStart": "Schermbeveiliging"
     },
     "tasks": {
         "resetOrder": "Automatisch sorteren",

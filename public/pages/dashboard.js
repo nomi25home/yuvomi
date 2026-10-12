@@ -6129,16 +6129,17 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
       <div class="wall__foot">
         ${stamp}
         ${timer.controls}
-        ${screensaverEnabled && !timer.display ? `
-        <button type="button" class="wall__foot-btn" id="wall-screensaver-start"
-                aria-label="${esc(t('dashboard.wallScreensaverStart'))}">
-          <i data-lucide="image" aria-hidden="true"></i>
-          <span class="wall__foot-btn-label" aria-hidden="true">${esc(t('dashboard.wallScreensaverStart'))}</span>
-        </button>` : ''}
-        <button type="button" class="wall__foot-btn" id="wall-exit" aria-label="${esc(t('dashboard.wallExit'))}">
-          <i data-lucide="minimize-2" aria-hidden="true"></i>
-          <span class="wall__foot-btn-label" aria-hidden="true">${esc(t('dashboard.wallExit'))}</span>
-        </button>
+        <div class="wall__foot-end">${screensaverEnabled && !timer.display ? `
+          <button type="button" class="wall__foot-btn" id="wall-screensaver-start"
+                  aria-label="${esc(t('dashboard.wallScreensaverStart'))}">
+            <i data-lucide="image" aria-hidden="true"></i>
+            <span class="wall__foot-btn-label" aria-hidden="true">${esc(t('dashboard.wallScreensaverStart'))}</span>
+          </button>` : ''}
+          <button type="button" class="wall__foot-btn" id="wall-exit" aria-label="${esc(t('dashboard.wallExit'))}">
+            <i data-lucide="minimize-2" aria-hidden="true"></i>
+            <span class="wall__foot-btn-label" aria-hidden="true">${esc(t('dashboard.wallExit'))}</span>
+          </button>
+        </div>
       </div>
     </div>`;
 }

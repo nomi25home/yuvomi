@@ -392,7 +392,7 @@
         "eventEnded": "Encerrado",
         "eventsEndedMore": "+{{count}} mais cedo hoje",
         "eventsEndedMore_one": "+{{count}} mais cedo hoje",
-        "wallScreensaverNone": "Nenhuma foto para exibir.",
+        "wallScreensaverNone": "Protetor de tela não disponível.",
         "wallScreensaverStart": "Protetor de tela"
     },
     "tasks": {

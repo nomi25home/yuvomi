@@ -3889,6 +3889,53 @@ test('Wand-Modus: Screensaver-Knopf faellt weg, solange ein Timer laeuft (#1766)
   }
 });
 
+test('rebuildWall gibt screensaverEnabled an renderWallSurface weiter (Verdrahtungsschutz, #1766)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const prevStorage = global.localStorage;
+  // Kein laufender Timer: safeGet gibt null zurueck, readWallTimer liefert state:'idle'.
+  // Ohne diesen Schutz koennte der parallel laufende Timer-Test localStorage belegen.
+  global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  try {
+    await withWallWindow(() => {
+      let captured = '';
+      // Minimale Shell-Attrappe: rebuildWall schreibt via setHtml(shell, html) hinein.
+      const shell = {
+        replaceChildren() { captured = ''; },
+        insertAdjacentHTML(_pos, html) { captured += html; },
+      };
+      // wireWallSurface bricht sofort ab, wenn container.querySelector('.wall') null liefert.
+      const container = { querySelector: () => null };
+      const signal = { addEventListener() {} };
+      __test.rebuildWall(container, shell, {
+        data: { urgentTasks: wallTasks(1), users: [] },
+        weather: null,
+        failed: false,
+        updatedAt: null,
+        rerender: () => {},
+        signal,
+        fit: { show() {} },
+        screensaverEnabled: true,
+      });
+      nodeAssert.match(captured, /id="wall-screensaver-start"/,
+        'screensaverEnabled:true kommt in der Shell-HTML an');
+      __test.rebuildWall(container, shell, {
+        data: { urgentTasks: wallTasks(1), users: [] },
+        weather: null,
+        failed: false,
+        updatedAt: null,
+        rerender: () => {},
+        signal,
+        fit: { show() {} },
+        screensaverEnabled: false,
+      });
+      nodeAssert.ok(!/id="wall-screensaver-start"/.test(captured),
+        'screensaverEnabled:false erzeugt keinen Knopf in der Shell');
+    });
+  } finally {
+    global.localStorage = prevStorage;
+  }
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

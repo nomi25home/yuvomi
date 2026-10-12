@@ -406,7 +406,7 @@
         "nutritionEntries": "{{count}} رکورد امروز",
         "nutritionEntries_one": "{{count}} رکورد امروز",
         "weatherUnavailable": "آب‌وهوا در حال حاضر در دسترس نیست",
-        "wallScreensaverNone": "هیچ عکسی برای نمایش وجود ندارد.",
+        "wallScreensaverNone": "محافظ صفحه‌نمایش در دسترس نیست.",
         "wallScreensaverStart": "محافظ صفحه‌نمایش"
     },
     "tasks": {

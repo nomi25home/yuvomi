@@ -263,8 +263,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (#1766). When Immich is connected, a button labelled "Screensaver" appears in the wall footer
   next to the kitchen timer controls and the exit button. Tapping it starts the screensaver at
   once, the same as the idle timer would. While a kitchen timer is running the button is not
-  there: a photo covering the countdown is not a timer. If there are no photos to show, the
-  button answers with one line instead. For a paired display the button appears only when an
+  there: a photo covering the countdown is not a timer. If the screensaver cannot start (no
+  photos configured, Immich unreachable, or a connection error), the button answers with one
+  line instead. For a paired display the button appears only when an
   administrator has switched the photo screensaver on for it under Settings → Household → Wall
   tablets.
 

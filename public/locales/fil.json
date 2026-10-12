@@ -406,7 +406,7 @@
         "nutritionEntries": "{{count}} tala ngayong araw",
         "nutritionEntries_one": "{{count}} tala ngayong araw",
         "weatherUnavailable": "Hindi available ang panahon sa ngayon",
-        "wallScreensaverNone": "Walang mga larawan na ipapakita.",
+        "wallScreensaverNone": "Hindi available ang screen saver.",
         "wallScreensaverStart": "Screen saver"
     },
     "tasks": {

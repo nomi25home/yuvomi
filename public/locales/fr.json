@@ -392,7 +392,7 @@
         "nutritionEntries": "{{count}} entrées aujourd’hui",
         "nutritionEntries_one": "{{count}} entrée aujourd’hui",
         "weatherUnavailable": "Météo momentanément indisponible",
-        "wallScreensaverNone": "Aucune photo à afficher.",
+        "wallScreensaverNone": "Écran de veille non disponible.",
         "wallScreensaverStart": "Écran de veille"
     },
     "tasks": {

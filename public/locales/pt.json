@@ -392,7 +392,7 @@
         "nutritionEntries": "{{count}} registos hoje",
         "nutritionEntries_one": "{{count}} registo hoje",
         "weatherUnavailable": "Clima indisponível no momento",
-        "wallScreensaverNone": "Nenhuma foto para mostrar.",
+        "wallScreensaverNone": "Protetor de ecrã não disponível.",
         "wallScreensaverStart": "Protetor de ecrã"
     },
     "tasks": {

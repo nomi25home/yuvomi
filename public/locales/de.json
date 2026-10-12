@@ -406,7 +406,7 @@
         "nutritionEntries": "{{count}} Einträge heute",
         "nutritionEntries_one": "{{count}} Eintrag heute",
         "weatherUnavailable": "Wetter gerade nicht verfügbar",
-        "wallScreensaverNone": "Keine Fotos vorhanden.",
+        "wallScreensaverNone": "Bildschirmschoner nicht verfügbar.",
         "wallScreensaverStart": "Bildschirmschoner"
     },
     "tasks": {

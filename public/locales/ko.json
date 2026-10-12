@@ -406,7 +406,7 @@
         "nutritionEntries": "오늘 기록 {{count}}건",
         "nutritionEntries_one": "오늘 기록 {{count}}건",
         "weatherUnavailable": "현재 날씨를 불러올 수 없습니다",
-        "wallScreensaverNone": "표시할 사진이 없습니다.",
+        "wallScreensaverNone": "화면 보호기를 사용할 수 없습니다.",
         "wallScreensaverStart": "화면 보호기"
     },
     "tasks": {

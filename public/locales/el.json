@@ -392,7 +392,7 @@
         "nutritionEntries": "{{count}} καταχωρίσεις σήμερα",
         "nutritionEntries_one": "{{count}} καταχώριση σήμερα",
         "weatherUnavailable": "Ο καιρός δεν είναι διαθέσιμος αυτή τη στιγμή",
-        "wallScreensaverNone": "Δεν υπάρχουν φωτογραφίες.",
+        "wallScreensaverNone": "Η προφύλαξη οθόνης δεν είναι διαθέσιμη.",
         "wallScreensaverStart": "Προφύλαξη οθόνης"
     },
     "tasks": {

@@ -392,7 +392,7 @@
         "nutritionEntries": "今天 {{count}} 条记录",
         "nutritionEntries_one": "今天 {{count}} 条记录",
         "weatherUnavailable": "天气暂时不可用",
-        "wallScreensaverNone": "没有可显示的照片。",
+        "wallScreensaverNone": "屏幕保护程序不可用。",
         "wallScreensaverStart": "屏幕保护"
     },
     "tasks": {
