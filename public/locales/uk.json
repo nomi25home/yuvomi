@@ -469,7 +469,9 @@
         "nutritionEntries_one": "Сьогодні {{count}} запис",
         "nutritionEntries_few": "Сьогодні {{count}} записи",
         "nutritionEntries_many": "Сьогодні {{count}} записів",
-        "weatherUnavailable": "Погода зараз недоступна"
+        "weatherUnavailable": "Погода зараз недоступна",
+        "wallScreensaverNone": "Немає фото для показу.",
+        "wallScreensaverStart": "Заставка"
     },
     "tasks": {
         "resetOrder": "Сортувати автоматично",

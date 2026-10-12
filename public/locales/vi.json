@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Chưa đặt mục tiêu hằng ngày.",
         "nutritionEntries": "{{count}} mục hôm nay",
         "nutritionEntries_one": "{{count}} mục hôm nay",
-        "weatherUnavailable": "Hiện không có dữ liệu thời tiết"
+        "weatherUnavailable": "Hiện không có dữ liệu thời tiết",
+        "wallScreensaverNone": "Không có ảnh để hiển thị.",
+        "wallScreensaverStart": "Màn hình chờ"
     },
     "tasks": {
         "resetOrder": "Sắp xếp tự động",

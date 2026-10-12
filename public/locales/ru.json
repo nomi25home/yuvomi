@@ -469,7 +469,9 @@
         "nutritionEntries_one": "Сегодня {{count}} запись",
         "nutritionEntries_few": "Сегодня {{count}} записи",
         "nutritionEntries_many": "Сегодня {{count}} записей",
-        "weatherUnavailable": "Погода сейчас недоступна"
+        "weatherUnavailable": "Погода сейчас недоступна",
+        "wallScreensaverNone": "Нет фото для показа.",
+        "wallScreensaverStart": "Заставка"
     },
     "tasks": {
         "resetOrder": "Сортировать автоматически",

@@ -391,7 +391,9 @@
         "nutritionNoTarget": "No daily target set yet.",
         "nutritionEntries": "{{count}} entries today",
         "nutritionEntries_one": "{{count}} entry today",
-        "weatherUnavailable": "Weather currently unavailable"
+        "weatherUnavailable": "Weather currently unavailable",
+        "wallScreensaverNone": "No photos to show.",
+        "wallScreensaverStart": "Screensaver"
     },
     "tasks": {
         "resetOrder": "Sort automatically",

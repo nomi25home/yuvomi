@@ -483,7 +483,9 @@
         "nutritionEntries_one": "Dzisiaj {{count}} wpis",
         "nutritionEntries_few": "Dzisiaj {{count}} wpisy",
         "nutritionEntries_many": "Dzisiaj {{count}} wpisów",
-        "weatherUnavailable": "Pogoda jest obecnie niedostępna"
+        "weatherUnavailable": "Pogoda jest obecnie niedostępna",
+        "wallScreensaverNone": "Brak zdjęć do wyświetlenia.",
+        "wallScreensaverStart": "Wygaszacz ekranu"
     },
     "tasks": {
         "resetOrder": "Sortuj automatycznie",

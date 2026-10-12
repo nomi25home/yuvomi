@@ -391,7 +391,9 @@
         "nutritionNoTarget": "अभी तक कोई दैनिक लक्ष्य नहीं।",
         "nutritionEntries": "आज {{count}} प्रविष्टियाँ",
         "nutritionEntries_one": "आज {{count}} प्रविष्टि",
-        "weatherUnavailable": "मौसम अभी उपलब्ध नहीं है"
+        "weatherUnavailable": "मौसम अभी उपलब्ध नहीं है",
+        "wallScreensaverNone": "दिखाने के लिए कोई फ़ोटो नहीं.",
+        "wallScreensaverStart": "स्क्रीनसेवर"
     },
     "tasks": {
         "resetOrder": "अपने-आप क्रमबद्ध करें",

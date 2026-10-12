@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Δεν έχει οριστεί ημερήσιος στόχος.",
         "nutritionEntries": "{{count}} καταχωρίσεις σήμερα",
         "nutritionEntries_one": "{{count}} καταχώριση σήμερα",
-        "weatherUnavailable": "Ο καιρός δεν είναι διαθέσιμος αυτή τη στιγμή"
+        "weatherUnavailable": "Ο καιρός δεν είναι διαθέσιμος αυτή τη στιγμή",
+        "wallScreensaverNone": "Δεν υπάρχουν φωτογραφίες.",
+        "wallScreensaverStart": "Προφύλαξη οθόνης"
     },
     "tasks": {
         "resetOrder": "Αυτόματη ταξινόμηση",

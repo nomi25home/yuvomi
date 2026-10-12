@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Henüz günlük hedef belirlenmedi.",
         "nutritionEntries": "Bugün {{count}} kayıt",
         "nutritionEntries_one": "Bugün {{count}} kayıt",
-        "weatherUnavailable": "Hava durumu şu anda kullanılamıyor"
+        "weatherUnavailable": "Hava durumu şu anda kullanılamıyor",
+        "wallScreensaverNone": "Gösterilecek fotoğraf yok.",
+        "wallScreensaverStart": "Ekran koruyucu"
     },
     "tasks": {
         "resetOrder": "Otomatik sırala",

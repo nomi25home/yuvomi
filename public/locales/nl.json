@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Nog geen dagdoel ingesteld.",
         "nutritionEntries": "{{count}} items vandaag",
         "nutritionEntries_one": "{{count}} item vandaag",
-        "weatherUnavailable": "Weer momenteel niet beschikbaar"
+        "weatherUnavailable": "Weer momenteel niet beschikbaar",
+        "wallScreensaverNone": "Geen foto’s om te tonen.",
+        "wallScreensaverStart": "Screensaver"
     },
     "tasks": {
         "resetOrder": "Automatisch sorteren",

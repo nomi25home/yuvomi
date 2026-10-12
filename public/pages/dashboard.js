@@ -6010,8 +6010,8 @@ function createWallFit(win, signal) {
  * Einpassen stand zuerst als lose Zeile in `rebuildDashboard`, und kein Test
  * merkte, wenn sie fehlte.
  */
-function rebuildWall(container, shell, { data, weather, failed, updatedAt, rerender, signal, fit }) {
-  setHtml(shell, renderWallSurface(data, weather, { failed, updatedAt }));
+function rebuildWall(container, shell, { data, weather, failed, updatedAt, rerender, signal, fit, screensaverEnabled = false }) {
+  setHtml(shell, renderWallSurface(data, weather, { failed, updatedAt, screensaverEnabled }));
   if (globalThis.window?.lucide) globalThis.window.lucide.createIcons({ el: shell });
   wireWallSurface(container, rerender, signal);
   // Die Titel unter den Gesichtern folgen dem Platz: nach jedem Aufbau von der
@@ -6091,7 +6091,7 @@ function renderWallError() {
  * sollte, keinen Timer startet, weckt der erste Zeiger auf eine schlafende
  * Wand dort nur (wall-timer.js).
  */
-function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null, now = new Date() } = {}) {
+function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null, now = new Date(), screensaverEnabled = false } = {}) {
   // Der Kuechentimer (#844). Er wird auch im Lade- und Fehlerzustand gebaut: er
   // haengt an nichts, was geladen werden koennte, und ein laufender Timer, der
   // beim naechsten Netzfehler verschwaende, waere schlimmer als gar keiner.
@@ -6129,6 +6129,12 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
       <div class="wall__foot">
         ${stamp}
         ${timer.controls}
+        ${screensaverEnabled && !timer.display ? `
+        <button type="button" class="wall__foot-btn" id="wall-screensaver-start"
+                aria-label="${esc(t('dashboard.wallScreensaverStart'))}">
+          <i data-lucide="image" aria-hidden="true"></i>
+          <span class="wall__foot-btn-label" aria-hidden="true">${esc(t('dashboard.wallScreensaverStart'))}</span>
+        </button>` : ''}
         <button type="button" class="wall__foot-btn" id="wall-exit" aria-label="${esc(t('dashboard.wallExit'))}">
           <i data-lucide="minimize-2" aria-hidden="true"></i>
           <span class="wall__foot-btn-label" aria-hidden="true">${esc(t('dashboard.wallExit'))}</span>
@@ -6161,6 +6167,11 @@ function wireWallSurface(container, rerender, signal) {
   signal.addEventListener('abort', () => clearTimeout(awakeTimer));
 
   wireWallTimer(wall, rerender, signal, { announce: announceDashboard });
+
+  wall.querySelector('#wall-screensaver-start')?.addEventListener('click', async () => {
+    const { preview } = await import('/components/photo-screensaver.js');
+    if (!await preview()) window.yuvomi?.showToast(t('dashboard.wallScreensaverNone'), 'info');
+  }, { signal });
 }
 
 /**
@@ -6785,6 +6796,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // wer fragt.
   const overviewRequest = (query) => dashboardRequest(query, { wall: wallMode });
   let isCustomizing = false;
+  let screensaverEnabled = false;
   let currency     = 'EUR';
   let visibleMealTypes = MEAL_ORDER;
   let loadFailed   = false;
@@ -6856,6 +6868,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
     rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+    screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
     lastLoadedAt = new Date();
@@ -7486,7 +7499,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (!shell) return;
     if (wallMode) {
       rebuildWall(container, shell, {
-        data, weather, failed: loadFailed, updatedAt: lastLoadedAt, rerender, signal, fit: wallFit,
+        data, weather, failed: loadFailed, updatedAt: lastLoadedAt, rerender, signal, fit: wallFit, screensaverEnabled,
       });
       return;
     }

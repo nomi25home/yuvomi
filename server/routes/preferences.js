@@ -20,6 +20,7 @@ import { isWidgetId } from '../services/module-capabilities.js';
 import { listVisibleCategories } from '../services/note-categories.js';
 import { syncPreventionRemindersForSubject } from '../services/prevention-reminders.js';
 import { syncAllFastingReminders } from '../services/fasting-reminders.js';
+import { isScreensaverEnabled } from './screensaver.js';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -669,6 +670,9 @@ router.get('/', (req, res) => {
         holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
         holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
         holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
+        // A derived flag (#1766): true when Immich is configured and, for a
+        // paired display, when an admin has switched the screensaver on for it.
+        screensaver_enabled: isScreensaverEnabled() && (req.authMethod !== 'display' || req.displayShowsScreensaver === true),
     };
     // EIN WANDTABLETT BEKOMMT NUR DEN DARSTELLUNGSTEIL (#1208). Diese Antwort
     // ist die Sammelstelle des ganzen Haushalts - Wohnkoordinaten,

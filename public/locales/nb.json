@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Intet daglig mål satt ennå.",
         "nutritionEntries": "{{count}} oppføringer i dag",
         "nutritionEntries_one": "{{count}} oppføring i dag",
-        "weatherUnavailable": "Været er ikke tilgjengelig akkurat nå"
+        "weatherUnavailable": "Været er ikke tilgjengelig akkurat nå",
+        "wallScreensaverNone": "Ingen bilder å vise.",
+        "wallScreensaverStart": "Skjermsparer"
     },
     "tasks": {
         "resetOrder": "Sorter automatisk",

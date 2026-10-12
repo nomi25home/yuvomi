@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Inget dagsmål angivet än.",
         "nutritionEntries": "{{count}} poster idag",
         "nutritionEntries_one": "{{count}} post idag",
-        "weatherUnavailable": "Vädret är inte tillgängligt just nu"
+        "weatherUnavailable": "Vädret är inte tillgängligt just nu",
+        "wallScreensaverNone": "Inga bilder att visa.",
+        "wallScreensaverStart": "Skärmsläckare"
     },
     "tasks": {
         "resetOrder": "Sortera automatiskt",

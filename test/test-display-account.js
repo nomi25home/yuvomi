@@ -324,6 +324,45 @@ test('die Fotos des Bildschirmschoners nur, wenn ein Administrator sie fuer dies
   await refusedAtGate(photoPath, 'ist nach dem Ausschalten wieder gesperrt');
 });
 
+test('screensaver_enabled in /preferences: false ohne Immich, true fuer Mitglieder und Displays mit Schalter (#1766)', async () => {
+  // Ohne Immich: beide bekommen false.
+  delete process.env.IMMICH_URL;
+  delete process.env.IMMICH_API_KEY;
+
+  const created = await admin('POST', '/displays', { display_name: 'ScreensaverFlagProbe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+  const displayId = created.body.data.id;
+
+  const ohneImmichMember  = (await admin('GET', '/preferences')).body.data.screensaver_enabled;
+  const ohneImmichDisplay = (await display('GET', '/preferences')).body.data.screensaver_enabled;
+  assert.equal(ohneImmichMember,  false, 'Mitglied: false ohne Immich');
+  assert.equal(ohneImmichDisplay, false, 'Display: false ohne Immich');
+
+  // Mit Immich, Schalter aus: Mitglied true, Display weiterhin false.
+  process.env.IMMICH_URL = 'https://photos.example';
+  process.env.IMMICH_API_KEY = 'test-key';
+  try {
+    const schalterAusMember  = (await admin('GET', '/preferences')).body.data.screensaver_enabled;
+    const schalterAusDisplay = (await display('GET', '/preferences')).body.data.screensaver_enabled;
+    assert.equal(schalterAusMember,  true,  'Mitglied: true mit Immich');
+    assert.equal(schalterAusDisplay, false, 'Display: false solange Schalter aus');
+
+    // Schalter ein: Display bekommt jetzt auch true.
+    assert.equal((await admin('PATCH', `/displays/${displayId}`, { show_screensaver: true })).status, 200);
+    const schalterAnDisplay = (await display('GET', '/preferences')).body.data.screensaver_enabled;
+    assert.equal(schalterAnDisplay, true, 'Display: true sobald Schalter an');
+
+    // Schalter aus: Display wieder false.
+    assert.equal((await admin('PATCH', `/displays/${displayId}`, { show_screensaver: false })).status, 200);
+    const schalterWiederAus = (await display('GET', '/preferences')).body.data.screensaver_enabled;
+    assert.equal(schalterWiederAus, false, 'Display: false nach Ausschalten');
+  } finally {
+    delete process.env.IMMICH_URL;
+    delete process.env.IMMICH_API_KEY;
+  }
+});
+
 test('die Rechte-Nutzlast traegt die Scope-Liste als Modulrechte', async () => {
   // DIE OBERFLAECHE HAENGT DARAN, NICHT AN EINER ZWEITEN LISTE IM FRONTEND. Die
   // Uebersicht bot dem Tablett Kacheln fuer Geburtstage, Budget und Notizen an,
@@ -1060,7 +1099,7 @@ test('ein Display sieht von /preferences nur den Darstellungsteil', async () => 
   // Filter waere derselbe Fehler in die andere Richtung (im Browser gemessen:
   // ohne diese Felder faellt der Auth-Guard in seinen catch).
   for (const key of ['language_effective', 'date_format', 'time_format', 'week_start',
-    'timezone_effective', 'app_name', 'disabled_modules', 'dashboard_widgets']) {
+    'timezone_effective', 'app_name', 'disabled_modules', 'dashboard_widgets', 'screensaver_enabled']) {
     assert.ok(key in res.body.data, `${key} fehlt dem Tablett`);
   }
 });

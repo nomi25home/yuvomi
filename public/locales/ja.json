@@ -391,7 +391,9 @@
         "nutritionNoTarget": "1日の目標はまだ設定されていません。",
         "nutritionEntries": "今日の記録 {{count}} 件",
         "nutritionEntries_one": "今日の記録 {{count}} 件",
-        "weatherUnavailable": "現在、天気を取得できません"
+        "weatherUnavailable": "現在、天気を取得できません",
+        "wallScreensaverNone": "表示する写真がありません。",
+        "wallScreensaverStart": "スクリーンセーバー"
     },
     "tasks": {
         "resetOrder": "自動で並べ替え",

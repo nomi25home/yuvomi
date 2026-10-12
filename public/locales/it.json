@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Nessun obiettivo giornaliero impostato.",
         "nutritionEntries": "{{count}} voci oggi",
         "nutritionEntries_one": "{{count}} voce oggi",
-        "weatherUnavailable": "Meteo al momento non disponibile"
+        "weatherUnavailable": "Meteo al momento non disponibile",
+        "wallScreensaverNone": "Nessuna foto da mostrare.",
+        "wallScreensaverStart": "Salvaschermo"
     },
     "tasks": {
         "resetOrder": "Ordina automaticamente",

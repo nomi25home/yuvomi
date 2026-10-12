@@ -3858,6 +3858,37 @@ test('das Familienmitglieder-Widget kennt die eigene Schicht statt "Heute frei" 
   nodeAssert.match(stillFree, /todayFree/, 'ein wirklich freier Tag darf weiterhin "Heute frei" sagen');
 });
 
+test('Wand-Modus: Screensaver-Knopf erscheint mit screensaverEnabled, nicht ohne (#1766)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  await withWallWindow(() => {
+    const data = { urgentTasks: wallTasks(1), users: [] };
+    const on  = __test.renderWallSurface(data, null, { screensaverEnabled: true });
+    const off = __test.renderWallSurface(data, null, { screensaverEnabled: false });
+    nodeAssert.match(on,  /id="wall-screensaver-start"/, 'mit Flag: Knopf da');
+    nodeAssert.ok(!/id="wall-screensaver-start"/.test(off), 'ohne Flag: kein Knopf');
+    // Der Ausstieg muss in beiden Faellen vorhanden sein.
+    nodeAssert.match(on,  /id="wall-exit"/, 'Ausstieg bleibt mit Flag');
+    nodeAssert.match(off, /id="wall-exit"/, 'Ausstieg bleibt ohne Flag');
+  });
+});
+
+test('Wand-Modus: Screensaver-Knopf faellt weg, solange ein Timer laeuft (#1766)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const prevStorage = global.localStorage;
+  // Einen laufenden Timer eintragen: der Schluesseleintrag ist ein zukuenftiger Zeitstempel.
+  global.localStorage = { getItem: () => String(Date.now() + 120_000), setItem() {}, removeItem() {} };
+  try {
+    await withWallWindow(() => {
+      const data = { urgentTasks: wallTasks(1), users: [] };
+      const html = __test.renderWallSurface(data, null, { screensaverEnabled: true });
+      nodeAssert.ok(!/id="wall-screensaver-start"/.test(html),
+        'laufender Timer verdraengt den Screensaver-Knopf');
+    });
+  } finally {
+    global.localStorage = prevStorage;
+  }
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

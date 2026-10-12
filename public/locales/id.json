@@ -405,7 +405,9 @@
         "nutritionNoTarget": "Belum ada target harian.",
         "nutritionEntries": "{{count}} catatan hari ini",
         "nutritionEntries_one": "{{count}} catatan hari ini",
-        "weatherUnavailable": "Cuaca sedang tidak tersedia"
+        "weatherUnavailable": "Cuaca sedang tidak tersedia",
+        "wallScreensaverNone": "Tidak ada foto untuk ditampilkan.",
+        "wallScreensaverStart": "Pelindung layar"
     },
     "tasks": {
         "resetOrder": "Urutkan otomatis",

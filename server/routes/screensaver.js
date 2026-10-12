@@ -172,5 +172,10 @@ router.get('/photos/:id', async (req, res) => {
   }
 });
 
+/** True when Immich is configured well enough to serve photos. */
+export function isScreensaverEnabled() {
+  return config().enabled;
+}
+
 export const __test = { config, immichUrl };
 export default router;

@@ -405,7 +405,9 @@
         "nutritionNoTarget": "هنوز هدف روزانه‌ای تعیین نشده است.",
         "nutritionEntries": "{{count}} رکورد امروز",
         "nutritionEntries_one": "{{count}} رکورد امروز",
-        "weatherUnavailable": "آب‌وهوا در حال حاضر در دسترس نیست"
+        "weatherUnavailable": "آب‌وهوا در حال حاضر در دسترس نیست",
+        "wallScreensaverNone": "هیچ عکسی برای نمایش وجود ندارد.",
+        "wallScreensaverStart": "محافظ صفحه‌نمایش"
     },
     "tasks": {
         "resetOrder": "مرتب‌سازی خودکار",

@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Aún no hay objetivo diario.",
         "nutritionEntries": "{{count}} registros hoy",
         "nutritionEntries_one": "{{count}} registro hoy",
-        "weatherUnavailable": "El tiempo no está disponible en este momento"
+        "weatherUnavailable": "El tiempo no está disponible en este momento",
+        "wallScreensaverNone": "No hay fotos para mostrar.",
+        "wallScreensaverStart": "Salvapantallas"
     },
     "tasks": {
         "resetOrder": "Ordenar automáticamente",

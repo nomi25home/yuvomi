@@ -391,7 +391,9 @@
         "nutritionNoTarget": "Ainda sem objetivo diário definido.",
         "nutritionEntries": "{{count}} registos hoje",
         "nutritionEntries_one": "{{count}} registo hoje",
-        "weatherUnavailable": "Clima indisponível no momento"
+        "weatherUnavailable": "Clima indisponível no momento",
+        "wallScreensaverNone": "Nenhuma foto para mostrar.",
+        "wallScreensaverStart": "Protetor de ecrã"
     },
     "tasks": {
         "resetOrder": "Ordenar automaticamente",

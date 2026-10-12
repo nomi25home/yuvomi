@@ -391,7 +391,9 @@
         "todayWasteTonight": "Colocar para fora esta noite",
         "eventEnded": "Encerrado",
         "eventsEndedMore": "+{{count}} mais cedo hoje",
-        "eventsEndedMore_one": "+{{count}} mais cedo hoje"
+        "eventsEndedMore_one": "+{{count}} mais cedo hoje",
+        "wallScreensaverNone": "Nenhuma foto para exibir.",
+        "wallScreensaverStart": "Protetor de tela"
     },
     "tasks": {
         "resetOrder": "Ordenar automaticamente",

@@ -405,7 +405,9 @@
         "nutritionNoTarget": "Noch kein Tagesziel gesetzt.",
         "nutritionEntries": "{{count}} Einträge heute",
         "nutritionEntries_one": "{{count}} Eintrag heute",
-        "weatherUnavailable": "Wetter gerade nicht verfügbar"
+        "weatherUnavailable": "Wetter gerade nicht verfügbar",
+        "wallScreensaverNone": "Keine Fotos vorhanden.",
+        "wallScreensaverStart": "Bildschirmschoner"
     },
     "tasks": {
         "resetOrder": "Automatisch sortieren",

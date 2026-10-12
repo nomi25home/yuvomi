@@ -259,6 +259,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The switch reaches a tablet nobody touches in both directions: a screensaver that could not
   get its photos asks again after the next idle period instead of waiting for a touch, and one
   whose next photo is refused closes instead of leaving a black screen.
+- **Wall mode: a "Screensaver" button in the footer starts the photo screensaver by hand**
+  (#1766). When Immich is connected, a button labelled "Screensaver" appears in the wall footer
+  next to the kitchen timer controls and the exit button. Tapping it starts the screensaver at
+  once, the same as the idle timer would. While a kitchen timer is running the button is not
+  there: a photo covering the countdown is not a timer. If there are no photos to show, the
+  button answers with one line instead. For a paired display the button appears only when an
+  administrator has switched the photo screensaver on for it under Settings → Household → Wall
+  tablets.
 
 ## [2.76.0] - 2026-10-11
 
