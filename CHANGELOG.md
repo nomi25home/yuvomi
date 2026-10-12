@@ -29,9 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what is left and what is finished. The wall still does not scroll: it shows as many lines as
   the screen has room for and says "+2 more" for the rest. When space runs short, finished tasks
   give way first. Someone who has finished everything keeps their ticked tasks until the next
-  day. Under the faces only tasks the whole household may see appear: a task set to "Assignees
-  only" is not listed there, whoever is signed in on the device. (The day's programme beside it
-  is unchanged and still shows what the signed-in person may see.)
+  day. Only tasks the whole household may see appear; a task set to "Assignees only" is not on
+  the wall, whoever is signed in on the device.
 - **A profile picture can be fetched from Gravatar once, if the operator turns it on.** Off by
   default: while `GRAVATAR_BASE_URL` is unset or empty nothing is sent and Settings → Account shows
   no button. An operator opts in by setting it to `https://gravatar.com/avatar/` or a Libravatar
@@ -40,8 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused. Only a SHA-256 hash of the address and the server's IP leave the server, through the
   SSRF-guarded client with an 8 second limit, a 512 KiB cap and a signature check. If the
   picture, the address or the account changes while the fetch runs, nothing is stored (409).
+  The hint and the error messages name the service the operator chose by its host name, so a
+  mirror is never called gravatar.com, and a failed fetch is announced once, in the form's error
+  line.
 - **Tapping a category or subcategory in the budget overview filters the transactions list.**
-  (#1593, from D#1583) The filter applies in place and can be cleared again.
+  (#1593, from D#1583) The filter applies in place and can be cleared again. A category with
+  both income and spending is marked in both blocks, because the list then shows both; keyboard
+  focus stays on the bar that was tapped and its ring is no longer cut off, and whether the tap
+  jumps to the list follows the width of the budget area, not of the window. The bars answer to
+  the pointer.
 - **The screensaver can show the time and fill the screen, chosen on each device** (#1766, from
   D#885). Two switches under Settings → Account → Appearance, below the delay: the current time,
   on unless switched off, in the household's time format and zone, turning on the full minute and
@@ -58,6 +64,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   well as German and English, so "hvetemel" lands under baked goods and "oppvaskmiddel" under
   household instead of everything ending up under "Other". Matching stays whole-word, so a
   compound such as "kyllinglår" still falls through unless it is listed on its own.
+- **The wall shows only what the whole household may see** (#1817). Wall mode is a shared
+  surface, not a personal screen: it hangs in the kitchen, whoever opened it. The day's
+  programme and "Who's up today" now leave out every task and appointment that is not visible
+  to everyone - a task set to "Assignees only" or private, an appointment set to "Assignees
+  only" or private, and appointments from a calendar subscription that is not shared with the
+  household - also when the wall was opened from the session of the person they belong to.
+  Someone who would only be "up today" because of such an entry is not listed. The normal
+  overview and "Today at a glance" stay personal and show them as before.
 
 ### Fixed
 

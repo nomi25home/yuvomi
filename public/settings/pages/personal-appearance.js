@@ -223,12 +223,6 @@ export function screensaverIdleOptions() {
 }
 
 /**
- * Device-local like wall mode: no server request, no preference. The
- * screensaver watches the attribute this sets, so the new delay applies without
- * a reload, and the toast confirms it like the wall-mode toggle above it.
- * Exported so test:screensaver-idle can drive the real handler.
- */
-/**
  * The clock and full-bleed switches (#1766). Device-local like the select
  * above; the screensaver reads both when it next starts, which is what the
  * toast says, since nothing on this page changes visibly. Exported so
@@ -241,6 +235,12 @@ export function bindScreensaverSwitch(toggle, store) {
   });
 }
 
+/**
+ * Device-local like wall mode: no server request, no preference. The
+ * screensaver watches the attribute this sets, so the new delay applies without
+ * a reload, and the toast confirms it like the wall-mode toggle above it.
+ * Exported so test:screensaver-idle can drive the real handler.
+ */
 export function bindScreensaverIdleSelect(select) {
   select?.addEventListener('change', () => {
     const seconds = setScreensaverIdleSeconds(Number(select.value));
