@@ -41,7 +41,7 @@ import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
-  dashboardQuery, dashboardQueryFiltersCounts, normalizeShoppingListSelection,
+  dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -6777,6 +6777,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // dann gibt es auch nichts zurueckzusetzen (#827).
   let followsDefault = true;
   const canPublish = user?.role === 'admin';
+  // Die Wand fragt die Haushaltsfassung der Uebersicht ab (#1817,
+  // `dashboardRequest`). JEDER Abruf dieser Seite geht hier durch - auch der
+  // stille Refresh, sonst stuende nach einer Viertelstunde wieder die
+  // persoenliche Fassung an der Wand. Die faelligen Erinnerungen ebenso
+  // (`loadPendingReminders`): sie sind die zweite Antwort, die davon abhaengt,
+  // wer fragt.
+  const overviewRequest = (query) => dashboardRequest(query, { wall: wallMode });
   let isCustomizing = false;
   let currency     = 'EUR';
   let visibleMealTypes = MEAL_ORDER;
@@ -6788,13 +6795,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let lastLoadedAt = null;
   try {
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
-      api.get(layoutHintQuery('/dashboard')),
+      api.get(overviewRequest(layoutHintQuery('/dashboard'))),
       api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
       // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
       // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
       // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
       (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
-      loadPendingReminders(),
+      loadPendingReminders(overviewRequest),
     ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):
     // dieser Aufbau gehoert niemandem mehr und faesst die Flaeche nicht an.
@@ -6810,7 +6817,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * keine Zahl, und mit ihr als „gefiltert" holte der Router die Antwort bei
      * jedem Kaltstart ein zweites Mal (`dashboardQueryFiltersCounts`). */
     window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
-      filtered: dashboardQueryFiltersCounts(layoutHintQuery('/dashboard')),
+      filtered: dashboardQueryFiltersCounts(overviewRequest(layoutHintQuery('/dashboard'))),
     });
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
@@ -6836,7 +6843,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * die ohne Optionen. */
     if (dashboardQuery(widgetConfig) !== layoutHintQuery('/dashboard')) {
       try {
-        const filtered = await api.get(dashboardQuery(widgetConfig));
+        const filtered = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
         if (signal.aborted) return;
         localizeEventLists(filtered);
         data = filtered;
@@ -6945,7 +6952,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   async function reloadIfQueryChanged(previousQuery) {
     if (dashboardQuery(widgetConfig) === previousQuery) return;
     try {
-      const fresh = await api.get(dashboardQuery(widgetConfig));
+      const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       localizeEventLists(fresh);
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
@@ -7647,7 +7654,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (isCustomizing || loadFailed || refreshInFlight) return;
     refreshInFlight = true;
     try {
-      const fresh = await api.get(dashboardQuery(widgetConfig));
+      const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       if (signal.aborted) return;
       localizeEventLists(fresh);
       // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard
@@ -7669,7 +7676,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       }
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
-      fresh.pendingReminders = await loadPendingReminders();
+      fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;
       data = fresh;
       lastLoadedAt = new Date();
@@ -7802,10 +7809,14 @@ function todayFingerprint(data, cfg, now = new Date()) {
  * Modulrecht und Token-Scope (`mayTouchOrigin`), das Blatt waehlt daraus nur
  * noch, welche Herkunft eine Zeile ist. Ein Fehler kostet die Zeilen, nicht
  * die Uebersicht: die Erinnerung spricht weiter ueber Toast und Glocke.
+ *
+ * `request` IST DIE EINE REGEL DER SEITE (`overviewRequest`): die Wand fragt
+ * auch hier die Haushaltsfassung ab, und die ist leer - eine Erinnerung gilt
+ * der Person, die um sie gebeten hat, nicht der Kueche (#1817).
  */
-async function loadPendingReminders() {
+async function loadPendingReminders(request = (path) => path, get = (path) => api.get(path)) {
   try {
-    const res = await api.get('/reminders/pending');
+    const res = await get(request('/reminders/pending'));
     return Array.isArray(res?.data) ? res.data : [];
   } catch {
     return [];
@@ -7899,7 +7910,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Test-Tor fuer die Klarheits-Runde (test/test-dashboard-clarity.js): eigene
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
-Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppingTile, loadShoppingLists, renderDashboardLayout, wireLinks });
+Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppingTile, loadShoppingLists, loadPendingReminders, renderDashboardLayout, wireLinks });
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });

@@ -29,9 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what is left and what is finished. The wall still does not scroll: it shows as many lines as
   the screen has room for and says "+2 more" for the rest. When space runs short, finished tasks
   give way first. Someone who has finished everything keeps their ticked tasks until the next
-  day. Under the faces only tasks the whole household may see appear: a task set to "Assignees
-  only" is not listed there, whoever is signed in on the device. (The day's programme beside it
-  is unchanged and still shows what the signed-in person may see.)
+  day. Only tasks the whole household may see appear; a task set to "Assignees only" is not on
+  the wall, whoever is signed in on the device.
 - **A profile picture can be fetched from Gravatar once, if the operator turns it on.** Off by
   default: while `GRAVATAR_BASE_URL` is unset or empty nothing is sent and Settings → Account shows
   no button. An operator opts in by setting it to `https://gravatar.com/avatar/` or a Libravatar
@@ -40,8 +39,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused. Only a SHA-256 hash of the address and the server's IP leave the server, through the
   SSRF-guarded client with an 8 second limit, a 512 KiB cap and a signature check. If the
   picture, the address or the account changes while the fetch runs, nothing is stored (409).
+  The hint and the error messages name the service the operator chose by its host name, so a
+  mirror is never called gravatar.com, and a failed fetch is announced once, in the form's error
+  line.
 - **Tapping a category or subcategory in the budget overview filters the transactions list.**
-  (#1593, from D#1583) The filter applies in place and can be cleared again.
+  (#1593, from D#1583) The filter applies in place and can be cleared again. A category with
+  both income and spending is marked in both blocks, because the list then shows both; keyboard
+  focus stays on the bar that was tapped and its ring is no longer cut off, and whether the tap
+  jumps to the list follows the width of the budget area, not of the window. The bars answer to
+  the pointer.
+- **The screensaver can show the time and fill the screen, chosen on each device** (#1766, from
+  D#885). Two switches under Settings → Account → Appearance, below the delay: the current time,
+  on unless switched off, in the household's time format and zone, turning on the full minute and
+  sitting in the corner opposite the photo caption, moving with it so no text stays in one place;
+  and photos that fill the whole screen instead of fitting inside it, off unless chosen, because it
+  crops portrait photos. Both are stored in the browser like wall mode and the delay, so the frame
+  in the hallway and the kitchen tablet decide for themselves, and both apply from the next start
+  of the screensaver without a reload.
+- **Tasks can be put in an order of your own within a category.** In the task list grouped by
+  category, every row has a grip: drag it, or press the arrow keys at the focused grip, and the
+  order is saved for the whole household. Tasks you never placed keep the old order (due date,
+  then priority) and sort after the placed ones, so a new task lands at the end of its category.
+  A recurring task passes its place on to its next occurrence; a task that moves to another
+  category loses its place. A "Sort automatically" button in the group header returns a category
+  to the automatic order. Grouping by due date, the board, selection mode, `tasks: read` and the
+  wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
+  `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 242).
 
 ### Changed
 
@@ -50,6 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   well as German and English, so "hvetemel" lands under baked goods and "oppvaskmiddel" under
   household instead of everything ending up under "Other". Matching stays whole-word, so a
   compound such as "kyllinglår" still falls through unless it is listed on its own.
+- **The wall shows only what the whole household may see** (#1817). Wall mode is a shared
+  surface, not a personal screen: it hangs in the kitchen, whoever opened it. The day's
+  programme and "Who's up today" now leave out every task and appointment that is not visible
+  to everyone - a task set to "Assignees only" or private, an appointment set to "Assignees
+  only" or private, and appointments from a calendar subscription that is not shared with the
+  household - also when the wall was opened from the session of the person they belong to.
+  Someone who would only be "up today" because of such an entry is not listed. The same holds
+  for what concerns one person alone: a wall opened from a member's session no longer shows
+  that person's medication doses, own shift, due reminders or the reward requests waiting for
+  their approval - a coupled display never showed them, and now every wall reads the same.
+  The normal overview and "Today at a glance" stay personal and show all of it as before.
 
 ### Fixed
 
@@ -97,6 +131,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you changed or took back during the upload, and for a new shopping item that left its synced
   list in that moment. Until now such a task also lost the list you had just chosen and stayed in
   the old one.
+- **An entry deleted after an interrupted upload no longer comes back** (#1882). When a new
+  event, task or shopping item reached the CalDAV or iCloud server but the server's answer got
+  lost on the way - a dropped connection, a timeout, a server error after saving - Yuvomi kept
+  the entry as not yet uploaded. If you deleted it before the next sync, the copy stayed on the
+  server and the next sync brought the deleted entry back. If you instead picked another calendar
+  or list for it, or set it back to "Local", the next sync added the server copy as a second
+  entry. Yuvomi now remembers that an upload was sent and never confirmed: the next sync removes
+  the copy from the server instead of importing it, and the entry ends up only where you last
+  put it. The copy is removed with the next sync run, not at the moment you delete the entry,
+  and only after Yuvomi has read that the entry at that address is really its own. An upload
+  that the server finishes late is covered for 24 hours after the last attempt.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from

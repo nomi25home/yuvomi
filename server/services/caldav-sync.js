@@ -19,6 +19,7 @@ import {
   countAccountEvents as countEventsOfAccount, deleteAccountEvents,
 } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
+import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount, ObjectIndex } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -604,6 +605,10 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
       const dropped = Number(db.get().prepare(
         "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id = ?"
       ).run(accountId).changes) || 0;
+      // Ebenso die Notizen nie gebuchter Uploads (#1882): ihre Adressen
+      // meinen den alten Server, und eine Aufgabe hielte sonst für immer an
+      // einer Liste des alten Kontos fest.
+      dropUploadAttemptsOf({ source: 'caldav', accountId });
       if (dropped) {
         log.warn(`Account ${accountId} points to a new server or user: dropped ${dropped} pending deletion(s) meant for the old one.`);
       }
@@ -665,6 +670,8 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
     db.get().prepare(
       "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id = ?"
     ).run(accountId);
+    // Ebenso die Notizen nie gebuchter Uploads (#1882).
+    dropUploadAttemptsOf({ source: 'caldav', accountId });
     const rows = detachAccountRows(accountId);
     db.get().prepare('DELETE FROM caldav_accounts WHERE id = ?').run(accountId);
     // Die Frist der Farb-Heilung (#1270) haengt an keinem Fremdschluessel.
@@ -1227,6 +1234,30 @@ async function runSync({ createClient } = {}) {
               // in dem Stand, für den er vorgemerkt wurde (#1883).
               if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null, obj.etag ?? null)) continue;
 
+              // Der eigene Upload, dessen Antwort verloren ging. Übernommen
+              // wird er nur für einen Termin, der auf den Upload in GENAU
+              // diesen Kalender dieses Kontos wartet - die UID kommt vom
+              // Server und weist nichts aus.
+              const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
+                source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId,
+                calendarUrl: selCal.calendar_url, accountId: account.id,
+                isWaitingHere: (eventId) => localUploadsOf(account.id).some(
+                  (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
+                ),
+              });
+
+              // Für dieses Objekt steht die Notiz eines Uploads, der nie
+              // gebucht wurde (#1882) - gleich über welches Konto er lief.
+              // Dann ist es kein Eintrag wie jeder andere: wartet sein Termin
+              // hier, wird es übernommen; sonst wird es weder importiert noch
+              // einer Zeile zugeordnet (gelöscht, anderes Ziel, woanders
+              // gespiegelt, oder er wartet über ein anderes Konto). Entfernt
+              // wird es nach dem Abruf (`releaseLeftoverUploads`). Frisch
+              // gefragt: der Termin kann gefallen sein, während dieser Lauf
+              // noch liest.
+              if (outbound.isUnbookedOwnUpload({ source: 'caldav', uid: ev.uid, calendarUrl: selCal.calendar_url })
+                  && !adoptOwn()) continue;
+
               let existing = rowForUid(ev.uid, obj.url ?? null, account.id);
               // Die Zeile gehört einem anderen Konto, oder sie hat keines und
               // ist nicht zu übernehmen: nicht anfassen, keine zweite anlegen.
@@ -1237,17 +1268,7 @@ async function runSync({ createClient } = {}) {
               // Zeile übernehmen statt eine zweite anzulegen; sie ist danach
               // als geändert vorgemerkt, der Zweig darunter lässt sie stehen
               // und der Outbound dieses Laufs trägt den lokalen Stand hinauf.
-              if (!existing && obj.url
-                  && outbound.adoptOwnEventUpload({
-                    source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId,
-                    calendarUrl: selCal.calendar_url, accountId: account.id,
-                    // Nur ein Termin, der auf den Upload in GENAU diesen
-                    // Kalender dieses Kontos wartet - die UID kommt vom
-                    // Server und weist nichts aus.
-                    isWaitingHere: (eventId) => localUploadsOf(account.id).some(
-                      (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
-                    ),
-                  })) {
+              if (!existing && adoptOwn()) {
                 existing = rowForUid(ev.uid, obj.url ?? null, account.id);
                 if (existing === false) continue;
               }
@@ -1387,6 +1408,11 @@ async function runSync({ createClient } = {}) {
       try {
         // Gemeldet wird, was der Server gelöscht hat - nicht, was ohne Anfrage fiel.
         const deletions = { sent: 0 };
+        // Die Reste nie bestätigter Uploads entfernen (#1882), in den
+        // Kalendern, die dieser Lauf abgerufen hat.
+        await outbound.releaseLeftoverUploads(client, {
+          source: 'caldav', accountId: account.id, calendarUrls: ownCalendarUrls,
+        });
         await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
           accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
         });
@@ -1431,7 +1457,9 @@ async function runSync({ createClient } = {}) {
 
           // Upload to CalDAV. Ein 412 auf den eigenen Namen ist der eigene
           // frühere Upload und wird übernommen (uploadNewEvent).
-          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData);
+          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData, {
+            source: 'caldav', eventId: event.id, accountId: account.id,
+          });
 
           const calRefId  = upsertExternalCalendar(
             'caldav', event.target_caldav_calendar_url,

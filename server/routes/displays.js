@@ -311,7 +311,7 @@ router.post('/', (req, res) => {
 });
 
 /**
- * Ob dieses Display den Foto-Bildschirmschoner zeigt (#1766, Migration 241).
+ * Ob dieses Display den Foto-Bildschirmschoner zeigt (#1766, Migration 243).
  * Body: { show_screensaver: boolean }
  *
  * DIE WAHL TRIFFT EIN ADMINISTRATOR, NICHT DAS TABLETT. Ein Display aendert
