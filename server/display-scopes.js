@@ -156,7 +156,7 @@ export const DISPLAY_READ_PATHS = Object.freeze([
  * bleiben gesperrt.
  *
  * NUR WENN EIN ADMINISTRATOR ES FUER DIESES DISPLAY EINGESCHALTET HAT
- * (`display_accounts.show_screensaver`, Migration 243, Standard aus). Ein
+ * (`display_accounts.show_screensaver`, Migration 244, Standard aus). Ein
  * Display aendert keine Einstellungen: die Wartezeit kennt kein "nie", und die
  * Display-Oberflaeche hat keine Einstellungen. Ohne den Schalter faenge jedes
  * gekoppelte Tablett nach fuenf Minuten an, Fotos ueber den Kalender zu legen.

@@ -225,10 +225,19 @@ function attemptById(id) {
  * @param {(collectionUrl: string) => boolean} [p.inScope]  nur Reste an Plätzen,
  *        die dieser Durchgang führt (eingeschaltete Kalender bzw. Listen);
  *        alles andere bleibt unberührt stehen
+ * @param {(attempt: object) => boolean} [p.keepWhileRefused]  Reste, deren
+ *        Notiz auch NACH der Frist stehen bleibt, solange der Server das
+ *        Entfernen ablehnt: die Zeile ist anderswo Spiegel DERSELBEN UID, und
+ *        ohne die Notiz läse der Abruf zwei Objekte für eine Zeile
+ * @param {(attempt: object) => Promise<boolean>} [p.beforeRemove]  letzte
+ *        Frage vor dem DELETE eines Rests, an dessen Adresse das Objekt mit
+ *        der UID des Uploads liegt: `false` lässt Objekt und Notiz stehen (der
+ *        Aufrufer hat selbst entschieden, was mit der Notiz geschieht). Wirft
+ *        sie, wird nichts entfernt und die Notiz bleibt.
  * @param {string} p.label  für das Log
  * @returns {Promise<number>} entfernte Objekte
  */
-export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, label }) {
+export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, keepWhileRefused = null, beforeRemove = null, label }) {
   let attempts;
   try {
     attempts = uploadAttemptsOf({ source, accountId, kinds });
@@ -268,12 +277,25 @@ export async function removeLeftoverUploads(client, { source, accountId = null, 
       continue;
     }
 
+    if (beforeRemove) {
+      let allowed;
+      try {
+        allowed = await beforeRemove(attempt);
+      } catch (err) {
+        log.warn(`[${label}] Could not confirm that ${attempt.uid} may be removed at ${attempt.object_url} (${err.message}); nothing is removed there.`);
+        continue;
+      }
+      // Nach dem await: Notiz und Zeile von jetzt.
+      const still = attemptById(attempt.id);
+      if (!allowed || !still || stateOf(still) !== 'leftover') continue;
+    }
+
     try {
       await client.deleteCalendarObject({ calendarObject: { url: attempt.object_url, etag: found.own.etag } });
     } catch (err) {
       const status = err?.status;
       if (status !== 404 && status !== 410) {
-        if (isExpired(attempt, Date.now())) {
+        if (isExpired(attempt, Date.now()) && !(keepWhileRefused && keepWhileRefused(attempt))) {
           log.error(`[${label}] Giving up on removing ${attempt.uid}, the leftover of an unconfirmed upload: ${err.message}`);
           dropUploadAttempt(attempt.id);
         } else {

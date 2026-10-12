@@ -334,8 +334,23 @@ function upsertShoppingItem(sel, todo, accountId, objectUrl = null) {
   const isChecked = todo.completed ? 1 : 0;
 
   const existing = db.get().prepare(
-    `SELECT id FROM shopping_items WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
+    `SELECT id, outbound_move FROM shopping_items WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
   ).get(todo.uid, accountId);
+
+  // DER ARTIKEL IST HIER UMGEZOGEN, SEIN OBJEKT NOCH NICHT (#1700). Der Abruf
+  // liest es am alten Platz und stellte die Zeile sonst dorthin zurück - der
+  // Server folgt hier der Zeile, nicht umgekehrt. Frisch an der Zeile gelesen,
+  // nicht aus dem Stand vom Anfang des Laufs: der Umzug kann eintreffen,
+  // während der Lauf noch den Server liest. Nur eine fehlende Adresse wird
+  // nachgetragen, ohne sie ist das Original nicht lesbar.
+  if (existing?.outbound_move) {
+    if (objectUrl) {
+      db.get().prepare(
+        'UPDATE shopping_items SET external_object_url = COALESCE(external_object_url, ?) WHERE id = ?'
+      ).run(objectUrl, existing.id);
+    }
+    return;
+  }
 
   let itemId;
   if (existing) {
@@ -430,6 +445,25 @@ async function sync(opts = {}) {
   return runSerialized('caldav-todo', 'sync', () => runSync(opts));
 }
 
+// Konto → Zahl der wartenden Aufträge, die zuletzt gemeldet wurde: im
+// Standard-Log steht der Zustand, wenn er sich ändert, nicht bei jedem Lauf.
+const reportedWaiting = new Map();
+
+/**
+ * Meldet, wie viele Löschaufträge dieses Kontos auf eine abgewählte Liste
+ * warten (#1884).
+ */
+function reportWaitingDeletions(account) {
+  const waiting = todoOutbound.deletionsWaitingForSelection(account.id).length;
+  const before = reportedWaiting.get(account.id) || 0;
+  reportedWaiting.set(account.id, waiting);
+  if (!waiting) return;
+  const line = `Account ${account.id} ("${account.name}"): ${waiting} pending deletion(s) wait for a reminder list that is not selected. `
+    + 'Nothing is deleted there while it is switched off; they are carried out once it is selected again and dropped if it no longer exists on the server.';
+  if (waiting !== before) log.info(line);
+  else log.debug(line);
+}
+
 async function runSync({ createClient: makeClient } = {}) {
   const accounts = getAllAccounts();
   if (accounts.length === 0) {
@@ -438,6 +472,11 @@ async function runSync({ createClient: makeClient } = {}) {
 
   // Client-Factory injizierbar (Tests), Default = echter tsdav-Client.
   const clientFactory = makeClient || createClient;
+  // Die Quelle einer Mitnahme (#1700) kann ein anderes Konto sein.
+  const clientFor = async (id) => {
+    const other = getAccountById(id);
+    return other ? clientFactory(other) : null;
+  };
 
   let totalItems       = 0;
   let totalPushed      = 0;
@@ -449,10 +488,26 @@ async function runSync({ createClient: makeClient } = {}) {
         SELECT * FROM caldav_reminder_selection WHERE account_id = ? AND enabled = 1
       `).all(account.id);
 
-      if (enabledLists.length === 0) continue;
+      // Ohne eingeschaltete Liste gibt es nichts abzurufen. Wartet aber ein
+      // Löschauftrag auf eine abgewählte (#1884), fragt der Lauf trotzdem die
+      // Auflistung ab: nur sie sagt, ob es die Liste noch gibt.
+      // Dasselbe für einen Umzug in eine abgewählte Liste (#1700).
+      const waitsForSelection = todoOutbound.deletionsWaitingForSelection(account.id).length > 0
+        || todoOutbound.movesWaitingForSelection(account.id) > 0;
+      if (enabledLists.length === 0 && !waitsForSelection) continue;
 
       const client     = await clientFactory(account);
       const serverCals  = await client.fetchCalendars();
+
+      if (enabledLists.length === 0) {
+        // Eine leere Auflistung sagt auch hier nichts.
+        if (serverCals.length > 0) {
+          todoOutbound.dropDeletionsOfMissingLists(account.id, serverCals.map((c) => c.url));
+          todoOutbound.returnMovesIntoMissingLists(account.id, serverCals.map((c) => c.url));
+        }
+        reportWaitingDeletions(account);
+        continue;
+      }
       // Der Server nennt KEINE Collection, obwohl Listen ausgewählt sind: das
       // ist eine unvollständige Antwort (ein Multistatus, der nur die
       // Home-Collection nennt oder jede Ressource mit 403 quittiert), kein
@@ -465,6 +520,12 @@ async function runSync({ createClient: makeClient } = {}) {
         );
         continue;
       }
+      // Löschaufträge für Listen, die der Server nicht mehr nennt, haben ihr
+      // Ziel erreicht (#1884). Vor dem Lesen der Aufträge für den Abruf unten.
+      todoOutbound.dropDeletionsOfMissingLists(account.id, serverCals.map((c) => c.url));
+      // Ein Umzug in eine Liste, die der Server nicht mehr nennt, geht zurück (#1700).
+      todoOutbound.returnMovesIntoMissingLists(account.id, serverCals.map((c) => c.url));
+
       const owner       = db.get().prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
       const createdBy   = owner ? owner.id : 1;
 
@@ -474,6 +535,10 @@ async function runSync({ createClient: makeClient } = {}) {
       // nicht die Listen-URL — ein Prune träfe sonst auch die Einträge der Liste, die
       // gerade nur wegen eines Server-Fehlers leer aussieht.
       const incompleteModules = new Set();
+
+      // Ein Umzug, dessen Zielliste gar keinen Platz auf einem Server mehr hat
+      // (#1700), wird zum Löschen am Server - vor dem Lesen der Aufträge.
+      todoOutbound.releaseStrandedShoppingMoves(account.id);
 
       // Ausstehende Rückrichtung einmal je Lauf und Modul (#617): eine lokal
       // gelöschte Aufgabe darf der Inbound nicht wieder anlegen, eine lokal
@@ -611,7 +676,20 @@ async function runSync({ createClient: makeClient } = {}) {
         if (incompleteModules.has('shopping')) {
           log.warn(`Account ${account.id}: a reminder list could not be fetched, skipping shopping deletion.`);
         } else {
-          pruneRemoved(db.get(), 'shopping_items', account.id, seenByModule.shopping);
+          // Ein wartender Umzug, dessen Objekt in einer nicht abgerufenen
+          // Liste liegt (#1700), ist nicht "auf dem Server gelöscht".
+          //
+          // NUR ZUSÄTZLICH zu dem, was der Server geliefert hat. Hat er nichts
+          // geliefert, bleibt die Liste leer und der Leer-Guard von
+          // `pruneRemoved` (#508) greift: eine einzige hier ergänzte UID
+          // machte sonst aus "nichts gesehen" ein "alles andere ist fort", und
+          // der Prune räumte jeden Einkaufsartikel des Kontos ab.
+          // Scheitert das Lesen der wartenden Umzüge, geht der Fehler hoch und
+          // dieser Lauf prunt gar nicht - es gibt hier keinen leeren Ersatzwert.
+          const shielded = seenByModule.shopping.length
+            ? todoOutbound.uidsOfMovesFromUnfetchedLists(account.id, enabledLists.map((s) => s.list_url))
+            : [];
+          pruneRemoved(db.get(), 'shopping_items', account.id, [...seenByModule.shopping, ...shielded]);
         }
       }
 
@@ -639,11 +717,13 @@ async function runSync({ createClient: makeClient } = {}) {
         }
       }
 
+      reportWaitingDeletions(account);
+
       // Die Reste nie bestätigter Uploads entfernen (#1882). Nach dem Abruf,
       // der sie nicht importiert hat, und vor den Uploads: eine Zeile mit
       // neuem Ziel in diesem Konto geht so nicht neben ihren Rest.
       try {
-        const cleared = await todoOutbound.releaseLeftoverTodoUploads(client, account.id);
+        const cleared = await todoOutbound.releaseLeftoverTodoUploads(client, account.id, { clientFor });
         if (cleared) log.info(`${cleared} leftover(s) of unconfirmed uploads removed from the server.`);
       } catch (err) {
         log.error(`Removing leftovers of unconfirmed uploads failed for account ${account.id}:`, err.message);
@@ -690,6 +770,30 @@ async function runSync({ createClient: makeClient } = {}) {
         if (created) log.info(`${created} locally created shopping item(s) uploaded to the server.`);
       } catch (err) {
         log.error(`Uploading local shopping items failed for account ${account.id}:`, err.message);
+      }
+
+      // Umgezogene Einkaufsartikel nehmen ihr Objekt mit (#1700). Ebenfalls
+      // nach dem Prune: die Zeile zeigt danach auf ein Objekt, das dieser Lauf
+      // in der neuen Liste noch nicht gelesen hat.
+      try {
+        const targets = db.get().prepare(`
+          SELECT list_url, target_list_id FROM caldav_reminder_selection
+           WHERE account_id = ? AND enabled = 1 AND target_module = 'shopping' AND target_list_id IS NOT NULL
+        `).all(account.id);
+        const lists = new Map(
+          targets.map((s) => [s.list_url, serverCals.find((c) => c.url === s.list_url)]).filter(([, cal]) => cal)
+        );
+        const carried = await todoOutbound.processPendingShoppingMoves(
+          client,
+          account.id,
+          targets.map((s) => ({ listUrl: s.list_url, targetListId: s.target_list_id })),
+          lists,
+          { clientFor }
+        );
+        totalPushed += carried;
+        if (carried) log.info(`${carried} moved shopping item(s) carried to their new list on the server.`);
+      } catch (err) {
+        log.error(`Carrying moved shopping items failed for account ${account.id}:`, err.message);
       }
 
       db.get().prepare('UPDATE caldav_accounts SET last_sync = ? WHERE id = ?')

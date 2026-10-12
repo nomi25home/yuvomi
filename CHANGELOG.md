@@ -66,6 +66,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
   `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 242).
 
+- **Custom modules can be installed from Settings, from GitHub or as a ZIP file, where the operator
+  allows it.** Until now a third-party module reached Yuvomi only as a folder copied into `modules/`
+  on the server. The new page Settings → Modules → Add custom module (admin only) takes the address
+  of a public GitHub repository or an uploaded `.zip` and installs the module from it. **The feature
+  is off unless the operator sets `MODULES_ALLOW_WEB_INSTALL`**: a module is JavaScript that runs
+  with the session of every member who opens it, so installing one is the operator's choice. A
+  module installed this way arrives disabled until an admin approves it in Active modules from a
+  browser session, and the web interface removes or replaces only what it installed. Limits, checks
+  and the API are in `MODULES.md` under "Installing From Settings".
+- **Move a shopping item to another list** (#1700, from D#998). The edit dialog has a list
+  selector under amount and category when there is more than one list. The item moves as it is -
+  name, amount, category, note, link, price and shop - and lands at the end of its category on
+  the other list, so nothing has to be typed again. Between two lists mirrored from a CalDAV
+  server the entry itself moves: Yuvomi reads it in the old list, stores it unchanged in the new
+  one and only then removes it from the old one, so its tags, alarms and everything another app
+  keeps on it come along - also from one account to another. If the server does not accept it
+  in the new list, the entry stays untouched where it was, and after the fifth refusal the item
+  is back on the list it came from, with a line in the sync log. The same happens when the new
+  list no longer exists on the server. While the new list is switched off in the reminder sync,
+  the move waits until it is switched on again. Moving an item to a
+  list that is not mirrored removes it on the server without deleting it in Yuvomi.
+  `PATCH /api/v1/shopping/items/:itemId` takes `list_id` for the same move (migration 243).
+
 ### Changed
 
 - **Recipes mirrored from a Norwegian Mealie or Tandoor sort into shopping categories.** The
@@ -83,6 +106,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for what concerns one person alone: a wall opened from a member's session no longer shows
   that person's medication doses, own shift, due reminders or the reward requests waiting for
   their approval - a coupled display never showed them, and now every wall reads the same.
+  And the device on the wall no longer receives what the wall never draws: pinned notes, the
+  budget, shared-expense balances, quick links, countdowns and the housekeeper's unpaid amount
+  used to travel along in the background and now stay off it, as does anything a future module
+  adds until it is given a place on the wall.
   The normal overview and "Today at a glance" stay personal and show all of it as before.
 
 ### Fixed
@@ -179,6 +206,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the installer after using them day to day: one word for a shift ("vakt"), a reminder
   ("påminnelse") and a tablet ("nettbrett") throughout, "container" and "image" for Docker
   instead of literal translations, and singular forms for a count of one instead of "(er)".
+- **Deleting an entry of a switched-off CalDAV calendar or reminder list no longer deletes it on
+  the server, and is no longer lost or stuck** (#1884). Switching a calendar or reminder list off
+  in Settings is meant to leave everything in it alone. A deletion made in Yuvomi for an entry of
+  such a calendar was sent to the server right away all the same; if the server refused it five
+  times, Yuvomi gave up, and the deleted event came back when you switched the calendar on
+  again. For tasks and shopping items the deletion always went through.
+  In other cases the deletion waited for good, also after the calendar itself had been deleted on
+  the server. Now the deletion waits while the calendar or list is switched off: nothing is
+  deleted there, and waiting does not use up its retries. It is carried out when you switch the
+  calendar or list on again, so the entry does not come back, and it is dropped when the
+  calendar or list no longer exists on the server or the account is removed. The sync log names
+  how many deletions are waiting. For iCloud, a deletion for a calendar that no longer exists is
+  dropped the same way.
 - **A paired wall tablet can show the photo screensaver** (#1766). Its account could not read the
   screensaver photos, so the screensaver never started on the one device it was built for. An
   administrator now switches it on per tablet under Settings → Household → Wall tablets; it is off

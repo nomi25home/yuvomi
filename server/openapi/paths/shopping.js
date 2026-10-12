@@ -63,7 +63,21 @@ export function shoppingPaths() {
       }),
     },
     '/api/v1/shopping/items/{itemId}': {
-      patch: op({ summary: 'Update shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({
+        summary: 'Update shopping item',
+        description: 'Body: { is_checked?, name?, quantity?, category?, notes?, url?, price_cents?, store_id?, list_id? } - '
+          + 'a field that is not sent stays as it is. `list_id` moves the item to another list: it keeps its name, quantity, '
+          + 'category, note, link, price and shop, and goes to the end of its category on the list it lands on. `list_id` and '
+          + '`store_id` are positive integers, as a number or a string of digits; anything else and an unknown '
+          + '`list_id` are refused with 400 and nothing changes. If the item is mirrored from a CalDAV list and the target '
+          + 'list is mirrored too, its object on the server moves along after the response, unchanged and under the same UID; '
+          + 'if the target list is not mirrored, the object is removed on the server and its mirrored tags are dropped. '
+          + '`list_change` in the response names the list the item came from.',
+        tag: 'Shopping',
+        params: [idParam('itemId', 'Item ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true }),
     },
     '/api/v1/shopping/{listId}': {
