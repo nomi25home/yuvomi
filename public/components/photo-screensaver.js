@@ -171,6 +171,12 @@ window.addEventListener('pointermove', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stop(); else resetIdle();
 });
+// The session is gone (api.js fires this before it throws on a 401): retire the
+// run, so the catch in start() arms nothing. This module also loads on the
+// sign-in and setup pages, where every knock would end the same way and make
+// the router draw the page again - once per idle period, for as long as the tab
+// stays open. The gesture that signs in arms the timer again.
+window.addEventListener('auth:expired', () => stop());
 // A new delay re-arms the timer at once, so it applies without a reload. Only
 // while nothing is showing: the change comes from the settings page, and a
 // visible screensaver there is the admin preview, which stays until dismissed.

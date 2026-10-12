@@ -443,6 +443,36 @@ test('an image that fails to load takes the overlay down and knocks again later'
   gesture();
 });
 
+// The component loads from index.html on the sign-in and setup pages too. There
+// the request answers 401, and api.js fires `auth:expired` before it throws -
+// which the router answers by drawing the sign-in page again. A re-arm after
+// that would repeat it every idle period for as long as the tab is open: one
+// request, one redraw of a form somebody may be filling in, one history entry.
+test('a request that ends the session does not knock again - the next gesture arms it', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 1);
+  // What api.js does on a 401: the event first, synchronously, then the throw.
+  for (const handler of listeners['auth:expired'] || []) handler({});
+  requests[0].reject(new Error('Sitzung abgelaufen.'));
+  await flush();
+  mock.timers.tick(10 * 60_000);
+  assert.equal(requests.length, 1, 'ten idle periods later: still the one request');
+  assert.equal(overlays(), 0);
+
+  // Signing in again takes a pointer or a key, and that arms the timer as ever.
+  gesture();
+  mock.timers.tick(59_999);
+  assert.equal(requests.length, 1);
+  mock.timers.tick(1);
+  assert.equal(requests.length, 2, 'one idle period after the gesture');
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1, 'and the screensaver opens for the new session');
+  gesture();
+});
+
 test('the setting sits next to wall mode in Appearance, not under the Immich connection', () => {
   const appearance = read('../public/settings/pages/personal-appearance.js');
   assert.match(appearance, /from '\/utils\/screensaver-idle\.js'/);
