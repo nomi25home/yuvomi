@@ -6081,12 +6081,24 @@ button.today-cockpit__more--link {
 }
 
 /* Eine Zeile braucht Platz fuer beides: fuenf Startknoepfe (340px) und je
- * Aussenspalte einen wachen Ausstieg samt Beschriftung (220px, de). Fehlt er,
- * werden die Aussenspalten ungleich und die Mitte rutscht wieder (gemessen: bei
- * einer 800px breiten Flaeche um 26px). Die Bedienung bekommt dann eine eigene
- * Zeile ueber Stand und Ausstieg; der alte Fuss lief bei 390px sogar rechts
- * aus dem Bild (Ausstieg wach bei 356-478). Gefragt wird die FLAECHE
- * (`container: wall`, siehe `.wall`), nicht das Fenster. */
+ * Aussenspalte die Gruppe am Ende - den Ausstieg samt Beschriftung (220px, de)
+ * und seit #1766 daneben den Schoner-Knopf (48px plus 8px Abstand), zusammen
+ * 276px. Fehlt der Platz, werden die Aussenspalten ungleich und die Mitte
+ * rutscht wieder (gemessen: bei einer 800px breiten Flaeche um 26px). Die
+ * Bedienung bekommt dann eine eigene Zeile ueber Stand und Ausstieg; der alte
+ * Fuss lief bei 390px sogar rechts aus dem Bild (Ausstieg wach bei 356-478).
+ * Gefragt wird die FLAECHE (`container: wall`, siehe `.wall`), nicht das
+ * Fenster.
+ *
+ * DIE SCHWELLE BLEIBT, DIE RESERVE SCHRUMPFT. Ab 1024px Flaeche hat jede
+ * Aussenspalte 326px (1024 - 340 - 2 x 16, halbiert): fuer de 50px Luft statt
+ * 106. Gemessen mit Knopf, alle Sprachen: bei 1024px Flaeche stehen die
+ * Startknoepfe in 23 von 26 mittig, ab 1192px in allen. Dazwischen reicht es
+ * den drei laengsten Ausstiegen nicht (ru bis 14px, pt-BR bis 9px, el bis
+ * 58px versetzt; el rutschte dort schon ohne Knopf). Der Versatz steht still -
+ * die Gruppe ist schlafend und wach gleich breit -, der Nachtipp trifft also
+ * denselben Knopf. Eine hoehere Schwelle naehme dafuer jeder Sprache bis
+ * rund 1140px die eine Zeile. */
 @container wall (max-width: 1023px) {
   .wall__foot {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -6097,6 +6109,37 @@ button.today-cockpit__more--link {
     grid-column: 1 / -1;
     grid-row: 1;
     justify-self: center;
+  }
+
+  /* MIT DEM SCHONER-KNOPF REICHT DIE ZWEITE ZEILE NICHT MEHR IN JEDER SPRACHE
+   * (#1766). Auf 390px bleiben 342px: Stand, Knopf und Ausstieg brauchen in de
+   * 366. Das Raster oben drueckt die Stand-Spalte dann unter die Breite ihres
+   * laengsten Wortes, und der Stand liegt UNTER dem Knopf (gemessen: ru 43px,
+   * uk 20px). Hier bricht deshalb der Inhalt um, nicht die Spalte: der Stand
+   * gibt zuerst nach und laeuft auf zwei Zeilen (die Fusshoehe bleibt, er ist
+   * auch zweizeilig niedriger als der Knopf), aber nie unter sein laengstes
+   * Wort. Reicht selbst das nicht, rutscht die Gruppe als Ganzes in eine
+   * dritte Zeile. Ohne den Knopf - also auch solange ein Timer laeuft - gilt
+   * das Raster wie bisher. */
+  .wall__foot:has(.wall__foot-btn--icon) {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .wall__foot:has(.wall__foot-btn--icon) > :first-child {
+    flex: 1 1 0;
+    min-inline-size: min-content;
+  }
+
+  .wall__foot:has(.wall__foot-btn--icon) > :nth-child(2) {
+    order: -1;
+    flex: 0 0 100%;
+    min-inline-size: 0;
+    justify-content: center;
+  }
+
+  .wall__foot:has(.wall__foot-btn--icon) > :last-child {
+    margin-inline-start: auto;
   }
 }
 
@@ -6160,6 +6203,23 @@ button.today-cockpit__more--link {
 .wall__foot-btn:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
+}
+
+/* DER SCHONER-START TRAEGT NUR SEIN ZEICHEN, IN JEDER BREITE (#1766). Mit Wort
+ * war die Gruppe aus Schoner und Ausstieg in de 416px breit und in jeder Sprache
+ * anders: die Aussenspalten wurden ungleich und die Startknoepfe rutschten
+ * (gemessen bis 100px, el bei 1280), auf 390px lag der Stand unter dem Knopf.
+ * Ein Kreis von `--target-lg` ist in jeder Sprache gleich breit.
+ *
+ * Das widerspricht dem Satz oben nicht: „mit Wort" gilt dem AUSSTIEG, weil ein
+ * namenloses Zeichen dort der einzige Weg hinaus war. Der Schoner ist ein
+ * Zusatzweg - wer ihn nicht erkennt, verliert nichts, er startet nach der
+ * Wartezeit ohnehin von selbst. Den Namen tragen `aria-label` und `title`. */
+.wall__foot-btn--icon {
+  justify-content: center;
+  inline-size: var(--target-lg);
+  padding: 0;
+  flex-shrink: 0;
 }
 
 /* ── Küchentimer (#844) ──────────────────────────────────────────────────────
