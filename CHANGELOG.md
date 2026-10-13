@@ -95,6 +95,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the move waits until it is switched on again. Moving an item to a
   list that is not mirrored removes it on the server without deleting it in Yuvomi.
   `PATCH /api/v1/shopping/items/:itemId` takes `list_id` for the same move (migration 243).
+- **Wall mode: a button in the footer starts the photo screensaver by hand** (#1766). When
+  Immich is connected, a picture symbol sits in the wall footer next to the exit button. Tapping
+  it starts the screensaver at once, the same as the idle timer would. The button shows the
+  symbol only and carries its name, "Screensaver", as a tooltip and for screen readers, so it
+  takes the same room in every language and does not push the timer buttons aside. While a
+  kitchen timer is running the button is not there: a photo covering the countdown is not a
+  timer. If the screensaver cannot start (no photos configured, Immich unreachable, or a
+  connection error), the button answers with one line instead. For a paired display the button
+  appears only when an administrator has switched the photo screensaver on for it under
+  Settings → Household → Wall tablets.
 
 ### Changed
 
@@ -342,15 +352,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The switch reaches a tablet nobody touches in both directions: a screensaver that could not
   get its photos asks again after the next idle period instead of waiting for a touch, and one
   whose next photo is refused closes instead of leaving a black screen.
-- **Wall mode: a "Screensaver" button in the footer starts the photo screensaver by hand**
-  (#1766). When Immich is connected, a button labelled "Screensaver" appears in the wall footer
-  next to the kitchen timer controls and the exit button. Tapping it starts the screensaver at
-  once, the same as the idle timer would. While a kitchen timer is running the button is not
-  there: a photo covering the countdown is not a timer. If the screensaver cannot start (no
-  photos configured, Immich unreachable, or a connection error), the button answers with one
-  line instead. For a paired display the button appears only when an
-  administrator has switched the photo screensaver on for it under Settings → Household → Wall
-  tablets.
 
 ## [2.76.0] - 2026-10-11
 
