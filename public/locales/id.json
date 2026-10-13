@@ -406,8 +406,8 @@
         "nutritionEntries": "{{count}} catatan hari ini",
         "nutritionEntries_one": "{{count}} catatan hari ini",
         "weatherUnavailable": "Cuaca sedang tidak tersedia",
-        "wallScreensaverNone": "Pelindung layar tidak tersedia.",
-        "wallScreensaverStart": "Pelindung layar"
+        "wallScreensaverNone": "Screensaver tidak tersedia.",
+        "wallScreensaverStart": "Screensaver"
     },
     "tasks": {
         "resetOrder": "Urutkan otomatis",

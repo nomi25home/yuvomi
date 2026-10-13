@@ -392,8 +392,8 @@
         "nutritionEntries": "{{count}} registos hoje",
         "nutritionEntries_one": "{{count}} registo hoje",
         "weatherUnavailable": "Clima indisponível no momento",
-        "wallScreensaverNone": "Protetor de ecrã não disponível.",
-        "wallScreensaverStart": "Protetor de ecrã"
+        "wallScreensaverNone": "Proteção de ecrã não disponível.",
+        "wallScreensaverStart": "Proteção de ecrã"
     },
     "tasks": {
         "resetOrder": "Ordenar automaticamente",

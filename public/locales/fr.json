@@ -392,8 +392,8 @@
         "nutritionEntries": "{{count}} entrées aujourd’hui",
         "nutritionEntries_one": "{{count}} entrée aujourd’hui",
         "weatherUnavailable": "Météo momentanément indisponible",
-        "wallScreensaverNone": "Écran de veille non disponible.",
-        "wallScreensaverStart": "Écran de veille"
+        "wallScreensaverNone": "Économiseur d'écran non disponible.",
+        "wallScreensaverStart": "Économiseur d'écran"
     },
     "tasks": {
         "resetOrder": "Trier automatiquement",

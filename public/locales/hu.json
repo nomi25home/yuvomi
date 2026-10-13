@@ -392,8 +392,8 @@
         "nutritionEntries": "Ma {{count}} bejegyzés",
         "nutritionEntries_one": "Ma {{count}} bejegyzés",
         "weatherUnavailable": "Az időjárás jelenleg nem érhető el",
-        "wallScreensaverNone": "A képernyőkímélő nem érhető el.",
-        "wallScreensaverStart": "Képernyőkímélő"
+        "wallScreensaverNone": "A képernyővédő nem érhető el.",
+        "wallScreensaverStart": "Képernyővédő"
     },
     "tasks": {
         "resetOrder": "Automatikus rendezés",
