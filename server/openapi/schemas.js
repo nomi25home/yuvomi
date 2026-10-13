@@ -113,12 +113,49 @@ const calendarProviderTargetProperties = {
 };
 
 export const schemas = {
+        CalendarImportInput: {
+          type: 'object',
+          description: 'Import an ICS document or URL into a household local calendar.',
+          properties: {
+            ics: { type: 'string', description: 'Raw ICS file text. Required when url is omitted.' },
+            url: { type: 'string', format: 'uri', description: 'Shared calendar URL. Required when ics is omitted.' },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
+            local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Omit to use the default calendar.' },
+          },
+          oneOf: [{ required: ['ics'] }, { required: ['url'] }],
+        },
+        LocalCalendarCreateInput: {
+          type: 'object', required: ['name'],
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 80 },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+          },
+        },
+        LocalCalendarReorderInput: {
+          type: 'object', required: ['order'], properties: {
+            order: { type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+          },
+        },
+        LocalCalendarUpdateInput: {
+          type: 'object',
+          minProperties: 1,
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 80 },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            sort_order: { type: 'integer', minimum: 0 },
+          },
+        },
         ApiError: {
           type: 'object',
           properties: {
             error: { type: 'string' },
             code: { type: 'integer' },
             reason: { type: 'string' },
+            params: {
+              type: 'object',
+              additionalProperties: { type: 'integer' },
+              description: 'Only next to a `reason` whose cause carries a number (waste import and URL sources): the limit or status itself, e.g. `{ "limit_mb": 5 }`, so a client can put it into its own sentence instead of parsing `error`.',
+            },
             storage_code: { $ref: '#/components/schemas/DocumentStorageErrorCode' },
           },
         },
@@ -643,6 +680,18 @@ export const schemas = {
             cal_color: {
               type: ['string', 'null'],
               description: 'Inherited colour of the source calendar or ICS subscription, read-only. Applies to every event of that source and therefore says nothing about this one; it is the fallback below color and the assignee.',
+            },
+            local_calendar_id: {
+              type: ['integer', 'null'],
+              description: 'Resolved local calendar for an authored event; null for generated or externally synchronized events and events with a Google/CalDAV target. Omit on create to resolve to the default without storing it. Membership applies to a whole series, never a single occurrence.',
+            },
+            local_calendar_name: {
+              type: ['string', 'null'],
+              description: 'Display name of the local Yuvomi calendar, read-only.',
+            },
+            local_calendar_color: {
+              type: ['string', 'null'],
+              description: 'Colour of the local Yuvomi calendar, read-only. Used after event, assignee, and external source colours.',
             },
             attachment_name: { type: ['string', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },
             attachment_mime: { type: ['string', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },
@@ -1795,8 +1844,14 @@ export const schemas = {
             outcome: {
               type: 'string',
               enum: ['committed', 'unchanged', 'needs_mapping', 'error'],
-              description: 'committed: every label had a remembered decision, applied via the same atomic path as a file re-import. unchanged: a conditional GET reported no change (304). needs_mapping: content changed but at least one label (or blocking diagnostic) has no remembered decision - see source.needs_mapping and the preview field. error: the fetch failed - see source.last_error.',
+              description: 'committed: every label had a remembered decision, applied via the same atomic path as a file re-import. unchanged: a conditional GET reported no change (304). needs_mapping: content changed but at least one label (or blocking diagnostic) has no remembered decision - see source.needs_mapping and the preview field. error: the fetch failed - see reason for its class and source.last_error for the stored message.',
             },
+            reason: {
+              type: 'string',
+              enum: ['waste_source_fetch_http_status', 'waste_source_fetch_too_large', 'waste_source_fetch_blocked', 'waste_source_fetch_unreachable', 'waste_source_fetch_no_events', 'waste_source_url_invalid', 'waste_source_url_not_https'],
+              description: 'Only with outcome=error: the class of the failed fetch. http_status: the other side answered, but not with a success (params.status). too_large: the response exceeds the upload limit (params.limit_mb). blocked: a private or blocked address. unreachable: everything else (DNS, refused or reset connection, TLS, timeout, a redirect that is not followed). no_events: the other side answered with a success, but without a single calendar entry (a maintenance or login page, an empty calendar) - nothing is applied and the imported pickups stay (#1938). url_invalid / url_not_https: the stored URL no longer passes validation. Not stored with the source - a later read knows only last_error.',
+            },
+            params: { type: 'object', additionalProperties: { type: 'integer' }, description: 'Only with a reason that carries a number: `{ "status": 404 }` or `{ "limit_mb": 5 }`.' },
             diff: { $ref: '#/components/schemas/WasteImportDiff' },
             preview: { $ref: '#/components/schemas/WasteImportPreview' },
           },

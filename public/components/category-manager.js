@@ -7,7 +7,8 @@
  * Verhalten:
  *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
  *                 addMaxLength, localizedLabels,
- *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey, errorFallbackKey })
+ *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey, errorFallbackKey,
+ *                 alreadyDeletedReason })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
  *   - `localizedLabels: true` haengt der Listenanfrage `?lang=<Oberflaechensprache>` an -
  *     fuer Routen, die ihre Labels auf dem Server uebersetzen (heute nur Budget, #1859)
@@ -16,6 +17,11 @@
  *   - `errorFallbackKey`: der allgemeine Satz fuer einen Fehler ohne bekannten Grund.
  *     Wer ihn setzt, zeigt nie den Text des Servers (#1909, heute der Einkauf); ohne
  *     ihn bleibt der alte Rueckfall auf `err.message`, bis das Modul seine Gruende hat
+ *   - `alreadyDeletedReason`: der `reason`, mit dem die Route des Aufrufers beim
+ *     Loeschen sagt "diese Zeile gibt es nicht mehr" (jemand anderes war schneller).
+ *     Wer ihn setzt, bekommt dafuer den Erfolgsweg statt eines Fehlers (#1909, heute
+ *     der Einkauf); ohne ihn bleibt jedes gescheiterte Loeschen ein Fehler. Die
+ *     Komponente kennt selbst keinen Grund eines Moduls
  *   - Räumt Listener in disconnectedCallback() auf
  *
  * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
@@ -41,7 +47,7 @@ import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 /** Platzhalter-Id fuer den Eintrag ohne Ton: eine leere `data-tab-id` waere kein Knopf. */
 const NO_COLOR_ID = '__none__';
@@ -123,6 +129,10 @@ class CategoryManagerElement extends HTMLElement {
     this._subDeleteDetailKey = 'category.deleteSubConfirmDetail';
     // Siehe `_errMsg`: gesetzt heisst, der Text des Servers erreicht den Toast nie.
     this._errorFallbackKey = null;
+    // Siehe `_delete`: der Grund, mit dem die Route des Aufrufers sagt "diese
+    // Zeile gibt es nicht mehr". Ohne ihn bleibt jedes gescheiterte Loeschen
+    // ein Fehler.
+    this._alreadyDeletedReason = null;
     // OPT-IN: nur wer eine Palette mitgibt, bekommt die Farbwahl. Fuenf der
     // sechs Aufrufer zeigen ihre Kategorien nirgends als farbige Marke - dort
     // waere ein Farbknopf eine Einstellung ohne Wirkung.
@@ -162,6 +172,9 @@ class CategoryManagerElement extends HTMLElement {
     if (opts.deleteDetailKey) this._deleteDetailKey = opts.deleteDetailKey;
     if (opts.subDeleteDetailKey) this._subDeleteDetailKey = opts.subDeleteDetailKey;
     if (opts.errorFallbackKey) this._errorFallbackKey = opts.errorFallbackKey;
+    if (typeof opts.alreadyDeletedReason === 'string' && opts.alreadyDeletedReason) {
+      this._alreadyDeletedReason = opts.alreadyDeletedReason;
+    }
     this._renderShell();
     this._load();
   }
@@ -219,6 +232,8 @@ class CategoryManagerElement extends HTMLElement {
       await this._fetch();
       this._render();
     } catch (err) {
+      // BEWUSST NICHT `_fail`: das Laden darf sich nicht selbst wieder
+      // anstossen, wenn es scheitert.
       window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
@@ -662,6 +677,24 @@ class CategoryManagerElement extends HTMLElement {
     }
   }
 
+  /**
+   * Der eine Weg, auf dem eine gescheiterte Aenderung gemeldet wird.
+   *
+   * Sagt der Server, dass es die Zeile nicht mehr gibt (`isGone`, #1909) -
+   * jemand anderes hat sie geloescht, waehrend dieser Dialog offen war -,
+   * holt die Komponente ihre Liste selbst neu und meldet dem Aufrufer eine
+   * Aenderung, damit auch die Seite darunter nachzieht. Der Satz raet nicht
+   * mehr zum Neuladen.
+   */
+  _fail(err) {
+    window.yuvomi?.showToast(this._errMsg(err), 'danger');
+    if (!isGone(err)) return;
+    // Beim Loeschen ist das Element schon aus dem Dokument (siehe
+    // `_notifyChanged`): dann gibt es hier nichts mehr zu zeichnen.
+    if (this.isConnected) this._load();
+    this._notifyChanged();
+  }
+
   async _onSubmit(e) {
     e.preventDefault();
     const subForm = e.target.closest('.cat-subadd-form');
@@ -688,7 +721,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.added'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -762,7 +795,7 @@ class CategoryManagerElement extends HTMLElement {
       this._paintMark(key, res.data.color);
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -794,7 +827,7 @@ class CategoryManagerElement extends HTMLElement {
         this._notifyChanged();
         return;
       } catch (err) {
-        window.yuvomi?.showToast(this._errMsg(err), 'danger');
+        this._fail(err);
         if (err?.status !== 409) return;
         // Der 409 darf nur den Prompt wiederholen, aus dem diese Anfrage kam.
         // Ein inzwischen geoeffnetes (selbst schon wieder geschlossenes)
@@ -851,7 +884,7 @@ class CategoryManagerElement extends HTMLElement {
       if (movedKey) this._announceMove(movedKey, { groupKey });
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
       if (rollbackRender) {
         const inputs = this._snapshotAddInputs();
         this._renderGroup(groupKey);
@@ -895,13 +928,22 @@ class CategoryManagerElement extends HTMLElement {
     );
     if (!confirmed) return;
     try {
-      await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
+      try {
+        await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
+      } catch (err) {
+        // JEMAND ANDERES HAT DIE ZEILE SCHON GELOESCHT: das Ziel ist erreicht,
+        // also laeuft der Erfolgsweg darunter - Zeile raus, "Geloescht", und
+        // die Seite erfaehrt es wie jedes Loeschen. Nur mit dem Grund, den der
+        // Aufrufer genannt hat (`alreadyDeletedReason`); alles andere ist ein
+        // Fehler und geht an `_fail`.
+        if (!this._alreadyDeletedReason || !isAlreadyDeleted(err, this._alreadyDeletedReason)) throw err;
+      }
       this._cats = this._cats.filter((c) => this._keyOf(c) !== key);
       this._renderGroup(this._groupOf(cat));
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged({ action: 'delete', key, item: cat });
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -924,7 +966,7 @@ class CategoryManagerElement extends HTMLElement {
       this._notifyChanged();
       return res;
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -945,7 +987,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.renamed'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -979,7 +1021,7 @@ class CategoryManagerElement extends HTMLElement {
       if (movedSubKey) this._announceMove(movedSubKey, { parentKey: parent });
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
       if (rollbackRender) {
         const inputs = this._snapshotAddInputs();
         this._renderSublist(parent);
@@ -1006,7 +1048,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 }

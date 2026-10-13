@@ -17,6 +17,10 @@ import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'waste-routes-test-secret';
+// The upload limit is configuration, not a constant: 1 MB here, so the cases
+// below see the limit the server READ in its answer (`params.limit_mb: 1`),
+// not a 5 somebody wrote into a sentence (#1909).
+process.env.MAX_UPLOAD_MB = '1';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: wasteRouter } = await import('../server/routes/waste/index.js');
@@ -59,8 +63,12 @@ function seedUser(prefix, role = 'member') {
 const ADMIN = seedUser('admin', 'admin');
 let actor = { id: ADMIN, role: 'admin' };
 
+const { BODY_LIMIT } = await import('../server/utils/upload-limit.js');
+
 const app = express();
-app.use(express.json());
+// The same body limit server/index.js mounts: a file just over the upload
+// limit still reaches the route, which is what names the reason.
+app.use(express.json({ limit: BODY_LIMIT }));
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.session = { userId: actor.id, role: actor.role };
@@ -745,4 +753,553 @@ test('hasWasteWriteAccess: a write-scoped token for a member with actual write r
 test('hasWasteWriteAccess: a read-only-scoped token is denied even for an admin session, since the token itself narrows access', () => {
   const req = { authMethod: 'api_token', authScopes: ['waste:read'], sessionModuleAccess: null };
   assert.equal(helpers.hasWasteWriteAccess(req), false);
+});
+
+// -------------------------------------------------------------------------
+// #1909: the server names the case (`reason`), the client owns the sentence
+// -------------------------------------------------------------------------
+//
+// One case per reason, through the real routes: status AND reason. The `error`
+// sentence stays (it is the API's), so each case also asserts it is still there.
+// What a case answers is written down here by hand - it is not derived from the
+// server source or from the client's map, so the two closing tests below compare
+// three independent things: what the routes really answer, which literals the
+// server source carries, and which reasons the client has a sentence for.
+
+const MISSING = 987654;
+const seenReasons = new Set();
+
+async function expectReason(response, status, reason) {
+  const r = await response;
+  assert.equal(r.status, status, JSON.stringify(r.body));
+  assert.equal(r.body.reason, reason, JSON.stringify(r.body));
+  assert.equal(r.body.code, status);
+  assert.equal(typeof r.body.error, 'string', 'the English sentence stays for API consumers');
+  assert.ok(r.body.error.length > 0);
+  seenReasons.add(reason);
+}
+
+const monthly = (typeId, overrides = {}) => ({
+  type_id: typeId, recurrence_kind: 'monthly_fixed_day', anchor_date: '2026-01-15', interval: 1, month_day: 15, ...overrides,
+});
+
+test('reason waste_type_not_found: a type that is gone, on every route that names one', async () => {
+  await expectReason(call('GET', `/waste/types/${MISSING}`), 404, 'waste_type_not_found');
+  await expectReason(call('PUT', `/waste/types/${MISSING}`, { body: { name: 'x' } }), 404, 'waste_type_not_found');
+  await expectReason(call('DELETE', `/waste/types/${MISSING}`), 404, 'waste_type_not_found');
+  await expectReason(call('PUT', `/waste/reminder-settings/${MISSING}`, { body: { enabled: true } }), 404, 'waste_type_not_found');
+});
+
+// The CHOSEN type is gone - not the thing the request is about. Its own reason,
+// so `waste_type_not_found` means one thing only (a 404: the type itself), and
+// the page can keep a dialog open that merely offered a stale choice.
+test('reason waste_selected_type_not_found: a schedule, pickup, mapping or import decision names a type that is gone', async () => {
+  await expectReason(call('POST', '/waste/schedules', {
+    body: { type_id: MISSING, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: ['MO'] },
+  }), 400, 'waste_selected_type_not_found');
+  const type = await createType();
+  const schedule = await createWeeklySchedule(type.id);
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}`, { body: { type_id: MISSING } }), 400, 'waste_selected_type_not_found');
+  await expectReason(call('POST', '/waste/pickups', { body: { type_id: MISSING, date: '2026-03-01' } }), 400, 'waste_selected_type_not_found');
+  const source = await commitSource();
+  const mapping = (await call('GET', `/waste/sources/${source.id}`)).body.data.mappings[0];
+  await expectReason(call('PUT', `/waste/sources/${source.id}/mappings/${mapping.id}`, { body: { type_id: MISSING } }), 400, 'waste_selected_type_not_found');
+  await expectReason(call('POST', '/waste/import/commit', {
+    body: { ics: icsFixture('2026-10-09'), name: 'gone type', mappings: [{ normalized_label: 'restmüll', type_id: MISSING }] },
+  }), 400, 'waste_selected_type_not_found');
+});
+
+test('reason waste_schedule_not_found: get, update, delete and an override on a schedule that is gone', async () => {
+  await expectReason(call('GET', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${MISSING}`, { body: { active: false } }), 404, 'waste_schedule_not_found');
+  await expectReason(call('DELETE', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${MISSING}/overrides/2026-01-05`, { body: { replacement_date: null } }), 404, 'waste_schedule_not_found');
+});
+
+test('reason waste_pickup_not_found: get, update and delete of a pickup that is gone', async () => {
+  await expectReason(call('GET', `/waste/pickups/${MISSING}`), 404, 'waste_pickup_not_found');
+  await expectReason(call('PUT', `/waste/pickups/${MISSING}`, { body: { date: '2026-03-01' } }), 404, 'waste_pickup_not_found');
+  await expectReason(call('DELETE', `/waste/pickups/${MISSING}`), 404, 'waste_pickup_not_found');
+});
+
+test('reason waste_source_not_found: every source route on a source that is gone', async () => {
+  for (const [method, path, body] of [
+    ['GET', `/waste/sources/${MISSING}`],
+    ['PUT', `/waste/sources/${MISSING}`, { name: 'x' }],
+    ['DELETE', `/waste/sources/${MISSING}`],
+    ['POST', `/waste/sources/${MISSING}/refresh`, {}],
+    ['GET', `/waste/sources/${MISSING}/mapping-profile/export`],
+    ['POST', `/waste/sources/${MISSING}/mapping-profile/import/preview`, { profile: { mappings: [] } }],
+    ['POST', `/waste/sources/${MISSING}/mapping-profile/import/commit`, { profile: { mappings: [] } }],
+    ['PUT', `/waste/sources/${MISSING}/mappings/1`, { ignored: true }],
+    ['POST', `/waste/sources/${MISSING}/reimport/preview`, { ics: icsFixture('2026-10-03') }],
+    ['POST', `/waste/sources/${MISSING}/reimport/commit`, { ics: icsFixture('2026-10-03') }],
+  ]) {
+    await expectReason(call(method, path, { body }), 404, 'waste_source_not_found');
+  }
+});
+
+test('reason waste_mapping_not_found: a mapping that is gone on a source that exists', async () => {
+  const source = await commitSource();
+  await expectReason(call('PUT', `/waste/sources/${source.id}/mappings/${MISSING}`, { body: { ignored: true } }), 404, 'waste_mapping_not_found');
+});
+
+test('reason waste_override_not_found and waste_occurrence_not_found: restoring twice, moving a day the schedule does not have', async () => {
+  const type = await createType();
+  const schedule = await createWeeklySchedule(type.id);
+  await expectReason(call('DELETE', `/waste/schedules/${schedule.id}/overrides/2026-01-05`), 404, 'waste_override_not_found');
+  // 2026-01-06 is a Tuesday; the schedule runs on Mondays.
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-08' } }), 400, 'waste_occurrence_not_found');
+});
+
+test('reason waste_type_in_use and waste_pickup_exists: the two conflicts', async () => {
+  const type = await createType();
+  await createWeeklySchedule(type.id);
+  await expectReason(call('DELETE', `/waste/types/${type.id}`), 409, 'waste_type_in_use');
+
+  const first = await call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-04-01' } });
+  assert.equal(first.status, 201);
+  await expectReason(call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-04-01' } }), 409, 'waste_pickup_exists');
+  const second = await call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-04-02' } });
+  await expectReason(call('PUT', `/waste/pickups/${second.body.data.id}`, { body: { date: '2026-04-01' } }), 409, 'waste_pickup_exists');
+});
+
+test('reasons of the schedule dialog: each input the dialog lets through names its own case', async () => {
+  const type = await createType();
+  const weekly = (overrides) => ({ type_id: type.id, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: ['MO'], ...overrides });
+  const post = (body) => call('POST', '/waste/schedules', { body });
+
+  await expectReason(post(weekly({ anchor_date: '' })), 400, 'waste_schedule_anchor_date_invalid');
+  await expectReason(post(weekly({ valid_until: '2026-01-01' })), 400, 'waste_schedule_ends_before_anchor');
+  await expectReason(post(weekly({ weekdays: [] })), 400, 'waste_schedule_weekdays_required');
+  await expectReason(post(weekly({ interval: 53 })), 400, 'waste_schedule_interval_invalid');
+  await expectReason(post(monthly(type.id, { interval: 25 })), 400, 'waste_schedule_interval_invalid');
+  await expectReason(post({ type_id: type.id, recurrence_kind: 'monthly_ordinal_weekday', anchor_date: '2026-01-13', interval: 25, weekdays: 'TU', month_day: 2 }), 400, 'waste_schedule_interval_invalid');
+  await expectReason(post(monthly(type.id, { month_day: 0, anchor_date: '2026-01-15' })), 400, 'waste_schedule_month_day_invalid');
+  await expectReason(post(monthly(type.id, { month_day: 1 })), 400, 'waste_schedule_anchor_not_month_day');
+  await expectReason(post(monthly(type.id, { month_day: -1 })), 400, 'waste_schedule_anchor_not_last_day');
+  // 2026-01-13 is the second Tuesday; the 14th is not.
+  await expectReason(post({ type_id: type.id, recurrence_kind: 'monthly_ordinal_weekday', anchor_date: '2026-01-14', interval: 1, weekdays: 'TU', month_day: 2 }), 400, 'waste_schedule_anchor_not_ordinal_weekday');
+
+  // The same through the update route.
+  const schedule = await createWeeklySchedule(type.id);
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}`, { body: { weekdays: [] } }), 400, 'waste_schedule_weekdays_required');
+});
+
+test('a validation only an API caller triggers carries no reason, and does not hide one a member can reach', async () => {
+  const type = await createType();
+  const apiOnly = await call('POST', '/waste/schedules', {
+    body: { type_id: type.id, recurrence_kind: 'yearly', anchor_date: '2026-01-05', interval: 1 },
+  });
+  assert.equal(apiOnly.status, 400);
+  assert.equal('reason' in apiOnly.body, false, JSON.stringify(apiOnly.body));
+
+  // Two problems at once: the response carries every sentence and the reason of
+  // the first problem that has one.
+  const both = await call('POST', '/waste/schedules', {
+    body: { type_id: type.id, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: [], valid_until: 'someday' },
+  });
+  assert.equal(both.status, 400);
+  assert.equal(both.body.reason, 'waste_schedule_weekdays_required');
+  assert.match(both.body.error, /^valid_until must be a valid YYYY-MM-DD date\. weekdays must be a non-empty list/,
+    'the problem without a reason comes first and does not take the reason away from the second');
+
+  const typeName = await call('POST', '/waste/types', { body: {} });
+  assert.equal(typeName.status, 400);
+  assert.equal('reason' in typeName.body, false);
+});
+
+test('reasons waste_pickup_date_invalid, waste_override_date_invalid, waste_override_same_date: an empty or unchanged date', async () => {
+  const type = await createType();
+  await expectReason(call('POST', '/waste/pickups', { body: { type_id: type.id, date: '' } }), 400, 'waste_pickup_date_invalid');
+  const pickup = await call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-05-01' } });
+  await expectReason(call('PUT', `/waste/pickups/${pickup.body.data.id}`, { body: { date: '' } }), 400, 'waste_pickup_date_invalid');
+
+  const schedule = await createWeeklySchedule(type.id);
+  const override = (replacement) => call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: replacement } });
+  await expectReason(override(''), 400, 'waste_override_date_invalid');
+  await expectReason(override('2026-01-05'), 400, 'waste_override_same_date');
+});
+
+test('reasons waste_reminder_offset_invalid and waste_reminder_time_invalid: the two fields of a reminder row', async () => {
+  const type = await createType();
+  const put = (body) => call('PUT', `/waste/reminder-settings/${type.id}`, { body });
+  await expectReason(put({ enabled: true, offset_days: 99, delivery_time: '08:00' }), 400, 'waste_reminder_offset_invalid');
+  await expectReason(put({ enabled: true, offset_days: 'soon', delivery_time: '08:00' }), 400, 'waste_reminder_offset_invalid');
+  await expectReason(put({ enabled: true, offset_days: 1, delivery_time: '25:00' }), 400, 'waste_reminder_time_invalid');
+  // The emptied time field of the dialog: this was a 500 (NOT NULL constraint).
+  await expectReason(put({ enabled: true, offset_days: 1, delivery_time: '' }), 400, 'waste_reminder_time_invalid');
+});
+
+// -------------------------------------------------------------------------
+// #1909, second slice: import limits, mapping profile, URL sources
+// -------------------------------------------------------------------------
+
+/** Like expectReason, and the numbers of the cause travel structured next to it. */
+async function expectReasonWithParams(response, status, reason, params) {
+  const r = await response;
+  await expectReason(r, status, reason);
+  assert.deepEqual(r.body.params, params, JSON.stringify(r.body));
+  return r;
+}
+
+const vcalendar = (events) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${events.join('\r\n')}\r\nEND:VCALENDAR`;
+
+test('reasons of the import limits: an empty or oversized file, too many entries, pickups or labels - each with its limit as a number', async () => {
+  const { MAX_ICS_BYTES, MAX_VEVENTS, MAX_DISTINCT_LABELS, MAX_CANDIDATE_INSTANCES } = await import('../server/services/waste-import.js');
+  assert.equal(MAX_ICS_BYTES, 1024 * 1024, 'the suite runs with MAX_UPLOAD_MB=1');
+  const source = await commitSource();
+  const previews = ['/waste/import/preview', `/waste/sources/${source.id}/reimport/preview`];
+
+  for (const path of previews) {
+    await expectReason(call('POST', path, { body: {} }), 400, 'waste_import_empty_file');
+    await expectReason(call('POST', path, { body: { ics: '   ' } }), 400, 'waste_import_empty_file');
+    const tooLarge = await expectReasonWithParams(call('POST', path, { body: { ics: 'X'.repeat(MAX_ICS_BYTES + 1) } }),
+      400, 'waste_import_file_too_large', { limit_mb: 1 });
+    assert.match(tooLarge.body.error, /exceeds the 1 MB upload limit/, 'the sentence for API consumers is unchanged');
+  }
+  await expectReason(call('POST', '/waste/import/commit', { body: { name: 'x' } }), 400, 'waste_import_empty_file');
+
+  const manyEvents = [];
+  for (let i = 0; i <= MAX_VEVENTS; i += 1) manyEvents.push(`BEGIN:VEVENT\r\nUID:m-${i}@x\r\nSUMMARY:R\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT`);
+  const manyLabels = [];
+  for (let i = 0; i <= MAX_DISTINCT_LABELS; i += 1) manyLabels.push(`BEGIN:VEVENT\r\nUID:l-${i}@x\r\nSUMMARY:Label-${i}\r\nCATEGORIES:Label-${i}\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT`);
+  // Six daily series from the start of the import window: more instances in
+  // the window than the cap, however the day of the run falls.
+  const windowStart = new Date(Date.now() - 360 * 86_400_000).toISOString().slice(0, 10).replace(/-/g, '');
+  const manyInstances = [];
+  for (let i = 0; i < 6; i += 1) manyInstances.push(`BEGIN:VEVENT\r\nUID:i-${i}@x\r\nSUMMARY:R\r\nDTSTART;VALUE=DATE:${windowStart}\r\nRRULE:FREQ=DAILY;COUNT=1500\r\nEND:VEVENT`);
+
+  for (const [events, reason, limit] of [
+    [manyEvents, 'waste_import_event_cap_exceeded', MAX_VEVENTS],
+    [manyLabels, 'waste_import_label_cap_exceeded', MAX_DISTINCT_LABELS],
+    [manyInstances, 'waste_import_instance_cap_exceeded', MAX_CANDIDATE_INSTANCES],
+  ]) {
+    for (const path of previews) {
+      await expectReasonWithParams(call('POST', path, { body: { ics: vcalendar(events) } }), 400, reason, { limit });
+    }
+    // The commit reparses and names the same case.
+    await expectReasonWithParams(call('POST', '/waste/import/commit', { body: { ics: vcalendar(events), name: 'x', mappings: [] } }), 400, reason, { limit });
+  }
+});
+
+test('an import refusal only an API caller triggers carries no reason and no params', async () => {
+  for (const body of [
+    { ics: icsFixture('2026-10-11') },                          // no name
+    { ics: icsFixture('2026-10-11'), name: 'x', mappings: [] }, // no decision for the label
+  ]) {
+    const r = await call('POST', '/waste/import/commit', { body });
+    assert.equal(r.status, 400, JSON.stringify(r.body));
+    assert.equal('reason' in r.body, false, JSON.stringify(r.body));
+    assert.equal('params' in r.body, false, JSON.stringify(r.body));
+  }
+});
+
+test('reasons preview_changed and source_changed: the two refusals of a stale preview', async () => {
+  const source = await commitSource('2026-11-21');
+  const preview = await call('POST', `/waste/sources/${source.id}/reimport/preview`, { body: { ics: icsFixture('2026-11-21') } });
+  const mappings = [{ normalized_label: 'restmüll', ignored: true }];
+  await expectReason(call('POST', `/waste/sources/${source.id}/reimport/commit`, {
+    body: { ics: icsFixture('2026-11-21'), mappings, expected_version: preview.body.data.expected_version + 7, preview_digest: preview.body.data.digest },
+  }), 409, 'source_changed');
+  await expectReason(call('POST', `/waste/sources/${source.id}/reimport/commit`, {
+    body: { ics: icsFixture('2026-11-22'), mappings, expected_version: preview.body.data.expected_version, preview_digest: preview.body.data.digest },
+  }), 409, 'preview_changed');
+});
+
+test('reasons waste_profile_invalid and waste_profile_changed: a file that is no mapping profile, a profile other than the previewed one', async () => {
+  const source = await commitSource();
+  const preview = (profile) => call('POST', `/waste/sources/${source.id}/mapping-profile/import/preview`, { body: { profile } });
+  await expectReason(preview(undefined), 400, 'waste_profile_invalid');
+  await expectReason(preview('a string'), 400, 'waste_profile_invalid');
+  await expectReason(preview({ anything: 'else' }), 400, 'waste_profile_invalid');
+  await expectReason(preview({ mappings: [{ pattern: 'restmüll' }] }), 400, 'waste_profile_invalid');
+  await expectReason(preview({ mappings: [{ pattern: ' ', type_name: 'x' }] }), 400, 'waste_profile_invalid');
+
+  const commit = (body) => call('POST', `/waste/sources/${source.id}/mapping-profile/import/commit`, { body });
+  await expectReason(commit({ profile: [] }), 400, 'waste_profile_invalid');
+  await expectReason(commit({ profile: { mappings: [] }, profile_digest: 'not the digest of this profile' }), 409, 'waste_profile_changed');
+});
+
+async function sourceCount() {
+  return (await call('GET', '/waste/sources')).body.data.length;
+}
+
+test('reasons of the URL source dialog: an address that is none, one without https, an interval out of bounds - and no source is left behind', async () => {
+  const { MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES } = await import('../server/services/waste-url-source.js');
+  assert.equal(process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK, undefined, 'https is required in this part');
+  const before = await sourceCount();
+  const post = (body) => call('POST', '/waste/sources', { body: { name: 'Feed', ...body } });
+  const bounds = { min: MIN_REFRESH_INTERVAL_MINUTES, max: MAX_REFRESH_INTERVAL_MINUTES };
+
+  await expectReason(post({}), 400, 'waste_source_url_invalid');
+  await expectReason(post({ url: 'not an address' }), 400, 'waste_source_url_invalid');
+  await expectReason(post({ url: 'ftp://example.org/a.ics' }), 400, 'waste_source_url_invalid');
+  await expectReason(post({ url: 'http://example.org/a.ics' }), 400, 'waste_source_url_not_https');
+  for (const interval of [MIN_REFRESH_INTERVAL_MINUTES - 1, MAX_REFRESH_INTERVAL_MINUTES + 1, 90.5, 'often']) {
+    await expectReasonWithParams(post({ url: 'https://example.org/a.ics', refresh_interval_minutes: interval }), 400, 'waste_source_interval_invalid', bounds);
+  }
+  assert.equal(await sourceCount(), before, 'a refused dialog creates nothing, and none of these reached the network');
+
+  // No name: only an API caller gets here (the dialog fills one in).
+  const unnamed = await call('POST', '/waste/sources', { body: { url: 'https://example.org/a.ics' } });
+  assert.equal(unnamed.status, 400);
+  assert.equal('reason' in unnamed.body, false);
+});
+
+test('reason waste_source_not_url: a manual refresh of a source that came from a file', async () => {
+  const source = await commitSource();
+  await expectReason(call('POST', `/waste/sources/${source.id}/refresh`, { body: {} }), 400, 'waste_source_not_url');
+});
+
+/** A throwaway local stand-in for the other side; never the network. `handler` may be swapped between requests. */
+async function startStandIn() {
+  const standIn = { handler: (_req, res) => { res.writeHead(500).end(); } };
+  const remote = http.createServer((req, res) => standIn.handler(req, res));
+  await new Promise((r) => remote.listen(0, '127.0.0.1', r));
+  standIn.url = `http://127.0.0.1:${remote.address().port}/cal.ics`;
+  standIn.close = () => new Promise((r) => { remote.closeAllConnections?.(); remote.close(r); });
+  return standIn;
+}
+
+/** A port nothing listens on: bound once, then released. */
+async function closedPort() {
+  const probe = http.createServer();
+  await new Promise((r) => probe.listen(0, '127.0.0.1', r));
+  const { port } = probe.address();
+  await new Promise((r) => probe.close(r));
+  return port;
+}
+
+async function withPrivateNetwork(run) {
+  process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK = 'true';
+  try { return await run(); } finally { delete process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK; }
+}
+
+/** The answer of a refresh that ran and failed at the fetch: 200, outcome 'error', the class as reason. */
+async function expectFetchFailure(response, status, reason, params) {
+  const r = await response;
+  assert.equal(r.status, status, JSON.stringify(r.body));
+  assert.equal(r.body.data.outcome, 'error', JSON.stringify(r.body));
+  assert.equal(r.body.data.reason, reason, JSON.stringify(r.body));
+  assert.deepEqual(r.body.data.params, params, JSON.stringify(r.body));
+  seenReasons.add(reason);
+  return r;
+}
+
+test('reasons of a failed fetch: one per class - the status of the other side, too large, unreachable, a blocked address - on refresh, create and re-import', async () => {
+  const standIn = await startStandIn();
+  try {
+    const labelType = await createType({ name: `Feedtype-${randomUUID()}` });
+    const feed = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:feed-1@x\r\nSUMMARY:${labelType.name}\r\nDTSTART;VALUE=DATE:20261201\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+    standIn.handler = (_req, res) => { res.writeHead(200, { 'Content-Type': 'text/calendar' }).end(feed); };
+    const created = await withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Feed', url: standIn.url } }));
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.notEqual(created.body.data.outcome, 'error');
+    assert.equal('reason' in created.body.data, false, 'a fetch that worked names no failure');
+    const id = created.body.data.source.id;
+    const refresh = () => withPrivateNetwork(() => call('POST', `/waste/sources/${id}/refresh`, { body: {} }));
+    const reimport = (step) => withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/${step}`, { body: {} }));
+
+    // The other side answers, but not with a calendar.
+    for (const status of [404, 503]) {
+      standIn.handler = (_req, res) => { res.writeHead(status).end('nope'); };
+      const failed = await expectFetchFailure(refresh(), 200, 'waste_source_fetch_http_status', { status });
+      assert.match(failed.body.data.source.last_error, new RegExp(`HTTP ${status}`), 'the stored text is unchanged');
+      for (const step of ['preview', 'commit']) {
+        const r = await expectReasonWithParams(reimport(step), 502, 'waste_source_fetch_http_status', { status });
+        assert.equal(r.body.error, `Fetching the source URL failed: HTTP ${status}`, 'the sentence for API consumers is unchanged');
+      }
+    }
+
+    // More than the upload limit: announced, and unannounced mid-stream.
+    const { MAX_ICS_BYTES } = await import('../server/services/waste-import.js');
+    standIn.handler = (_req, res) => { res.writeHead(200, { 'Content-Length': String(MAX_ICS_BYTES + 1) }); res.write('X'); };
+    await expectFetchFailure(refresh(), 200, 'waste_source_fetch_too_large', { limit_mb: 1 });
+    standIn.handler = (_req, res) => { res.writeHead(200); res.end('X'.repeat(MAX_ICS_BYTES + 10)); };
+    await expectFetchFailure(refresh(), 200, 'waste_source_fetch_too_large', { limit_mb: 1 });
+    await expectReasonWithParams(reimport('preview'), 502, 'waste_source_fetch_too_large', { limit_mb: 1 });
+
+    // Nothing answers: a refused connection, and a connection cut mid-answer.
+    standIn.handler = (req) => { req.socket.destroy(); };
+    await expectFetchFailure(refresh(), 200, 'waste_source_fetch_unreachable', undefined);
+    await expectReason(reimport('preview'), 502, 'waste_source_fetch_unreachable');
+    const dead = `http://127.0.0.1:${await closedPort()}/cal.ics`;
+    const unreachable = await expectFetchFailure(
+      withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Dead', url: dead } })),
+      201, 'waste_source_fetch_unreachable', undefined,
+    );
+    assert.equal(typeof unreachable.body.data.source.id, 'number', 'the source is created either way, as before');
+
+    // Without the opt-in a private address is refused before any connection.
+    const localUrl = `https://127.0.0.1:${await closedPort()}/cal.ics`;
+    const local = await withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Local', url: localUrl } }));
+    assert.equal(local.status, 201, JSON.stringify(local.body));
+    const blocked = await expectFetchFailure(call('POST', `/waste/sources/${local.body.data.source.id}/refresh`, { body: {} }), 200, 'waste_source_fetch_blocked', undefined);
+    assert.match(blocked.body.data.source.last_error, /private IP address/);
+    await expectReason(call('POST', `/waste/sources/${local.body.data.source.id}/reimport/preview`, { body: {} }), 502, 'waste_source_fetch_blocked');
+
+    // A stored address that no longer passes validation (http, opt-in removed):
+    // the reason of the validation, not a class of its own.
+    await expectReason(call('POST', `/waste/sources/${id}/reimport/preview`, { body: {} }), 502, 'waste_source_url_not_https');
+    await expectFetchFailure(call('POST', `/waste/sources/${id}/refresh`, { body: {} }), 200, 'waste_source_url_not_https', undefined);
+  } finally {
+    await standIn.close();
+  }
+});
+
+// -------------------------------------------------------------------------
+// #1938: zero calendar entries is never a calendar
+// -------------------------------------------------------------------------
+
+const NO_EVENT_TEXTS = [
+  ['an HTML page', '<html><head><title>Login</title></head><body><form><input name="user"></form></body></html>'],
+  ['an empty VCALENDAR', 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nEND:VCALENDAR\r\n'],
+];
+
+function importedPickupCount(sourceId) {
+  return db.prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE source_id = ?').get(sourceId).n;
+}
+
+test('reason waste_import_no_events: a file without a calendar entry is refused at the preview and at the commit - fresh import and re-import, and nothing is created or removed', async () => {
+  const source = await commitSource('2026-11-05');
+  assert.equal(importedPickupCount(source.id), 1);
+  const sourcesBefore = await sourceCount();
+  for (const [name, ics] of NO_EVENT_TEXTS) {
+    // The preview refuses already: nobody gets to confirm "0 pickups".
+    for (const path of ['/waste/import/preview', `/waste/sources/${source.id}/reimport/preview`]) {
+      const r = await expectReasonWithParams(call('POST', path, { body: { ics } }), 400, 'waste_import_no_events', undefined);
+      assert.equal(r.body.error, 'The file contains no calendar entries.', `${name}: ${path}`);
+      assert.equal('params' in r.body, false);
+    }
+    // A client that goes straight to the commit, with everything it needs.
+    await expectReason(call('POST', '/waste/import/commit', { body: { ics, name: `Empty ${name}`, mappings: [] } }), 400, 'waste_import_no_events');
+    await expectReason(call('POST', `/waste/sources/${source.id}/reimport/commit`, { body: { ics, mappings: [], expected_version: source.version } }), 400, 'waste_import_no_events');
+  }
+  assert.equal(await sourceCount(), sourcesBefore, 'no empty source was created');
+  assert.equal(importedPickupCount(source.id), 1, 'the re-import removed nothing');
+  assert.equal((await call('GET', `/waste/sources/${source.id}`)).body.data.version, source.version);
+
+  // A calendar WITH entries, none of them a pickup (far outside the window),
+  // previews and commits as before: the rule is about what the file holds.
+  const far = icsFixture('2040-01-01');
+  const preview = await call('POST', `/waste/sources/${source.id}/reimport/preview`, { body: { ics: far } });
+  assert.equal(preview.status, 200, JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.data.counts, { events: 1, candidates: 0, distinct_labels: 0 });
+  const commit = await call('POST', `/waste/sources/${source.id}/reimport/commit`, {
+    body: { ics: far, mappings: [], expected_version: source.version, preview_digest: preview.body.data.digest },
+  });
+  assert.equal(commit.status, 200, JSON.stringify(commit.body));
+  assert.equal(commit.body.data.diff.removed, 1);
+});
+
+test('reason waste_source_fetch_no_events: an address that answers 200 without a calendar entry - on refresh, on create and in the reviewed re-import', async () => {
+  const standIn = await startStandIn();
+  try {
+    const labelType = await createType({ name: `Emptyfeed-${randomUUID()}` });
+    const feed = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:ef-1@x\r\nSUMMARY:${labelType.name}\r\nDTSTART;VALUE=DATE:20261201\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+    standIn.handler = (_req, res) => { res.writeHead(200, { 'Content-Type': 'text/calendar' }).end(feed); };
+    const created = await withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Feed that goes empty', url: standIn.url } }));
+    assert.equal(created.body.data.outcome, 'needs_mapping', JSON.stringify(created.body));
+    const id = created.body.data.source.id;
+    // The reviewed first commit, so that the source HAS a pickup to lose.
+    const first = await withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/commit`, {
+      body: {
+        expected_version: created.body.data.preview.expected_version, preview_digest: created.body.data.preview.digest,
+        mappings: created.body.data.preview.labels.map((l) => ({ normalized_label: l.normalized_label, type_id: labelType.id })),
+      },
+    }));
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    const { version } = first.body.data.source;
+    assert.equal(importedPickupCount(id), 1);
+
+    for (const [name, body] of NO_EVENT_TEXTS) {
+      standIn.handler = (_req, res) => { res.writeHead(200, { 'Content-Type': 'text/html', ETag: '"page"' }).end(body); };
+      const refreshed = await expectFetchFailure(withPrivateNetwork(() => call('POST', `/waste/sources/${id}/refresh`, { body: {} })), 200, 'waste_source_fetch_no_events', undefined);
+      assert.equal(refreshed.body.data.source.last_error, 'No calendar entries in the response', name);
+      assert.equal(refreshed.body.data.source.version, version, 'nothing was committed');
+      assert.equal(importedPickupCount(id), 1, `${name}: the imported pickup is still there`);
+      for (const step of ['preview', 'commit']) {
+        const r = await expectReasonWithParams(
+          withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/${step}`, { body: { mappings: [], expected_version: version } })),
+          502, 'waste_source_fetch_no_events', undefined,
+        );
+        assert.equal(r.body.error, 'Fetching the source URL failed: No calendar entries in the response');
+      }
+      const fresh = await expectFetchFailure(
+        withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: `Typo ${name}`, url: standIn.url } })),
+        201, 'waste_source_fetch_no_events', undefined,
+      );
+      assert.equal(fresh.body.data.source.version, 0, 'the first answer was not taken for a calendar');
+    }
+    assert.equal(importedPickupCount(id), 1);
+  } finally {
+    await standIn.close();
+  }
+});
+
+test('reason refresh_in_progress: a second manual refresh while the first is still fetching', async () => {
+  const standIn = await startStandIn();
+  try {
+    let release;
+    const held = new Promise((r) => { release = r; });
+    let arrived;
+    const first = new Promise((r) => { arrived = r; });
+    standIn.handler = async (_req, res) => { arrived(); await held; res.writeHead(304).end(); };
+    const { createUrlSourcePlaceholder } = await import('../server/services/waste-store.js');
+    const source = createUrlSourcePlaceholder(db, { name: 'Slow', url: standIn.url, refreshIntervalMinutes: 60, userId: ADMIN });
+    await withPrivateNetwork(async () => {
+      const running = call('POST', `/waste/sources/${source.id}/refresh`, { body: {} });
+      await first;
+      await expectReason(call('POST', `/waste/sources/${source.id}/refresh`, { body: {} }), 409, 'refresh_in_progress');
+      release();
+      assert.equal((await running).status, 200);
+    });
+  } finally {
+    await standIn.close();
+  }
+});
+
+// Runs after the cases above (node:test keeps file order): what they SAW.
+test('every waste_* reason the server source carries is answered by a real route, and nothing else is', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const files = [
+    ...readdirSync(new URL('../server/routes/waste/', import.meta.url)).map((name) => `../server/routes/waste/${name}`),
+    ...readdirSync(new URL('../server/services/', import.meta.url)).filter((name) => name.startsWith('waste-')).map((name) => `../server/services/${name}`),
+  ];
+  assert.ok(files.length >= 15, 'the scan found the waste routes and services');
+  const inSource = new Set();
+  for (const file of files) {
+    const text = readFileSync(new URL(file, import.meta.url), 'utf8');
+    // A reason stands as `reason: '...'` or as the trailing argument of a typed
+    // error / a domain problem. `entity_type = 'waste_pickup'` in SQL is neither.
+    // Three reasons are older than the `waste_` prefix (#1795) and part of the
+    // promised API, so they keep their names.
+    for (const [, reason] of text.matchAll(/(?:reason:\s*|,\s*)'(waste_[a-z_]+|preview_changed|source_changed|refresh_in_progress)'\s*[)},]/g)) inSource.add(reason);
+  }
+  // An import limit names its reason through its own code: the store builds
+  // `waste_import_<code>` from the WasteImportError it catches.
+  const importer = readFileSync(new URL('../server/services/waste-import.js', import.meta.url), 'utf8');
+  const codes = [...importer.matchAll(/new WasteImportError\([^\n]*?,\s*'([a-z_]+)'\s*[,)]/g)].map((m) => m[1]);
+  assert.equal(codes.length, 6, `the scan reads the import refusals (found ${codes.join(', ')})`);
+  for (const code of codes) inSource.add(`waste_import_${code}`);
+  assert.ok(inSource.size >= 20, `the scan reads reasons at all (found ${inSource.size})`);
+  assert.deepEqual([...seenReasons].sort(), [...inSource].sort(),
+    'a reason in the server source has no case above that sees it in a real answer - or a case sees one the scan misses');
+});
+
+test('every waste_* reason a route answers has a sentence in the client, and the client knows no other', async () => {
+  const { readFileSync } = await import('node:fs');
+  // The client side, read without the server: the map in public/utils/friendly-error.js.
+  // This suite runs without the browser loader, so the map is read as text here;
+  // test:friendly-error imports the same file as a program and checks the keys
+  // in every locale.
+  const client = readFileSync(new URL('../public/utils/friendly-error.js', import.meta.url), 'utf8');
+  const caseMap = client.slice(client.indexOf('export const CASE_MESSAGES'), client.indexOf('export const GONE_REASONS'));
+  // Every reason whose sentence is a waste sentence - with or without the prefix.
+  const withSentence = new Set([...caseMap.matchAll(/^\s*\['([a-z_]+)',\s*'waste\.[A-Za-z]+'\],?\s*$/gm)].map((m) => m[1]));
+  assert.ok(withSentence.size >= 40, `the map is read at all (found ${withSentence.size})`);
+  assert.deepEqual([...withSentence].sort(), [...seenReasons].sort(),
+    'server and client disagree: a reason without a sentence shows the general one and hides the cause, '
+    + 'a sentence without a reason is never shown');
 });

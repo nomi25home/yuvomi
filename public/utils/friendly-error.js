@@ -53,7 +53,165 @@ export const CASE_MESSAGES = new Map([
   // einen gibt); hier stehen die beiden ohne Zaehler, fuer jede andere Stelle.
   ['category_exists', 'category.errorExists'],
   ['category_last', 'category.errorLast'],
+  // Abfuhr (#1909). Die acht "gibt es nicht mehr" stehen auch in GONE_REASONS.
+  // `waste_occurrence_not_found`: der Termin wurde inzwischen geaendert, die
+  // Abholung, die verschoben oder ausgesetzt werden sollte, steht nicht mehr
+  // im Plan. `waste_override_not_found` sieht nur, wer ihn anders als ueber
+  // "Zuruecksetzen" erreicht - dort ist er ein Erfolg (isAlreadyDeleted).
+  ['waste_type_not_found', 'waste.errorTypeGone'],
+  // Nicht die Abfallart, um die es geht, sondern die im Formular GEWAEHLTE
+  // fehlt (Termin, Abholung, Zuordnung, Import): ein eigener Grund, damit
+  // `waste_type_not_found` nur eines heisst. Die Seite haelt den Dialog dann
+  // offen und frischt die Auswahl auf, statt ihn zu schliessen.
+  ['waste_selected_type_not_found', 'waste.errorSelectedTypeGone'],
+  ['waste_schedule_not_found', 'waste.errorScheduleGone'],
+  ['waste_pickup_not_found', 'waste.errorPickupGone'],
+  ['waste_source_not_found', 'waste.errorSourceGone'],
+  ['waste_mapping_not_found', 'waste.errorMappingGone'],
+  ['waste_override_not_found', 'waste.errorOverrideGone'],
+  ['waste_occurrence_not_found', 'waste.errorOccurrenceGone'],
+  ['waste_type_in_use', 'waste.typeDeleteRefused'],
+  ['waste_pickup_exists', 'waste.pickupDuplicateError'],
+  // Eingaben, die der Termin-Dialog durchlaesst und erst der Server prueft.
+  ['waste_schedule_anchor_date_invalid', 'waste.errorScheduleAnchorRequired'],
+  ['waste_schedule_ends_before_anchor', 'waste.errorScheduleEndsBeforeStart'],
+  ['waste_schedule_weekdays_required', 'waste.errorScheduleWeekdaysRequired'],
+  ['waste_schedule_interval_invalid', 'waste.errorScheduleInterval'],
+  ['waste_schedule_month_day_invalid', 'waste.errorScheduleMonthDay'],
+  ['waste_schedule_anchor_not_month_day', 'waste.errorScheduleAnchorNotMonthDay'],
+  ['waste_schedule_anchor_not_last_day', 'waste.errorScheduleAnchorNotLastDay'],
+  ['waste_schedule_anchor_not_ordinal_weekday', 'waste.errorScheduleAnchorNotWeekday'],
+  ['waste_pickup_date_invalid', 'waste.errorDateRequired'],
+  ['waste_override_date_invalid', 'waste.errorDateRequired'],
+  ['waste_override_same_date', 'waste.errorOverrideSameDate'],
+  ['waste_reminder_offset_invalid', 'waste.errorReminderOffset'],
+  ['waste_reminder_time_invalid', 'waste.errorReminderTime'],
+  // Import einer Datei oder einer Adresse. Die Grenzen tragen ihre Zahl als
+  // Parameter (CASE_PARAMS). Die drei ohne Praefix sind aelter als die Regel
+  // (#1795) und Teil der zugesagten API - sie bleiben, wie sie heissen.
+  ['waste_import_empty_file', 'waste.errorImportEmpty'],
+  ['waste_import_file_too_large', 'waste.errorImportTooLarge'],
+  ['waste_import_event_cap_exceeded', 'waste.errorImportTooManyEvents'],
+  ['waste_import_instance_cap_exceeded', 'waste.errorImportTooManyPickups'],
+  ['waste_import_label_cap_exceeded', 'waste.errorImportTooManyLabels'],
+  // #1938: eine Datei ohne einen einzigen Kalendereintrag ist kein Kalender.
+  ['waste_import_no_events', 'waste.errorImportNoEvents'],
+  ['preview_changed', 'waste.importPreviewChangedError'],
+  ['source_changed', 'waste.importSourceChangedError'],
+  ['waste_profile_invalid', 'waste.mappingProfileInvalidFile'],
+  ['waste_profile_changed', 'waste.errorProfileChanged'],
+  // Quelle mit Adresse: Eingaben des Dialogs, der Handabruf, und je Klasse
+  // eines gescheiterten Abrufs EIN Grund (server/services/waste-url-source.js).
+  ['waste_source_url_invalid', 'waste.errorSourceUrlInvalid'],
+  ['waste_source_url_not_https', 'waste.errorSourceUrlNotHttps'],
+  ['waste_source_interval_invalid', 'waste.errorSourceInterval'],
+  ['waste_source_not_url', 'waste.errorSourceNotUrl'],
+  ['refresh_in_progress', 'waste.errorSourceRefreshRunning'],
+  ['waste_source_fetch_http_status', 'waste.errorSourceFetchStatus'],
+  ['waste_source_fetch_too_large', 'waste.errorSourceFetchTooLarge'],
+  ['waste_source_fetch_blocked', 'waste.errorSourceFetchBlocked'],
+  ['waste_source_fetch_unreachable', 'waste.errorSourceFetchUnreachable'],
+  // #1938: die Adresse hat geantwortet, aber ohne einen Kalendereintrag. Die
+  // bisherigen Abholungen bleiben, der Satz sagt das.
+  ['waste_source_fetch_no_events', 'waste.errorSourceFetchNoEvents'],
 ]);
+
+/**
+ * Welche ZAHLEN ein Satz aus der Antwort einsetzen darf: Grund -> Namen (#1909).
+ * Der Server gibt sie strukturiert mit (`params` neben `reason`), der Satz
+ * traegt sie als `{{name}}`.
+ *
+ * Eine ALLOWLIST je Grund: nur diese Namen kommen in den Satz, nie ein
+ * beliebiges Feld der Antwort, und nur als ganze Zahl (readParams). Fehlt eine
+ * oder ist sie keine, sagt die App den allgemeinen Satz der Stelle - ein Satz
+ * mit einem leeren Platzhalter waere schlechter als keiner. `count` steht hier
+ * nie: der Name waehlt in t() die Pluralform.
+ */
+export const CASE_PARAMS = new Map([
+  ['waste_import_file_too_large', ['limit_mb']],
+  ['waste_import_event_cap_exceeded', ['limit']],
+  ['waste_import_instance_cap_exceeded', ['limit']],
+  ['waste_import_label_cap_exceeded', ['limit']],
+  ['waste_source_interval_invalid', ['min', 'max']],
+  ['waste_source_fetch_http_status', ['status']],
+  ['waste_source_fetch_too_large', ['limit_mb']],
+]);
+
+const PARAM_MAX = 1_000_000_000;
+
+/**
+ * Die erlaubten Zahlen aus `params`, oder null, wenn eine fehlt oder keine ist.
+ * Gelesen wird nur das eigene Feld eines schlichten Objekts; heraus kommt ein
+ * neues Objekt mit genau den erlaubten Namen.
+ */
+function readParams(given, names) {
+  if (given === null || typeof given !== 'object' || Array.isArray(given)) return null;
+  const out = {};
+  for (const name of names) {
+    const value = Object.prototype.hasOwnProperty.call(given, name) ? given[name] : undefined;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > PARAM_MAX) return null;
+    out[name] = value;
+  }
+  return out;
+}
+
+/**
+ * Gruende, die sagen: das Ding, auf das die Handlung zielte, gibt es nicht
+ * mehr - der Stand der Seite ist also veraltet (jemand anderes im Haushalt hat
+ * es geloescht). Die Seite laedt dann selbst nach, statt dem Nutzer dazu zu
+ * raten (#1909); der Satz sagt nur noch, was passiert ist.
+ *
+ * Eine ALLOWLIST, kein Muster auf `_not_found` und nie der blanke Status 404:
+ * ein Grund, den diese Liste nicht kennt, loest kein Nachladen aus. Jeder
+ * Eintrag hat einen Satz in CASE_MESSAGES, und jeder `*_not_found` dort steht
+ * hier - beides haelt test:friendly-error.
+ */
+export const GONE_REASONS = new Set([
+  'shopping_list_not_found',
+  'shopping_item_not_found',
+  'shopping_store_not_found',
+  'shopping_category_not_found',
+  'waste_type_not_found',
+  'waste_selected_type_not_found',
+  'waste_schedule_not_found',
+  'waste_pickup_not_found',
+  'waste_source_not_found',
+  'waste_mapping_not_found',
+  'waste_override_not_found',
+  'waste_occurrence_not_found',
+]);
+
+/**
+ * Sagt dieser Fehler, dass das Ziel der Handlung verschwunden ist?
+ * Der Grund einer Absage (403) zaehlt nur an einer Absage - wie in `knownKey`.
+ *
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+export function isGone(err) {
+  const status = err?.status ?? err?.response?.status;
+  return status !== 403 && GONE_REASONS.has(err?.data?.reason);
+}
+
+/**
+ * War das LOESCHEN schon erledigt? Wer etwas loescht, das ein anderes
+ * Haushaltsmitglied schon geloescht hat, bekommt "gibt es nicht mehr" - und hat
+ * damit, was er wollte. Das ist kein Fehler, den die Seite melden muesste: kein
+ * Toast, und die Zeile kommt nicht zurueck.
+ *
+ * Nur fuer den Loeschweg, und nur fuer den Grund des Dings, das geloescht
+ * werden sollte: `reason` nennt der Aufrufer. Ein Loeschen, das an etwas
+ * ANDEREM scheitert (die Liste des Artikels, ein unbekannter Grund, eine blanke
+ * 404, eine Absage), bleibt ein Fehler. Abhaken oder Speichern auf einem
+ * verschwundenen Ding fragen hier nie - sie behalten Toast und Nachladen.
+ *
+ * @param {unknown} err
+ * @param {string} reason - der Grund "dieses Ding gibt es nicht mehr"
+ * @returns {boolean}
+ */
+export function isAlreadyDeleted(err, reason) {
+  return isGone(err) && err.data.reason === reason;
+}
 
 /**
  * Der Satz, den die App fuer diesen Fehler SICHER kennt - oder nichts.
@@ -77,17 +235,38 @@ function knownKey(err) {
 }
 
 /**
+ * Der Satz zu `knownKey`, fertig uebersetzt - oder nichts. Traegt der Fall
+ * Zahlen (CASE_PARAMS), setzt t() sie ein; fehlen sie, gibt es keinen Satz,
+ * und der Aufrufer sagt seinen allgemeinen.
+ *
+ * @param {unknown} err
+ * @returns {string|undefined}
+ */
+function knownSentence(err) {
+  const key = knownKey(err);
+  if (!key) return undefined;
+  const reason = err?.data?.reason;
+  // Nur am Fall selbst: eine Absage (403) oder Offline mit demselben `reason`
+  // im Rumpf hat einen anderen Satz bekommen und setzt nichts ein.
+  const names = CASE_MESSAGES.get(reason) === key ? CASE_PARAMS.get(reason) : undefined;
+  if (!names) return t(key);
+  const params = readParams(err?.data?.params, names);
+  return params ? t(key, params) : undefined;
+}
+
+/**
  * DER EINE WEG FUER DIE SEITEN (#1909): aus einem gefangenen Fehler der Satz,
  * den ein Toast zeigt. Bekannter Fall -> sein Satz, alles andere -> der
  * allgemeine Satz der Stelle. Der Text des Servers (`err.data.error`,
- * `err.message`) kommt hier nie heraus.
+ * `err.message`) kommt hier nie heraus; aus der Antwort stammen hoechstens die
+ * Zahlen, die CASE_PARAMS fuer den Fall freigibt.
  *
  * @param {unknown} err
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
  * @returns {string} uebersetzter Satz
  */
 export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
-  return t(knownKey(err) ?? fallbackKey);
+  return knownSentence(err) ?? t(fallbackKey);
 }
 
 /**
@@ -112,8 +291,8 @@ export function friendlyError(err) {
   // ("Zugriff verweigert. Bitte erneut anmelden."), und der riet zur Anmeldung,
   // wo die Sitzung in Ordnung war: eine abgelaufene Sitzung ist ein 401 und
   // laeuft ueber auth:expired, nie hier durch.
-  const known = knownKey(err);
-  if (known) return t(known);
+  const known = knownSentence(err);
+  if (known) return known;
   const status = err?.status ?? err?.response?.status;
   if (status === 404) return t('common.errorNotFound');
   if (status >= 500) return t('common.errorServer');

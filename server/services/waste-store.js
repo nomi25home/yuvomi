@@ -11,17 +11,37 @@ import crypto from 'node:crypto';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
 import { str } from '../middleware/validate.js';
 import {
-  validateType, validateOneOff, validateScheduleRecurrence, validateOverride, validateRange,
+  validateType, validateOneOff, scheduleRecurrenceProblems, overrideProblems, validateRange,
   resolveOccurrences, nextPerType, expandSchedule, WEEKDAY_CODES, OCCURRENCE_RANGE_MAX_DAYS,
 } from './waste-domain.js';
 import { buildImportPreview, computeDigest, WasteImportError } from './waste-import.js';
 
 export class WasteValidationError extends Error {
-  constructor(errors) {
+  /**
+   * @param {string[]} errors English sentences for logs and API consumers
+   * @param {string|null} [reason] stable machine-readable code for a case a household member can
+   *   reach from the page (#1909); the client owns the sentence for it. Several errors at once
+   *   carry the reason of the first one that has any. Validation only an API caller triggers
+   *   carries none.
+   * @param {object|null} [params] the numbers the cause carries (a limit in MB, a count), sent
+   *   next to `reason` so the client puts them into its own sentence. Only with a reason.
+   */
+  constructor(errors, reason = null, params = null) {
     super(errors.join(' '));
     this.name = 'WasteValidationError';
     this.errors = errors;
+    this.reason = reason;
+    this.params = reason ? params : null;
   }
+}
+
+/**
+ * An import limit as the 400 it is at the route: the sentence stays, and the
+ * limit's own code becomes the reason (`waste_import_file_too_large`, ...) with
+ * the limit as a number next to it. Before #1909 the code was dropped here.
+ */
+function importValidationError(err) {
+  return new WasteValidationError([err.message], `waste_import_${err.code}`, err.params);
 }
 
 export class WasteConflictError extends Error {
@@ -38,10 +58,28 @@ export class WasteConflictError extends Error {
 }
 
 export class WasteNotFoundError extends Error {
-  constructor(message) {
+  /**
+   * @param {string} message English sentence for logs and API consumers
+   * @param {string|null} [reason] stable code naming WHAT is gone (`waste_type_not_found`, ...),
+   *   so the page can reload itself instead of advising the member to (#1909)
+   */
+  constructor(message, reason = null) {
     super(message);
     this.name = 'WasteNotFoundError';
+    this.reason = reason;
   }
+}
+
+/**
+ * Throws the domain layer's problems (`{ message, reason }`) as ONE validation error: every
+ * sentence for the API consumer, and the reason of the first problem that names one.
+ */
+function throwOnProblems(problems) {
+  if (!problems.length) return;
+  throw new WasteValidationError(
+    problems.map((problem) => problem.message),
+    problems.find((problem) => problem.reason)?.reason ?? null,
+  );
 }
 
 function isUniqueViolation(err) {
@@ -78,7 +116,7 @@ export function createType(d, input, userId) {
 
 export function updateType(d, id, input) {
   const existing = getType(d, id);
-  if (!existing) throw new WasteNotFoundError('Waste type not found.');
+  if (!existing) throw new WasteNotFoundError('Waste type not found.', 'waste_type_not_found');
   const { value, errors } = validateType(input, { partial: true });
   if (errors.length) throw new WasteValidationError(errors);
 
@@ -119,13 +157,13 @@ function pruneFeedTypeSelections(d, typeId) {
  */
 export function deleteType(d, id) {
   const existing = getType(d, id);
-  if (!existing) throw new WasteNotFoundError('Waste type not found.');
+  if (!existing) throw new WasteNotFoundError('Waste type not found.', 'waste_type_not_found');
 
   const scheduleCount = d.prepare('SELECT COUNT(*) AS n FROM waste_schedules WHERE type_id = ?').get(id).n;
   const oneOffCount = d.prepare('SELECT COUNT(*) AS n FROM waste_one_off_pickups WHERE type_id = ?').get(id).n;
   const importedCount = d.prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE type_id = ?').get(id).n;
   if (scheduleCount > 0 || oneOffCount > 0 || importedCount > 0) {
-    throw new WasteConflictError('Waste type has schedules, pickups, or imported data and cannot be deleted; archive it instead.');
+    throw new WasteConflictError('Waste type has schedules, pickups, or imported data and cannot be deleted; archive it instead.', 'waste_type_in_use');
   }
 
   d.transaction(() => {
@@ -190,11 +228,10 @@ function normalizeScheduleInput(input, existing = null) {
 
 export function createSchedule(d, input, userId) {
   if (!getType(d, input.type_id)) {
-    throw new WasteValidationError(['type_id must reference an existing waste type.']);
+    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_selected_type_not_found');
   }
   const schedule = normalizeScheduleInput(input);
-  const errors = validateScheduleRecurrence(schedule);
-  if (errors.length) throw new WasteValidationError(errors);
+  throwOnProblems(scheduleRecurrenceProblems(schedule));
 
   const result = d.prepare(`
     INSERT INTO waste_schedules
@@ -209,13 +246,12 @@ export function createSchedule(d, input, userId) {
 
 export function updateSchedule(d, id, input) {
   const existing = getSchedule(d, id);
-  if (!existing) throw new WasteNotFoundError('Waste schedule not found.');
+  if (!existing) throw new WasteNotFoundError('Waste schedule not found.', 'waste_schedule_not_found');
   if (input.type_id !== undefined && !getType(d, input.type_id)) {
-    throw new WasteValidationError(['type_id must reference an existing waste type.']);
+    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_selected_type_not_found');
   }
   const schedule = normalizeScheduleInput(input, existing);
-  const errors = validateScheduleRecurrence(schedule);
-  if (errors.length) throw new WasteValidationError(errors);
+  throwOnProblems(scheduleRecurrenceProblems(schedule));
 
   d.prepare(`
     UPDATE waste_schedules SET
@@ -232,7 +268,7 @@ export function updateSchedule(d, id, input) {
 /** Overrides cascade via ON DELETE CASCADE (invariant #5) - nothing extra to clean up here. */
 export function deleteSchedule(d, id) {
   const existing = getSchedule(d, id);
-  if (!existing) throw new WasteNotFoundError('Waste schedule not found.');
+  if (!existing) throw new WasteNotFoundError('Waste schedule not found.', 'waste_schedule_not_found');
   d.prepare('DELETE FROM waste_schedules WHERE id = ?').run(id);
 }
 
@@ -270,14 +306,13 @@ function loadOverridesBySchedule(d, scheduleIds) {
  */
 export function upsertOverride(d, scheduleId, input) {
   const schedule = getSchedule(d, scheduleId);
-  if (!schedule) throw new WasteNotFoundError('Waste schedule not found.');
+  if (!schedule) throw new WasteNotFoundError('Waste schedule not found.', 'waste_schedule_not_found');
 
-  const errors = validateOverride(input);
-  if (errors.length) throw new WasteValidationError(errors);
+  throwOnProblems(overrideProblems(input));
 
   const raw = expandSchedule(schedule, [], input.original_date, input.original_date);
   if (raw.length === 0) {
-    throw new WasteValidationError(['original_date is not a calculated occurrence of this schedule.']);
+    throw new WasteValidationError(['original_date is not a calculated occurrence of this schedule.'], 'waste_occurrence_not_found');
   }
 
   d.prepare(`
@@ -294,7 +329,7 @@ export function upsertOverride(d, scheduleId, input) {
 export function deleteOverride(d, scheduleId, originalDate) {
   const result = d.prepare('DELETE FROM waste_schedule_overrides WHERE schedule_id = ? AND original_date = ?')
     .run(scheduleId, originalDate);
-  if (result.changes === 0) throw new WasteNotFoundError('Override not found.');
+  if (result.changes === 0) throw new WasteNotFoundError('Override not found.', 'waste_override_not_found');
 }
 
 // -------------------------------------------------------------------------
@@ -314,10 +349,10 @@ export function getOneOff(d, id) {
 
 export function createOneOff(d, input, userId) {
   if (!getType(d, input.type_id)) {
-    throw new WasteValidationError(['type_id must reference an existing waste type.']);
+    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_selected_type_not_found');
   }
-  const { value, errors } = validateOneOff(input);
-  if (errors.length) throw new WasteValidationError(errors);
+  const { value, errors, reason } = validateOneOff(input);
+  if (errors.length) throw new WasteValidationError(errors, reason);
 
   try {
     const result = d.prepare(`
@@ -326,23 +361,23 @@ export function createOneOff(d, input, userId) {
     `).run(input.type_id, value.date, value.note, userId ?? null);
     return getOneOff(d, Number(result.lastInsertRowid));
   } catch (err) {
-    if (isUniqueViolation(err)) throw new WasteConflictError('A one-off pickup already exists for this type and date.');
+    if (isUniqueViolation(err)) throw new WasteConflictError('A one-off pickup already exists for this type and date.', 'waste_pickup_exists');
     throw err;
   }
 }
 
 export function updateOneOff(d, id, input) {
   const existing = getOneOff(d, id);
-  if (!existing) throw new WasteNotFoundError('One-off pickup not found.');
-  const { value, errors } = validateOneOff(input, { partial: true });
-  if (errors.length) throw new WasteValidationError(errors);
+  if (!existing) throw new WasteNotFoundError('One-off pickup not found.', 'waste_pickup_not_found');
+  const { value, errors, reason } = validateOneOff(input, { partial: true });
+  if (errors.length) throw new WasteValidationError(errors, reason);
 
   const merged = { ...existing, ...value };
   try {
     d.prepare('UPDATE waste_one_off_pickups SET date = ?, note = ? WHERE id = ?')
       .run(merged.date, merged.note, id);
   } catch (err) {
-    if (isUniqueViolation(err)) throw new WasteConflictError('A one-off pickup already exists for this type and date.');
+    if (isUniqueViolation(err)) throw new WasteConflictError('A one-off pickup already exists for this type and date.', 'waste_pickup_exists');
     throw err;
   }
   return getOneOff(d, id);
@@ -350,7 +385,7 @@ export function updateOneOff(d, id, input) {
 
 export function deleteOneOff(d, id) {
   const result = d.prepare('DELETE FROM waste_one_off_pickups WHERE id = ?').run(id);
-  if (result.changes === 0) throw new WasteNotFoundError('One-off pickup not found.');
+  if (result.changes === 0) throw new WasteNotFoundError('One-off pickup not found.', 'waste_pickup_not_found');
 }
 
 // -------------------------------------------------------------------------
@@ -485,7 +520,7 @@ export function mappingsByLabel(d, sourceId) {
 
 export function renameSource(d, id, name) {
   const existing = getSource(d, id);
-  if (!existing) throw new WasteNotFoundError('Waste import source not found.');
+  if (!existing) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   const v = str(name, 'name', { max: 150 });
   if (v.error) throw new WasteValidationError([v.error]);
   d.prepare('UPDATE waste_sources SET name = ? WHERE id = ?').run(v.value, id);
@@ -495,7 +530,7 @@ export function renameSource(d, id, name) {
 /** Mappings/imported pickups cascade via ON DELETE CASCADE (invariant #5); other sources and manual data are untouched. */
 export function deleteSource(d, id) {
   const existing = getSource(d, id);
-  if (!existing) throw new WasteNotFoundError('Waste import source not found.');
+  if (!existing) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   d.prepare('DELETE FROM waste_sources WHERE id = ?').run(id);
 }
 
@@ -564,15 +599,15 @@ export function listDueUrlSources(d) {
  */
 export function updateMapping(d, sourceId, mappingId, { type_id = null, ignored = false }) {
   const source = getSource(d, sourceId);
-  if (!source) throw new WasteNotFoundError('Waste import source not found.');
+  if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   const existing = d.prepare('SELECT * FROM waste_source_mappings WHERE id = ? AND source_id = ?').get(mappingId, sourceId);
-  if (!existing) throw new WasteNotFoundError('Mapping not found.');
+  if (!existing) throw new WasteNotFoundError('Mapping not found.', 'waste_mapping_not_found');
 
   if (ignored) {
     d.prepare('UPDATE waste_source_mappings SET type_id = NULL, ignored = 1 WHERE id = ?').run(mappingId);
   } else {
     if (!type_id || !getType(d, type_id)) {
-      throw new WasteValidationError(['type_id must reference an existing waste type when a mapping is not ignored.']);
+      throw new WasteValidationError(['type_id must reference an existing waste type when a mapping is not ignored.'], 'waste_selected_type_not_found');
     }
     d.prepare('UPDATE waste_source_mappings SET type_id = ?, ignored = 0 WHERE id = ?').run(type_id, mappingId);
   }
@@ -600,7 +635,7 @@ function chunkDateRange(start, end) {
  */
 export function previewImport(d, { sourceId = null, icsText } = {}) {
   const source = sourceId ? getSource(d, sourceId) : null;
-  if (sourceId && !source) throw new WasteNotFoundError('Waste import source not found.');
+  if (sourceId && !source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
 
   const today = todayKey(d);
   // The pickup DAY is a household-local fact, not a UTC one (see
@@ -614,7 +649,7 @@ export function previewImport(d, { sourceId = null, icsText } = {}) {
     const preview = buildImportPreview(icsText, { today, timeZone, existingTypes, existingMappings });
     return { ...preview, source_id: source?.id ?? null, expected_version: source?.version ?? null };
   } catch (err) {
-    if (err instanceof WasteImportError) throw new WasteValidationError([err.message]);
+    if (err instanceof WasteImportError) throw importValidationError(err);
     throw err;
   }
 }
@@ -644,7 +679,7 @@ export function commitImport(d, {
   expectedVersion = null, previewDigest = null, userId = null,
 } = {}) {
   const source = sourceId ? getSource(d, sourceId) : null;
-  if (sourceId && !source) throw new WasteNotFoundError('Waste import source not found.');
+  if (sourceId && !source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   if (source && expectedVersion !== source.version) {
     throw new WasteConflictError('This source changed since you last previewed it; preview again before committing.', 'source_changed');
   }
@@ -668,7 +703,7 @@ export function commitImport(d, {
   try {
     preview = buildImportPreview(icsText, { today, timeZone, existingTypes, existingMappings });
   } catch (err) {
-    if (err instanceof WasteImportError) throw new WasteValidationError([err.message]);
+    if (err instanceof WasteImportError) throw importValidationError(err);
     throw err;
   }
 
@@ -730,7 +765,7 @@ export function commitImport(d, {
         resolvedTypeIdByLabel.set(normalizedLabel, typeId);
       } else {
         if (!getType(d, decision.type_id)) {
-          throw new WasteValidationError([`type_id ${decision.type_id} does not reference an existing waste type.`]);
+          throw new WasteValidationError([`type_id ${decision.type_id} does not reference an existing waste type.`], 'waste_selected_type_not_found');
         }
         resolvedTypeIdByLabel.set(normalizedLabel, decision.type_id);
       }
@@ -910,7 +945,7 @@ export function getReminderSetting(d, userId, typeId) {
 }
 
 export function upsertReminderSetting(d, userId, typeId, { enabled, offsetDays, deliveryTime }) {
-  if (!getType(d, typeId)) throw new WasteNotFoundError('Waste type not found.');
+  if (!getType(d, typeId)) throw new WasteNotFoundError('Waste type not found.', 'waste_type_not_found');
   d.prepare(`
     INSERT INTO waste_reminder_settings (user_id, type_id, enabled, offset_days, delivery_time)
     VALUES (?, ?, ?, ?, ?)
@@ -945,12 +980,12 @@ function sameLabelNormalization(label) {
 
 function assertProfileShape(profile) {
   if (!profile || typeof profile !== 'object' || !Array.isArray(profile.mappings)) {
-    throw new WasteValidationError(['profile must be an object with a mappings array.']);
+    throw new WasteValidationError(['profile must be an object with a mappings array.'], 'waste_profile_invalid');
   }
   for (const entry of profile.mappings) {
     if (typeof entry?.pattern !== 'string' || !entry.pattern.trim()
       || typeof entry?.type_name !== 'string' || !entry.type_name.trim()) {
-      throw new WasteValidationError(['Each mapping profile entry needs a non-empty pattern and type_name.']);
+      throw new WasteValidationError(['Each mapping profile entry needs a non-empty pattern and type_name.'], 'waste_profile_invalid');
     }
   }
 }
@@ -966,7 +1001,7 @@ export function computeMappingProfileDigest(profile) {
 /** Exports the current, resolved (non-ignored, mapped) label -> type-name mappings of one source as a portable profile. */
 export function exportMappingProfile(d, sourceId) {
   const source = getSource(d, sourceId);
-  if (!source) throw new WasteNotFoundError('Waste import source not found.');
+  if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   const typesById = new Map(listTypes(d, { includeArchived: true }).map((t) => [t.id, t]));
   const mappings = listMappings(d, sourceId)
     .filter((m) => !m.ignored && m.type_id && typesById.has(m.type_id))
@@ -984,7 +1019,7 @@ export function exportMappingProfile(d, sourceId) {
  */
 export function previewMappingProfileImport(d, sourceId, profile) {
   const source = getSource(d, sourceId);
-  if (!source) throw new WasteNotFoundError('Waste import source not found.');
+  if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   assertProfileShape(profile);
 
   const existingMappingsByLabel = new Map(listMappings(d, sourceId).map((m) => [m.normalized_label, m]));
@@ -1039,10 +1074,10 @@ export function previewMappingProfileImport(d, sourceId, profile) {
  * mapping row that has since changed underfoot.
  */
 export function commitMappingProfileImport(d, sourceId, profile, profileDigest) {
-  if (!getSource(d, sourceId)) throw new WasteNotFoundError('Waste import source not found.');
+  if (!getSource(d, sourceId)) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   assertProfileShape(profile);
   if (profileDigest !== computeMappingProfileDigest(profile)) {
-    throw new WasteConflictError('The mapping profile changed since it was last previewed; preview it again before committing.');
+    throw new WasteConflictError('The mapping profile changed since it was last previewed; preview it again before committing.', 'waste_profile_changed');
   }
   const preview = previewMappingProfileImport(d, sourceId, profile);
   const applied = d.transaction(() => {

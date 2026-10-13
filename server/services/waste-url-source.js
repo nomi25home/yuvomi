@@ -14,11 +14,11 @@
  */
 
 import { createLogger } from '../logger.js';
-import { readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
+import { readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 import { checkSSRF as checkSSRFWithOptIn } from './ics-subscription.js';
 import { url as validateUrl, num } from '../middleware/validate.js';
-import { MAX_ICS_BYTES } from './waste-import.js';
+import { MAX_ICS_BYTES, MAX_ICS_MB } from './waste-import.js';
 import * as store from './waste-store.js';
 import { WasteValidationError, WasteNotFoundError, WasteConflictError } from './waste-store.js';
 
@@ -45,25 +45,96 @@ function isPrivateNetworkAllowed() {
 /** Validates a candidate subscription URL: http(s) only (opt-in-gated), bounded length. Throws WasteValidationError. */
 export function validateSourceUrl(raw) {
   const v = validateUrl(raw, 'url');
-  if (v.error) throw new WasteValidationError([v.error]);
-  if (!v.value) throw new WasteValidationError(['url is required.']);
+  if (v.error) throw new WasteValidationError([v.error], 'waste_source_url_invalid');
+  if (!v.value) throw new WasteValidationError(['url is required.'], 'waste_source_url_invalid');
   const allowPrivate = isPrivateNetworkAllowed();
   if (!allowPrivate && new URL(v.value).protocol !== 'https:') {
-    throw new WasteValidationError(['url must be an https:// URL.']);
+    throw new WasteValidationError(['url must be an https:// URL.'], 'waste_source_url_not_https');
   }
   return v.value;
 }
 
 export function validateRefreshIntervalMinutes(raw) {
   const v = num(raw, 'refresh_interval_minutes', { required: false });
-  if (v.error) throw new WasteValidationError([v.error]);
+  // One reason for "not a number" and "outside the bounds": the dialog's field
+  // lets both through, and the sentence for both names the bounds.
+  const bounds = { min: MIN_REFRESH_INTERVAL_MINUTES, max: MAX_REFRESH_INTERVAL_MINUTES };
+  if (v.error) throw new WasteValidationError([v.error], 'waste_source_interval_invalid', bounds);
   const minutes = v.value ?? DEFAULT_REFRESH_INTERVAL_MINUTES;
   if (!Number.isInteger(minutes) || minutes < MIN_REFRESH_INTERVAL_MINUTES || minutes > MAX_REFRESH_INTERVAL_MINUTES) {
     throw new WasteValidationError([
       `refresh_interval_minutes must be an integer between ${MIN_REFRESH_INTERVAL_MINUTES} and ${MAX_REFRESH_INTERVAL_MINUTES}.`,
-    ]);
+    ], 'waste_source_interval_invalid', bounds);
   }
   return minutes;
+}
+
+/**
+ * A fetch that failed for a cause this module can name: the other side answered
+ * with a status that is not a success, or sent more than the upload limit. The
+ * message is what `last_error` stores and logs show, unchanged; `reason` and
+ * `params` are what a response carries so the client says it in its own
+ * sentence (#1909).
+ */
+export class WasteFetchError extends Error {
+  constructor(message, reason, params = null) {
+    super(message);
+    this.name = 'WasteFetchError';
+    this.reason = reason;
+    this.params = params;
+  }
+}
+
+/**
+ * Names the class of a failed fetch - ONE reason per class, never the message:
+ *   - the stored URL no longer passes validation      -> its own reason
+ *   - a status that is not a success, a response too large, an answer
+ *     without a calendar entry (emptyFeedAsFetchFailure)  -> WasteFetchError
+ *   - a private or blocked address (pre-check or connect) -> waste_source_fetch_blocked
+ *   - everything else (DNS, refused, reset, TLS, the 15 s timeout, a redirect
+ *     this client does not follow)                    -> waste_source_fetch_unreachable
+ *
+ * The last class is the remainder on purpose: Node's network errors are an
+ * open set, and a cause this function cannot tell apart is still "the address
+ * did not deliver" for the person reading the sentence.
+ *
+ * @param {unknown} err what fetchIcsText threw
+ * @returns {{reason: string, params?: object}}
+ */
+export function classifyFetchFailure(err) {
+  if (err instanceof WasteFetchError) return { reason: err.reason, ...(err.params && { params: err.params }) };
+  if (err instanceof WasteValidationError && err.reason) {
+    return { reason: err.reason, ...(err.params && { params: err.params }) };
+  }
+  if (err instanceof BlockedAddressError) return { reason: 'waste_source_fetch_blocked' };
+  return { reason: 'waste_source_fetch_unreachable' };
+}
+
+/** The reason the importer gives text without a single calendar entry (waste-import.js, `no_events`). */
+const IMPORT_NO_EVENTS = 'waste_import_no_events';
+
+/**
+ * A fetched answer without a single calendar entry, as the failed FETCH it is
+ * for a URL source (#1938) - or null for every other error.
+ *
+ * The importer refuses such text for every caller (`waste_import_no_events`,
+ * "the file contains ..."). For a source with an address there is no file and
+ * nothing the household handed over: the other side answered 200 with
+ * something that is not its calendar (a maintenance or login page, an empty
+ * VCALENDAR). That is a failure of the remote like a 503, so it gets a reason
+ * in the family of the failed fetch and travels the way one does - outcome
+ * `error` from a refresh, 502 from the reviewed preview/commit.
+ *
+ * `no_events`, not `not_a_calendar`: the rule counts entries and never looks
+ * for the VCALENDAR envelope, and an empty VCALENDAR is a calendar by the
+ * letter. The name says what was measured, like its file twin.
+ *
+ * @param {unknown} err what previewImport/commitImport threw
+ * @returns {WasteFetchError|null}
+ */
+export function emptyFeedAsFetchFailure(err) {
+  if (!(err instanceof WasteValidationError) || err.reason !== IMPORT_NO_EVENTS) return null;
+  return new WasteFetchError('No calendar entries in the response', 'waste_source_fetch_no_events');
 }
 
 /**
@@ -83,6 +154,10 @@ function checkSSRF(urlStr) {
  * job, so both source kinds share one parser entry point). Conditional GET
  * via etag/lastModified; `{ notModified: true }` short-circuits a 304.
  */
+function tooLarge() {
+  return new WasteFetchError(`ICS file exceeds the ${MAX_ICS_MB} MB limit.`, 'waste_source_fetch_too_large', { limit_mb: MAX_ICS_MB });
+}
+
 export async function fetchIcsText(rawUrl, { etag = null, lastModified = null } = {}) {
   const url = validateSourceUrl(rawUrl);
   await checkSSRF(url);
@@ -104,10 +179,10 @@ export async function fetchIcsText(rawUrl, { etag = null, lastModified = null } 
   }
 
   if (res.status === 304) return { notModified: true };
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new WasteFetchError(`HTTP ${res.status}`, 'waste_source_fetch_http_status', { status: res.status });
 
   const cl = parseInt(res.headers.get('content-length') || '0', 10);
-  if (cl > MAX_ICS_BYTES) throw new Error(`ICS file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB limit.`);
+  if (cl > MAX_ICS_BYTES) throw tooLarge();
 
   // Buffer chunks and decode ONCE at the end, not per chunk: a multi-byte
   // UTF-8 character split across a chunk boundary would otherwise decode as
@@ -117,7 +192,7 @@ export async function fetchIcsText(rawUrl, { etag = null, lastModified = null } 
   let received = 0;
   for await (const chunk of res.body) {
     received += chunk.length;
-    if (received > MAX_ICS_BYTES) throw new Error(`ICS file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB limit.`);
+    if (received > MAX_ICS_BYTES) throw tooLarge();
     chunks.push(chunk);
   }
 
@@ -207,6 +282,31 @@ function recordFailureAndRethrow(d, source, err) {
   throw err;
 }
 
+/**
+ * Records a failed fetch on the source and answers with outcome `error`: the
+ * last good snapshot stays (pickups, mappings, version), and so do `etag`,
+ * `last_modified` and `last_success_at` - only `last_error`, the failure count
+ * and the backoff are written.
+ *
+ * The validators matter for an answer that ARRIVED but is no calendar (#1938):
+ * storing the ETag of that answer would make the next attempt a 304, and the
+ * 304 branch reads as "unchanged" and clears the error - the outage would hide
+ * itself after one attempt.
+ */
+function recordFetchFailure(d, source, err) {
+  const failures = (source.consecutive_failures ?? 0) + 1;
+  const updated = store.recordUrlSourceAttempt(d, source.id, {
+    errorMessage: err.message || 'Fetch failed.',
+    consecutiveFailures: failures,
+    nextAttemptAt: minutesFromNow(backoffMinutes(failures)),
+  });
+  log.warn(`Waste source ${source.id} (${source.name}): fetch failed - ${err.message}`);
+  // The class of the failure travels with THIS answer (#1909), so the page
+  // can say why in its own sentence. It is not stored: `last_error` keeps
+  // the message, and a later read of the source knows only that.
+  return { source: updated, outcome: 'error', ...classifyFetchFailure(err) };
+}
+
 export function minutesFromNow(minutes) {
   return new Date(Date.now() + minutes * 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
 }
@@ -216,6 +316,9 @@ export function minutesFromNow(minutes) {
  *   - unchanged (304)      -> reset failures, reschedule at the normal cadence
  *   - fetch/network failure -> record last_error, back off (failure preserves
  *                              the last good snapshot - nothing else is touched)
+ *   - no calendar entry in
+ *     the answer (#1938)    -> the same failed attempt: nothing is committed,
+ *                              and the validators of that answer are not kept
  *   - fully mapped          -> commit via the same commitImport() every file
  *                              re-import uses, reschedule at the normal cadence
  *   - new/unmapped label(s)
@@ -223,7 +326,8 @@ export function minutesFromNow(minutes) {
  *     blocking diagnostic   -> needs_mapping=1, scheduler skips this source
  *                              until a reviewed manual refresh resolves it
  *
- * @returns {{source: object, outcome: 'unchanged'|'error'|'committed'|'needs_mapping', diff?: object, preview?: object}}
+ * @returns {{source: object, outcome: 'unchanged'|'error'|'committed'|'needs_mapping', diff?: object, preview?: object, reason?: string, params?: object}}
+ *   `reason`/`params` only with outcome 'error': the class of the failed fetch (classifyFetchFailure)
  */
 export async function refreshUrlSource(d, sourceId) {
   if (inFlight.has(sourceId)) {
@@ -239,21 +343,14 @@ export async function refreshUrlSource(d, sourceId) {
 
 async function refreshUrlSourceUnclaimed(d, sourceId) {
   const source = store.getSource(d, sourceId);
-  if (!source) throw new WasteNotFoundError('Waste import source not found.');
-  if (source.kind !== 'url') throw new WasteValidationError(['This source is not a URL subscription.']);
+  if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
+  if (source.kind !== 'url') throw new WasteValidationError(['This source is not a URL subscription.'], 'waste_source_not_url');
 
   let fetched;
   try {
     fetched = await fetchIcsText(source.url, { etag: source.etag, lastModified: source.last_modified });
   } catch (err) {
-    const failures = (source.consecutive_failures ?? 0) + 1;
-    const updated = store.recordUrlSourceAttempt(d, sourceId, {
-      errorMessage: err.message || 'Fetch failed.',
-      consecutiveFailures: failures,
-      nextAttemptAt: minutesFromNow(backoffMinutes(failures)),
-    });
-    log.warn(`Waste source ${sourceId} (${source.name}): fetch failed - ${err.message}`);
-    return { source: updated, outcome: 'error' };
+    return recordFetchFailure(d, source, err);
   }
 
   if (fetched.notModified) {
@@ -271,6 +368,11 @@ async function refreshUrlSourceUnclaimed(d, sourceId) {
     preview = store.previewImport(d, { sourceId, icsText: fetched.text });
     mappingDecisions = buildAutoMappingDecisions(preview);
   } catch (err) {
+    // An answer without a calendar entry is a failed attempt of the SOURCE
+    // (#1938), for the scheduler and the manual refresh alike: both come
+    // through here. Returned, not rethrown - see emptyFeedAsFetchFailure.
+    const emptyFeed = emptyFeedAsFetchFailure(err);
+    if (emptyFeed) return recordFetchFailure(d, source, emptyFeed);
     return recordFailureAndRethrow(d, source, err);
   }
 
@@ -322,7 +424,8 @@ export const __test = { buildAutoMappingDecisions, backoffMinutes, checkSSRF };
  *
  * A NETWORK-fetch failure does not fail creation: refreshUrlSource returns
  * `{outcome: 'error'}` normally in that case, the row is created either way,
- * and the scheduler retries per its own backoff. A PARSE or COMMIT failure is
+ * and the scheduler retries per its own backoff. A first answer without a
+ * calendar entry is that same case (#1938). A PARSE or COMMIT failure is
  * different - refreshUrlSource's recordFailureAndRethrow re-throws those, so
  * this whole call rejects and the caller's create request fails outright. The
  * placeholder row would otherwise survive that rejection as an orphan: it

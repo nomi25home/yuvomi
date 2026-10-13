@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Organize events in several local calendars** (#1243, from D#1231). Create and rename household
+  calendars, reorder them through the manager's More menu, choose the destination when importing an ICS
+  file, and share a separate ICS subscription link for each calendar. Calendar links include only events
+  visible to everyone in the household. Legacy iCloud auto-upload continues for the default calendar,
+  including when explicitly selected; events in other local calendars stay local. Deleting a calendar
+  moves its events to the default calendar, so with the legacy Apple Calendar connection they then
+  upload to iCloud; the delete confirmation says so when that connection is set up.
 - **Checked-off shopping items collect in one section at the end of the list** (#1816, from D#1624).
   Ticking an item moves it out of its category into "Checked off", a collapsed section at the
   bottom that shows how many items it holds. The items stay on the list, and the list above gets
@@ -114,19 +121,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Waste: an address that stops serving its calendar no longer wipes your pickups** (#1938). A
+  subscribed waste calendar is fetched on its own. When the other side answered with something
+  that holds no calendar entry - a maintenance or login page, an empty calendar - Yuvomi took
+  that for a calendar with zero pickups: every imported pickup of the source was removed, the
+  reminders for them went with it, and the source looked healthy. Now such an answer is a failed
+  fetch like any other. The pickups and reminders stay, the source records the error and tries
+  again sooner, and the page says that no calendar with entries arrived. Adding a new address
+  that serves no calendar says so instead of showing a working source, and a file without a
+  single calendar entry is refused in the import assistant before anything can be confirmed.
+  A calendar that has entries is applied as before, also when it has fewer than last time.
+  For API clients: `POST /waste/sources/{id}/refresh` answers 200 with `outcome: "error"` and
+  `reason: "waste_source_fetch_no_events"` where it answered `outcome: "committed"` with
+  `diff.removed`; `POST /waste/sources` answers 201 with the same outcome and reason. The four
+  import endpoints (`/waste/import/preview`, `/waste/import/commit` and
+  `/waste/sources/{id}/reimport/preview`, `.../reimport/commit`) refuse a file without calendar
+  entries with 400 and `reason: "waste_import_no_events"` where they answered 200 or 201, and a
+  URL source's re-import answers 502 with `reason: "waste_source_fetch_no_events"`. Re-importing
+  an empty calendar no longer empties a source; delete the source instead.
+- **Calendar: an event moved away while it was uploading stays where you put it** (#1926). The
+  legacy Apple Calendar connection uploads the events of the default calendar to iCloud. If an
+  event was moved to another local calendar in the moment its upload was running, it was recorded
+  as uploaded anyway: it was on iCloud and had lost the calendar it had just been given. The same
+  could happen with Google when an event gave up its Google calendar during the upload, and an
+  event deleted in that moment stayed behind at Google. Now such an event stays local and keeps
+  its calendar, and the copy that reached the provider is removed on the next sync.
+- **Google Calendar: an edit made while the event is uploading is sent afterwards** (#1932).
+  Sending a new event to Google takes a moment. If you changed its title, time or another
+  detail in that moment, Google kept the event as it was before the edit and Yuvomi recorded it
+  as up to date, so the change never reached Google - and the next sync could write Google's
+  older version back over your edit. Yuvomi now looks at the event again after Google has
+  answered and sends an edit made in the meantime with the next sync. CalDAV and iCloud already
+  did this (#1862).
 - **Shopping: an error message is in your language** (#1909). When something could not be
   saved, the note showed the server's own sentence, in English or German whatever the app was set
   to - "Unbekannte Liste." in an English session, when an item was moved to a list somebody had
-  just deleted. The shopping page now says it in the language of the app and adds what to do: the
-  list, item, shop or category no longer exists (reload the page), or a shop of that name already
-  exists (choose a different name). The same goes for the dialogs that manage shops and shopping
-  categories. Anything else on the shopping page shows the general sentence instead of a server
+  just deleted. The shopping page now says it in the language of the app: the list, item, shop or
+  category no longer exists, or a shop of that name already exists (choose a different name). The
+  same goes for the dialogs that manage shops and shopping categories. Anything else on the shopping page shows the general sentence instead of a server
   text. The other pages are unchanged for now and follow module by module. For API clients: the
   affected answers of `/api/v1/shopping` carry a
   `reason` next to `error` (`shopping_list_not_found`, `shopping_item_not_found`,
   `shopping_store_not_found`, `shopping_store_exists`, `shopping_category_not_found`,
   `category_exists`, `category_last`); status codes are unchanged, and three German `error`
   sentences are now English ("Unknown list.", "Unknown store.", "Store already exists.").
+- **Shopping: the page catches up by itself when something is gone** (#1909). If somebody else
+  in the household deleted a list, an item, a shop or a category while your page was open, the
+  next thing you did with it failed, and the note told you to reload the page. The page now does
+  that for you: it fetches the lists, shops, categories and items again and shows the current
+  state, and the note only says what happened ("This item no longer exists."). If the list you
+  were looking at is gone, you land on the first remaining one. An edit dialog for an item that
+  no longer exists closes; in any other case it stays open with what you typed and offers the
+  current lists, shops and categories. The dialogs that manage shops and shopping categories
+  refresh their rows the same way. One case stays quiet: if you delete an item that somebody else
+  has already deleted, it is simply gone - no note, and the row does not come back for a moment.
+  The same holds for a list, a shop or a shopping category that somebody else deleted first: the
+  list stays gone without a note, and the dialog confirms the shop or category as deleted instead
+  of reporting an error.
+- **Waste collection: an error message is in your language and names the cause** (#1909). The
+  waste page showed the server's own English sentence when something could not be saved, for
+  example "anchor_date must fall on month_day itself (its day-of-month must equal month_day)."
+  for a monthly schedule whose first pickup is not on the chosen day. Types, schedules, moved or
+  skipped pickups, one-off pickups, the rename and mapping of a source and the reminder settings
+  now say it in the language of the app, each cause with its own sentence: no weekday chosen, the
+  end date before the first pickup, an interval or day of the month out of range, a first pickup
+  that does not fall on the chosen day, a missing date, a pickup moved to the day it is already
+  on, a reminder outside 0 to 14 days or without a time. If somebody else in the household
+  deleted the type, schedule, pickup or source in the meantime, the note says so, an open dialog
+  closes and the page fetches the current state by itself. Deleting something that is already
+  deleted, or resetting a pickup that is already back on its day, simply succeeds. Saving a
+  reminder with an emptied time field no longer ends in a server error. The ICS import, the
+  mapping profile and sources with an address say it the same way, with the number where the
+  cause has one: a calendar larger than the upload limit, with more entries, pickups or labels
+  than the import takes, an address that is none or does not start with https://, an interval
+  out of range, a source that is being refreshed right now. A calendar that could not be fetched
+  says why by its kind - the address answered but delivered no calendar, the calendar is too
+  large, the address is on a private network, or it cannot be reached - instead of
+  "Fetching the source URL failed: HTTP 404". A file over the limit is refused before it is
+  sent. If only the type you picked in a dialog is gone (a schedule, a one-off pickup, a mapping
+  of a source, an import decision), the dialog stays open with everything you entered, the list
+  of types is fetched again and the focus is on it; nothing else is chosen in its place. The
+  failure text a source keeps from its last automatic fetch, shown in the source dialog, is
+  still the server's. For API clients: the affected answers of `/api/v1/waste` carry a `reason`
+  next to `error` (`waste_*_not_found`, `waste_type_in_use`, `waste_pickup_exists`,
+  `waste_schedule_*`, `waste_pickup_date_invalid`, `waste_override_*`, `waste_reminder_*`,
+  `waste_import_*`, `waste_profile_*`, `waste_source_*`, listed in the OpenAPI description), and
+  `params` with the number where the cause has one (`{ "limit_mb": 5 }`); a refresh or create
+  that ends with `outcome: "error"` names the class of the failed fetch as `reason` in `data`.
+  Status codes and `error` texts are unchanged, except that an empty `delivery_time` on
+  `PUT /waste/reminder-settings/{typeId}` now answers 400 instead of 500.
 - **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
   Wall mode always shows the same four things - the time, today's schedule, who's up today and
   the weather - on every device. The hint under Settings → Household → Wall tablets now names

@@ -15,8 +15,8 @@ import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
 import { id as validateId } from '../../middleware/validate.js';
 import { wasteErrorResponse, currentUserId, hasWasteWriteAccess, redactSourceForReader } from './helpers.js';
-import { MAX_ICS_BYTES } from '../../services/waste-import.js';
-import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow } from '../../services/waste-url-source.js';
+import { MAX_ICS_BYTES, MAX_ICS_MB } from '../../services/waste-import.js';
+import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow, classifyFetchFailure, emptyFeedAsFetchFailure } from '../../services/waste-url-source.js';
 
 const log = createLogger('Waste');
 const router = express.Router();
@@ -36,7 +36,7 @@ router.get('/:id', (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     res.json({ data: { ...redactSourceForReader(source, req), mappings: store.listMappings(db.get(), vId.value) } });
   } catch (err) {
     log.error('GET /waste/sources/:id error:', err);
@@ -103,9 +103,9 @@ router.post('/:id/refresh', async (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     if (source.kind !== 'url') {
-      return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400 });
+      return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400, reason: 'waste_source_not_url' });
     }
     const result = await refreshUrlSource(db.get(), vId.value);
     res.json({ data: { ...result, source: redactSourceForReader(result.source, req) } });
@@ -174,11 +174,14 @@ router.put('/:id/mappings/:mappingId', (req, res) => {
 function icsFromBody(req, res) {
   const ics = req.body?.ics;
   if (typeof ics !== 'string' || !ics.trim()) {
-    res.status(400).json({ error: 'An ICS file is required.', code: 400 });
+    res.status(400).json({ error: 'An ICS file is required.', code: 400, reason: 'waste_import_empty_file' });
     return null;
   }
   if (Buffer.byteLength(ics, 'utf8') > MAX_ICS_BYTES) {
-    res.status(400).json({ error: `The file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB upload limit.`, code: 400 });
+    res.status(400).json({
+      error: `The file exceeds the ${MAX_ICS_MB} MB upload limit.`, code: 400,
+      reason: 'waste_import_file_too_large', params: { limit_mb: MAX_ICS_MB },
+    });
     return null;
   }
   return ics;
@@ -205,7 +208,9 @@ async function icsTextForReimport(source, req, res) {
       }
       return fetched;
     } catch (err) {
-      res.status(502).json({ error: `Fetching the source URL failed: ${err.message}`, code: 502 });
+      // The class of the failure as `reason` (and its number as `params`), next
+      // to the sentence that carries the cause for logs and API consumers (#1909).
+      res.status(502).json({ error: `Fetching the source URL failed: ${err.message}`, code: 502, ...classifyFetchFailure(err) });
       return null;
     }
   }
@@ -213,17 +218,33 @@ async function icsTextForReimport(source, req, res) {
   return ics === null ? null : { text: ics, etag: null, lastModified: null };
 }
 
+/**
+ * A URL source whose fetched answer holds no calendar entry (#1938): the
+ * reviewed path says it the way it says every other failed fetch - 502 with
+ * the class as `reason` - instead of the file sentence the importer threw. A
+ * file source, and every other error, is not answered here.
+ * @returns {boolean} true if a response was sent
+ */
+function emptyFeedResponse(res, source, err) {
+  const failure = source?.kind === 'url' ? emptyFeedAsFetchFailure(err) : null;
+  if (!failure) return false;
+  res.status(502).json({ error: `Fetching the source URL failed: ${failure.message}`, code: 502, ...classifyFetchFailure(failure) });
+  return true;
+}
+
 router.post('/:id/reimport/preview', async (req, res) => {
+  let source = null;
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    source = store.getSource(db.get(), vId.value);
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     const fetched = await icsTextForReimport(source, req, res);
     if (fetched === null) return;
     const preview = store.previewImport(db.get(), { sourceId: vId.value, icsText: fetched.text });
     res.json({ data: preview });
   } catch (err) {
+    if (emptyFeedResponse(res, source, err)) return;
     if (wasteErrorResponse(res, err)) return;
     log.error('POST /waste/sources/:id/reimport/preview error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
@@ -231,11 +252,12 @@ router.post('/:id/reimport/preview', async (req, res) => {
 });
 
 router.post('/:id/reimport/commit', async (req, res) => {
+  let source = null;
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    source = store.getSource(db.get(), vId.value);
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     const fetched = await icsTextForReimport(source, req, res);
     if (fetched === null) return;
     const body = req.body ?? {};
@@ -276,6 +298,7 @@ router.post('/:id/reimport/commit', async (req, res) => {
     })();
     res.json({ data: result });
   } catch (err) {
+    if (emptyFeedResponse(res, source, err)) return;
     if (wasteErrorResponse(res, err)) return;
     log.error('POST /waste/sources/:id/reimport/commit error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
