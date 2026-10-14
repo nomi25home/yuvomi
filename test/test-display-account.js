@@ -1288,7 +1288,7 @@ test('das Display-Dashboard liefert Mahlzeiten fuer die Wand, ohne sensible Feld
   const meal = await admin('POST', '/meals', { date: today, meal_type: 'lunch', title: 'Testgericht', notes: 'Geheimes Rezept' });
   assert.ok([200, 201].includes(meal.status), `Mahlzeit anlegen: ${meal.status} ${JSON.stringify(meal.body)}`);
 
-  const res = await wall('GET', '/dashboard');
+  const res = await wall('GET', '/dashboard?audience=household');
   assert.equal(res.status, 200);
   const meals = res.body.todayMeals;
   assert.ok(Array.isArray(meals), 'todayMeals muss ein Array sein, nicht undefined');
@@ -1314,16 +1314,17 @@ test('das Display-Dashboard liefert Einkauf, Haushaltshilfe, Abfuhr und Vorrat f
   const item = await admin('POST', `/shopping/${listId}/items`, { name: 'Milch' });
   assert.ok([200, 201].includes(item.status), `Artikel anlegen: ${item.status}`);
 
-  const res = await wall('GET', '/dashboard');
+  const res = await wall('GET', '/dashboard?audience=household');
   assert.equal(res.status, 200);
 
   assert.equal(typeof res.body.shoppingOpenCount, 'number', 'shoppingOpenCount muss eine Zahl sein');
   assert.ok(res.body.shoppingOpenCount >= 1, 'mindestens ein offener Artikel');
 
-  // HAUSHALTSHILFE: konfiguriert oder nicht - die Kennzahlen duerften kein Display erreichen.
+  // HAUSHALTSHILFE: alle Schluessel bleiben - householdAudienceAnswer nullt die
+  // Kennzahlen, entfernt sie aber nicht. Das haelt die Form der Antwort stabil.
   assert.ok('housekeeping' in res.body, 'housekeeping muss vorhanden sein');
-  assert.ok(!('unpaidAmount' in res.body.housekeeping), 'unpaidAmount darf kein Display erreichen');
-  assert.ok(!('visitsThisMonth' in res.body.housekeeping), 'visitsThisMonth darf kein Display erreichen');
+  assert.equal(res.body.housekeeping.unpaidAmount, 0, 'unpaidAmount ist 0 (nullt, nicht fehlt)');
+  assert.equal(res.body.housekeeping.visitsThisMonth, 0, 'visitsThisMonth ist 0 (nullt, nicht fehlt)');
   assert.ok('configured' in res.body.housekeeping, 'configured muss vorhanden sein');
   assert.ok('present' in res.body.housekeeping, 'present muss vorhanden sein');
 

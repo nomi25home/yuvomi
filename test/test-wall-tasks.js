@@ -1477,3 +1477,31 @@ test('Allowlist: das Display ohne den Parameter bekommt, was es bekam', withCloc
   assert.deepEqual(wall.weekEvents, []);
   assert.ok(titles(wall.urgentTasks).includes('Tisch decken'), 'Reichweite: das Programm steht');
 }));
+
+test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitglied (#1903)', async () => {
+  let memberWall;
+  let displayWall;
+  await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+    seedWallSources();
+    memberWall = await overview(ANNA, householdQuery());
+    displayWall = await asCoupledDisplay(() => overview(DISPLAY, '?audience=household'));
+  })();
+  // Server-seitig: alle fuenf Quellen muessen beim Display ankommen.
+  assert.ok(Array.isArray(displayWall.todayMeals) && displayWall.todayMeals.length > 0, 'Mahlzeiten kommen an');
+  assert.ok(displayWall.shoppingOpenCount > 0, 'Einkauf kommt an');
+  assert.ok(displayWall.housekeeping?.present === true, 'Haushaltshilfe kommt an');
+  assert.ok(Array.isArray(displayWall.wastePickups) && displayWall.wastePickups.length > 0, 'Abfuhr kommt an');
+  assert.ok(Array.isArray(displayWall.pantryExpiring?.todayItems) && displayWall.pantryExpiring.todayItems.length > 0, 'Vorrat kommt an');
+  // Pantry-Artikel: nur name, keine internen Kennzahlen.
+  for (const item of displayWall.pantryExpiring.todayItems) {
+    assert.deepEqual(Object.keys(item), ['name'], 'Pantry-Artikel hat nur name');
+  }
+  // Browser-seitig: dieselben Zeilen und derselbe Ueberlauf.
+  await onWallAt(NOON_BERLIN, () => {
+    const day = (data) => {
+      const model = dash.buildTodayCockpitModel(data, [], { cap: dash.WALL_ROW_CAP, now: new Date(), groupOverdue: false });
+      return { rows: model.allRows.map((row) => [row.kind, row.title]), overflow: model.overflow };
+    };
+    assert.deepEqual(day(displayWall), day(memberWall), 'Programm und Ueberlauf stimmen ueberein');
+  })();
+});

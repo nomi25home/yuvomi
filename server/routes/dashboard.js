@@ -512,11 +512,11 @@ router.get('/', (req, res) => {
   }
   // Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
   // (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
-  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden VOR
-  // dem Deny-Payload-Durchlauf aus `leftOut` entfernt, damit die Bloecke unten
-  // laufen; sensible Felder filtert die Route am Ende jedes Blocks.
+  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden NUR
+  // fuer den Wand-Request (`audience=household`) aus `leftOut` entfernt - die
+  // persoenliche Uebersicht des Displays bleibt unveraendert.
   const isDisplay = req.authMethod === 'display';
-  if (isDisplay) {
+  if (isDisplay && householdAudience) {
     for (const key of ['meals', 'shopping', 'housekeeping', 'waste', 'pantry']) {
       leftOut.delete(key);
     }
@@ -750,7 +750,7 @@ router.get('/', (req, res) => {
   }
   // Displays zeigen nur, was die Wand-Zeile braucht: Datum, Typ, Titel und Koch.
   // `notes` und `created_by` bleiben zurueck (#1903).
-  if (isDisplay && Array.isArray(result.todayMeals)) {
+  if (isDisplay && householdAudience && Array.isArray(result.todayMeals)) {
     result.todayMeals = result.todayMeals.map(({
       id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
       recipe_has_image, recipe_has_own_image,
@@ -1294,13 +1294,6 @@ router.get('/', (req, res) => {
     log.error('housekeeping error:', err.message);
     result.housekeeping = { configured: false, present: false, presentSince: null, workerName: null, visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null };
   }
-  // Displays erhalten nur den Anwesenheitsstatus: Zahlbetrag und Besuchszahl
-  // sind interne Kennzahlen und gehoeren nicht an die Wand (#1903).
-  if (isDisplay && result.housekeeping) {
-    const { configured, present, presentSince, workerName, lastVisit } = result.housekeeping;
-    result.housekeeping = { configured, present, presentSince, workerName, lastVisit };
-  }
-
   // Abfuhr fuer das Heute-Blatt: heute (Tonne raus) und morgen (heute Abend
   // rausstellen). Dieselbe Aufloesung wie Kachel, Modul und Kalender
   // (`getOccurrences`, invariant #3: nie doppelt), nur das Zwei-Tage-Fenster
@@ -1358,6 +1351,14 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('pantryExpiring error:', err.message);
     result.pantryExpiring = null;
+  }
+  // Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
+  // Kennzahlen und gehoeren nicht an die Wand (#1903).
+  if (isDisplay && householdAudience && Array.isArray(result.pantryExpiring?.todayItems)) {
+    result.pantryExpiring = {
+      ...result.pantryExpiring,
+      todayItems: result.pantryExpiring.todayItems.map(({ name }) => ({ name })),
+    };
   }
 
   // „Heute dran"-Karte: pro Mitglied die Zahl der heute fälligen oder über-
