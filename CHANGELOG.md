@@ -9,7 +9,166 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Wall display shows today's meals, shopping count, housekeeping status, waste pickups, and expiring pantry items** (#1903). Paired wall displays previously showed only the calendar, tasks, rewards, and weather sections of the today sheet. The dashboard now delivers the five missing sources to display sessions with the same narrow fields the wall tile uses: meal title, type, and cook — no private notes or recipe content; shopping open-item count; housekeeping presence, worker name, and check-in time — without the unpaid amount or visit count; waste-pickup type names and icons; and expiring pantry items. Individual module routes for these remain closed to displays.
+- **Wall display shows today's meals, shopping count, housekeeping status, waste pickups, and expiring pantry items** (#1903). Paired wall displays previously showed only the calendar, tasks, rewards, and weather sections of the today sheet. The dashboard now delivers the five missing sources to display sessions with the same narrow fields the wall tile uses: meal title, type, and cook - no private notes or recipe content; shopping open-item count; housekeeping presence, worker name, and check-in time - without the unpaid amount or visit count; waste-pickup type names and icons; and expiring pantry items. Individual module routes for these remain closed to displays.
+- **Budget overview: expense categories and subcategories show their share of the total.** The
+  share stands quietly after the amount, the same way the Statistics tab already shows it. A
+  category is measured against the total of all expenses, a subcategory against the total of its
+  category; income rows stay as they are. The share is calculated in one place for both pages, so
+  the Statistics tab now also writes a share below one percent as "<1 %" instead of "0%", and
+  formats the number in the language and region you have chosen.
+
+### Fixed
+
+- **Calendar: an imported series saved from the form keeps its times on every server** (#1993).
+  Saving an imported series stores the time as you see it in the household's time zone, next to the
+  series' own time zone. The calendar view and the ICS feed then read that time in the zone the
+  server process runs in, so the same series could show at different times after a container was
+  rebuilt with another `TZ`. The time is now always read in the household's time zone, and the
+  series continues on the clock of its own zone. Also affected: CalDAV and iCloud. They received
+  the household's digits unchanged, labelled with the event's own zone. This applied to imported
+  single events with their own zone as well as to series. If your household time zone differs from
+  the zone of such an event, Yuvomi now sends a different clock time to CalDAV and iCloud the next
+  time the event is pushed - the one you saw in the form. A series you edited in Yuvomi is lined up
+  with its rule on the clock of its own zone, so the provider no longer counts an extra occurrence
+  on the day before. Google is unchanged. Not yet covered: the dashboard countdown of an imported
+  series whose own zone differs from the household's can still name a day next to the one the
+  calendar shows (#1998).
+- **Documents: an error message is in your language and names the cause** (#1909). The
+  documents page showed the server's own English sentence when something could not be saved,
+  moved or deleted, whatever the app language, for example "Folder not found." when somebody else
+  in the household had deleted the folder in the meantime. Folders and documents that no longer
+  exist, a folder name that is already taken, a folder that would be nested too deep, a file type
+  that is not allowed, a file whose content does not match its type, an empty file and a document
+  storage that does not respond now get a sentence in the language of the app. When the folder or
+  document is gone, the page fetches folders and documents by itself and an open dialog closes,
+  also when a deletion meets a document that is gone (it may only have become invisible to you,
+  so this is not reported as deleted). If the folder chosen when uploading or editing a document,
+  or the parent chosen for a new folder, was deleted in the meantime, the dialog stays open with
+  your input and offers the current folders. Not covered: uploading a whole folder into a folder
+  deleted in the meantime still lists the failure per file and needs the dialog to be opened
+  again, as before. Linking a document from a DMS
+  or sending one to it names a removed DMS account, a document gone in the DMS, an already linked
+  or already stored document and an unreachable DMS. The failures listed after uploading a folder
+  use the same sentences. Uploading into or moving a document to a folder deleted in the meantime
+  answered with a server error and now says that the folder is gone. Any other failure shows the
+  general message instead of the server's text. For API clients: those answers of
+  `/api/v1/documents` carry a `reason` next to `error` (`documents_folder_not_found`,
+  `documents_selected_folder_not_found`, `documents_folder_exists`, `documents_folder_too_deep`
+  with `params.limit`, `documents_document_not_found`, `documents_file_type_not_allowed`,
+  `documents_file_content_mismatch`, `documents_file_empty`, `documents_storage_failed`,
+  `dms_account_not_found`, `dms_document_not_found`, `dms_document_already_linked`,
+  `dms_document_already_stored`, `dms_unreachable`); a document with an unknown `folder_id` is a
+  400 instead of a 500, also when the folder disappears while the file is being stored, an empty
+  file is reported as empty instead of as an invalid data URL, a local failure while linking or
+  sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged.
+- **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
+  the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
+  open. Its buttons had lost the connection to the form they belong to, and find it again.
+- **Housekeeping: only admins are offered to create or edit a housekeeper profile.** A member
+  with write access to Housekeeping saw "Create profile" and the edit button next to each
+  housekeeper, and saving was refused, because profiles are an admin task. Members now open the
+  profile to read it, as with read-only access, and the empty overview says that an admin creates
+  the profile. Checking in and out and keeping open visits stay with every member who may write.
+  For API clients: `GET /api/v1/housekeeping/workers` carries `can_manage` next to `data`, true
+  when the caller may create and edit profiles.
+- **A series end set in the repeat options ends on the same occurrence in every calendar**
+  (#1974). The end date was saved as the end of that day in UTC. Google, CalDAV and iCloud read
+  that moment: east of UTC they showed one occurrence more (a daily series at 00:30 in Berlin also
+  on the day after the end), west of UTC one fewer (at 23:30 in Los Angeles the last day was
+  missing), and a synced series with its own time zone ended early in Yuvomi as well. The end is
+  now saved as the date you picked, and each calendar receives the end of that day in the time
+  zone it computes the series in - as a UTC time next to a timed start, as RFC 5545 requires, and
+  as a date for all-day series. Series saved before this update keep the end they have; it is
+  applied the next time the repeat options are changed. Two smaller cases from the same report: an
+  end that came back from another calendar as a UTC time showed the following day in the edit form
+  west of UTC, and an end with a time but no time zone reached Google as UTC instead of the
+  series' local time.
+
+## [2.77.1] - 2026-10-14
+
+### Fixed
+
+- **A synced "last day of the month" series keeps the date you entered after the next sync**
+  (#1956). A series created in Yuvomi from a date in the middle of the month is sent to Google,
+  CalDAV or Apple Calendar with a start its rule accepts: entered on 15 January, it starts on 31
+  January over there. The next sync read that start back and wrote it into Yuvomi: the event then
+  showed 31 January as its start, and its reminders moved with it by 16 days, although nobody had
+  changed anything in the other calendar. Yuvomi now remembers what it sent. When the other
+  calendar returns exactly that and the event was not changed in Yuvomi since, the entered start,
+  end, repeat rule and time zone stay, and so do the reminders; a title changed over there still
+  comes in. Any other change in the other calendar is taken over as before. A series whose
+  start already came back before this update keeps that start: the date entered back then is not
+  known any more. A repeat rule sent back by an API client with its values in another order
+  (`BYDAY=TU,MO` for `BYDAY=MO,TU`) no longer counts as a rule written in Yuvomi.
+- **A timed series that ends on a date ends on the same occurrence in Google as in Yuvomi** (#1974).
+  When a series with a time of day ends on a date - for example after "this and all following"
+  cut it off - Yuvomi shows it up to and including that day in your time zone. Google got the end
+  of that day in UTC instead. East of UTC Google could show one occurrence more (a daily 00:30 in
+  Berlin also on the morning after the last day), west of UTC one fewer (a daily 23:30 in Los
+  Angeles was missing on the last day). The end now goes to Google as the end of that day in the
+  time zone the series is sent with. This applies to what is sent from now on: once Google's
+  answer has come back into Yuvomi, a series keeps the end both sides already agree on.
+- **Waste collection: the source dialog says why the last refresh failed in your language**
+  (#1909). The dialog of a calendar address showed the server's own English text of the last
+  failed refresh, for example "No calendar entries in the response". It now shows the same
+  sentence the manual refresh shows, in the language of the app: no calendar with entries came
+  from the address, the address answered with an error status, the calendar is too large, the
+  address is blocked or could not be reached. A source whose last failure happened before this
+  update shows the general sentence until its next refresh. For API clients: a source carries
+  `last_error_reason` and `last_error_params` next to `last_error` (the same `reason` and `params`
+  the refresh answer has), omitted for a caller without write access like `last_error` itself.
+- **A "last day of the month" series keeps its start date in Google, CalDAV and Apple Calendar after
+  an edit** (#1935). A series you create in Yuvomi from a date in the middle of the month is sent
+  with a start date its own rule accepts: entered on 15 January, it starts on 31 January over there.
+  That only held for the first upload. After any later edit, even one that only changed the title,
+  the other calendar got 15 January as the start and could show that day as one occurrence more
+  than Yuvomi does. The series now goes out with the same start on every upload. The same applies
+  when you change the start date or the repeat rule of a series that is already synced, including
+  one that came from the other calendar. A synced series whose start date and rule you did not
+  change in Yuvomi is still sent back exactly as it came in. A series that already shows the wrong
+  start date in the other calendar is corrected the next time you change its start date or its
+  repeat rule in Yuvomi.
+- **Saving an event without touching its time no longer moves it** (#1958). With no household time
+  zone set and the app opened from a device in another time zone than the server, the event form
+  showed a synced event in the device's zone and sent those digits back on every save; the server
+  read them in its own zone, so renaming an event moved it by the difference between the two
+  zones, and an all-day event stored as midnight UTC could slip to the day before. The form now
+  leaves start and end out of the save when you did not change them, and the stored time stays as
+  it was. Setting a household time zone in Settings is still the way to make device and server
+  agree on times you type in.
+- **Health: an error message is in your language and names the cause** (#1909). The health
+  pages showed the server's own sentence when something could not be saved or deleted, in German
+  or English whatever the app language, for example "Medikament nicht gefunden." when somebody
+  else in the household had deleted the medication in the meantime. Measurements, medications,
+  time slots, dose entries, lab reports and analytes, activities, preventive care, nutrition
+  entries, periods and day entries now say in the language of the app that the entry no longer
+  exists; an open dialog closes and the area fetches the current state by itself, also when a
+  deletion meets an entry that is gone. If the preventive care type chosen in an
+  open dialog was deleted in Settings, the dialog stays open with your input and offers the
+  current types. Importing period history names the cause when the text is too large, has only
+  a header row or holds too many periods. Any other failure shows the general message of the
+  place instead of the server's text. The same holds for preventive care types in Settings, where
+  deleting a type another admin already deleted simply succeeds. Not
+  covered: the list of invalid rows of a period import still shows the server's row messages.
+  For API clients: those answers of `/api/v1/health` carry a `reason` next to `error`
+  (`health_*_not_found`, `health_prevention_selected_type_not_found`,
+  `health_cycle_import_too_large`, `health_cycle_import_no_rows`,
+  `health_cycle_import_too_many_rows`, the import limits in `params`); status codes are unchanged,
+  and the `error` texts that were German are now English.
+- **A contact or shopping item that is already gone from a CalDAV or CardDAV server no longer
+  blocks its sync.** On servers where Yuvomi lists the contacts of an address book before
+  downloading them (#529, for example mailbox.org), one contact deleted in between made the whole
+  address book fail. A shopping item moved to another list kept waiting for the move when its
+  original had already been deleted on the server. Both came from servers that report a single
+  entry as "not found", as standard CalDAV and CardDAV servers do. Such an entry now counts as gone.
+  Any other refusal still stops the sync with its HTTP status, and an entry the server sends
+  without its content is an error, not an empty contact or event.
+
+### Security
+
+- **Reminder and task sync with CalDAV checks every request against the account's address**, as
+  event sync does since #1860. This applies to the sync run and the immediate update after an edit.
+>>>>>>> origin/main
 
 ## [2.77.0] - 2026-10-14
 

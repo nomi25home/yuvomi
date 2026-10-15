@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Az elérési út meghaladja az öt mappaszint korlátját.",
             "reasonParentFailed": "A szülőmappát nem sikerült létrehozni.",
             "reasonRateLimited": "A szerver túl sok kérést kap. Próbáld meg később újra a feltöltést."
-        }
+        },
+        "errorFolderGone": "Ez a mappa már nem létezik.",
+        "errorSelectedFolderGone": "A kiválasztott mappa már nem létezik.",
+        "errorFolderExists": "Itt már van ilyen nevű mappa. Válassz másik nevet.",
+        "errorFolderTooDeep": "A mappák legfeljebb {{limit}} szint mélyen ágyazhatók egymásba.",
+        "errorDocumentGone": "Ez a dokumentum már nem érhető el.",
+        "errorFileTypeNotAllowed": "Ez a fájltípus nem tölthető fel.",
+        "errorFileContentMismatch": "A fájl tartalma nem egyezik a típusával.",
+        "errorFileEmpty": "A fájl üres.",
+        "errorStorageFailed": "A dokumentumtár nem válaszolt. Próbáld újra később.",
+        "errorDmsAccountGone": "Ez a DMS-fiók már nem létezik.",
+        "errorDmsDocumentGone": "Ez a dokumentum már nem létezik a DMS-ben.",
+        "errorDmsAlreadyLinked": "Ez a DMS-dokumentum már össze van kapcsolva.",
+        "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva."
     },
     "housekeeping": {
         "title": "Háztartás",
@@ -3868,6 +3881,7 @@
         "noVisits": "Még nincs látogatás",
         "noWorkerTitle": "Nincs háztartási profil",
         "noWorkerHint": "Hozza létre a munkás profilját a kapcsolatok, díjak és fizetési ütemezés meghatározásához.",
+        "noWorkerHintAdminOnly": "A profilt egy admin hozza létre, a kapcsolatokkal, a díjjal és a fizetési ütemezéssel együtt.",
         "taskTemplates": "Javasolt házimunkák",
         "addCustomTask": "Egyéni házimunka hozzáadása",
         "noReports": "Még nincs jelentés.",
@@ -5429,7 +5443,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Ez a mérés már nem létezik.",
+        "errorMedicationGone": "Ez a gyógyszer már nem létezik.",
+        "errorScheduleGone": "Ez az időpont már nem létezik.",
+        "errorDoseGone": "Ez az adagbejegyzés már nem létezik.",
+        "errorLabReportGone": "Ez a lelet már nem létezik.",
+        "errorLabResultGone": "Ez a paraméter már nem létezik.",
+        "errorActivityGone": "Ez a tevékenység már nem létezik.",
+        "errorPreventionTypeGone": "Ez a megelőzési típus már nem létezik.",
+        "errorSelectedPreventionTypeGone": "A kiválasztott típus már nem létezik.",
+        "errorPreventionRecordGone": "Ez a megelőzési bejegyzés már nem létezik.",
+        "errorNutritionEntryGone": "Ez a bejegyzés már nem létezik.",
+        "errorPeriodGone": "Ez a menstruáció már nem létezik.",
+        "errorCycleDayGone": "Ez a napi bejegyzés már nem létezik.",
+        "errorCycleImportTooLarge": "A szöveg nagyobb, mint {{limit_kb}} KB. Importáld a menstruációkat kisebb részekben.",
+        "errorCycleImportNoRows": "A fájlban csak fejlécsor van, menstruáció nincs.",
+        "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt."
     },
     "waste": {
         "title": "Hulladékgyűjtés",

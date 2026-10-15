@@ -22,14 +22,15 @@
 import { createLogger } from '../logger.js';
 import * as outbound from './calendar-outbound.js';
 import { patchICSEvent } from '../utils/ics-patch.js';
-import { eventDateTimeFields } from '../utils/ics-datetime.js';
+import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
+import { icsSnapshot } from './outbound-echo.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
-import { isOriginRefusal } from '../utils/caldav-client.js';
+import { isOriginRefusal, sameObjectAddress } from '../utils/caldav-client.js';
 
 const log = createLogger('CalDAVOutbound');
 
@@ -199,13 +200,14 @@ function deletedByUser(source, uid, sourceObjectUrl, sourceCalendarUrl, accountI
 export function icsFieldsForEvent(event, householdZone = null) {
   // Start/Ende mit der eigenen Wiederholungsregel in Einklang (#986); ein
   // importiertes DTSTART bleibt unberuehrt (#756).
-  const when = eventDateTimeFields(outboundEvent(event), householdZone);
+  const when = eventDateTimeFields(outboundEvent(event, { householdZone }), householdZone);
 
   const fields = {
     SUMMARY:     event.title,
     DESCRIPTION: event.description || null,
     LOCATION:    event.location || null,
-    RRULE:       event.recurrence_rule || null,
+    // Reines Datum als UNTIL neben getimtem DTSTART -> Ende des Ortstags (#1974).
+    RRULE:       event.recurrence_rule ? rruleForDtstart(event.recurrence_rule, when) : null,
     DTSTART:     when.dtstart,
     DTEND:       when.dtend,
   };
@@ -278,10 +280,10 @@ export async function fetchObjectsByUrl(client, wanted) {
       // Über die URL zurück auf den Termin abbilden - verlässlicher als die UID
       // erneut aus dem Objekt zu parsen.
       for (const obj of objects || []) {
-        const match = items.find((i) => i.url === obj.url) || (items.length === 1 ? items[0] : null);
+        const match = items.find((i) => sameObjectAddress(i.url, obj.url));
         if (!match) continue;
         index.set(match.uid, {
-          url: obj.url || match.url, etag: obj.etag, data: obj.data, calendarUrl,
+          url: match.url, etag: obj.etag, data: obj.data, calendarUrl,
         });
       }
     } catch (err) {
@@ -694,7 +696,8 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           outbound.dropDeletionsIn({
             source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id, accountId,
           });
-          outbound.settleOutbound(fresh, moveTo);
+          // Mit dem Anlegen ging der Patch hinaus: sein Schnappschuss (#1956).
+          outbound.settleOutbound(fresh, moveTo, fresh, { snapshot: icsSnapshot(fresh, patched, event.external_calendar_id, zone) });
           done++;
           continue; // der Patch ist mit dem Anlegen bereits geschrieben
         } catch (err) {
@@ -723,7 +726,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       // Die Adresse kam aus dem Abruf; die Zeile merkt sich die, an der ihr
       // Objekt wirklich liegt.
       if (index && url !== event.external_object_url) outbound.recordObjectUrl(event.id, url);
-      outbound.settleOutbound(fresh);
+      outbound.settleOutbound(fresh, null, fresh, { snapshot: icsSnapshot(fresh, patched, event.external_calendar_id, zone) });
       done++;
     } catch (err) {
       outbound.handleUpdateError(err, event, 'update', label(source));

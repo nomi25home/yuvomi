@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "La ruta supera el límite de cinco niveles de carpetas.",
             "reasonParentFailed": "No se pudo crear la carpeta superior.",
             "reasonRateLimited": "El servidor está recibiendo demasiadas solicitudes. Intenta cargar de nuevo más tarde."
-        }
+        },
+        "errorFolderGone": "Esta carpeta ya no existe.",
+        "errorSelectedFolderGone": "La carpeta elegida ya no existe.",
+        "errorFolderExists": "Ya existe aquí una carpeta con este nombre. Elige otro nombre.",
+        "errorFolderTooDeep": "Las carpetas se pueden anidar como máximo {{limit}} niveles.",
+        "errorDocumentGone": "Este documento ya no está disponible.",
+        "errorFileTypeNotAllowed": "Este tipo de archivo no se puede subir.",
+        "errorFileContentMismatch": "El contenido del archivo no coincide con su tipo.",
+        "errorFileEmpty": "El archivo está vacío.",
+        "errorStorageFailed": "El almacenamiento de documentos no respondió. Inténtalo de nuevo más tarde.",
+        "errorDmsAccountGone": "Esta cuenta de DMS ya no existe.",
+        "errorDmsDocumentGone": "Este documento ya no existe en el DMS.",
+        "errorDmsAlreadyLinked": "Este documento del DMS ya está vinculado.",
+        "errorDmsAlreadyStored": "Este documento ya está guardado en un DMS."
     },
     "shortcuts": {
         "goKitchen": "Cocina",
@@ -3868,6 +3881,7 @@
         "noVisits": "Sin visitas todavía",
         "noWorkerTitle": "Sin perfil de limpieza",
         "noWorkerHint": "Crea el perfil para definir contactos, tarifa y calendario de pago.",
+        "noWorkerHintAdminOnly": "Un administrador crea el perfil, con contactos, tarifa y calendario de pago.",
         "taskTemplates": "Tareas sugeridas",
         "addCustomTask": "Agregar tarea personalizada",
         "noReports": "Aún no hay reportes.",
@@ -5429,7 +5443,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Esta medición ya no existe.",
+        "errorMedicationGone": "Este medicamento ya no existe.",
+        "errorScheduleGone": "Esta franja horaria ya no existe.",
+        "errorDoseGone": "Esta entrada de dosis ya no existe.",
+        "errorLabReportGone": "Este informe ya no existe.",
+        "errorLabResultGone": "Este parámetro ya no existe.",
+        "errorActivityGone": "Esta actividad ya no existe.",
+        "errorPreventionTypeGone": "Este tipo de prevención ya no existe.",
+        "errorSelectedPreventionTypeGone": "El tipo elegido ya no existe.",
+        "errorPreventionRecordGone": "Este registro de prevención ya no existe.",
+        "errorNutritionEntryGone": "Este registro ya no existe.",
+        "errorPeriodGone": "Este periodo ya no existe.",
+        "errorCycleDayGone": "Esta entrada del día ya no existe.",
+        "errorCycleImportTooLarge": "El texto ocupa más de {{limit_kb}} KB. Importa los periodos en partes más pequeñas.",
+        "errorCycleImportNoRows": "El archivo solo tiene la fila de encabezado y ningún periodo.",
+        "errorCycleImportTooManyRows": "Una importación puede tener como máximo {{limit}} periodos. Divide el archivo."
     },
     "waste": {
         "title": "Recogida de basura",

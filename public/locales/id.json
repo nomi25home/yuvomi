@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Jalur melebihi batas lima tingkat folder.",
             "reasonParentFailed": "Folder induk tidak dapat dibuat.",
             "reasonRateLimited": "Server sedang menerima terlalu banyak permintaan. Coba unggah lagi nanti."
-        }
+        },
+        "errorFolderGone": "Folder ini sudah tidak ada.",
+        "errorSelectedFolderGone": "Folder yang dipilih sudah tidak ada.",
+        "errorFolderExists": "Sudah ada folder dengan nama ini di sini. Pilih nama lain.",
+        "errorFolderTooDeep": "Folder dapat bersarang paling banyak {{limit}} tingkat.",
+        "errorDocumentGone": "Dokumen ini sudah tidak tersedia.",
+        "errorFileTypeNotAllowed": "Jenis file ini tidak dapat diunggah.",
+        "errorFileContentMismatch": "Isi file tidak sesuai dengan jenisnya.",
+        "errorFileEmpty": "File kosong.",
+        "errorStorageFailed": "Penyimpanan dokumen tidak merespons. Coba lagi nanti.",
+        "errorDmsAccountGone": "Akun DMS ini sudah tidak ada.",
+        "errorDmsDocumentGone": "Dokumen ini sudah tidak ada di DMS.",
+        "errorDmsAlreadyLinked": "Dokumen DMS ini sudah ditautkan.",
+        "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS."
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",
@@ -3872,6 +3885,7 @@
         "noVisits": "Belum ada kunjungan",
         "noWorkerTitle": "Tidak ada profil asisten rumah tangga",
         "noWorkerHint": "Buat profil untuk menetapkan kontak, tarif harian, dan ritme pembayaran.",
+        "noWorkerHintAdminOnly": "Admin yang membuat profil, beserta kontak, tarif harian, dan ritme pembayaran.",
         "taskTemplates": "Tugas yang disarankan",
         "addCustomTask": "Tambah tugas kustom",
         "noReports": "Belum ada laporan.",
@@ -5429,7 +5443,23 @@
                 "kcal": "kkal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Pengukuran ini sudah tidak ada.",
+        "errorMedicationGone": "Obat ini sudah tidak ada.",
+        "errorScheduleGone": "Slot waktu ini sudah tidak ada.",
+        "errorDoseGone": "Entri dosis ini sudah tidak ada.",
+        "errorLabReportGone": "Hasil ini sudah tidak ada.",
+        "errorLabResultGone": "Analit ini sudah tidak ada.",
+        "errorActivityGone": "Aktivitas ini sudah tidak ada.",
+        "errorPreventionTypeGone": "Jenis perawatan pencegahan ini sudah tidak ada.",
+        "errorSelectedPreventionTypeGone": "Jenis yang dipilih sudah tidak ada.",
+        "errorPreventionRecordGone": "Catatan perawatan pencegahan ini sudah tidak ada.",
+        "errorNutritionEntryGone": "Catatan ini sudah tidak ada.",
+        "errorPeriodGone": "Menstruasi ini sudah tidak ada.",
+        "errorCycleDayGone": "Catatan hari ini sudah tidak ada.",
+        "errorCycleImportTooLarge": "Teks lebih besar dari {{limit_kb}} KB. Impor menstruasi dalam bagian yang lebih kecil.",
+        "errorCycleImportNoRows": "File hanya berisi baris judul tanpa menstruasi.",
+        "errorCycleImportTooManyRows": "Satu impor boleh berisi paling banyak {{limit}} menstruasi. Bagi file-nya."
     },
     "waste": {
         "title": "Pengumpulan sampah",

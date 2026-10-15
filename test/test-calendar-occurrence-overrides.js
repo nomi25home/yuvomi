@@ -84,7 +84,10 @@ test('body-free event projection mirrors every calendar_events column but the in
   const { get } = await import('../server/db.js');
   // Deliberate exclusion, not an oversight: legacy inline attachment bodies can
   // be megabytes and never belong in a compact read path.
-  const EXCLUDED = ['attachment_data'];
+  // outbound_snapshot (#1956): what the last aligned push sent. Its only reader
+  // is the inbound sync, with its own SELECT; no read path needs it, and an API
+  // answer should not carry it.
+  const EXCLUDED = ['attachment_data', 'outbound_snapshot'];
   const schema = get().prepare('PRAGMA table_info(calendar_events)').all()
     .map((column) => column.name);
   assert.ok(EXCLUDED.every((name) => schema.includes(name)),
@@ -108,6 +111,8 @@ function createDatabase() {
   database.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions
   database.exec(MIGRATIONS_SQL[174]); // generated name-day event owner
   database.exec(MIGRATIONS_SQL[245]);
+  // Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
+  database.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
   database.exec(`
     CREATE TABLE housekeeping_work_sessions (
       id INTEGER PRIMARY KEY,

@@ -43,6 +43,9 @@ export const BODY_FREE_EVENT_COLUMNS = Object.freeze([
   // Das CalDAV-Konto der Zeile (#1860), neben den uebrigen Sync-Spalten: wer
   // eine so gelesene Zeile an den Ausgang weitergibt, braucht es dort.
   'caldav_account_id',
+  // Wer Start und Regel verfasst hat (#1935): der Feed und jeder andere
+  // ausgehende Weg richten den Start nur aus, wenn die Zeile die Marke traegt.
+  'series_authored',
 ]);
 
 const eventColumnCache = new WeakMap();
@@ -136,7 +139,8 @@ export function expandAndResolveEventRows(database, rows, from, to, options = {}
     from,
     to,
     exceptions,
-    { ...options.expansion, includeRecurrenceIdentity: true },
+    // Die Zone kommt von hier, die Expansion kennt keine Datenbank (#1993).
+    { householdZone: householdTimeZone(database), ...options.expansion, includeRecurrenceIdentity: true },
   );
   return resolveProjectedEventRows(database, expanded, options)
     .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));

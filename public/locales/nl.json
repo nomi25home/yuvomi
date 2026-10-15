@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Het pad overschrijdt de limiet van vijf mapniveaus.",
             "reasonParentFailed": "De bovenliggende map kon niet worden gemaakt.",
             "reasonRateLimited": "De server ontvangt te veel verzoeken. Probeer de upload later opnieuw."
-        }
+        },
+        "errorFolderGone": "Deze map bestaat niet meer.",
+        "errorSelectedFolderGone": "De gekozen map bestaat niet meer.",
+        "errorFolderExists": "Hier bestaat al een map met deze naam. Kies een andere naam.",
+        "errorFolderTooDeep": "Mappen kunnen maximaal {{limit}} niveaus diep worden genest.",
+        "errorDocumentGone": "Dit document is niet meer beschikbaar.",
+        "errorFileTypeNotAllowed": "Dit bestandstype kan niet worden geüpload.",
+        "errorFileContentMismatch": "De inhoud van het bestand past niet bij het bestandstype.",
+        "errorFileEmpty": "Het bestand is leeg.",
+        "errorStorageFailed": "De documentopslag reageerde niet. Probeer het later opnieuw.",
+        "errorDmsAccountGone": "Dit DMS-account bestaat niet meer.",
+        "errorDmsDocumentGone": "Dit document bestaat niet meer in het DMS.",
+        "errorDmsAlreadyLinked": "Dit DMS-document is al gekoppeld.",
+        "errorDmsAlreadyStored": "Dit document staat al in een DMS."
     },
     "housekeeping": {
         "title": "Huishouden",
@@ -3868,6 +3881,7 @@
         "noVisits": "Nog geen bezoeken",
         "noWorkerTitle": "Geen schoonmakerprofiel",
         "noWorkerHint": "Maak het medewerkersprofiel aan om contactgegevens, tarief en betalingsschema vast te leggen.",
+        "noWorkerHintAdminOnly": "Een beheerder maakt het profiel aan, met contactgegevens, tarief en betalingsschema.",
         "taskTemplates": "Voorgestelde klusjes",
         "addCustomTask": "Aangepast klusje toevoegen",
         "noReports": "Nog geen rapporten.",
@@ -5429,7 +5443,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Deze meting bestaat niet meer.",
+        "errorMedicationGone": "Dit medicijn bestaat niet meer.",
+        "errorScheduleGone": "Dit tijdstip bestaat niet meer.",
+        "errorDoseGone": "Deze innamevermelding bestaat niet meer.",
+        "errorLabReportGone": "Deze uitslag bestaat niet meer.",
+        "errorLabResultGone": "Deze analyt bestaat niet meer.",
+        "errorActivityGone": "Deze activiteit bestaat niet meer.",
+        "errorPreventionTypeGone": "Dit type preventieve zorg bestaat niet meer.",
+        "errorSelectedPreventionTypeGone": "Het gekozen type bestaat niet meer.",
+        "errorPreventionRecordGone": "Dit preventie-item bestaat niet meer.",
+        "errorNutritionEntryGone": "Dit item bestaat niet meer.",
+        "errorPeriodGone": "Deze menstruatie bestaat niet meer.",
+        "errorCycleDayGone": "Dit dagitem bestaat niet meer.",
+        "errorCycleImportTooLarge": "De tekst is groter dan {{limit_kb}} KB. Importeer de menstruaties in kleinere delen.",
+        "errorCycleImportNoRows": "Het bestand bevat alleen een kopregel en geen menstruaties.",
+        "errorCycleImportTooManyRows": "Eén import mag hoogstens {{limit}} menstruaties bevatten. Splits het bestand."
     },
     "waste": {
         "title": "Afvalinzameling",

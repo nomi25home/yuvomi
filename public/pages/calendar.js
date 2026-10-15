@@ -6141,6 +6141,8 @@ export const __test = {
   readOnly, openEventModal,
   periodStepOf, periodArrowLabels, openCalendarFilters,
   buildEventModalContent, eventAdvancedTopics, wireVisibilityWarning,
+  // #1974: die Detailzeile der Wiederholung, gemessen an der echten Verdrahtung.
+  renderEventDetail,
   calendarSaveErrorMessage,
   hasCurrentAttachment,
   attachmentNode,
@@ -6546,7 +6548,8 @@ function renderEventDetail(ev, reminders = []) {
     // WANN und WER stehen seit R18 im Kopf (eventDetailHead): die Zeit in
     // Worten, die Personen als Avatare. Eine Zeile bleibt nur fuer den frei
     // eingetragenen Namen ohne Konto - er hat kein Bild fuer den Kopf.
-    recurrenceRow(ev.recurrence_rule),
+    // Zone und Start der Serie: ein UNTIL mit Uhrzeit endet an ihrem Ortstag (#1974).
+    recurrenceRow(ev.recurrence_rule, { seriesZone: ev.tzid, seriesStart: ev.start_datetime }),
     { icon: 'map-pin', label: t('calendar.locationLabel'), value: ev.location ? fmtLocation(ev.location) : '', action: mapRowAction(ev) },
     ev.assigned_users?.length ? null : assignedRow([], t('calendar.assignedLabel'), ev.assigned_name || ''),
     {
@@ -6974,6 +6977,47 @@ function eventStartFromForm(root) {
   const sd = readDateInput(root, '#modal-start-date');
   const st = parseTimeInput(root.querySelector('#modal-start-time')?.value || '');
   return st ? `${sd}T${st}` : sd;
+}
+
+/** Das Ende, das das Formular gerade traegt - Gegenstueck zu eventStartFromForm. */
+function eventEndFromForm(root) {
+  if (root.querySelector('#modal-allday')?.checked) {
+    return readDateInput(root, '#modal-allday-end') || readDateInput(root, '#modal-end-date') || null;
+  }
+  const ed = readDateInput(root, '#modal-end-date');
+  const et = parseTimeInput(root.querySelector('#modal-end-time')?.value || '');
+  return ed ? (et ? `${ed}T${et}` : ed) : null;
+}
+
+/**
+ * Beginn, Ende und „ganztaegig", wie das Formular sie beim Oeffnen zeigte
+ * (#1958). Gegen diesen Stand prueft das Speichern, ob jemand die Zeit
+ * angefasst hat - siehe eventTimesUntouched().
+ */
+const eventTimeBaselines = new WeakMap();
+
+function eventTimesFromForm(root) {
+  return {
+    allDay: !!root.querySelector('#modal-allday')?.checked,
+    start: eventStartFromForm(root),
+    end: eventEndFromForm(root),
+  };
+}
+
+/**
+ * Zeigt das Formular noch dieselbe Zeit wie beim Oeffnen? (#1958)
+ *
+ * Gefragt wird nach den ZUSAMMENGESETZTEN Werten, nicht nach den einzelnen
+ * Feldern: die Datums- und Zeitfelder sind `<yuvomi-datepicker>`-Hosts, die
+ * der Feld-Ausgangsstand von #1284 (`input, select, textarea`) gar nicht
+ * sieht. Ohne Ausgangsstand gilt die Zeit als angefasst - im Zweifel geht sie
+ * mit, wie vor #1958.
+ */
+function eventTimesUntouched(root) {
+  const before = eventTimeBaselines.get(root);
+  if (!before) return false;
+  const now = eventTimesFromForm(root);
+  return now.allDay === before.allDay && now.start === before.start && now.end === before.end;
 }
 
 /**
@@ -7779,6 +7823,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   // es ueberhaupt etwas zu fragen gibt (#1284). Als Letztes: alles darueber
   // darf noch Werte setzen, die zum Ausgangsstand gehoeren.
   eventFormBaselines.set(panel, readEventFormState(panel));
+  eventTimeBaselines.set(panel, eventTimesFromForm(panel));
 }
 
 /**
@@ -8172,6 +8217,10 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       // Kanonischer Datums-Key aus dem Kalenderzustand. Das Widget formatiert
       // ihn nur; es kennt weder die Zeit- noch die Ganztags-Feldnamen.
       startDate,
+      // Ein UNTIL mit Uhrzeit endet am Ortstag der Serie, so wie der Server es
+      // liest (#1974) - dafuer braucht das Formular ihre Zone und ihren Start.
+      seriesZone: isEdit ? event.tzid : null,
+      seriesStart: isEdit ? event.start_datetime : null,
     })}
 
     ${isEdit && requiresWholeSeriesConfirmation(event) ? `
@@ -8292,13 +8341,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
 
   if (allday) {
     start_datetime = eventStartFromForm(overlay);
-    end_datetime   = readDateInput(overlay, '#modal-allday-end')
-                   || readDateInput(overlay, '#modal-end-date');
-    end_datetime   = end_datetime || null;
+    end_datetime   = eventEndFromForm(overlay);
   } else {
     const stRaw = overlay.querySelector('#modal-start-time').value;
     const st = parseTimeInput(stRaw);
-    const ed = readDateInput(overlay, '#modal-end-date');
     const etRaw = overlay.querySelector('#modal-end-time').value;
     const et = parseTimeInput(etRaw);
     if ((stRaw && !st) || (etRaw && !et)) {
@@ -8311,7 +8357,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Dieselbe Zusammensetzung, mit der die Erinnerungszeilen den Beginn im
     // Dialog verfolgen - zwei Schreibweisen koennten auseinanderlaufen.
     start_datetime = eventStartFromForm(overlay);
-    end_datetime   = ed ? (et ? `${ed}T${et}` : ed) : null;
+    end_datetime   = eventEndFromForm(overlay);
   }
 
   const visibleDateFields = allday
@@ -8539,6 +8585,19 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
           savePath = target.path;
           reminderBaseStart = newStart;
           reloadAfter = true;
+        } else if (eventTimesUntouched(overlay)) {
+          // EINE ZEIT, DIE NIEMAND ANGEFASST HAT, GEHT NICHT MIT (#1958). Das
+          // Formular zeigt einen Instant (`14:00:00Z`) in der Anzeigezone und
+          // schickt ihn als nackte Ziffern zurueck; die Route deutet die in der
+          // Haushaltszone. Ohne gesetzte Haushaltszone ist die Anzeigezone die
+          // des Browsers, die Haushaltszone die des Servers - und ein reiner
+          // Titel-Edit verschob den Termin um ihren Abstand. Fehlen Beginn und
+          // Ende, behaelt die Route die gespeicherten Werte (COALESCE). Beide
+          // fallen nur ZUSAMMEN weg: wer eines anfasst, schickt beide, damit
+          // eine Zeile nie zwei Speicherformen traegt.
+          seriesBody = { ...body };
+          delete seriesBody.start_datetime;
+          delete seriesBody.end_datetime;
         }
         const res = localRecurring
           ? await requestCalendarOccurrenceMutation({

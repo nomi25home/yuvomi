@@ -243,13 +243,32 @@ test('foldICSLine lässt kurze Zeilen unangetastet', () => {
 
 // ── Feldabbildung ───────────────────────────────────────────────────────────────
 
-test('ein getimter Termin behält die Zone, in der er importiert wurde', () => {
+// Zonenlose Ziffern neben einer `tzid` sind Wanduhr des HAUSHALTS (#1993): so
+// schreibt sie PUT. Bis dahin las dieser Test ohne Haushaltszone, und das Ergebnis
+// hing an der Zone der Maschine (gruen in CEST, rot in der UTC-CI).
+test('ein getimter Termin behält die Zone, in der er importiert wurde (Haushalt = tzid)', () => {
   const { fields } = icsFieldsForEvent({
     title: 'X', start_datetime: '2035-03-10T09:00', end_datetime: '2035-03-10T10:00',
     tzid: 'Europe/Berlin', all_day: 0,
-  });
+  }, 'Europe/Berlin');
   assert.deepEqual(fields.DTSTART, { value: '20350310T090000', params: ';TZID=Europe/Berlin' });
   assert.deepEqual(fields.DTEND,   { value: '20350310T100000', params: ';TZID=Europe/Berlin' });
+});
+
+test('Haushalt != tzid: die Haushaltsziffern gehen in der Zone des Termins hinaus (#1993)', () => {
+  // 09:00 in Berlin (CET) ist 00:00 in Los Angeles (PST).
+  const { fields } = icsFieldsForEvent({
+    title: 'X', start_datetime: '2035-03-10T09:00', end_datetime: '2035-03-10T10:00',
+    tzid: 'America/Los_Angeles', all_day: 0,
+  }, 'Europe/Berlin');
+  assert.deepEqual(fields.DTSTART, { value: '20350310T000000', params: ';TZID=America/Los_Angeles' });
+  assert.deepEqual(fields.DTEND,   { value: '20350310T010000', params: ';TZID=America/Los_Angeles' });
+});
+
+test('ohne Haushaltszone wirft ein zonenloser Start neben einer tzid, statt die Prozesszone zu lesen (#1993)', () => {
+  assert.throws(() => icsFieldsForEvent({
+    title: 'X', start_datetime: '2035-03-10T09:00', tzid: 'Europe/Berlin', all_day: 0,
+  }), TypeError);
 });
 
 test('eine UTC-Zeit bekommt keine zusätzliche TZID aufgesetzt', () => {
@@ -1934,4 +1953,18 @@ test('auch der Apple-Legacy-Sync serialisiert seine Sofortversuche', async () =>
   assert.equal(tombstones().length, 0);
 
   db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+});
+
+// Der Sofortversuch ordnet ein Objekt der Antwort nur der Zeile zu, nach deren
+// Adresse gefragt war. Fehlt das angefragte (404) und nennt der Server dafuer
+// ein anderes Objekt mit Daten, galt dieses als "das einzige angefragte" - und
+// der Sofortversuch schrieb an seine Adresse.
+test('Sofortversuch: ein nicht angefragtes Objekt wird keiner Zeile zugeordnet, ein kodiertes schon', async () => {
+  const wanted = [{ uid: 'mine@test', url: 'https://dav.example/cal/family/mine@test.ics', calendarUrl: 'https://dav.example/cal/family/' }];
+  const answering = (objects) => ({ fetchCalendarObjects: async () => objects });
+  const stray = await caldavOutbound.fetchObjectsByUrl(answering([{ url: 'https://dav.example/cal/family/someone-else.ics', etag: '"x"', data: 'BEGIN:VCALENDAR' }]), wanted);
+  assert.equal(stray.size, 0, 'ein fremdes Objekt wurde der angefragten Zeile zugeordnet');
+  const encoded = await caldavOutbound.fetchObjectsByUrl(answering([{ url: 'https://dav.example/cal/family/mine%40test.ics', etag: '"y"', data: 'BEGIN:VCALENDAR' }]), wanted);
+  assert.equal(encoded.get('mine@test')?.etag, '"y"', 'dieselbe Adresse mit %40 wurde nicht erkannt');
+  assert.equal(encoded.get('mine@test')?.url, 'https://dav.example/cal/family/mine@test.ics', 'geschrieben wird an die angefragte Adresse');
 });

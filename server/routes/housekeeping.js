@@ -429,8 +429,9 @@ function createVisitCalendarEvent(database, worker, checkIn, actorId, title = nu
   const visitDate = visitDateOverride || checkIn.slice(0, 10);
   const result = database.prepare(`
     INSERT INTO calendar_events
-      (title, start_datetime, end_datetime, all_day, color, icon, assigned_to, created_by, external_source)
-    VALUES (?, ?, NULL, 1, ?, ?, ?, ?, 'local')
+      (title, start_datetime, end_datetime, all_day, color, icon, assigned_to, created_by, external_source,
+       series_authored)
+    VALUES (?, ?, NULL, 1, ?, ?, ?, ?, 'local', 1)
   `).run(
     title || visitTitleFallback(database, worker),
     visitDate,
@@ -866,7 +867,15 @@ router.get('/workers', (req, res) => {
   try {
     const context = localDayContext(req.query);
     const receipts = receiptAccess(req);
-    res.json({ data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)) });
+    // `can_manage`: darf der Aufrufer Profile anlegen und bearbeiten
+    // (POST /worker)? Dieselben zwei Pruefungen wie dort - Schreibrecht am
+    // Modul samt Token-Scope und die Admin-Rolle -, damit die Seite die
+    // Admin-Regel nicht nachbaut (wie `can_mark_unpaid`, #1136). Ohne das Feld
+    // bot sie einem Mitglied "Profil anlegen" an, das am 403 endete.
+    res.json({
+      data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)),
+      can_manage: mayWriteHousekeeping(req) && isAdminRequest(req),
+    });
   } catch (err) {
     log.error('GET /workers error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

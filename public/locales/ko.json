@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "경로가 폴더 5단계 제한을 초과합니다.",
             "reasonParentFailed": "상위 폴더를 만들 수 없습니다.",
             "reasonRateLimited": "서버에 요청이 너무 많습니다. 나중에 다시 업로드하세요."
-        }
+        },
+        "errorFolderGone": "이 폴더는 더 이상 존재하지 않습니다.",
+        "errorSelectedFolderGone": "선택한 폴더가 더 이상 존재하지 않습니다.",
+        "errorFolderExists": "여기에 같은 이름의 폴더가 이미 있습니다. 다른 이름을 선택하세요.",
+        "errorFolderTooDeep": "폴더는 최대 {{limit}}단계까지 중첩할 수 있습니다.",
+        "errorDocumentGone": "이 문서는 더 이상 사용할 수 없습니다.",
+        "errorFileTypeNotAllowed": "이 파일 형식은 업로드할 수 없습니다.",
+        "errorFileContentMismatch": "파일 내용이 파일 형식과 일치하지 않습니다.",
+        "errorFileEmpty": "파일이 비어 있습니다.",
+        "errorStorageFailed": "문서 저장소가 응답하지 않았습니다. 나중에 다시 시도하세요.",
+        "errorDmsAccountGone": "이 DMS 계정은 더 이상 존재하지 않습니다.",
+        "errorDmsDocumentGone": "이 문서는 DMS에 더 이상 존재하지 않습니다.",
+        "errorDmsAlreadyLinked": "이 DMS 문서는 이미 연결되어 있습니다.",
+        "errorDmsAlreadyStored": "이 문서는 이미 DMS에 저장되어 있습니다."
     },
     "userMultiSelect": {
         "nobody": "없음",
@@ -3872,6 +3885,7 @@
         "noVisits": "아직 방문 없음",
         "noWorkerTitle": "가사 관리 프로필 없음",
         "noWorkerHint": "프로필을 만들어 연락처, 일당, 결제 주기를 설정하세요.",
+        "noWorkerHintAdminOnly": "프로필은 관리자가 연락처, 일당, 결제 주기와 함께 만듭니다.",
         "taskTemplates": "추천 작업",
         "addCustomTask": "사용자 지정 작업 추가",
         "noReports": "아직 신고 없음.",
@@ -5429,7 +5443,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "이 측정값은 더 이상 없습니다.",
+        "errorMedicationGone": "이 약은 더 이상 없습니다.",
+        "errorScheduleGone": "이 시간대는 더 이상 없습니다.",
+        "errorDoseGone": "이 복용 기록은 더 이상 없습니다.",
+        "errorLabReportGone": "이 소견은 더 이상 없습니다.",
+        "errorLabResultGone": "이 분석물질은 더 이상 없습니다.",
+        "errorActivityGone": "이 활동은 더 이상 없습니다.",
+        "errorPreventionTypeGone": "이 예방 관리 종류는 더 이상 없습니다.",
+        "errorSelectedPreventionTypeGone": "선택한 종류는 더 이상 없습니다.",
+        "errorPreventionRecordGone": "이 예방 관리 기록은 더 이상 없습니다.",
+        "errorNutritionEntryGone": "이 기록은 더 이상 없습니다.",
+        "errorPeriodGone": "이 생리 기간은 더 이상 없습니다.",
+        "errorCycleDayGone": "이 날의 기록은 더 이상 없습니다.",
+        "errorCycleImportTooLarge": "텍스트가 {{limit_kb}}KB보다 큽니다. 생리 기간을 더 작게 나누어 가져오세요.",
+        "errorCycleImportNoRows": "파일에 머리글 행만 있고 생리 기간이 없습니다.",
+        "errorCycleImportTooManyRows": "한 번에 최대 {{limit}}개의 생리 기간만 가져올 수 있습니다. 파일을 나누세요."
     },
     "waste": {
         "title": "쓰레기 수거",

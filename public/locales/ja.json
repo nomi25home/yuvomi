@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "パスがフォルダー5階層の上限を超えています。",
             "reasonParentFailed": "親フォルダーを作成できませんでした。",
             "reasonRateLimited": "サーバーへのリクエストが多すぎます。しばらくしてからもう一度アップロードしてください。"
-        }
+        },
+        "errorFolderGone": "このフォルダーはもう存在しません。",
+        "errorSelectedFolderGone": "選択したフォルダーはもう存在しません。",
+        "errorFolderExists": "この場所には同じ名前のフォルダーがすでにあります。別の名前を選んでください。",
+        "errorFolderTooDeep": "フォルダーは最大 {{limit}} 階層までしか入れ子にできません。",
+        "errorDocumentGone": "このドキュメントはもう利用できません。",
+        "errorFileTypeNotAllowed": "この種類のファイルはアップロードできません。",
+        "errorFileContentMismatch": "ファイルの内容がファイルの種類と一致しません。",
+        "errorFileEmpty": "ファイルが空です。",
+        "errorStorageFailed": "ドキュメントの保存先が応答しませんでした。しばらくしてからもう一度お試しください。",
+        "errorDmsAccountGone": "この DMS アカウントはもう存在しません。",
+        "errorDmsDocumentGone": "このドキュメントは DMS にもう存在しません。",
+        "errorDmsAlreadyLinked": "この DMS ドキュメントはすでにリンクされています。",
+        "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。"
     },
     "shortcuts": {
         "goKitchen": "キッチン",
@@ -3868,6 +3881,7 @@
         "noVisits": "訪問はまだありません",
         "noWorkerTitle": "ハウスキーパーのプロフィールなし",
         "noWorkerHint": "連絡先、日額、支払いスケジュールを設定するにはプロフィールを作成してください。",
+        "noWorkerHintAdminOnly": "プロフィールは管理者が作成します（連絡先、日額、支払いスケジュールを含む）。",
         "taskTemplates": "おすすめのタスク",
         "addCustomTask": "独自のタスクを追加",
         "noReports": "報告はまだありません。",
@@ -5429,7 +5443,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "この測定値はもう存在しません。",
+        "errorMedicationGone": "この薬はもう存在しません。",
+        "errorScheduleGone": "この時間帯はもう存在しません。",
+        "errorDoseGone": "この服用記録はもう存在しません。",
+        "errorLabReportGone": "この検査結果はもう存在しません。",
+        "errorLabResultGone": "この項目はもう存在しません。",
+        "errorActivityGone": "このアクティビティはもう存在しません。",
+        "errorPreventionTypeGone": "この予防ケアの種類はもう存在しません。",
+        "errorSelectedPreventionTypeGone": "選択した種類はもう存在しません。",
+        "errorPreventionRecordGone": "この予防ケアの記録はもう存在しません。",
+        "errorNutritionEntryGone": "この記録はもう存在しません。",
+        "errorPeriodGone": "この生理期間はもう存在しません。",
+        "errorCycleDayGone": "この日の記録はもう存在しません。",
+        "errorCycleImportTooLarge": "テキストが{{limit_kb}}KBを超えています。生理期間を小さく分けてインポートしてください。",
+        "errorCycleImportNoRows": "ファイルには見出し行しかなく生理期間がありません。",
+        "errorCycleImportTooManyRows": "一度にインポートできる生理期間は最大{{limit}}件です。ファイルを分けてください。"
     },
     "waste": {
         "title": "ゴミ収集",

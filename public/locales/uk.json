@@ -3974,7 +3974,20 @@
             "reasonTooDeep": "Шлях перевищує обмеження у п’ять рівнів папок.",
             "reasonParentFailed": "Не вдалося створити батьківську папку.",
             "reasonRateLimited": "Сервер отримує забагато запитів. Повторіть завантаження пізніше."
-        }
+        },
+        "errorFolderGone": "Цієї папки більше немає.",
+        "errorSelectedFolderGone": "Вибраної папки більше немає.",
+        "errorFolderExists": "Тут уже є папка з такою назвою. Виберіть іншу назву.",
+        "errorFolderTooDeep": "Папки можна вкладати не глибше ніж на {{limit}} рівнів.",
+        "errorDocumentGone": "Цей документ більше недоступний.",
+        "errorFileTypeNotAllowed": "Файли цього типу не можна завантажити.",
+        "errorFileContentMismatch": "Вміст файлу не відповідає його типу.",
+        "errorFileEmpty": "Файл порожній.",
+        "errorStorageFailed": "Сховище документів не відповіло. Спробуйте пізніше.",
+        "errorDmsAccountGone": "Цього облікового запису DMS більше немає.",
+        "errorDmsDocumentGone": "Цього документа більше немає в DMS.",
+        "errorDmsAlreadyLinked": "Цей документ із DMS уже пов’язано.",
+        "errorDmsAlreadyStored": "Цей документ уже зберігається в DMS."
     },
     "shortcuts": {
         "goKitchen": "Кухня",
@@ -4096,6 +4109,7 @@
         "noVisits": "Відвідувань ще немає",
         "noWorkerTitle": "Немає профілю працівника",
         "noWorkerHint": "Створіть профіль працівника, щоб визначити контакти, ставку та графік оплати.",
+        "noWorkerHintAdminOnly": "Профіль створює адміністратор: з контактами, ставкою та графіком оплати.",
         "taskTemplates": "Запропоновані справи",
         "addCustomTask": "Додайте індивідуальну роботу",
         "noReports": "Звітів ще немає.",
@@ -5687,7 +5701,23 @@
                 "kcal": "ккал",
                 "g": "г"
             }
-        }
+        },
+        "errorVitalGone": "Цього вимірювання більше немає.",
+        "errorMedicationGone": "Цих ліків більше немає.",
+        "errorScheduleGone": "Цього часу прийому більше немає.",
+        "errorDoseGone": "Цього запису про прийом більше немає.",
+        "errorLabReportGone": "Цього результату більше немає.",
+        "errorLabResultGone": "Цього показника більше немає.",
+        "errorActivityGone": "Цієї активності більше немає.",
+        "errorPreventionTypeGone": "Цього виду профілактики більше немає.",
+        "errorSelectedPreventionTypeGone": "Вибраного виду більше немає.",
+        "errorPreventionRecordGone": "Цього запису про профілактику більше немає.",
+        "errorNutritionEntryGone": "Цього запису більше немає.",
+        "errorPeriodGone": "Цієї менструації більше немає.",
+        "errorCycleDayGone": "Цього запису за день більше немає.",
+        "errorCycleImportTooLarge": "Текст більший за {{limit_kb}} КБ. Імпортуйте менструації меншими частинами.",
+        "errorCycleImportNoRows": "У файлі лише рядок заголовка і жодної менструації.",
+        "errorCycleImportTooManyRows": "Один імпорт може містити не більше {{limit}} менструацій. Розділіть файл."
     },
     "waste": {
         "title": "Вивезення сміття",

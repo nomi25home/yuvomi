@@ -9,8 +9,11 @@ import * as db from '../../db.js';
 import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
 import { icsSubscriptionVisibleWhere, normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
+import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
-import { hasExplicitZone, householdTimeZone, shiftDateKey, utcToWall } from '../../utils/timezone.js';
+import {
+  hasExplicitZone, householdTimeZone, shiftDateKey, storedDayDiffersFromSeriesDay, storedToWall, utcToWall,
+} from '../../utils/timezone.js';
 import {
   StorageError,
   cleanupStagedUpload,
@@ -598,8 +601,10 @@ router.post('/', async (req, res) => {
            attachment_name, attachment_mime, attachment_size, attachment_data, attachment_document_id,
            target_caldav_account_id, target_caldav_calendar_url, target_google_calendar_id,
            target_outlook_account_id, target_outlook_calendar_id, visibility,
-           countdown, local_calendar_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           countdown, local_calendar_id, series_authored)
+        -- series_authored = 1: Start und Regel stammen aus Yuvomi und bleiben
+        -- es, auch wenn der Upload die Zeile zum Spiegel macht (#1935).
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       `).run(
         vTitle.value, vDesc.value,
         vStart.value, vEnd.value,
@@ -907,9 +912,9 @@ router.put('/:id', async (req, res) => {
     // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
     // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
     // Route selbst nimmt das Feld nicht entgegen.
-    const wandUhr = event.tzid ? utcToWall(String(startDanach ?? ''), event.tzid) : null;
-    const zonenUnsicher = !!event.tzid
-      && !(wandUhr && wandUhr.date === String(startDanach ?? '').slice(0, 10));
+    // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
+    const wandUhr = event.tzid ? storedToWall(String(startDanach ?? ''), event.tzid, zoneOpts.zone) : null;
+    const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), event.tzid, zoneOpts.zone);
     if (serieBeruehrt
       && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
       return res.status(400).json({
@@ -1029,6 +1034,19 @@ router.put('/:id', async (req, res) => {
     // aufeinander - der Sync legt seinen Hex in Großbuchstaben ab
     // (`utils/ical-color.js`). Der Farbwähler im Client vergleicht aus
     // demselben Grund über `sameColor()`.
+    // WER START ODER REGEL IN YUVOMI AENDERT, HAT SIE VERFASST (#1935) - auch
+    // an einer eingelesenen Serie. Die Marke entscheidet, ob der ausgehende
+    // Weg den Start auf die eigene Regel ausrichtet (services/outbound-dtstart.js).
+    // Verglichen wird der BEGINN, nicht der Text: das Formular schickt die
+    // Wanduhrzeit des Haushalts, ein eingelesener Termin liegt als Zeitpunkt in
+    // der Zeile. Am Text gemessen setzte jede Titelaenderung die Marke, und die
+    // eingelesene Serie ginge danach mit einem anderen DTSTART zurueck (#756).
+    const seriesAuthoredHere = startOrRuleChanged(event, {
+      start_datetime: startDanach,
+      all_day: all_day !== undefined ? all_day : event.all_day,
+      recurrence_rule: regelDanach,
+    }, zoneOpts.zone);
+
     const asColorKey = (c) => (c == null ? null : String(c).toLowerCase());
     const colorChanged = colorTouched && asColorKey(colorVal) !== asColorKey(event.color);
     const colorModified = colorChanged ? 1 : event.color_modified;
@@ -1121,7 +1139,10 @@ router.put('/:id', async (req, res) => {
             -- App), darf eine gesetzte Markierung nicht stillschweigend löschen.
             countdown       = ?,
             user_modified   = ?,
-            color_modified  = ?
+            color_modified  = ?,
+            -- Wer Start oder Regel hier aendert, hat sie ab jetzt verfasst
+            -- (#1935); jede andere Bearbeitung laesst die Marke, wie sie ist.
+            series_authored = CASE WHEN ? THEN 1 ELSE series_authored END
         WHERE id = ?
       `).run(
         title?.trim()  ?? null,
@@ -1151,6 +1172,7 @@ router.put('/:id', async (req, res) => {
         req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : event.countdown,
         userModified,
         colorModified,
+        seriesAuthoredHere ? 1 : 0,
         id
       );
       // Eine lokale Farbwahl macht einen gespiegelten Termin dauerhaft zu
@@ -1345,7 +1367,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         { status: unauthorized ? 403 : 400, code: eligibility.reason },
       ));
     }
-    baseOccurrenceFor(master, req.params.recurrenceId);
+    baseOccurrenceFor(master, req.params.recurrenceId, householdTimeZone(db.get()));
 
     const mutation = validateOccurrenceMutationBody(db.get(), req.body, { master });
     const { values: validated, errors } = mutation;
@@ -1505,7 +1527,8 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
         { status: unauthorized ? 403 : 400, code: eligibility.reason },
       ));
     }
-    const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId);
+    const seriesZone = householdTimeZone(db.get());
+    const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId, seriesZone);
 
     const mutation = validateOccurrenceMutationBody(db.get(), req.body, { following: true, master });
     const { values: validated } = mutation;
@@ -1557,7 +1580,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       recurrence_rule: Object.hasOwn(req.body, 'recurrence_rule')
         ? validated.recurrence_rule
         : master.recurrence_rule,
-    });
+    }, seriesZone);
 
     const replacementRequested = typeof req.body.attachment_data === 'string'
       && req.body.attachment_data.trim() !== '';

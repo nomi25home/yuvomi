@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "Sökvägen överskrider gränsen på fem mappnivåer.",
             "reasonParentFailed": "Den överordnade mappen kunde inte skapas.",
             "reasonRateLimited": "Servern tar emot för många förfrågningar. Försök ladda upp igen senare."
-        }
+        },
+        "errorFolderGone": "Den här mappen finns inte längre.",
+        "errorSelectedFolderGone": "Den valda mappen finns inte längre.",
+        "errorFolderExists": "Det finns redan en mapp med det här namnet här. Välj ett annat namn.",
+        "errorFolderTooDeep": "Mappar kan kapslas högst {{limit}} nivåer djupt.",
+        "errorDocumentGone": "Det här dokumentet är inte längre tillgängligt.",
+        "errorFileTypeNotAllowed": "Den här filtypen kan inte laddas upp.",
+        "errorFileContentMismatch": "Filens innehåll stämmer inte med dess filtyp.",
+        "errorFileEmpty": "Filen är tom.",
+        "errorStorageFailed": "Dokumentlagringen svarade inte. Försök igen senare.",
+        "errorDmsAccountGone": "Det här DMS-kontot finns inte längre.",
+        "errorDmsDocumentGone": "Det här dokumentet finns inte längre i DMS.",
+        "errorDmsAlreadyLinked": "Det här DMS-dokumentet är redan länkat.",
+        "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS."
     },
     "shortcuts": {
         "goKitchen": "Kök",
@@ -3868,6 +3881,7 @@
         "noVisits": "Inga besök ännu",
         "noWorkerTitle": "Ingen städprofil",
         "noWorkerHint": "Skapa profilen för kontakt, dagspris och betalningsschema.",
+        "noWorkerHintAdminOnly": "En admin skapar profilen, med kontakt, dagspris och betalningsschema.",
         "taskTemplates": "Föreslagna uppgifter",
         "addCustomTask": "Lägg till egen uppgift",
         "noReports": "Inga rapporter ännu.",
@@ -5429,7 +5443,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Det här mätvärdet finns inte längre.",
+        "errorMedicationGone": "Den här medicinen finns inte längre.",
+        "errorScheduleGone": "Den här tidpunkten finns inte längre.",
+        "errorDoseGone": "Den här dosposten finns inte längre.",
+        "errorLabReportGone": "Det här provsvaret finns inte längre.",
+        "errorLabResultGone": "Den här analyten finns inte längre.",
+        "errorActivityGone": "Den här aktiviteten finns inte längre.",
+        "errorPreventionTypeGone": "Den här typen av förebyggande vård finns inte längre.",
+        "errorSelectedPreventionTypeGone": "Den valda typen finns inte längre.",
+        "errorPreventionRecordGone": "Den här posten för förebyggande vård finns inte längre.",
+        "errorNutritionEntryGone": "Den här posten finns inte längre.",
+        "errorPeriodGone": "Den här mensen finns inte längre.",
+        "errorCycleDayGone": "Den här dagsposten finns inte längre.",
+        "errorCycleImportTooLarge": "Texten är större än {{limit_kb}} KB. Importera menscyklerna i mindre delar.",
+        "errorCycleImportNoRows": "Filen har bara en rubrikrad och ingen mens.",
+        "errorCycleImportTooManyRows": "En import får innehålla högst {{limit}} menscykler. Dela upp filen."
     },
     "waste": {
         "title": "Avfallshämtning",

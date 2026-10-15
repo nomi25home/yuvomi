@@ -3974,7 +3974,20 @@
             "reasonTooDeep": "Путь превышает лимит в пять уровней папок.",
             "reasonParentFailed": "Не удалось создать родительскую папку.",
             "reasonRateLimited": "Сервер получает слишком много запросов. Повторите загрузку позже."
-        }
+        },
+        "errorFolderGone": "Этой папки больше нет.",
+        "errorSelectedFolderGone": "Выбранной папки больше нет.",
+        "errorFolderExists": "Здесь уже есть папка с таким названием. Выберите другое название.",
+        "errorFolderTooDeep": "Папки можно вкладывать не глубже {{limit}} уровней.",
+        "errorDocumentGone": "Этот документ больше недоступен.",
+        "errorFileTypeNotAllowed": "Файлы этого типа нельзя загрузить.",
+        "errorFileContentMismatch": "Содержимое файла не соответствует его типу.",
+        "errorFileEmpty": "Файл пустой.",
+        "errorStorageFailed": "Хранилище документов не ответило. Попробуйте позже.",
+        "errorDmsAccountGone": "Этой учётной записи DMS больше нет.",
+        "errorDmsDocumentGone": "Этого документа больше нет в DMS.",
+        "errorDmsAlreadyLinked": "Этот документ из DMS уже привязан.",
+        "errorDmsAlreadyStored": "Этот документ уже хранится в DMS."
     },
     "shortcuts": {
         "goKitchen": "Кухня",
@@ -4096,6 +4109,7 @@
         "noVisits": "Визитов пока нет",
         "noWorkerTitle": "Нет профиля помощника",
         "noWorkerHint": "Создайте профиль, чтобы задать контакты, ставку и график оплаты.",
+        "noWorkerHintAdminOnly": "Профиль создаёт администратор: с контактами, ставкой и графиком оплаты.",
         "taskTemplates": "Предлагаемые задачи",
         "addCustomTask": "Добавить свою задачу",
         "noReports": "Сообщений пока нет.",
@@ -5687,7 +5701,23 @@
                 "kcal": "ккал",
                 "g": "г"
             }
-        }
+        },
+        "errorVitalGone": "Этого измерения больше нет.",
+        "errorMedicationGone": "Этого лекарства больше нет.",
+        "errorScheduleGone": "Этого времени приёма больше нет.",
+        "errorDoseGone": "Этой записи о приёме больше нет.",
+        "errorLabReportGone": "Этого результата больше нет.",
+        "errorLabResultGone": "Этого показателя больше нет.",
+        "errorActivityGone": "Этой активности больше нет.",
+        "errorPreventionTypeGone": "Этого вида профилактики больше нет.",
+        "errorSelectedPreventionTypeGone": "Выбранного вида больше нет.",
+        "errorPreventionRecordGone": "Этой записи о профилактике больше нет.",
+        "errorNutritionEntryGone": "Этой записи больше нет.",
+        "errorPeriodGone": "Этой менструации больше нет.",
+        "errorCycleDayGone": "Этой записи за день больше нет.",
+        "errorCycleImportTooLarge": "Текст больше {{limit_kb}} КБ. Импортируйте менструации частями поменьше.",
+        "errorCycleImportNoRows": "В файле только строка заголовка и нет ни одной менструации.",
+        "errorCycleImportTooManyRows": "В одном импорте может быть не более {{limit}} менструаций. Разделите файл."
     },
     "waste": {
         "title": "Вывоз мусора",

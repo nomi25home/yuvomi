@@ -4089,7 +4089,20 @@
             "reasonTooDeep": "يتجاوز المسار حد خمسة مستويات من المجلدات.",
             "reasonParentFailed": "تعذر إنشاء المجلد الأب.",
             "reasonRateLimited": "يتلقى الخادم طلبات كثيرة جدًا الآن. حاول التحميل مرة أخرى لاحقًا."
-        }
+        },
+        "errorFolderGone": "هذا المجلد لم يعد موجودًا.",
+        "errorSelectedFolderGone": "المجلد المحدد لم يعد موجودًا.",
+        "errorFolderExists": "يوجد هنا مجلد بهذا الاسم بالفعل. اختر اسمًا آخر.",
+        "errorFolderTooDeep": "يمكن تداخل المجلدات حتى {{limit}} مستويات كحد أقصى.",
+        "errorDocumentGone": "هذا المستند لم يعد متاحًا.",
+        "errorFileTypeNotAllowed": "لا يمكن رفع هذا النوع من الملفات.",
+        "errorFileContentMismatch": "محتوى الملف لا يطابق نوعه.",
+        "errorFileEmpty": "الملف فارغ.",
+        "errorStorageFailed": "لم يستجب مخزن المستندات. حاول مرة أخرى لاحقًا.",
+        "errorDmsAccountGone": "حساب نظام إدارة المستندات هذا لم يعد موجودًا.",
+        "errorDmsDocumentGone": "هذا المستند لم يعد موجودًا في نظام إدارة المستندات.",
+        "errorDmsAlreadyLinked": "مستند نظام إدارة المستندات هذا مرتبط بالفعل.",
+        "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات."
     },
     "shortcuts": {
         "goKitchen": "المطبخ",
@@ -4211,6 +4224,7 @@
         "noVisits": "لا توجد زيارات بعد",
         "noWorkerTitle": "لا يوجد ملف تعريف",
         "noWorkerHint": "أنشئ ملف التعريف لتحديد بيانات الاتصال والأجر اليومي وجدول الدفع.",
+        "noWorkerHintAdminOnly": "ينشئ المسؤول ملف التعريف مع بيانات الاتصال والأجر اليومي وجدول الدفع.",
         "taskTemplates": "مهام مقترحة",
         "addCustomTask": "إضافة مهمة مخصصة",
         "noReports": "لا توجد بلاغات بعد.",
@@ -5817,7 +5831,23 @@
                 "kcal": "سعرة",
                 "g": "غ"
             }
-        }
+        },
+        "errorVitalGone": "لم يعد هذا القياس موجودًا.",
+        "errorMedicationGone": "لم يعد هذا الدواء موجودًا.",
+        "errorScheduleGone": "لم يعد هذا الوقت موجودًا.",
+        "errorDoseGone": "لم يعد سجل الجرعة هذا موجودًا.",
+        "errorLabReportGone": "لم يعد هذا التقرير موجودًا.",
+        "errorLabResultGone": "لم يعد هذا المؤشر موجودًا.",
+        "errorActivityGone": "لم يعد هذا النشاط موجودًا.",
+        "errorPreventionTypeGone": "لم يعد نوع الرعاية الوقائية هذا موجودًا.",
+        "errorSelectedPreventionTypeGone": "النوع المختار لم يعد موجودًا.",
+        "errorPreventionRecordGone": "لم يعد سجل الرعاية الوقائية هذا موجودًا.",
+        "errorNutritionEntryGone": "لم يعد هذا السجل موجودًا.",
+        "errorPeriodGone": "لم تعد هذه الدورة موجودة.",
+        "errorCycleDayGone": "لم يعد سجل هذا اليوم موجودًا.",
+        "errorCycleImportTooLarge": "النص أكبر من {{limit_kb}} كيلوبايت. استورد الدورات على أجزاء أصغر.",
+        "errorCycleImportNoRows": "يحتوي الملف على سطر العناوين فقط ولا يحتوي على دورات.",
+        "errorCycleImportTooManyRows": "يمكن أن يحتوي الاستيراد على {{limit}} دورة كحد أقصى. قسّم الملف."
     },
     "waste": {
         "title": "جمع النفايات",
