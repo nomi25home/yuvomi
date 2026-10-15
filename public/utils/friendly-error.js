@@ -165,6 +165,40 @@ export const CASE_MESSAGES = new Map([
   ['dms_document_already_linked', 'documents.errorDmsAlreadyLinked'],
   ['dms_document_already_stored', 'documents.errorDmsAlreadyStored'],
   ['dms_unreachable', 'documents.dmsSearchError'],
+  // Rezepte (#1909). Alle drei stehen auch in GONE_REASONS. Rezepte haben
+  // keine Sichtbarkeit: die 404 heisst "geloescht" - von einem anderen
+  // Haushaltsmitglied oder vom Abgleich mit einer Rezeptquelle. Ein Loeschen
+  // mit diesem Grund ist deshalb ein Erfolg (isAlreadyDeleted).
+  ['recipes_recipe_not_found', 'recipes.errorRecipeGone'],
+  // Das Rezept steht, aber die Zutat nicht mehr darin (geaendert, oder der
+  // Abgleich hat die Zutaten ersetzt).
+  ['recipes_ingredient_not_found', 'recipes.errorIngredientGone'],
+  // Die im Zuordnungs-Dialog GEWAEHLTE Vorratszeile fehlt: der Dialog bleibt
+  // offen und bietet den aktuellen Vorrat an.
+  ['recipes_selected_pantry_item_not_found', 'recipes.errorSelectedPantryItemGone'],
+  // Eine Mahlzeit aus einem Rezept, das es nicht mehr gibt (server/routes/meals.js).
+  ['meals_selected_recipe_not_found', 'recipes.errorRecipeGone'],
+  // Abos (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS. Die
+  // 404 eines Abos heisst nur "geloescht": die Schreibrouten lesen es ohne
+  // Sichtbarkeitsfilter, ein fremdes privates Abo endet mit 403. Ein Loeschen
+  // mit diesem Grund ist deshalb ein Erfolg (isAlreadyDeleted).
+  ['subscriptions_subscription_not_found', 'subscriptions.errorSubscriptionGone'],
+  // Ein abgeschlossenes Abo laesst sich nicht als bezahlt markieren (#2011).
+  ['subscriptions_subscription_completed', 'subscriptions.errorSubscriptionCompleted'],
+  ['subscriptions_category_not_found', 'subscriptions.errorCategoryGone'],
+  ['subscriptions_payment_method_not_found', 'subscriptions.errorPaymentMethodGone'],
+  // Nicht die Kategorie, um die es geht, sondern die im Abo-Dialog GEWAEHLTE:
+  // der Dialog bleibt offen und bietet die aktuellen an.
+  ['subscriptions_selected_category_not_found', 'subscriptions.errorSelectedCategoryGone'],
+  ['subscriptions_selected_payment_method_not_found', 'subscriptions.errorSelectedPaymentMethodGone'],
+  ['subscriptions_category_exists', 'subscriptions.errorCategoryExists'],
+  ['subscriptions_payment_method_exists', 'subscriptions.errorPaymentMethodExists'],
+  // Eingaben, die der Abo-Dialog durchlaesst und erst der Server prueft.
+  ['subscriptions_end_before_next_payment', 'subscriptions.errorEndBeforeNextPayment'],
+  ['subscriptions_occurrence_count_too_low', 'subscriptions.errorOccurrenceCountTooLow'],
+  ['subscriptions_logo_content_mismatch', 'subscriptions.errorLogoContentMismatch'],
+  // Die Logo-Suche hat geantwortet, aber nichts Brauchbares gefunden.
+  ['subscriptions_no_logo_found', 'subscriptions.logoSearchEmpty'],
 ]);
 
 /**
@@ -251,6 +285,15 @@ export const GONE_REASONS = new Set([
   'documents_document_not_found',
   'dms_account_not_found',
   'dms_document_not_found',
+  'recipes_recipe_not_found',
+  'recipes_ingredient_not_found',
+  'recipes_selected_pantry_item_not_found',
+  'meals_selected_recipe_not_found',
+  'subscriptions_subscription_not_found',
+  'subscriptions_category_not_found',
+  'subscriptions_payment_method_not_found',
+  'subscriptions_selected_category_not_found',
+  'subscriptions_selected_payment_method_not_found',
 ]);
 
 /**
