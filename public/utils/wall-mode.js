@@ -108,7 +108,7 @@ function safeRemove(key) {
 
 /**
  * Callback, der bei jeder Aenderung des Wand-Aktivzustands aufgerufen wird.
- * Wird einmal von dashboard.js mit `reportWallPauseState` aus push.js belegt.
+ * Wird einmal von router.js mit `reportWallPauseState` aus push.js belegt.
  */
 let _wallActiveChangeHook = null;
 

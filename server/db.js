@@ -10904,15 +10904,20 @@ const MIGRATIONS = [
   },
   {
     version: 249,
-    description: 'push_subscriptions: wall_paused flag pauses delivery while the wall is shown (#1904)',
+    description: 'push_subscriptions: wall_paused_at timestamp pauses delivery while the wall is shown (#1904)',
     // EIN GERAET IM WANDMODUS SOLL KEINE PERSOENLICHEN SYSTEM-BENACHRICHTIGUNGEN
-    // BEKOMMEN (#1904). Der Server ueberspringt Abos, bei denen `wall_paused = 1`
-    // gesetzt ist; die Seite setzt dieses Flag per PUT /push/wall-mode, wenn der
-    // Wandmodus beginnt oder endet. Bestandszeilen bleiben auf 0 (nicht pausiert).
+    // BEKOMMEN (#1904). Der Server ueberspringt Abos, bei denen `wall_paused_at`
+    // in den letzten 12 Stunden gesetzt wurde; die Seite setzt diesen Zeitstempel
+    // per PUT /push/wall-mode, wenn der Wandmodus beginnt, und loescht ihn, wenn
+    // er endet. Laeuft ohne Erneuerung ab - nach 12 Stunden heilt sich ein Geraet
+    // ohne aktiven Wandmodus von selbst (#1904). Bestandszeilen bleiben NULL.
     up(database) {
       const columns = new Set(database.prepare('PRAGMA table_info(push_subscriptions)').all().map((c) => c.name));
-      if (!columns.has('wall_paused')) {
-        database.exec('ALTER TABLE push_subscriptions ADD COLUMN wall_paused INTEGER NOT NULL DEFAULT 0');
+      if (columns.has('wall_paused')) {
+        database.exec('ALTER TABLE push_subscriptions DROP COLUMN wall_paused');
+      }
+      if (!columns.has('wall_paused_at')) {
+        database.exec('ALTER TABLE push_subscriptions ADD COLUMN wall_paused_at TEXT');
       }
     },
   },

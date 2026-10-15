@@ -177,7 +177,7 @@ async function reportWallPauseState(active) {
     const reg = await serviceWorkerReady();
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return;
-    await api.put('/push/wall-mode', { endpoint: sub.endpoint, active });
+    await api.put('/push/wall-mode', { endpoint: sub.endpoint, active }, { quietExpiry: true });
   } catch { /* ignoriert: die Wand laeuft weiter, auch wenn die Meldung scheitert */ }
 }
 

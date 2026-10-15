@@ -58,7 +58,7 @@ import {
 } from '/utils/nav-badges.js';
 import { isNewerVersion, displayVersion, releasesNewForMe } from '/utils/version.js';
 import { setMaxUploadBytes } from '/utils/upload-limit.js';
-import { syncWallMode, onWallActiveChange } from '/utils/wall-mode.js';
+import { syncWallMode, onWallActiveChange, isWallActive } from '/utils/wall-mode.js';
 import {
   rememberScrollPosition,
   scrollPositionFor,
@@ -660,7 +660,7 @@ const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
-  auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
+  auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
   armScreensaver,
   rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
@@ -670,6 +670,24 @@ const navigate = createNavigate(routerState, {
 // Wenn der Wandmodus beginnt oder endet, haelt der Server das Abo dieses
 // Geraets an oder gibt es frei - persoenliche Pushes ueber der Wand (#1904).
 onWallActiveChange(reportWallPauseState);
+
+// Boot-Zeit und Lebensdauer-Erneuerung (#1904):
+// Der Uebergangs-Hook oben greift nicht, wenn theme-init.js `data-wall-mode`
+// schon gesetzt hat, bevor hier eine Navigation stattfand (Kaltstart auf `/`).
+// Und ein Geraet, das mit aktiver Wand gekilled wurde, bleibt bei Rueckkehr
+// pausiert, bis syncWallMode einen Wechsel sieht.
+// Zwei Stellen schliessen die Luecke:
+// - initPushAndReport: einmal pro Sitzung direkt nach initPush()
+// - visibilitychange: bei jedem Aufwachen, z. B. nach Telefon-Sperrbildschirm
+// - stundliches Interval: eine lang laufende Wand erneuert die Pause automatisch
+async function initPushAndReport() {
+  await initPush();
+  reportWallPauseState(isWallActive());
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) reportWallPauseState(isWallActive());
+});
+setInterval(() => { if (isWallActive()) reportWallPauseState(true); }, 60 * 60 * 1000);
 
 /**
  * Laedt, was jede Sitzung vor ihrer ersten Seite braucht: Praeferenzen,
