@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Wall display shows today's meals, shopping count, housekeeping status, waste pickups, and
+  expiring pantry items** (#1903). Paired wall displays previously showed only the calendar,
+  tasks, rewards, and weather sections of the today sheet. The dashboard now delivers the five
+  missing sources to display sessions with the same narrow fields the wall tile uses: meal title,
+  type, and cook - no private notes or recipe content; shopping open-item count; housekeeping
+  presence, worker name, and check-in time - without the unpaid amount or visit count;
+  waste-pickup type names and icons; and expiring pantry items. Individual module routes for
+  these remain closed to displays. Paired displays pick this up with the update - no
+  configuration needed.
+
 ### Fixed
 
 - **A server whose `TZ` names an unknown time zone now runs in UTC.** Without a household time zone
@@ -20,7 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Wall display shows today's meals, shopping count, housekeeping status, waste pickups, and expiring pantry items** (#1903). Paired wall displays previously showed only the calendar, tasks, rewards, and weather sections of the today sheet. The dashboard now delivers the five missing sources to display sessions with the same narrow fields the wall tile uses: meal title, type, and cook - no private notes or recipe content; shopping open-item count; housekeeping presence, worker name, and check-in time - without the unpaid amount or visit count; waste-pickup type names and icons; and expiring pantry items. Individual module routes for these remain closed to displays.
 - **Budget overview: expense categories and subcategories show their share of the total.** The
   share stands quietly after the amount, the same way the Statistics tab already shows it. A
   category is measured against the total of all expenses, a subcategory against the total of its

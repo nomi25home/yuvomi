@@ -1520,12 +1520,52 @@ test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitgl
   for (const item of displayWall.pantryExpiring.todayItems) {
     assert.deepEqual(Object.keys(item), ['name'], 'Pantry-Artikel hat nur name');
   }
+  // Server-seitig: keine privaten Zahlen in der Display-Antwort.
+  const displayText = JSON.stringify(displayWall);
+  for (const word of OFF_WALL_WORDS) {
+    assert.ok(!displayText.includes(word), `Display-Antwort enthaelt „${word}" nicht (#1903)`);
+  }
   // Browser-seitig: dieselben Zeilen und derselbe Ueberlauf.
   await onWallAt(NOON_BERLIN, () => {
-    const day = (data) => {
-      const model = dash.buildTodayCockpitModel(data, [], { cap: dash.WALL_ROW_CAP, now: new Date(), groupOverdue: false });
+    const now = new Date();
+    const day = (data, opts = {}) => {
+      const model = dash.buildTodayCockpitModel(data, [], { cap: dash.WALL_ROW_CAP, now, groupOverdue: false, ...opts });
       return { rows: model.allRows.map((row) => [row.kind, row.title]), overflow: model.overflow };
     };
-    assert.deepEqual(day(displayWall), day(memberWall), 'Programm und Ueberlauf stimmen ueberein');
+    // Basis: beide Datensaetze ergeben dieselben Zeilen bei Admin-Rechten.
+    const memberDay = day(memberWall);
+    assert.deepEqual(day(displayWall), memberDay, 'Programm und Ueberlauf stimmen ueberein');
+
+    // Display-Berechtigung: die fuenf Wand-Module auf none, wie ein echtes Display-Credential.
+    const displayModulePerms = { meals: 'none', shopping: 'none', housekeeping: 'none', waste: 'none', pantry: 'none' };
+    setPermissions({ admin: false, modules: displayModulePerms, widgets: {}, capabilities: {} });
+
+    // none-Rechte + isDisplay: dieselben Zeilen wie mit Admin-Rechten (gemessener Baseline).
+    assert.deepEqual(
+      day(displayWall, { isDisplay: true }),
+      memberDay,
+      'Browser: none-Rechte + isDisplay ergibt dieselben Zeilen wie mit vollen Rechten (#1903)',
+    );
+
+    // isModuleDisabled schweigt auch am Display (Haushaltsschalter geht vor).
+    const prevDisabled = global.window.yuvomi.isModuleDisabled;
+    global.window.yuvomi.isModuleDisabled = (m) => m === 'waste';
+    const withWasteOff = day(displayWall, { isDisplay: true });
+    global.window.yuvomi.isModuleDisabled = prevDisabled;
+    assert.ok(
+      !withWasteOff.rows.some((r) => r[0] === 'waste'),
+      'Browser: isModuleDisabled(waste) schweigt auch am Display (#1903)',
+    );
+
+    // Ohne isDisplay (Cockpit): keine der drei Sheet-Quellen mit none-Recht.
+    const cockpit = day(displayWall, { isDisplay: false });
+    const sheetKinds = new Set(['waste', 'pantry', 'housekeeping']);
+    assert.ok(
+      !cockpit.rows.some((r) => sheetKinds.has(r[0])),
+      'Browser: Cockpit ohne isDisplay zeigt keine der drei gesperrten Sheet-Quellen (#1903)',
+    );
+
+    // Admin-Rechte wiederherstellen.
+    setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
   })();
 });

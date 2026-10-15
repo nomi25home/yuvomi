@@ -380,15 +380,15 @@ export function sourceSpeaks(source, ctx) {
   return source.allowed ? Boolean(source.allowed(ctx)) : true;
 }
 
-/**
- * Der Kontext, den jede Quelle liest. Die Riegel kommen von aussen, damit
- * Cockpit (mit Widget-Konfiguration) und Wand (ohne) dieselben Quellen fragen.
- */
 /** Module, die ein Display auf der Wand zeigen darf, obwohl sein Credential
  *  `none`-Zugang hat: der Server liefert sie nur fuer `audience=household`,
  *  und die Wand braucht sie im Programm (#1903). */
 const WALL_DISPLAY_MODULES = new Set(['meals', 'shopping', 'housekeeping', 'waste', 'pantry']);
 
+/**
+ * Der Kontext, den jede Quelle liest. Die Riegel kommen von aussen, damit
+ * Cockpit (mit Widget-Konfiguration) und Wand (ohne) dieselben Quellen fragen.
+ */
 export function todaySheetContext({
   todayKey, tomorrowKey, nowTime, cfg = [], isAdmin = isPermAdmin(), viewer = null,
   isModuleDisabled = () => false,
