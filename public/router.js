@@ -26,7 +26,7 @@ import { dismissFilterPopovers } from '/utils/filter-sheet.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
-import { initPush, stopPush } from '/push.js';
+import { initPush, stopPush, reportWallPauseState } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
@@ -58,7 +58,7 @@ import {
 } from '/utils/nav-badges.js';
 import { isNewerVersion, displayVersion, releasesNewForMe } from '/utils/version.js';
 import { setMaxUploadBytes } from '/utils/upload-limit.js';
-import { syncWallMode } from '/utils/wall-mode.js';
+import { syncWallMode, onWallActiveChange } from '/utils/wall-mode.js';
 import {
   rememberScrollPosition,
   scrollPositionFor,
@@ -666,6 +666,10 @@ const navigate = createNavigate(routerState, {
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
   focusMainContentAfterNavigation, showToast, t,
 });
+
+// Wenn der Wandmodus beginnt oder endet, haelt der Server das Abo dieses
+// Geraets an oder gibt es frei - persoenliche Pushes ueber der Wand (#1904).
+onWallActiveChange(reportWallPauseState);
 
 /**
  * Laedt, was jede Sitzung vor ihrer ersten Seite braucht: Praeferenzen,

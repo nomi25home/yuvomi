@@ -63,6 +63,22 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
     }
   });
 
+  router.put('/wall-mode', (req, res) => {
+    try {
+      const userId = req.authUserId || req.session.userId;
+      const { endpoint, active } = req.body || {};
+      if (!endpoint || typeof active !== 'boolean') {
+        return res.status(400).json({ error: 'endpoint und active (boolean) sind erforderlich.', code: 400 });
+      }
+      getDb().prepare('UPDATE push_subscriptions SET wall_paused = ? WHERE endpoint = ? AND user_id = ?')
+        .run(active ? 1 : 0, endpoint, userId);
+      res.status(204).end();
+    } catch (err) {
+      log.error('Error updating wall-mode pause:', err.message);
+      res.status(500).json({ error: 'Internal error.', code: 500 });
+    }
+  });
+
   router.post('/test', async (req, res) => {
     try {
       const userId = req.authUserId || req.session.userId;

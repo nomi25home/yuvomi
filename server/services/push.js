@@ -152,7 +152,7 @@ export function createPushService({ db, webpush = webpushDefault } = {}) {
     // Deaktivieren noch dasteht. Synchron vor dem ersten `await`.
     if (!isActiveAccount(userId, { db: getDb() })) return 0;
     const { subject } = ensureVapid();
-    const subs = getDb().prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
+    const subs = getDb().prepare('SELECT * FROM push_subscriptions WHERE user_id = ? AND wall_paused = 0').all(userId);
     let sent = 0;
     for (const sub of subs) {
       const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };

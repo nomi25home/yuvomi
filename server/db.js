@@ -10902,6 +10902,20 @@ const MIGRATIONS = [
       if (!columns.has('outbound_snapshot')) database.exec('ALTER TABLE calendar_events ADD COLUMN outbound_snapshot TEXT');
     },
   },
+  {
+    version: 249,
+    description: 'push_subscriptions: wall_paused flag pauses delivery while the wall is shown (#1904)',
+    // EIN GERAET IM WANDMODUS SOLL KEINE PERSOENLICHEN SYSTEM-BENACHRICHTIGUNGEN
+    // BEKOMMEN (#1904). Der Server ueberspringt Abos, bei denen `wall_paused = 1`
+    // gesetzt ist; die Seite setzt dieses Flag per PUT /push/wall-mode, wenn der
+    // Wandmodus beginnt oder endet. Bestandszeilen bleiben auf 0 (nicht pausiert).
+    up(database) {
+      const columns = new Set(database.prepare('PRAGMA table_info(push_subscriptions)').all().map((c) => c.name));
+      if (!columns.has('wall_paused')) {
+        database.exec('ALTER TABLE push_subscriptions ADD COLUMN wall_paused INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+  },
 ];
 
 /**

@@ -142,7 +142,8 @@ function makeDb() {
       endpoint TEXT NOT NULL UNIQUE,
       p256dh TEXT NOT NULL, auth TEXT NOT NULL, user_agent TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      last_used_at TEXT
+      last_used_at TEXT,
+      wall_paused INTEGER NOT NULL DEFAULT 0
     );
   `);
   db.exec(MIGRATIONS.find((m) => m.version === 60).up);
@@ -302,6 +303,36 @@ test('sendPushToUser keeps sub on transient (500) error', async () => {
   const sent = await svc.sendPushToUser(1, { title: 'T' });
   assert.equal(sent, 0);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM push_subscriptions').get().c, 1);
+});
+
+test('sendPushToUser skips wall-paused sub, delivers to others of the same user (#1904)', async () => {
+  const db = makeDb();
+  const webpush = makeWebpushMock();
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, wall_paused)
+    VALUES (1,'https://push/wall','p','a',1),(1,'https://push/phone','p','a',0)
+  `).run();
+  const svc = createPushService({ db, webpush });
+  const sent = await svc.sendPushToUser(1, { title: 'T' });
+  assert.equal(sent, 1, 'nur das nicht-pausierte Abo wird bedient');
+  assert.equal(webpush.calls[0].endpoint, 'https://push/phone');
+});
+
+test('PUT /wall-mode setzt und loescht wall_paused fuer das eigene Abo (#1904)', async () => {
+  const db = makeDb();
+  const app = await startApp(db, makeWebpushMock());
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/tab','p','a')").run();
+  const put = (active) => fetchRetry(`${app.baseUrl}/wall-mode`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://push/tab', active }),
+  });
+  const r1 = await put(true);
+  assert.equal(r1.status, 204);
+  assert.equal(db.prepare("SELECT wall_paused FROM push_subscriptions WHERE endpoint = 'https://push/tab'").get().wall_paused, 1);
+  const r2 = await put(false);
+  assert.equal(r2.status, 204);
+  assert.equal(db.prepare("SELECT wall_paused FROM push_subscriptions WHERE endpoint = 'https://push/tab'").get().wall_paused, 0);
 });
 
 /**
