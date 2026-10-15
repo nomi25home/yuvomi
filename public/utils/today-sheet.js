@@ -401,10 +401,13 @@ export function todaySheetContext({
   // Modulrecht des Betrachters. Der Server liefert gesperrte Module ohnehin
   // leer - der Riegel hier haelt auch einen alten Stand im Speicher stumm.
   // Displays auf der Wand (isDisplay) kommen ohne Modulrecht, aber der Server
-  // schickt die fuenf Wand-Quellen trotzdem - dieser Riegel muss nachgeben.
+  // schickt die fuenf Wand-Quellen trotzdem. Nur der `moduleAccess`-Riegel
+  // weicht - der Haushaltsschalter (`isModuleDisabled`) bleibt stets aktiv:
+  // ein haushaltsweit abgeschaltetes Modul schweigt auch an der Wand.
   const moduleOff = (module) => {
+    if (isModuleDisabled(module)) return true;
     if (isDisplay && WALL_DISPLAY_MODULES.has(module)) return false;
-    return Boolean(isModuleDisabled(module)) || moduleAccess(module) === 'none';
+    return moduleAccess(module) === 'none';
   };
   return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget, widgetShown, existing };
 }

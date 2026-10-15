@@ -490,6 +490,18 @@ router.get('/', (req, res) => {
   // nicht die Module darin. Eine Kachel, deren Modul das Token nicht lesen darf,
   // kommt in derselben leeren Fassung wie bei einer Rollensperre.
   const denied = hiddenModulesFor(req, Object.keys(DENIED_PAYLOAD));
+  // Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
+  // (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
+  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden VOR
+  // `modulesLeftOut` aus `denied` entfernt, NICHT danach aus `leftOut` - so
+  // wirkt der Haushaltsschalter weiter: hat ein Haushalt Mahlzeiten abgeschaltet,
+  // fuegt `modulesLeftOut` sie aus `householdDisabledModules` wieder hinzu.
+  const isDisplay = req.authMethod === 'display';
+  if (isDisplay && householdAudience) {
+    for (const key of ['meals', 'shopping', 'housekeeping', 'waste', 'pantry']) {
+      denied.delete(key);
+    }
+  }
   // UND DER HAUSHALTSSCHALTER (#1660, docs/DECISIONS.md 11). Bis dahin fragte
   // diese Stelle nur nach Rechten und Scopes: ein haushaltsweit abgeschaltetes
   // Modul lieferte seine Termine, Aufgaben, Buchungen und Medikamente weiter
@@ -508,17 +520,6 @@ router.get('/', (req, res) => {
   if (householdAudience) {
     for (const [key, build] of Object.entries(DENIED_PAYLOAD)) {
       if (!Object.keys(build({ month: currentMonth })).some(householdAudienceShows)) leftOut.add(key);
-    }
-  }
-  // Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
-  // (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
-  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden NUR
-  // fuer den Wand-Request (`audience=household`) aus `leftOut` entfernt - die
-  // persoenliche Uebersicht des Displays bleibt unveraendert.
-  const isDisplay = req.authMethod === 'display';
-  if (isDisplay && householdAudience) {
-    for (const key of ['meals', 'shopping', 'housekeeping', 'waste', 'pantry']) {
-      leftOut.delete(key);
     }
   }
   for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));

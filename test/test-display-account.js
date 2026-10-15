@@ -1284,6 +1284,8 @@ test('das Display-Dashboard liefert Mahlzeiten fuer die Wand, ohne sensible Feld
   // Ohne Mahlzeit kann der Test nur belegen, dass das Gate oeffnet (leere Liste
   // statt undefined). Mit einer Mahlzeit prueft er zusaetzlich, dass `notes` und
   // `created_by` nicht durchkommen.
+  // UTC stellen: neue Date().toISOString().slice(0,10) und todayLocalKey muessen uebereinstimmen.
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', 'UTC')").run();
   const today = new Date().toISOString().slice(0, 10);
   const meal = await admin('POST', '/meals', { date: today, meal_type: 'lunch', title: 'Testgericht', notes: 'Geheimes Rezept' });
   assert.ok([200, 201].includes(meal.status), `Mahlzeit anlegen: ${meal.status} ${JSON.stringify(meal.body)}`);

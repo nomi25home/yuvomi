@@ -1489,6 +1489,19 @@ test('Allowlist: das Display ohne den Parameter bekommt, was es bekam', withCloc
   assert.ok(titles(wall.urgentTasks).includes('Tisch decken'), 'Reichweite: das Programm steht');
 }));
 
+test('Wand-Display: ein haushaltsweit abgeschaltetes Modul bleibt leer - auch am Display (#1903)', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  // Mahlzeiten fuer den Haushalt abschalten.
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[\"meals\"]') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  const displayWall = await asCoupledDisplay(() => overview(DISPLAY, '?audience=household'));
+  assert.deepEqual(displayWall.todayMeals, [], 'abgeschaltete Mahlzeiten kommen leer an');
+  // Die anderen vier Quellen laufen weiter.
+  assert.ok(displayWall.shoppingOpenCount > 0, 'Einkauf laueft weiter');
+  assert.ok(displayWall.housekeeping?.present === true, 'Haushaltshilfe laeuft weiter');
+  // Zustand zuruecksetzen.
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+}));
+
 test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitglied (#1903)', async () => {
   let memberWall;
   let displayWall;
