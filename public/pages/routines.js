@@ -9,7 +9,8 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext } from '/components/modal.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { isPermAdmin, isNavModuleReadOnly } from '/permissions.js';
@@ -120,11 +121,14 @@ function renderRoutine(routine) {
           <span class="routine-card__member">${esc(memberLabel)}</span>
         </div>
         <div class="routine-card__progress">${done}/${total}</div>
-        ${admin ? `
-          <div class="routine-card__actions">
-            ${rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: routine.name }), action: 'edit-routine', attrs: { 'data-id': routine.id } })}
-            ${rowActionHtml({ icon: 'trash-2', label: t('common.deleteNamed', { name: routine.name }), action: 'delete-routine', tone: 'danger', attrs: { 'data-id': routine.id } })}
-          </div>` : ''}
+        ${admin ? rowMenuHtml({
+          id: `routine-menu-${routine.id}`,
+          label: t('common.moreActionsNamed', { name: routine.name }),
+          items: [
+            { action: 'edit-routine', id: routine.id, icon: 'pencil', label: t('common.edit') },
+            { action: 'delete-routine', id: routine.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+          ],
+        }) : ''}
       </div>
       <ul class="routine-steps" role="list">
         ${steps.map((s) => renderStep(s, routine.id, admin)).join('')}
@@ -145,11 +149,14 @@ function renderStep(step, routineId, admin) {
                ${step.checked ? 'checked' : ''}>
         <span class="routine-step__text">${esc(step.label)}</span>
       </label>
-      ${admin ? `
-        <div class="routine-step__actions">
-          ${rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: step.label }), action: 'edit-step', attrs: { 'data-step-id': step.id, 'data-routine-id': routineId } })}
-          ${rowActionHtml({ icon: 'trash-2', label: t('common.deleteNamed', { name: step.label }), action: 'delete-step', tone: 'danger', attrs: { 'data-step-id': step.id, 'data-routine-id': routineId } })}
-        </div>` : ''}
+      ${admin ? rowMenuHtml({
+        id: `step-menu-${step.id}`,
+        label: t('common.moreActionsNamed', { name: step.label }),
+        items: [
+          { action: 'edit-step', icon: 'pencil', label: t('common.edit'), attrs: { 'data-step-id': step.id, 'data-routine-id': routineId } },
+          { action: 'delete-step', icon: 'trash-2', label: t('common.delete'), danger: true, attrs: { 'data-step-id': step.id, 'data-routine-id': routineId } },
+        ],
+      }) : ''}
     </li>
   `;
 }
@@ -216,6 +223,8 @@ function wireEvents(el) {
   el.querySelectorAll('.routine-card__add-step').forEach((btn) => {
     btn.addEventListener('click', () => openStepModal(Number(btn.dataset.routineId), null));
   });
+
+  installPopoverMenus(el);
 
   el.querySelectorAll('.routine-step__checkbox').forEach((checkbox) => {
     checkbox.addEventListener('change', async (e) => {
