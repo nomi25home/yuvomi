@@ -8,7 +8,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext } from '/components/modal.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { isPermAdmin, isNavModuleReadOnly } from '/permissions.js';
@@ -52,12 +52,14 @@ function render() {
   if (!el) return;
 
   if (state.routines === null) {
-    el.innerHTML = renderSkeletonList();
+    el.replaceChildren();
+    el.insertAdjacentHTML('beforeend', renderSkeletonList());
     return;
   }
 
   if (state.routines.length === 0 && !isPermAdmin()) {
-    el.innerHTML = emptyStateHTML({ icon: 'list-checks', title: t('routines.emptyTitle'), description: t('routines.emptyDescription') });
+    el.replaceChildren();
+    el.insertAdjacentHTML('beforeend', emptyStateHTML({ icon: 'list-checks', title: t('routines.emptyTitle'), description: t('routines.emptyDescription') }));
     refocusAfterRender(el);
     return;
   }
@@ -65,7 +67,8 @@ function render() {
   const morning = state.routines.filter((r) => r.slot === 'morning');
   const evening = state.routines.filter((r) => r.slot === 'evening');
 
-  el.innerHTML = `
+  el.replaceChildren();
+  el.insertAdjacentHTML('beforeend', `
     <div class="routines-page">
       ${isPermAdmin() && !readOnly() ? `
         <div class="routines-toolbar">
@@ -76,7 +79,7 @@ function render() {
       ${renderSlotSection('morning', morning)}
       ${renderSlotSection('evening', evening)}
     </div>
-  `;
+  `);
 
   wireEvents(el);
   wireScrollFade(el);
@@ -130,7 +133,7 @@ function renderRoutine(routine) {
         ${steps.map((s) => renderStep(s, routine.id, admin)).join('')}
       </ul>
       ${admin ? `
-        <button class="btn btn--ghost btn--xs routine-card__add-step" data-routine-id="${routine.id}" type="button">
+        <button class="btn btn--ghost btn--sm routine-card__add-step" data-routine-id="${routine.id}" type="button">
           + ${esc(t('routines.addStep'))}
         </button>` : ''}
     </div>
@@ -275,17 +278,17 @@ async function openRoutineModal(routine) {
     body: `
       <form id="routine-form" class="form-stack">
         <label class="form-label" for="routine-name">${esc(t('routines.fields.name'))} ${REQUIRED_MARK}</label>
-        <input id="routine-name" name="name" type="text" class="input" maxlength="100"
+        <input id="routine-name" name="name" type="text" class="form-input" maxlength="100"
                value="${esc(routine?.name ?? '')}" required autocomplete="off">
 
         <label class="form-label" for="routine-slot">${esc(t('routines.fields.slot'))}</label>
-        <select id="routine-slot" name="slot" class="input">
+        <select id="routine-slot" name="slot" class="form-input">
           <option value="morning"${(!routine || routine.slot === 'morning') ? ' selected' : ''}>${esc(t('routines.slot.morning'))}</option>
           <option value="evening"${routine?.slot === 'evening' ? ' selected' : ''}>${esc(t('routines.slot.evening'))}</option>
         </select>
 
         <label class="form-label" for="routine-member">${esc(t('routines.fields.member'))}</label>
-        <select id="routine-member" name="user_id" class="input">
+        <select id="routine-member" name="user_id" class="form-input">
           ${memberOptions(routine?.user_id ?? null)}
         </select>
       </form>
@@ -308,6 +311,7 @@ async function submitRoutineModal(routineId) {
     slot: data.slot,
     user_id: data.user_id ? Number(data.user_id) : null,
   };
+  const context = captureModalContext();
   try {
     if (routineId) {
       const res = await api.put(`/routines/${routineId}`, body);
@@ -317,7 +321,7 @@ async function submitRoutineModal(routineId) {
       const res = await api.post('/routines', body);
       state.routines.push(res.data);
     }
-    closeModal('routine-modal');
+    closeModal({ force: true, context });
     render();
   } catch {
     window.yuvomi?.showToast?.(t('common.errorGeneric'), 'error');
@@ -338,7 +342,7 @@ async function openStepModal(routineId, step) {
     body: `
       <form id="step-form" class="form-stack">
         <label class="form-label" for="step-label">${esc(t('routines.fields.label'))} ${REQUIRED_MARK}</label>
-        <input id="step-label" name="label" type="text" class="input" maxlength="200"
+        <input id="step-label" name="label" type="text" class="form-input" maxlength="200"
                value="${esc(step?.label ?? '')}" required autocomplete="off">
       </form>
     `,
@@ -356,6 +360,7 @@ async function submitStepModal(routineId, stepId) {
   if (!form?.reportValidity()) return;
   const data = Object.fromEntries(new FormData(form));
   const body = { label: data.label.trim() };
+  const context = captureModalContext();
   try {
     const routine = state.routines.find((r) => r.id === routineId);
     if (!routine) return;
@@ -367,7 +372,7 @@ async function submitStepModal(routineId, stepId) {
       const res = await api.post(`/routines/${routineId}/steps`, body);
       routine.steps.push(res.data);
     }
-    closeModal('step-modal');
+    closeModal({ force: true, context });
     render();
   } catch {
     window.yuvomi?.showToast?.(t('common.errorGeneric'), 'error');
@@ -379,14 +384,15 @@ async function submitStepModal(routineId, stepId) {
 // --------------------------------------------------------
 
 export function mount(container) {
-  container.innerHTML = `
-    <div class="page-layout">
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
+    <div class="page-layout app-page--reading">
       <header class="page-header">
         <h1 class="page-title">${esc(t('nav.routines'))}</h1>
       </header>
       <main id="routines-content" class="page-content"></main>
     </div>
-  `;
+  `);
 
   state = { routines: null, members: null };
   render();
