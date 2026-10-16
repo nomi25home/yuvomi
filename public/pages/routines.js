@@ -9,6 +9,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext } from '/components/modal.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { isPermAdmin, isNavModuleReadOnly } from '/permissions.js';
@@ -121,12 +122,8 @@ function renderRoutine(routine) {
         <div class="routine-card__progress">${done}/${total}</div>
         ${admin ? `
           <div class="routine-card__actions">
-            <button class="icon-btn" data-action="edit-routine" data-id="${routine.id}" type="button" aria-label="${esc(t('common.edit'))}">
-              <i data-lucide="pencil"></i>
-            </button>
-            <button class="icon-btn" data-action="delete-routine" data-id="${routine.id}" type="button" aria-label="${esc(t('common.delete'))}">
-              <i data-lucide="trash-2"></i>
-            </button>
+            ${rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: routine.name }), action: 'edit-routine', attrs: { 'data-id': routine.id } })}
+            ${rowActionHtml({ icon: 'trash-2', label: t('common.deleteNamed', { name: routine.name }), action: 'delete-routine', tone: 'danger', attrs: { 'data-id': routine.id } })}
           </div>` : ''}
       </div>
       <ul class="routine-steps" role="list">
@@ -150,12 +147,8 @@ function renderStep(step, routineId, admin) {
       </label>
       ${admin ? `
         <div class="routine-step__actions">
-          <button class="icon-btn icon-btn--xs" data-action="edit-step" data-step-id="${step.id}" data-routine-id="${routineId}" type="button" aria-label="${esc(t('common.edit'))}">
-            <i data-lucide="pencil"></i>
-          </button>
-          <button class="icon-btn icon-btn--xs" data-action="delete-step" data-step-id="${step.id}" data-routine-id="${routineId}" type="button" aria-label="${esc(t('common.delete'))}">
-            <i data-lucide="trash-2"></i>
-          </button>
+          ${rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: step.label }), action: 'edit-step', attrs: { 'data-step-id': step.id, 'data-routine-id': routineId } })}
+          ${rowActionHtml({ icon: 'trash-2', label: t('common.deleteNamed', { name: step.label }), action: 'delete-step', tone: 'danger', attrs: { 'data-step-id': step.id, 'data-routine-id': routineId } })}
         </div>` : ''}
     </li>
   `;
