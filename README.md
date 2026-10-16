@@ -82,7 +82,7 @@ Waste collection and Schedule start switched off.
 
 - **Plan** - Tasks · Calendar · Schedule · Notes
 - **Household** - Meals · Recipes · Shopping · Pantry · Housekeeping · Waste collection · Documents · Inventory · Rewards
-- **People** - Health · Contacts · Birthdays
+- **People** - Health · Contacts · Birthdays · Routines
 - **Finance** - Budget
 - **Settings** - Family · Reminders · API Tokens · Backup
 
@@ -107,6 +107,7 @@ Waste collection and Schedule start switched off.
 | **Schedule** | Rotating shifts and fixed weekly timetables, shown as an overlay in the calendar. Off by default. |
 | **Notes &amp; Contacts** | Markdown sticky notes with tappable checklists, plus contacts with CardDAV sync and vCard import/export. |
 | **Birthdays** | Birthdays and optional name days, with calendar entries, ages and reminders. |
+| **Routines** | Morning and evening checklists per household member, with step-by-step check-off and admin-managed routine templates. |
 | **Family** | Member profiles with roles, and invite links where new members pick their own password. |
 | **Reminders** | For tasks, events, medications, warranties, best-before dates, expiring documents and pickups - in-app, push, Gotify, ntfy, webhook or email. |
 | **API Tokens** | Bearer tokens with an OpenAPI 3.1 spec and a built-in MCP endpoint for AI agents. |
