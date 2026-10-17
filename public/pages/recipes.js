@@ -520,7 +520,7 @@ export async function render(container, { signal } = {}) {
   // Tab-Leiste. Der Router-Helfer (ux.js) setzt erst --fold-row-h per ResizeObserver,
   // dann ergänzen wir is-collapsed. Der MutationObserver beobachtet nur die
   // page-toolbar--fold-row-Klasse und läuft danach nicht weiter.
-  if (window.matchMedia('(max-width: 639px)').matches) {
+  if (typeof MutationObserver !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
     const mo = new MutationObserver(() => {
       if (toolbar.classList.contains('page-toolbar--fold-row')) {
         toolbar.classList.add('is-collapsed');

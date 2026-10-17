@@ -395,7 +395,7 @@ export async function render(container) {
   setKitchenTabsTrailing(searchToggle);
 
   // Zeile 2 auf Mobilgeräten anfangs eingeklappt (wie Rezepte).
-  if (window.matchMedia('(max-width: 639px)').matches) {
+  if (typeof MutationObserver !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
     const mo = new MutationObserver(() => {
       if (toolbar.classList.contains('page-toolbar--fold-row')) {
         toolbar.classList.add('is-collapsed');
