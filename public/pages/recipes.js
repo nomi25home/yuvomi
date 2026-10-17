@@ -542,7 +542,7 @@ export async function render(container, { signal } = {}) {
   setKitchenTabsTrailing(searchToggle);
 
   // Auf Mobilgeräten startet Zeile 2 eingeklappt: Inhalt beginnt direkt unter der
-  // Tab-Leiste. wireCollapsingHeader setzt erst --fold-row-h (per ResizeObserver),
+  // Tab-Leiste. Der Router-Helfer (ux.js) setzt erst --fold-row-h per ResizeObserver,
   // dann ergänzen wir is-collapsed. Der MutationObserver beobachtet nur die
   // page-toolbar--fold-row-Klasse und läuft danach nicht weiter.
   if (typeof MutationObserver !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
