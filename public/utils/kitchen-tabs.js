@@ -115,6 +115,8 @@ const BADGES = [
 
 /** Aktuelle Leiste; der Zustand wird nachgeladen, nachdem sie schon steht. */
 let _bar = null;
+/** Optionale Werkzeugzone am rechten Ende der Leiste (z.B. Suchschalter). */
+let _trailing = null;
 /** Die gleitende Kapsel der stehenden Leiste - eine, nie mehr. */
 let _indicator = null;
 let _activeRoute = null;
@@ -306,10 +308,23 @@ export function renderKitchenTabsBar(container, activeRoute) {
     onChange: onTabChosen,
   });
   _indicator = attachSegmentIndicator(_bar, { itemSelector: '.sub-tab' });
+  _trailing = document.createElement('div');
+  _trailing.className = 'kitchen-tabs-bar__trailing';
+  _bar.appendChild(_trailing);
   applyBadges(_lastSummary);
   scrollActiveSubTabIntoView(_bar);
   placeIndicator();
 
   refreshKitchenBadges();
   return _bar;
+}
+
+/**
+ * Setzt den Inhalt der Trailing-Zone der Küchenleiste.
+ * Wird von jedem Küchen-Modul aufgerufen: Rezepte und Vorrat übergeben einen
+ * Suchschalter, Mahlzeiten und Einkauf übergeben null (leert die Zone).
+ */
+export function setKitchenTabsTrailing(content) {
+  if (!_trailing) return;
+  _trailing.replaceChildren(...(content ? [content] : []));
 }

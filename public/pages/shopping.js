@@ -17,7 +17,7 @@ import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender, advancedSection } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
-import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, refreshKitchenBadges, setKitchenTabsTrailing } from '/utils/kitchen-tabs.js';
 import { mayImportMealPlan, mayTransferShoppingToPantry, announceTransfer, transferMessage } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
@@ -5002,7 +5002,32 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // beim Wechsel Mahlzeiten -> Einkauf aus und sprang nach dem Laden zurueck,
   // statt zu stehen wie in den drei Geschwister-Tabs (Integration Runde 3).
   const kitchenBar = renderKitchenTabsBar(container, '/shopping');
-  await loadPageData();
+  setKitchenTabsTrailing(null);
+  state.itemsError = null;
+  try {
+    // loadCategories() und loadLists() fangen selbst; der äußere catch ist das
+    // Netz für alles Unerwartete und bildet es auf denselben Fehlerzustand ab,
+    // statt die Ausnahme in den globalen Fehlerbildschirm laufen zu lassen.
+    await Promise.all([loadCategories(), loadStores(), loadLists()]);
+    if (!state.listsError && state.lists.length) {
+      const listParam = parseInt(new URLSearchParams(window.location.search).get('list'), 10) || null;
+      const target = listParam && state.lists.find((l) => l.id === listParam);
+      state.activeListId = target ? target.id : state.lists[0].id;
+      state.collapsedCategories = loadCollapsedCategories(state.currentUserId, state.activeListId);
+      state.tickedOpen = loadTickedOpen(state.currentUserId, state.activeListId);
+      try {
+        await loadItems(state.activeListId);
+      } catch (err) {
+        console.error('[Shopping] loadItems Fehler:', err);
+        clearItems();
+        state.activeList = state.lists.find((l) => l.id === state.activeListId) ?? null;
+        state.itemsError = err;
+      }
+    }
+  } catch (err) {
+    console.error('[Shopping] Ladefehler:', err);
+    state.listsError = err;
+  }
 
   // Alles ausser der Leiste abraeumen: sie bleibt eingehaengt, damit ihre
   // Kapsel weitergleitet und der waagrechte Scrollstand nicht zurueckspringt.
