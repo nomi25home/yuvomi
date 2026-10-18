@@ -52,6 +52,9 @@ function commonHost(els) {
  * @param {number} [opts.duration]     - ms pro Element, Standard `--duration-md`
  * @param {number} [opts.max=5]        - Maximale Anzahl gestaffelter Elemente
  */
+/** So viele Zeilen blenden beim ersten Aufbau ein - mehr passen auf keinen Bildschirm. */
+export const STAGGER_ROWS = 24;
+
 export function stagger(elements, { host = null, delay = 30, duration = durationToken('--duration-md', 200), max = 5 } = {}) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const els = Array.from(elements ?? []);
@@ -80,12 +83,30 @@ export function stagger(elements, { host = null, delay = 30, duration = duration
   // das Ziel ist der Wert des Stylesheets, also auch das 0.45 einer
   // abgehakten Einkaufszeile, nicht ein fest verdrahtetes 1.
   const easing = easingToken('--ease-out', 'ease-out');
-  els.forEach((el, i) => {
+  // NUR DER ANFANG DER LISTE (R20): ab der `max`-ten Zeile stehen alle auf
+  // derselben Verzoegerung, und bei 200 Aufgaben liefen 200 Animationen, von
+  // denen 180 unter der Falz niemand sieht. STAGGER_ROWS deckt einen hohen
+  // Bildschirm; der Rest steht sofort da.
+  els.slice(0, STAGGER_ROWS).forEach((el, i) => {
     if (typeof el?.animate !== 'function') return;
     el.animate([{ opacity: 0, transform: 'translateY(8px)', offset: 0 }], {
       duration, delay: i < max ? i * delay : max * delay, easing, fill: 'backwards',
     });
   });
+}
+
+/**
+ * Gehört dieser Tastendruck einer laufenden IME-Umwandlung (Japanisch,
+ * Koreanisch, Chinesisch)? Dann bestätigt Enter das Schriftzeichen und darf
+ * weder absenden noch einen Vorschlag übernehmen. `keyCode 229` fängt Safari,
+ * das das bestätigende Enter schon mit `isComposing: false` meldet (WebKit-Bug
+ * 165004).
+ *
+ * @param {KeyboardEvent} event
+ * @returns {boolean}
+ */
+export function isImeComposing(event) {
+  return Boolean(event?.isComposing || event?.keyCode === 229);
 }
 
 /**
@@ -161,19 +182,36 @@ export function acknowledgeCheck(el, { checked = true } = {}) {
  * die in tokens.css, der Rueckfall greift nur ohne Stylesheet (Node-Tests).
  */
 export function durationToken(name, fallback) {
-  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
-    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    : '';
+  const raw = rootToken(name);
   const ms = raw.endsWith('ms') ? parseFloat(raw) : raw.endsWith('s') ? parseFloat(raw) * 1000 : NaN;
   return Number.isFinite(ms) ? ms : fallback;
 }
 
 /** Wert eines Kurven-Tokens (`--ease-*`); WAAPI nimmt `cubic-bezier(...)` direkt. */
 export function easingToken(name, fallback = 'ease-out') {
-  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
-    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    : '';
-  return raw || fallback;
+  return rootToken(name) || fallback;
+}
+
+/**
+ * DIE BEWEGUNGS-TOKENS WERDEN EINMAL GELESEN (R20, Re-Critique 2026-10-17 a6
+ * P2). `getComputedStyle(root).getPropertyValue()` erzwingt eine Stilrechnung
+ * des ganzen Dokuments, wenn es seit dem letzten Frame geaendert wurde - und
+ * genau das ist es direkt nach einem Neuzeichnen: `stagger` las seinen
+ * Default nach dem Einsetzen von 200 Aufgaben und kostete so 210 ms (4x CPU).
+ * Dauer und Kurven haengen an keinem Theme und keiner Media Query
+ * (tokens.css), also reicht der erste gelesene Wert. Leer wird nicht gemerkt
+ * (das Stylesheet kann noch fehlen). Ein anderes `getComputedStyle`
+ * (Node-Test mit eigenem Stub) beginnt einen neuen Speicher.
+ */
+let _tokenCache = { source: null, values: new Map() };
+function rootToken(name) {
+  if (typeof getComputedStyle !== 'function' || typeof document === 'undefined') return '';
+  if (_tokenCache.source !== getComputedStyle) _tokenCache = { source: getComputedStyle, values: new Map() };
+  const known = _tokenCache.values.get(name);
+  if (known !== undefined) return known;
+  const raw = getComputedStyle(document.documentElement)?.getPropertyValue?.(name)?.trim?.() ?? '';
+  if (raw) _tokenCache.values.set(name, raw);
+  return raw;
 }
 
 /** Die Blockmasse, die beim Einklappen mit auf null gehen: Hoehe, Innen- und Aussenabstand, Rahmen. */
@@ -270,6 +308,47 @@ function followingNeighbours(el, limit = 60) {
 }
 
 /**
+ * FLIP, das auch der Layout-Shift-Messung standhaelt (R20). Eine Animation,
+ * die der Compositor faehrt, zeigt im Umschalt-Frame zwar die alte Lage -
+ * die Messung des Browsers sieht aber nur den Wert des Hauptthreads, und der
+ * ist dort noch `none`: gemessen blieb CLS 0,055 trotz Gleiten. Deshalb haelt
+ * ein Inline-`transform` die alte Lage im Umschalt-Frame, und erst im
+ * naechsten Frame uebernimmt die Animation von genau dort. Reduzierte
+ * Bewegung: kein Halten, kein Gleiten - der Wechsel steht.
+ * @param {Map<Element, {left: number, top: number}>} before - flipSnapshotElements()
+ */
+function holdThenGlide(before) {
+  if (!before?.size || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const duration = durationToken('--duration-md', 200);
+  const easing = easingToken('--ease-out', 'ease-out');
+  const held = [];
+  for (const [el, prev] of before) {
+    if (!el.isConnected || typeof el.animate !== 'function') continue;
+    const now = el.getBoundingClientRect();
+    const dx = prev.left - now.left;
+    const dy = prev.top - now.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+    const from = `translate(${dx}px, ${dy}px)`;
+    el.style.transform = from;
+    held.push([el, from]);
+  }
+  if (!held.length) return;
+  // ZWEI Frames Halt: der Wechsel kommt aus einem Scroll-Ereignis, das im
+  // selben Frame VOR den rAF-Rueckrufen laeuft - ein einfaches rAF raeumte
+  // ihn, bevor der Frame gemalt war. Eine sofort gestartete Animation zaehlt
+  // die Messung nicht (gemessen: CLS 0,055). Danach uebernimmt die Animation;
+  // der Inline-Wert geht erst, wenn sie laeuft (`ready`) - sonst stuende ein
+  // Frame lang die neue Lage ohne Versatz da.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    for (const [el, from] of held) {
+      const anim = el.animate([{ transform: from }, { transform: 'none' }], { duration, easing });
+      const release = () => { if (el.style.transform === from) el.style.transform = ''; };
+      Promise.resolve(anim.ready).then(release, release);
+    }
+  }));
+}
+
+/**
  * Das Gegenstueck: ein gerade eingesetztes Element erscheinen lassen
  * (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte Zeile, eine
  * Feldmeldung). Ohne `fill` - am Ende gilt wieder das Stylesheet.
@@ -286,11 +365,18 @@ function followingNeighbours(el, limit = 60) {
  * `interpolate-size`/`calc-size()` (Guide animate-to-intrinsic-sizes) waere
  * wieder eine Hoehenanimation und damit Layout je Frame.
  *
- * Unter `prefers-reduced-motion` steht das Element ohne Bewegung da.
+ * Unter `prefers-reduced-motion` blendet das Element nur ein (`--duration-sm`).
  */
 export function expandIn(el, { duration = durationToken('--duration-lg', 250) } = {}) {
   if (!el || typeof el.animate !== 'function') return Promise.resolve();
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  // Reduzierte Bewegung: keine Groesse, kein Nachruecken - aber eine Blende
+  // (R20, Re-Critique 2026-10-17 a6 P3; vorher stand die Zeile hart da,
+  // waehrend collapseOut dort ausblendet).
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const fadeMs = durationToken('--duration-sm', 150);
+    const opacity = getComputedStyle(el).opacity || '1';
+    return settleAnimation(el.animate([{ opacity: 0 }, { opacity }], { duration: fadeMs, easing: easingToken('--ease-out', 'ease-out') }), fadeMs);
+  }
   const easing = easingToken('--ease-in-out', 'ease-in-out');
   const neighbours = el.style && el.isConnected !== false ? followingNeighbours(el) : [];
   let before = null;
@@ -754,8 +840,6 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   let openH = 0;
   let dockTitle = null;
   let headSeal = null;
-  // Die Kinder der Lead-Zone, die im Band-Modus angedockt ausblenden.
-  let leadMarked = [];
 
   // DAS ABSENDER-SIEGEL: genau eines, unmittelbar vor dem Seitentitel.
   //
@@ -814,6 +898,27 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   const onGesture = (e) => { gestureTarget = e.target; };
   const GESTURES = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
 
+  /* DER KOPF KLAPPT UM, DER INHALT GLEITET (R20, Re-Critique 2026-10-17 a6 P2).
+   * Kalender und Budget klappten in EINEM Frame um (Inhalt ~52px Sprung,
+   * CLS 0,06), der Einkauf schob seine Liste per `margin` ueber 250 ms
+   * (Layout je Frame, CLS 0,06) - zwei Verhalten fuer eine Geste. Jetzt EIN
+   * Weg: der Zustand wechselt in einem Frame (Layout einmal), und was dabei
+   * springt - die Zeilen des Kopfes und alles unter ihm -, gleitet per FLIP
+   * nur mit `transform` von seiner alten Lage an die neue. Die visuelle Lage
+   * bleibt im Umschalt-Frame stehen; damit ist es kein Layout-Shift.
+   * `scroll-driven` (Guide shrinking-header-on-scroll) traegt hier nicht: der
+   * gedeckelte Kopf ordnet seine Zeilen um (der Zeitraum rueckt in die
+   * Titelzeile), das ist keine Strecke, die sich an den Scroll binden laesst.
+   * Reduzierte Bewegung: flipPlayElements tut nichts - der Wechsel steht. */
+  const setCollapsed = (on, states) => {
+    if (states.every((c) => toolbar.classList.contains(c) === on)) return;
+    const moving = [...toolbar.children, ...followingNeighbours(toolbar)];
+    const before = flipSnapshotElements(moving);
+    if (on) toolbar.classList.add(...states, 'was-collapsed');
+    else toolbar.classList.remove(...states);
+    holdThenGlide(before);
+  };
+
   // Hysterese, damit der Kopf nicht um seine eigene Schwelle flattert.
   const onInnerScroll = (e) => {
     const port = e.target;
@@ -862,7 +967,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
       : reserve + shorter;
     if (unfolded < (fold ? foldH : lead) + 48) {
-      toolbar.classList.remove(...states);
+      setCollapsed(false, states);
       return;
     }
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
@@ -870,8 +975,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const top = port.scrollTop;
     // `was-collapsed`: ab jetzt darf der Titel beim Ausklappen einblenden
     // (layout.css, `page-title-settle-back`) - nicht schon beim Seitenaufbau.
-    if (top > 24) toolbar.classList.add(...states, 'was-collapsed');
-    else if (top < 8) toolbar.classList.remove(...states);
+    if (top > 24) setCollapsed(true, states);
+    else if (top < 8) setCollapsed(false, states);
   };
   const update = () => {
     // VOR der Messung: das Siegel steht in der Titelzeile und zählt zu ihr.
@@ -968,7 +1073,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Haushaltshilfe 122→157px). Das ist exakt die Oszillation, gegen die das
     // negative `top` gewählt wurde. Gemessen statt aufgezählt, damit die Regel
     // auch beim sechsten Modul noch gilt. Was dann geschieht, steht unten bei
-    // der Faltung und beim Band.
+    // der Faltung.
     const lastLine = lines.length ? lines[lines.length - 1] : null;
     const tbCS = getComputedStyle(toolbar);
     const innerWidth = toolbar.clientWidth
@@ -1058,27 +1163,16 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     }
     toolbar.classList.toggle('page-toolbar--dock-fold', fold);
 
-    // DAS BAND: WO NICHTS FALTEN KANN, BLEIBT EIN STREIFEN DES TITELS STEHEN
-    // (Re-Critique 2026-09-27, R11 H1). Schichtplan, Haushaltshilfe und
-    // Belohnungen tragen als Bar-Zeile eine Tab-Leiste ueber die ganze Breite
-    // und kein „..." - dort half die Faltung nicht, und angedockt stand nur
-    // die Leiste da, ohne ein Wort, in welchem Modul sie liegt. Statt einer
-    // eigenen Zeile (die waere die Hoehenaenderung, gegen die das negative
-    // `top` gewaehlt ist) klebt der Kopf um genau die Hoehe des angedockten
-    // Titels TIEFER: der unterste Streifen der Lead-Zone bleibt sichtbar, der
-    // Titel steht absolut darin, und die Lead-Zone blendet angedockt aus.
-    // Die Geometrie haengt damit nicht am Andock-Zustand - der Kopf hat im
-    // Band-Modus immer dieselbe Hoehe und dieselbe Klebekante, angedockt
-    // wechselt nur, was in dem Streifen zu sehen ist. Die Schwelle der
-    // Trennlinie (unten, IntersectionObserver) rueckt um denselben Streifen.
-    const band = lead > 0 && !capped && Boolean(heading) && !roomForDockTitle && !fold;
-    toolbar.classList.toggle('page-toolbar--dock-band', band);
-    const leadEls = band ? lines.slice(0, -1).flatMap((l) => l.els) : [];
-    for (const el of leadMarked) if (!leadEls.includes(el)) el.removeAttribute('data-dock-lead');
-    for (const el of leadEls) if (!leadMarked.includes(el)) el.setAttribute('data-dock-lead', '');
-    leadMarked = leadEls;
+    // KEIN BAND MEHR (R20, Aufraeumen, Ulas 2026-10-17). Hier stand seit R11
+    // H1 die Bauart "Band": wo nichts falten konnte (Tab-Leiste ueber die
+    // ganze Breite), klebte der Kopf um die Hoehe des angedockten Titels
+    // tiefer. Seit R19 stehen die Reiter von Schichtplan, Haushaltshilfe und
+    // Belohnungen unter 1024px IN der Titelzeile (`--tabs-title`), die Koepfe
+    // sind einzeilig, und ab 1024px gab es die Regeln nie. Gemessen 2026-10-17
+    // ueber 11 Breiten 320-1023px mit und ohne Touch: keine Route erreichte die
+    // Bauart mehr - sie ist mit ihren Regeln (layout.css) entfallen.
 
-    if (lead > 0 && !capped && heading && (roomForDockTitle || fold || band)) {
+    if (lead > 0 && !capped && heading && (roomForDockTitle || fold)) {
       if (!dockTitle) {
         dockTitle = document.createElement('span');
         dockTitle.className = 'page-toolbar__dock-title';
@@ -1096,21 +1190,6 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       }
     } else if (dockTitle?.parentElement) {
       dockTitle.remove();
-    }
-
-    // Die Hoehe des Streifens ist die des angedockten Titels, gemessen - das
-    // CSS stellt ihn im Band-Modus unsichtbar, aber gerendert hin. Dazu das
-    // obere Polster des Kopfes: mit ihm steht der Titel angedockt so weit
-    // unter der Kante wie der Large Title ausgeklappt.
-    const bandH = band && dockTitle?.parentElement === toolbar
-      ? Math.min(lead, Math.ceil(dockTitle.getBoundingClientRect().height))
-      : 0;
-    if (bandH > 0) {
-      toolbar.style.setProperty('--dock-band-h', `${bandH}px`);
-      toolbar.style.setProperty('--dock-band-pad', `${Math.round(padTop)}px`);
-    } else {
-      toolbar.style.removeProperty('--dock-band-h');
-      toolbar.style.removeProperty('--dock-band-pad');
     }
 
     // Die Trennlinie erscheint, sobald die erste Zeile aus dem Scrollport
@@ -1134,10 +1213,6 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Belohnungen, Haushaltshilfe): der Kopf trug mobil NIE eine Trennlinie.
     // Bei drei Zeilen fiel es nicht auf - dort ist `lead` die Höhe von zwei
     // Zeilen und schiebt die erste weit über die Kante hinaus.
-    // Im Band-Modus klebt der Kopf um `bandH` tiefer, und genau so viel der
-    // ersten Zeile bleibt geklebt im Bild - der Rahmen schrumpft um dasselbe
-    // Mass, sonst dockte der Kopf nie an.
-    //
     // UND UM DAS, WAS DIE ERSTE ZEILE UNTER DIE LEAD-ZONE REICHT. `lead` ist
     // die Oberkante der letzten Zeile minus dem oberen Polster; die erste
     // Zeile endet aber `row-gap` vor der letzten, und ist das Polster groesser
@@ -1152,7 +1227,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const overhang = Math.max(0, Math.ceil(firstBottom - lead));
     io = new IntersectionObserver(
       ([entry]) => toolbar.classList.toggle('is-docked', !entry.isIntersecting),
-      { root: scrollport, threshold: 0, rootMargin: `-${bandH + overhang + 1}px 0px 0px 0px` },
+      { root: scrollport, threshold: 0, rootMargin: `-${overhang + 1}px 0px 0px 0px` },
     );
     io.observe(firstEl);
   };
@@ -1216,10 +1291,6 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       toolbar.removeEventListener('beforetoggle', onMenuToggle, { capture: true });
       toolbar.querySelectorAll('[data-dock-fold]').forEach((el) => el.removeAttribute('data-dock-fold'));
       toolbar.style.removeProperty('--dock-fold-bar-h');
-      for (const el of leadMarked) el.removeAttribute('data-dock-lead');
-      leadMarked = [];
-      toolbar.style.removeProperty('--dock-band-h');
-      toolbar.style.removeProperty('--dock-band-pad');
       dockTitle?.remove();
       dockTitle = null;
       headSeal?.remove();
@@ -1228,7 +1299,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       toolbar.style.removeProperty('--page-toolbar-lead');
       toolbar.style.removeProperty('--fold-row-h');
       foldH = 0;
-      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'was-collapsed', 'page-toolbar--dock-fold', 'page-toolbar--dock-band', 'page-toolbar--fold-row');
+      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'was-collapsed', 'page-toolbar--dock-fold', 'page-toolbar--fold-row');
     },
   };
 }
@@ -1533,6 +1604,71 @@ export function nextNavMinimized(state, { top, max, delta, gesture }) {
 }
 
 /**
+ * DIE MINIMIERTE KAPSEL IST EINE PILLE (R20, Entscheidung Ulas 2026-10-17,
+ * Messlatte iOS 26 Tab-Bar-Minimize). R19 machte sie nur flacher und gewann
+ * 8px; jetzt schrumpft sie an ihrer Startkante auf das aktive Ziel: die
+ * anderen Tabs blenden aus, das aktive gleitet per `translate` an den Anfang,
+ * die Kapsel wird so breit wie dieses eine Ziel plus ihr Polster rundum. Der
+ * FAB bleibt an seinem Platz.
+ *
+ * Reine Rechnung, damit sie ohne DOM pruefbar ist. Alle Werte stammen aus der
+ * AUSGEFAHRENEN Kapsel (gemessen vor dem Umschalten):
+ *   - `width`: Polster + Ziel (hoechstens 64px) + Polster + Rand (Border-Box)
+ *   - `shift`: wie weit das aktive Ziel zum ersten wandert (in RTL nach rechts)
+ *   - `itemWidth`: die Breite, auf der die Tabs waehrenddessen stehen bleiben -
+ *     schrumpfte ihr Flex-Slot mit, wanderten sie (und das aktive verzoege)
+ *
+ * @param {{ first: {left: number, right: number}, active: {left: number, right: number, width: number},
+ *   padStart: number, border?: number, rtl?: boolean }} m
+ * @returns {{ width: number, shift: number, itemWidth: number }}
+ */
+export const NAV_PILL_MAX_INNER = 64;
+export function navPillGeometry({ first, active, padStart, border = 0, rtl = false }) {
+  // Am Tablet ist ein Slot ~100px breit; die Pille bleibt trotzdem eine
+  // Pille (hoechstens NAV_PILL_MAX_INNER Inhalt), das Ziel steht mittig darin
+  // und ragt seitlich unter die Kante - sichtbar und tippbar bleiben 64px.
+  const inner = Math.min(active.width, NAV_PILL_MAX_INNER);
+  const centre = (active.width - inner) / 2;
+  const shift = rtl ? first.right - active.right + centre : first.left - active.left - centre;
+  return {
+    width: padStart * 2 + inner + border * 2,
+    shift,
+    itemWidth: active.width,
+  };
+}
+
+/** Ein Ziel der Kapsel, das gerade gezeichnet wird (der Kuechen-Tab fehlt je nach Modulen). */
+const isShownNavItem = (el) => Boolean(el?.classList?.contains('nav-item') && el.getClientRects?.().length);
+
+/**
+ * Misst die Pille an der ausgefahrenen Kapsel und schreibt sie als Variablen
+ * an `.nav-bottom` (layout.css liest sie im minimierten Zustand). Das aktive
+ * Ziel traegt `.nav-item--pill`. Ohne aktives Ziel (Einstellungen ueber Mehr
+ * ohne Markierung) steht das erste in der Pille.
+ * @param {Element} nav
+ */
+function measureNavPill(nav) {
+  const items = nav.querySelector?.('.nav-bottom__items');
+  if (!items) return;
+  const tabs = [...items.children].filter(isShownNavItem);
+  if (!tabs.length) return;
+  const active = tabs.find((el) => el.matches('[aria-current="page"], .nav-item--active')) ?? tabs[0];
+  const cs = getComputedStyle(items);
+  const rtl = cs.direction === 'rtl';
+  const g = navPillGeometry({
+    first: tabs[0].getBoundingClientRect(),
+    active: active.getBoundingClientRect(),
+    padStart: parseFloat(rtl ? cs.paddingRight : cs.paddingLeft) || 0,
+    border: parseFloat(cs.borderLeftWidth) || 0,
+    rtl,
+  });
+  nav.style.setProperty('--nav-pill-width', `${g.width}px`);
+  nav.style.setProperty('--nav-pill-shift', `${g.shift}px`);
+  nav.style.setProperty('--nav-item-width', `${g.itemWidth}px`);
+  for (const tab of tabs) tab.classList.toggle('nav-item--pill', tab === active);
+}
+
+/**
  * Verdrahtet `nextNavMinimized` an die Bottom-Nav. Zugehoert wird jedem
  * senkrechten Scrollport im Inhalt (`.app-content` und die eigenen Ports der
  * gedeckelten Module) - Dialoge, Blaetter und Popover zaehlen nicht, sie
@@ -1559,6 +1695,9 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
   const apply = (minimized) => {
     if (minimized === nav.classList.contains('nav-bottom--minimized')) return;
     clearTimeout(settleTimer);
+    // Gemessen wird ausgefahren - im Rueckweg (`--settling`) stehen die Tabs
+    // noch auf der alten Breite, das ist dieselbe Geometrie.
+    if (minimized) measureNavPill(nav);
     nav.classList.toggle('nav-bottom--minimized', minimized);
     doc.documentElement.classList.toggle('nav-minimized', minimized);
     // Zurueck gleitet sie ueber Zwischenhoehen - die duerfen die Zone nicht
@@ -1592,13 +1731,35 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
   doc.addEventListener('scroll', onScroll, { capture: true, passive: true });
   for (const type of GESTURES) doc.addEventListener(type, onGesture, { capture: true, passive: true });
 
+  const expand = () => { state = { minimized: false, travel: 0 }; apply(false); };
+  // EIN TIPP AUF DIE PILLE FAEHRT SIE AUS - er navigiert nicht und fuehrt
+  // auch nicht nach oben (das taete der Tipp auf den aktiven Tab). Gemerkt
+  // beim Druck: der Fokus, den der Browser dabei setzt, faehrt die Kapsel per
+  // `:focus-within` schon aus, bevor der `click` kommt.
+  let pillTap = false;
+  const onPillDown = () => { pillTap = nav.classList.contains('nav-bottom--minimized'); };
+  const onPillClick = (e) => {
+    if (!pillTap) return;
+    pillTap = false;
+    e.preventDefault();
+    e.stopPropagation();
+    expand();
+    // Bliebe der Fokus im Tab, haelt `:focus-within` die Kapsel offen, und
+    // sie minimierte beim naechsten Lesen nicht mehr.
+    if (e.detail > 0) e.target?.closest?.('.nav-item')?.blur?.();
+  };
+  nav.addEventListener?.('pointerdown', onPillDown, { capture: true, passive: true });
+  nav.addEventListener?.('click', onPillClick, { capture: true });
+
   return {
     nav,
-    expand: () => { state = { minimized: false, travel: 0 }; apply(false); },
+    expand,
     destroy: () => {
       clearTimeout(settleTimer);
       doc.removeEventListener('scroll', onScroll, { capture: true });
       for (const type of GESTURES) doc.removeEventListener(type, onGesture, { capture: true });
+      nav.removeEventListener?.('pointerdown', onPillDown, { capture: true });
+      nav.removeEventListener?.('click', onPillClick, { capture: true });
       // Der Root-Zustand gehoert der Kapsel, die ihn gesetzt hat; eine
       // Nachfolgerin beginnt ausgefahren.
       doc.documentElement.classList.remove('nav-minimized');

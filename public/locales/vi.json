@@ -42,6 +42,9 @@
         "errorOccurred": "Đã xảy ra lỗi.",
         "unexpectedError": "Đã xảy ra lỗi không mong muốn.",
         "errorDetails": "Chi tiết kỹ thuật",
+        "pageFailedTitle": "Hiện không thể mở {{page}}",
+        "pageFailedHint": "Mọi phần khác vẫn hoạt động bình thường.",
+        "toOverview": "Về Tổng quan",
         "errorGeneric": "Đã xảy ra lỗi.",
         "updateAvailable": "Có bản cập nhật - tải lại trang để nhận phiên bản mới nhất.",
         "titleRequired": "Tiêu đề là bắt buộc",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "Thêm {{title}} vào danh sách mua sắm",
         "emailInUse": "Địa chỉ email này đã thuộc về một tài khoản khác.",
+        "emailInvalid": "Nhập địa chỉ email hợp lệ.",
         "sessionUnreachableTitle": "Mất kết nối",
+        "serverNotReadyTitle": "Máy chủ hiện chưa sẵn sàng",
+        "rateLimitedTitle": "Quá nhiều yêu cầu",
         "sessionRetryHint": "Bạn vẫn được đăng nhập. Thử lại sau {{seconds}} giây.",
         "sessionRetrying": "Đang thử lại…",
         "searchNoResultsTitle": "Không có kết quả",
         "searchNoResultsDescription": "Không có mục nào khớp với tìm kiếm của bạn.",
         "searchNoResultsFilteredDescription": "Không có mục nào khớp với tìm kiếm và bộ lọc của bạn.",
-        "searchReset": "Đặt lại tìm kiếm"
+        "searchReset": "Đặt lại tìm kiếm",
+        "passwordMinLength": "Ít nhất 8 ký tự."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "Xóa khoản thanh toán khoản vay này?",
         "loanRemainingAmount": "Còn lại",
         "loanRemainingPrincipal": "Dư nợ gốc",
+        "loanOwedToYou": "Còn được trả lại",
         "loanStillToPay": "Còn phải trả",
         "loanPrincipalAmount": "Số tiền vay",
         "loanRemainingInstallments": "Số kỳ hạn còn lại",
         "loanPaidAmount": "Đã trả",
+        "loanReceivedAmount": "Đã nhận lại",
         "loansEmpty": "Không có khoản vay nào đang hoạt động.",
         "loanInstallmentMeta": "Đã trả {{paid}} trong số {{total}} kỳ hạn",
         "loanRemainingOf": "trong số {{total}}",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "Dư nợ gốc nhỏ nhất trước",
         "loanSortActive": "Sắp xếp: {{sort}}",
         "loanPaidStatus": "Đã trả",
-        "markLoanPaid": "Đánh dấu đã trả",
+        "loanBookInstallment": "Ghi khoản trả góp",
+        "loanReceiveRepayment": "Đã nhận tiền trả",
         "loanBorrowerLabel": "Người vay",
         "loanDirectionLabel": "Loại khoản vay",
         "loanDirectionLent": "Cho vay (được trả lại)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "Thẻ tín dụng",
         "accountType_investment": "Đầu tư",
         "accountType_other": "Khác",
-        "viewAccountTransactions": "Xem giao dịch của {{name}}",
-        "currentBalance": "Số dư hiện tại",
         "clearAccountFilter": "Xóa bộ lọc tài khoản",
         "archivedBadge": "Đã lưu trữ",
         "showArchivedAccounts": "Hiện mục đã lưu trữ",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "Giá trị đường xu hướng",
         "statsPointLabel": "{{period}}: thu nhập {{income}}, chi tiêu {{expenses}}",
         "statsPointLabelCumulative": "Đến {{period}}: thu nhập {{income}}, chi tiêu {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} dự kiến",
         "receiptsLabel": "Chứng từ",
         "receiptsHint": "Hóa đơn hoặc biên lai của giao dịch này.",
         "receiptDocumentName": "Chứng từ: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "Theo ngày",
         "ledgerSortAmount": "Theo số tiền",
         "ledgerSortActive": "Sắp xếp: {{sort}}",
-        "ledgerAccountsAll": "Tất cả tài khoản"
+        "ledgerAccountsAll": "Tất cả tài khoản",
+        "showAccountTransactions": "Xem giao dịch"
     },
     "settings": {
         "healthCycleEnableLabel": "Cung cấp chu kỳ cho gia đình",
@@ -1987,6 +1997,8 @@
         "confirmPasswordLabel": "Xác nhận mật khẩu mới",
         "savePassword": "Lưu mật khẩu",
         "passwordMismatch": "Mật khẩu không khớp.",
+        "currentPasswordWrong": "Mật khẩu hiện tại không đúng.",
+        "passwordTooShort": "Ít nhất 8 ký tự.",
         "passwordSavedToast": "Thay đổi mật khẩu thành công.",
         "oidcLinkTitle": "Đăng nhập một lần",
         "oidcLinkHint": "Liên kết tài khoản SSO của bạn với tài khoản này, để đăng nhập qua nhà cung cấp đưa bạn đến đây thay vì tạo tài khoản thứ hai.",
@@ -2096,6 +2108,7 @@
         "familyRoleGrandparent": "Ông bà",
         "familyRoleRelative": "Họ hàng",
         "familyRoleOther": "Thành viên gia đình",
+        "childStartHint": "Tài khoản trẻ em mới bắt đầu không có Ngân sách và nhịn ăn, chỉ xem Người giúp việc ở chế độ đọc, không có tiền công và thanh toán. Bạn có thể đổi sau trong “Vai trò và quyền”.",
         "systemAdminLabel": "Quản trị hệ thống",
         "systemAdminHint": "Quản trị hệ thống có thể quản lý cài đặt ứng dụng, tích hợp, mã API và tài khoản gia đình.",
         "systemAdminBadge": "Quản trị hệ thống",
@@ -2112,7 +2125,7 @@
         "removeMemberNamed": "Gỡ {{name}}",
         "memberDeactivatedToast": "Đã vô hiệu hóa {{name}}. Các mục vẫn được giữ lại.",
         "memberFormerBadge": "Thành viên cũ",
-        "memberOrderHint": "Thứ tự này áp dụng cho cả gia đình: lịch, thời khóa biểu và mọi danh sách người đều theo thứ tự này. Để thay đổi, hãy kéo tay nắm hoặc đặt tiêu điểm vào đó rồi nhấn các phím mũi tên. Thành viên mới xếp sau, theo tên.",
+        "memberOrderHint": "Thứ tự này áp dụng cho cả gia đình. Kéo tay cầm hoặc dùng phím mũi tên để thay đổi.",
         "logout": "Đăng xuất",
         "logoutConfirm": "Đăng xuất khỏi thiết bị này?",
         "synchronizing": "Đang đồng bộ…",
@@ -2141,7 +2154,7 @@
         "pwaInstallTitle": "Cài đặt Yuvomi trên thiết bị này",
         "pwaInstallChecking": "Đang kiểm tra tính khả dụng để cài đặt...",
         "pwaInstallReady": "Yuvomi có thể được cài đặt như một ứng dụng trên thiết bị này.",
-        "pwaInstallUnavailable": "Cài đặt hiện không khả dụng trên trình duyệt này.",
+        "pwaInstallUnavailable": "Trình duyệt này không cung cấp cài đặt ở đây. Trong Chrome và Edge, bạn tìm thấy nó trong menu trình duyệt; trong Safari, ở Chia sẻ > Thêm vào Dock hoặc Thêm vào Màn hình chính. Không có địa chỉ HTTPS thì không trình duyệt nào cung cấp.",
         "pwaInstallInstalled": "Yuvomi đã được cài đặt trên thiết bị này.",
         "pwaInstallIosHint": "Trên iPhone hoặc iPad, sử dụng menu Chia sẻ và chọn Thêm vào Màn hình Chính.",
         "pwaInstallButton": "Cài đặt ứng dụng",
@@ -2478,7 +2491,7 @@
         "deleteCardDAVAccountConfirm": "Các liên hệ đã đồng bộ vẫn còn, nhưng mất liên kết CardDAV.",
         "housekeepingPaymentsTitle": "Nhiệm vụ thanh toán",
         "housekeepingPaymentTasksLabel": "Tạo nhiệm vụ thanh toán mỗi lần nhân viên dọn dẹp điểm danh",
-        "housekeepingPaymentTasksHint": "Khi được bật, mỗi lần điểm danh sẽ tạo một nhiệm vụ để thanh toán cho nhân viên. Hoàn thành nhiệm vụ đó sẽ đánh dấu là đã thanh toán cho chuyến viếng thăm.",
+        "housekeepingPaymentTasksHint": "Khi được bật, mỗi lần điểm danh sẽ tạo một nhiệm vụ để thanh toán cho nhân viên. Hoàn thành nhiệm vụ đó sẽ đánh dấu là đã thanh toán cho chuyến viếng thăm. Chỉ người điểm danh và quản trị viên mới thấy nhiệm vụ này.",
         "housekeepingPaymentTasksSaved": "Cài đặt thanh toán dọn dẹp đã lưu.",
         "tasksSubtasksExpandedTitle": "Công việc con",
         "tasksSubtasksExpandedHint": "Chọn xem công việc con có được hiển thị mở theo mặc định hay không.",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "Thiết bị này vẫn đang ghép nối. Hãy thu hồi trước.",
         "feedExportIncludeBirthdays": "Bao gồm sinh nhật",
         "feedExportIncludeBirthdaysHint": "Tắt khi đăng ký nguồn sinh nhật riêng để tránh trùng lặp sinh nhật và ngày tên.",
-        "birthdayFeedHint": "Bất kỳ ai có liên kết này đều có thể xem tất cả sinh nhật và ngày tên đã lưu trong gia đình, kể cả khi tắt nhắc nhở. Chỉ dùng trên thiết bị của bạn."
+        "birthdayFeedHint": "Bất kỳ ai có liên kết này đều có thể xem tất cả sinh nhật và ngày tên đã lưu trong gia đình, kể cả khi tắt nhắc nhở. Chỉ dùng trên thiết bị của bạn.",
+        "skipToSheet": "Chuyển đến cài đặt",
+        "screensaverOffTitle": "Trình bảo vệ màn hình ảnh",
+        "screensaverNeedsImmich": "Trình bảo vệ màn hình bắt đầu khi quản trị viên đã kết nối Immich. Sau đó bạn đặt thời gian chờ, đồng hồ và cách khớp ảnh cho thiết bị này tại đây.",
+        "screensaverConnectImmich": "Kết nối Immich",
+        "weatherPlaceLabel": "Địa điểm",
+        "weatherPlaceHint": "Việc tìm kiếm diễn ra tại dịch vụ thời tiết Open-Meteo. Chỉ tên địa điểm được gửi đi.",
+        "weatherPlacePlaceholder": "Thành phố hoặc mã bưu chính",
+        "weatherPlaceSearch": "Tìm",
+        "weatherPlaceCurrent": "Hiện tại: {{place}}",
+        "weatherPlaceNone": "Chưa chọn địa điểm nào.",
+        "weatherPlaceResultsLabel": "Địa điểm tìm thấy",
+        "weatherPlacePick": "Chọn địa điểm của bạn trong danh sách.",
+        "weatherPlaceChosen": "Đã chọn {{place}}. Lưu để áp dụng.",
+        "weatherPlaceRequired": "Hãy tìm một địa điểm và chọn trong danh sách.",
+        "weatherPlaceTooShort": "Nhập ít nhất hai ký tự.",
+        "weatherPlaceNotFound": "Không tìm thấy địa điểm nào có tên này. Hãy thêm tên nước, ví dụ “Tân An, Việt Nam”.",
+        "weatherPlaceUnavailable": "Hiện không thể tìm địa điểm. Hãy thử lại sau ít phút hoặc nhập tọa độ thủ công.",
+        "weatherManualTitle": "Nhập tọa độ thủ công"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",
@@ -3482,7 +3513,8 @@
         "resultCountMany": "{{count}} kết quả",
         "goTo": "Đi tới",
         "newSection": "Tạo mới",
-        "recentLabel": "Mở gần đây"
+        "recentLabel": "Mở gần đây",
+        "createTaskNamed": "Tạo “{{title}}” thành việc cần làm"
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Ngoại tuyến - đang kết nối lại…",
-        "staleData": "Ngoại tuyến - cập nhật lúc: {{time}}"
+        "staleData": "Ngoại tuyến - cập nhật lúc: {{time}}",
+        "pageTitle": "Bạn đang ngoại tuyến",
+        "pageDescription": "Trang này cần kết nối. Ngay khi thiết bị trực tuyến trở lại, trang sẽ tự tải."
     },
     "shortcuts": {
         "search": "Mở tìm kiếm",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "Ví dụ: Phòng tắm",
         "taskFrequency": "Tần suất (ngày)",
         "taskCreatedToast": "Nhiệm vụ dọn dẹp đã tạo.",
-        "dashboard": "Tổng quan",
         "reports": "Báo cáo",
         "visitsThisMonth": "Số lượt đến tháng này",
         "lastVisit": "Lượt đến gần nhất",
@@ -4007,7 +4040,12 @@
         "currentMonth": "Hiện tại",
         "noVisitReportsInMonth": "Không có lượt đến của nhân viên được ghi nhận trong {{month}}.",
         "settledAdminOnly": "Chỉ quản trị viên mới có thể sửa hoặc xoá",
-        "reportVisitsCount": "Số lượt đến"
+        "reportVisitsCount": "Số lượt đến",
+        "amountsPermissionLabel": "Xem tiền công và thanh toán",
+        "errorAmountsHidden": "Chỉ người được xem số tiền của người giúp việc mới có thể đánh dấu thanh toán.",
+        "notHereToday": "Hôm nay chưa đến",
+        "tabVisits": "Lượt đến",
+        "tabChores": "Việc nhà"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
@@ -4040,7 +4078,6 @@
         "noBalances": "Mọi người đã thanh toán xong.",
         "noExpenses": "Không có chi phí nào khớp với chế độ xem này.",
         "noActivity": "Chưa có hoạt động nào.",
-        "owes": "nợ",
         "system": "Hệ thống",
         "quickGroceries": "Thêm chi phí siêu thị",
         "quickSchool": "Chia sẻ chi phí trường học",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} cho {{payee}}, {{amount}}. Một bút toán đảo sẽ hủy khoản thanh toán và số dư trở lại như trước. Khoản thanh toán vẫn nằm trong hoạt động, được đánh dấu đã hoàn tác.",
         "loadMoreActivity": "Tải thêm",
         "expenseDeleted": "Đã xóa",
-        "youAreOwedInGroup": "Bạn được nhận trong {{group}}",
-        "youOweInGroup": "Bạn nợ trong {{group}}"
+        "youAreOwedInGroup": "{{group}}: Bạn được nhận",
+        "youOweInGroup": "{{group}}: Bạn nợ",
+        "debtYouOwe": "Bạn nợ {{name}}",
+        "debtOwesYou": "{{name}} nợ bạn",
+        "debtOwes": "{{from}} nợ {{to}}"
     },
     "wmo": {
         "0": "Trời quang",
@@ -4256,7 +4296,8 @@
         "submit": "Gửi liên kết",
         "sent": "Nếu có tài khoản phù hợp, liên kết đặt lại đã được gửi.",
         "backToLogin": "Quay lại đăng nhập",
-        "unavailable": "Hộ gia đình này không cung cấp việc đặt lại mật khẩu. Vui lòng liên hệ quản trị viên hộ gia đình của bạn."
+        "unavailable": "Hộ gia đình này không cung cấp việc đặt lại mật khẩu. Vui lòng liên hệ quản trị viên hộ gia đình của bạn.",
+        "identifierRequired": "Nhập tên người dùng hoặc địa chỉ email của bạn."
     },
     "resetPassword": {
         "title": "Đặt mật khẩu mới",
@@ -4286,6 +4327,15 @@
         "test": "Kiểm tra kết nối",
         "testSuccess": "Đã gửi email thử nghiệm thành công.",
         "testFailed": "Kiểm tra thất bại: {{error}}",
+        "portInvalid": "Nhập cổng từ {{min}} đến {{max}}.",
+        "testFailedNotConfigured": "Hãy nhập máy chủ SMTP và địa chỉ người gửi trước.",
+        "testFailedAuth": "Máy chủ đã từ chối tên người dùng hoặc mật khẩu.",
+        "testFailedConnection": "Không thể kết nối máy chủ ở máy chủ và cổng này.",
+        "testFailedTls": "Không thể tạo kết nối mã hóa. Hãy kiểm tra kiểu mã hóa và cổng.",
+        "testFailedRejected": "Máy chủ không nhận email thử. Hãy kiểm tra địa chỉ người gửi.",
+        "testFailedUnknown": "Không thể gửi email thử.",
+        "testNoRecipient": "Email thử được gửi đến địa chỉ của bạn, nhưng địa chỉ đó còn trống. Hãy thêm ở Tài khoản → Email.",
+        "testNoRecipientLink": "Mở tài khoản",
         "saveFailed": "Lưu thất bại: {{error}}",
         "saved": "Đã lưu cài đặt."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Hằng ngày",
                 "none": "Chưa có giờ.",
                 "delete": "Xóa giờ",
-                "newHint": "Hãy lưu thuốc để có thể thêm giờ.",
                 "timeRequired": "Giờ là bắt buộc."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Không có loại khớp trong hộ gia đình này",
         "mappingProfileStatusAmbiguousType": "Không rõ ràng - nhiều loại có cùng tên",
         "icsCalendarName": "Thu gom rác",
-        "icsPickupSummary": "Thu gom: {{name}}"
+        "icsPickupSummary": "Thu gom: {{name}}",
+        "intervalDecrease": "Giảm khoảng cách",
+        "intervalIncrease": "Tăng khoảng cách"
     },
     "rewards": {
         "title": "Phần thưởng",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Xóa lựa chọn",
         "continuesUntil": "…tiếp tục đến {{time}}",
         "overviewEmptyTitle": "Chọn người để so sánh",
-        "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau."
+        "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau.",
+        "presetCodes": {
+            "early": "S",
+            "late": "C",
+            "night": "Đ",
+            "day": "N",
+            "vacation": "NP",
+            "sick": "NÔ",
+            "exam": "KT",
+            "lecture": "BG",
+            "seminar": "HT",
+            "lab": "TH"
+        },
+        "typesWithTime": "Có giờ"
     },
     "pairDisplay": {
         "title": "Ghép nối máy tính bảng",

@@ -382,11 +382,107 @@ test('R19: die leere Palette zeigt "Zuletzt geoeffnet", gemerkt werden nur Orte,
 // R19: der Dialog hinter `?` und „Tastenkombinationen" hiess „Hilfe" und
 // zeigte am Desktop nur Kuerzel. Er heisst jetzt, was er zeigt - am Finger
 // (Klartext-Hilfe ohne Kuerzel) bleibt es „Hilfe".
+// R20 (Re-Critique 2026-10-17, A1 P1-2): der Kuerzel-Dialog baute sein eigenes
+// Overlay - `aria-modal` am Grund, Titel als `span`, Esc am Dokument. Der Fokus
+// blieb auf MAIN, Tab lief hinaus, nach dem Schliessen fand er nicht zurueck.
+// Er oeffnet jetzt ueber den geteilten Dialog (Top-Layer, Fokusfalle, Esc,
+// Zurueck-Geste, Fokus-Rueckgabe) und zeigt die Kuerzel am Zeiger zweispaltig.
+test('R20: der Kuerzel-Dialog ist der geteilte Dialog, am Zeiger zweispaltig', () => {
+  const help = router.slice(router.indexOf('function showHelpModal('), router.indexOf('// Update-Hinweis (#490)'));
+  assert.match(help, /openModal\(\{/, 'oeffnet ueber components/modal.js');
+  assert.doesNotMatch(help, /createElement\('div'\)|setAttribute\('aria-modal'|addEventListener\('keydown'/, 'kein eigenes Overlay, kein eigener Esc-Weg');
+  assert.match(help, /dirtyGuard: false/, 'nichts Ungespeichertes - keine Verwerfen-Rueckfrage');
+  assert.match(help, /shortcuts-list--columns/, 'zwei Spalten am Zeiger');
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rule = css.slice(css.indexOf('.shortcuts-list--columns {'), css.indexOf('}', css.indexOf('.shortcuts-list--columns {')));
+  assert.match(rule, /grid-template-columns:\s*repeat\(2,/);
+  assert.match(rule, /grid-auto-flow:\s*column/, 'spaltenweise gelesen');
+});
+
 test('R19: der Kuerzel-Dialog heisst "Tastenkombinationen", die Klartext-Hilfe "Hilfe"', () => {
   const help = router.slice(router.indexOf('function showHelpModal('), router.indexOf('// Update-Hinweis (#490)'));
   assert.match(help, /const helpTitle = coarsePointer \? t\('help\.title'\) : t\('shortcuts\.help'\);/);
-  assert.match(help, /setAttribute\('aria-label', helpTitle\)/, 'der Name des Dialogs');
-  assert.match(help, /modal-panel__title">\$\{esc\(helpTitle\)\}/, 'die sichtbare Ueberschrift');
+  // Seit R20 traegt openModal() den Titel: sichtbare Ueberschrift (h2) und
+  // Name des Dialogs (aria-labelledby) aus derselben Zeichenkette.
+  assert.match(help, /openModal\(\{\s*title: helpTitle,/, 'Ueberschrift und Name des Dialogs');
   assert.doesNotMatch(help, /t\('help\.title'\)\)/, 'kein fester Titel "Hilfe" mehr im Kopf');
   assert.equal(de.shortcuts.help, 'Tastenkombinationen');
+});
+
+// R20 (Re-Critique 2026-10-17, A1 P2-4): die Palette ordnete nach der
+// Navigation - „ge" stellte „Belohnungen" (enthaelt es) vor „Geburtstage"
+// (beginnt damit) -, das Verb „Neu anlegen" holte bei „an" alle Anlege-
+// Befehle herein, die Datentreffer standen darunter, die Zeilen der gemischten
+// Sektionen trugen kein Siegel, und ohne Treffer gab es keinen Weg weiter.
+test('R20: ein Anfang schlaegt ein Teilstueck, das Verb holt keine Befehle mehr herein', async () => {
+  const { paletteRank } = await import('../public/utils/search-sections.js');
+  assert.equal(paletteRank('ge', 'Geburtstage'), 0);
+  assert.equal(paletteRank('ver', 'Einstellungen verwalten'), 1);
+  assert.equal(paletteRank('ge', 'Belohnungen'), 2);
+  const places = [{ label: 'Übersicht' }, { label: 'Belohnungen' }, { label: 'Geburtstage' }];
+  const settings = [{ label: 'Gesundheit' }];
+  assert.deepEqual(paletteCommands('ge', { places, settings }).places.map((p) => p.label),
+    ['Geburtstage', 'Gesundheit', 'Belohnungen'], 'Anfaenge zuerst, Orte und Einstellungen in einer Rangfolge');
+  const actions = [
+    { label: 'Aufgabe', context: 'Aufgaben', verb: 'Neu anlegen' },
+    { label: 'Termin', context: 'Kalender', verb: 'Neu anlegen' },
+  ];
+  assert.deepEqual(paletteCommands('an', { actions }).actions, [], 'ein Teilstueck des Verbs ist kein Wunsch nach allen Befehlen');
+  assert.equal(paletteCommands('anlegen', { actions }).actions.length, 2, 'das ausgeschriebene Verb bleibt ein Weg zu ihnen');
+  assert.deepEqual(paletteCommands('kal', { actions }).actions.map((a) => a.label), ['Termin'], 'das Modul bleibt ein Weg');
+});
+
+test('R20: Daten vor den Anlege-Befehlen, Siegel an gemischten Zeilen, ohne Treffer „als Aufgabe anlegen"', () => {
+  const render = body('function renderSearchResults(', '// Read-only-Modus für ein Modul anwenden');
+  const goTo = render.indexOf("makeSection(t('search.goTo')");
+  const dataAt = render.indexOf('SEARCH_SECTIONS.forEach');
+  const create = render.indexOf("makeSection(t('search.newSection')");
+  assert.ok(goTo >= 0 && dataAt > goTo && create > dataAt, 'Gehe zu, Daten, Neu anlegen');
+  assert.match(render.slice(goTo, dataAt), /rowSeals: true/, '„Gehe zu" traegt Siegel an den Zeilen');
+  assert.match(render.slice(create), /rowSeals: true/, '„Neu anlegen" auch');
+  assert.match(render, /createTaskFromQuery\(query\)/, 'ohne Treffer der Weg zur neuen Aufgabe');
+  const fn = body('function createTaskFromQuery(', 'function prefillNewTaskTitle(');
+  assert.match(fn, /navModuleAccess\('tasks'\) !== 'write'/, 'nur wer Aufgaben schreiben darf');
+  assert.match(body('function prefillNewTaskTitle(', '/** Text mit markierten Fundstellen'), /if \(!input\.value\)/, 'ein angefangenes Feld bleibt');
+  assert.match(de.search.createTaskNamed, /\{\{title\}\}/);
+});
+
+test('R20: nachkommende Daten lassen die Markierung an ihrer Zeile, nicht an ihrer Nummer', async () => {
+  const { wirePaletteCombobox } = await import('../public/utils/palette-combobox.js');
+  const input = new Stub('', { id: 'search-input' });
+  const results = new Stub('', { id: 'search-results' });
+  const row = (text) => Object.assign(new Stub('search-result'), { textContent: text });
+  const place = row('Geburtstage');
+  const action = row('Geburtstag');
+  results.append(new Stub('search-section').append(new Stub('search-section__rows').append(place)),
+    new Stub('search-section').append(new Stub('search-section__rows').append(action)));
+  const combo = wirePaletteCombobox({ input, listbox: results });
+  combo.refresh();
+  input.key('ArrowDown');
+  assert.equal(input.getAttribute('aria-activedescendant'), action.id);
+  // Die Daten kommen ZWISCHEN Orte und Befehle.
+  results.children.splice(1, 0, new Stub('search-section').append(new Stub('search-section__rows').append(row('Geburtstagstorte'))));
+  combo.refresh({ keep: true });
+  assert.equal(input.getAttribute('aria-activedescendant'), action.id, 'Enter oeffnet weiter, was markiert war');
+});
+
+// Codex-Review PR #2053 (P2): ohne Treffer steht „als Aufgabe anlegen" als
+// waehlbare Zeile da, renderSearchResults gab aber 0 zurueck - die Ansage
+// sagte „Keine Ergebnisse" und verschwieg die Zeile, die der Pfeil erreicht.
+test('R20: ohne Treffer nennt die Ansage die Zeile „als Aufgabe anlegen" und zaehlt sie mit', async () => {
+  const { paletteStatusText } = await import('../public/utils/search-sections.js');
+  assert.equal(typeof paletteStatusText, 'function', 'utils/search-sections.js exportiert paletteStatusText nicht');
+  const tr = (key, params) => (params ? `${key}:${params.count}` : key);
+  assert.equal(paletteStatusText(0, {}, tr), 'search.noResults');
+  assert.equal(paletteStatusText(1, {}, tr), 'search.resultCountOne:1');
+  assert.equal(paletteStatusText(3, {}, tr), 'search.resultCountMany:3');
+  assert.equal(paletteStatusText(1, { createLabel: '„Zahnarzt" als Aufgabe anlegen' }, tr),
+    'search.noResults „Zahnarzt" als Aufgabe anlegen');
+  const render = body('function renderSearchResults(', '// Read-only-Modus für ein Modul anwenden');
+  assert.match(render, /return createTask \? \{ count: 1, createLabel: createTask\.label \}/,
+    'die Zeile „als Aufgabe anlegen" zaehlt in der Rueckgabe mit');
+  const input = body("input.addEventListener('input'", 'return openSearch;');
+  assert.match(input, /const \{ count, createLabel \} = renderSearchResults\(results, data,/);
+  assert.match(input, /announceCount\(count, \{ createLabel \}\)/, 'die Ansage bekommt die Zeile');
+  assert.match(router, /const announceCount = \(count, opts\) => setStatus\(paletteStatusText\(count, opts, t\)\)/);
 });

@@ -13,14 +13,14 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete, expandIn, drawChartOnce } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
-import { nowFields } from '/utils/timezone.js';
+import { nowFields, nowDateTimeValue } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -40,7 +40,7 @@ import {
   prnDoseState, splitRemaining, toLocalStamp, parseLogInstant, scheduledLogs,
 } from '/utils/health-meds.js';
 import {
-  deriveFlag, summarizeReport, analyteNames, analyteTrend, LAB_FLAGS,
+  deriveFlag, summarizeReport, analyteNames, analyteTrend, defaultTrendAnalyte, LAB_FLAGS,
 } from '/utils/health-labs.js';
 import {
   ACTIVITY_TYPES, activityType, weekSummary, activityTotals, stepActivityAnchor,
@@ -2118,13 +2118,6 @@ function chartMarkup(metric, series, geo = CHART) {
 // Erfassungs-Modal
 // --------------------------------------------------------
 
-function localDateTimeValue(date) {
-  const key = toLocalDateKey(date);
-  const hh = String(date.getHours()).padStart(2, '0');
-  const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${key}T${hh}:${mm}`;
-}
-
 // Beispielwerte als Platzhalter des Blutdruck-Paars und die Einheit des
 // Pulses. Zahlen und ein Einheitenzeichen, keine Texte - wie `metric.units`.
 const PAIR_EXAMPLE = Object.freeze({ systolic: 120, diastolic: 80, pulse: 72 });
@@ -2242,7 +2235,7 @@ function valueFieldsMarkup(type, row = null) {
   const valueInput = `<input class="form-input form-composite__part form-composite__part--wide" id="vital-value" type="number" inputmode="decimal" step="any" required${staticUnit ? ' aria-describedby="vital-value-unit"' : ''}${valueAttr(row?.value_num)}>`;
   return `${formRowHtml({
     label: t(metric.labelKey),
-    labelFor: 'vital-value',
+    labelFor: 'vital-value', labelExtra: REQUIRED_MARK,
     field: true,
     control: `<span class="form-composite">${valueInput}${unitControl}${staticUnit ? `<span class="form-composite__unit" id="vital-value-unit">${esc(staticUnit)}</span>` : ''}</span>`,
   })}${unitChoice ? '' : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`}`;
@@ -2270,7 +2263,7 @@ function openVitalModal(opts = {}) {
   const visibilityValue = isEdit ? (row.visibility || 'private') : defaultVisibility(vitalScopeKey(currentType));
   const measuredValue = isEdit && row.measured_at
     ? String(row.measured_at).slice(0, 16)
-    : localDateTimeValue(now);
+    : nowDateTimeValue(now);
 
   openModal({
     title: isEdit ? t('health.vitals.edit') : t('health.vitals.add'),
@@ -3399,7 +3392,10 @@ function medLogHistoryMarkup() {
   }).join('');
   return `
     <details class="health-medlog">
-      <summary>${esc(t('health.meds.logTitle'))}</summary>
+      <summary>
+        <span>${esc(t('health.meds.logTitle'))}</span>
+        <i data-lucide="chevron-down" class="health-medlog__chevron" aria-hidden="true"></i>
+      </summary>
       <ul class="health-medlog__list">${rows}</ul>
     </details>`;
 }
@@ -3684,6 +3680,25 @@ function openMedModal(med) {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(med && med.id);
   const val = (v) => (v == null ? '' : String(v));
+  // EIN SCHRITT STATT ZWEIEN (R20, Re-Critique 2026-10-17 a5 P2-8): ein neues
+  // Medikament bekam seinen Einnahmeplan erst nach dem Speichern ("Speichere
+  // das Medikament, dann ..."), also Dialog zu, Zeile suchen, Dialog wieder
+  // auf. Jetzt sammelt der Editor die Zeitfenster eines NEUEN Medikaments als
+  // Entwurf, und das Speichern legt sie gleich danach an. Beim Bearbeiten
+  // bleibt es wie zuvor: jedes Zeitfenster speichert sofort.
+  const draft = isEdit ? null : [];
+  // Ein neues Medikament, das schon angelegt ist, waehrend ein Zeitfenster
+  // danach scheiterte: der naechste Versuch aendert es statt es zu verdoppeln.
+  // Ein schon gespeichertes Zeitfenster traegt seine Server-id im Entwurf
+  // (`savedId`, siehe wireSchedEditor): Loeschen trifft dann auch den Server.
+  let createdId = null;
+  // BESTAND UND NOTIZ HINTER "WEITERE EINSTELLUNGEN" (dieselbe Re-Critique):
+  // der Dialog mass mobil 1082px, die drei Bestandsfelder standen auch fuer
+  // ein Medikament offen, dessen Packung niemand zaehlt. Hat es einen Bestand
+  // oder eine Notiz, steht der Aufklapper offen - nichts Gespeichertes
+  // verschwindet hinter einem geschlossenen.
+  const moreOpen = [med?.stock_qty, med?.stock_unit, med?.refill_threshold, med?.note]
+    .some((v) => v != null && String(v).trim() !== '');
 
   openModal({
     title: isEdit ? t('health.meds.edit') : t('health.meds.add'),
@@ -3691,10 +3706,12 @@ function openMedModal(med) {
     content: `
       <form id="med-form" class="form-stack">
         <div class="form-field">
-          <label class="label" for="med-name">${esc(t('health.meds.field.name'))}</label>
+          <label class="label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
           <input class="input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
         </div>
-        <div class="modal-grid modal-grid--2">
+        ${/* Paare teilen sich die Zeile auch im 390er-Blatt (.form-pair,
+             layout.css): Dosis/Form und Uhrzeit/Dosis sind kurze Werte. */ ''}
+        <div class="form-pair">
           <div class="form-field">
             <label class="label" for="med-dosage">${esc(t('health.meds.field.dosageText'))}</label>
             <input class="input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
@@ -3704,24 +3721,6 @@ function openMedModal(med) {
             <input class="input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
           </div>
         </div>
-        <div class="modal-grid modal-grid--3">
-          <div class="form-field">
-            <label class="label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
-            <input class="input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
-          </div>
-          <div class="form-field">
-            <label class="label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
-            <input class="input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
-          </div>
-          <div class="form-field">
-            <label class="label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
-            <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
-          </div>
-        </div>
-        ${/* SCHALTER STATT HAKEN (Re-Kritik 2026-10-17): "Aktiv" und "Bei
-             Bedarf" sind Einstellungen des Medikaments, keine Auswahl - die
-             geteilte Schalterzeile wie im Abo-Dialog. Die Knoten bleiben
-             Checkboxen (".checked", "change"), nur mit role="switch". */ ''}
         ${formRowsHtml([
           toggleRowHtml({ label: t('health.meds.field.active'), control: 'switch', checked: med == null || Boolean(med.active), attrs: { id: 'med-active' } }),
           toggleRowHtml({ label: t('health.meds.field.prn'), control: 'switch', checked: Boolean(med?.prn), attrs: { id: 'med-prn' } }),
@@ -3749,6 +3748,12 @@ function openMedModal(med) {
             <p class="form-hint">${esc(t('health.meds.field.prnDoseHint'))}</p>
           </div>
         </div>
+
+        <div class="health-sched">
+          <span class="label">${esc(t('health.meds.schedule.title'))}</span>
+          <div id="med-sched-editor"></div>
+        </div>
+
         <div class="form-field">
           <label class="label" for="med-visibility">${esc(t('health.meds.field.visibility'))}</label>
           <select class="input" id="med-visibility">
@@ -3756,15 +3761,26 @@ function openMedModal(med) {
             <option value="family" ${(med?.visibility || defaultVisibility('meds')) === 'family' ? 'selected' : ''}>${esc(t('health.meds.visibility.family'))}</option>
           </select>
         </div>
+
+        ${advancedSection(`
+        <div class="modal-grid modal-grid--3">
+          <div class="form-field">
+            <label class="label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
+            <input class="input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
+          </div>
+          <div class="form-field">
+            <label class="label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
+            <input class="input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
+          </div>
+          <div class="form-field">
+            <label class="label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
+            <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
+          </div>
+        </div>
         <div class="form-field">
           <label class="label" for="med-note">${esc(t('health.meds.field.note'))}</label>
           <textarea class="input" id="med-note" rows="2" maxlength="5000">${esc(val(med?.note))}</textarea>
-        </div>
-
-        <div class="health-sched">
-          <span class="label">${esc(t('health.meds.schedule.title'))}</span>
-          <div id="med-sched-editor"></div>
-        </div>
+        </div>`, { open: moreOpen })}
 
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -3773,7 +3789,7 @@ function openMedModal(med) {
         </div>
       </form>`,
     onSave(panel) {
-      renderSchedEditor(panel, med);
+      renderSchedEditor(panel, med, draft);
       if (window.lucide) window.lucide.createIcons({ el: panel });
 
       // Die Bedarfsfelder folgen dem Haken - `style.display` und nicht `hidden`,
@@ -3799,7 +3815,28 @@ function openMedModal(med) {
         submitBtn.disabled = true;
         try {
           if (isEdit) await api.patch(`/health/medications/${med.id}`, body);
-          else await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
+          else {
+            // Die Zeitfenster des Entwurfs nach dem Medikament: es gibt sie
+            // erst mit seiner id. Scheitert eines, steht das Medikament schon
+            // und der Dialog bleibt offen. Der naechste Versuch legt es darum
+            // NICHT noch einmal an, sondern aendert das schon angelegte
+            // (`createdId`), und schickt nur die Zeitfenster, die noch fehlen
+            // (ohne `savedId`) - sonst entstuenden Medikament und Plan doppelt.
+            if (createdId == null) {
+              const created = await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
+              createdId = created?.data?.id ?? null;
+            } else {
+              await api.patch(`/health/medications/${createdId}`, body);
+            }
+            if (createdId != null) {
+              for (const sched of draft) {
+                if (sched.savedId != null) continue;
+                const res = await api.post(`/health/medications/${createdId}/schedules`, sched);
+                // Nicht enumerierbar: es reist nie in einen Request-Body.
+                Object.defineProperty(sched, 'savedId', { value: res?.data?.id ?? null, writable: true });
+              }
+            }
+          }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.meds.saved'), 'success');
           await reloadMedViews();
@@ -3861,19 +3898,18 @@ async function deleteMed(med) {
 }
 
 // Zeichnet den Einnahmeplan-Editor im Modal (Liste + Hinzufügen-Formular) und
-// verdrahtet ihn. Für ein noch nicht gespeichertes Medikament nur ein Hinweis.
-function renderSchedEditor(panel, med) {
+// verdrahtet ihn. Für ein noch nicht gespeichertes Medikament arbeitet er auf
+// dem Entwurf (`draft`), den das Speichern des Medikaments anlegt (R20).
+function renderSchedEditor(panel, med, draft = null) {
   const host = panel.querySelector('#med-sched-editor');
   if (!host) return;
   host.replaceChildren();
 
-  if (!med || !med.id) {
-    host.insertAdjacentHTML('beforeend',
-      `<div class="health-sched-hint">${esc(t('health.meds.schedule.newHint'))}</div>`);
-    return;
-  }
-
-  const schedules = meds.schedulesByMed[med.id] || [];
+  const isDraft = !med?.id;
+  // Ein Entwurf hat noch keine id; die Zeile braucht eine zum Loeschen.
+  const schedules = isDraft
+    ? (draft || []).map((s, i) => ({ ...s, id: `draft-${i}` }))
+    : (meds.schedulesByMed[med.id] || []);
   const list = schedules.length
     ? `<ul class="health-sched-list">${schedules.map(schedRowMarkup).join('')}</ul>`
     : `<div class="health-sched-empty">${esc(t('health.meds.schedule.none'))}</div>`;
@@ -3881,7 +3917,7 @@ function renderSchedEditor(panel, med) {
   host.insertAdjacentHTML('beforeend', `
     ${list}
     <div class="health-sched-add">
-      <div class="modal-grid modal-grid--2">
+      <div class="form-pair">
         <div class="form-field">
           <label class="label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
           <yuvomi-datepicker id="sched-time" type="time" value="08:00"></yuvomi-datepicker>
@@ -3903,7 +3939,7 @@ function renderSchedEditor(panel, med) {
       </button>
     </div>`);
   if (window.lucide) window.lucide.createIcons({ el: host });
-  wireSchedEditor(panel, med);
+  wireSchedEditor(panel, med, draft);
 }
 
 function schedRowMarkup(s) {
@@ -3920,8 +3956,9 @@ function schedRowMarkup(s) {
     </li>`;
 }
 
-function wireSchedEditor(panel, med) {
+function wireSchedEditor(panel, med, draft = null) {
   const host = panel.querySelector('#med-sched-editor');
+  const isDraft = !med?.id;
 
   host.querySelectorAll('.health-weekday').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -3942,6 +3979,11 @@ function wireSchedEditor(panel, med) {
     const body = { time_of_day: time, days_mask: indicesToDaysMask(indices) };
     if (doseRaw !== '' && doseRaw != null) body.dose_qty = Number(doseRaw);
 
+    if (isDraft) {
+      draft.push(body);
+      renderSchedEditor(panel, med, draft);
+      return;
+    }
     addBtn.disabled = true;
     try {
       const res = await api.post(`/health/medications/${med.id}/schedules`, body);
@@ -3957,6 +3999,27 @@ function wireSchedEditor(panel, med) {
 
   host.querySelectorAll('[data-sched-del]').forEach((btn) =>
     btn.addEventListener('click', async () => {
+      if (isDraft) {
+        const index = Number(String(btn.dataset.schedDel).replace('draft-', ''));
+        const saved = draft[index]?.savedId;
+        // Ein Teil-Speichern hat dieses Zeitfenster schon angelegt: es nur aus
+        // dem Entwurf zu nehmen liesse es am Medikament stehen, und der
+        // naechste Versuch ueberspraenge es.
+        if (saved != null) {
+          btn.disabled = true;
+          try {
+            await api.delete(`/health/schedules/${saved}`);
+          } catch (err) {
+            console.error('[Health] schedule delete error:', err);
+            btn.disabled = false;
+            reportError(err, 'health.meds.saveError', reloadMedViews);
+            return;
+          }
+        }
+        draft.splice(index, 1);
+        renderSchedEditor(panel, med, draft);
+        return;
+      }
       const id = Number(btn.dataset.schedDel);
       btn.disabled = true;
       try {
@@ -4033,7 +4096,7 @@ async function loadLabs() {
     labs.selectedReportId = labs.reports[0]?.id ?? null;
   }
   const names = analyteNames(labs.reports);
-  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = names[0] ?? null;
+  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = defaultTrendAnalyte(labs.reports);
 }
 
 function selectedReport() {
@@ -4231,7 +4294,7 @@ function flagIndicatorMarkup(flag) {
 function labTrendMarkup() {
   const names = analyteNames(labs.reports);
   if (names.length === 0) return '';
-  const selected = names.includes(labs.trendAnalyte) ? labs.trendAnalyte : names[0];
+  const selected = names.includes(labs.trendAnalyte) ? labs.trendAnalyte : defaultTrendAnalyte(labs.reports);
   const points = analyteTrend(labs.reports, selected);
 
   const options = names.map((n) =>
@@ -4370,6 +4433,11 @@ function wireLabs() {
       if (id === labs.selectedReportId) return;
       labs.selectedReportId = id;
       renderLabsShell();
+      // DER FOKUS BLEIBT AUF DEM BEFUND (Re-Critique 2026-10-17, Persona Sam):
+      // der Neuaufbau tauschte die Liste aus, und der Fokus fiel auf BODY -
+      // der naechste Tab begann wieder oben auf der Seite. Die gewaehlte Karte
+      // steht im neuen Baum unter derselben ID.
+      labs.root.querySelector(`.health-lab-card[data-report-id="${id}"]`)?.focus({ preventScroll: true });
     }));
 
   // Kein `return` als Riegel: die Analyt-Auswahl darunter LIEST nur, und eine
@@ -4728,7 +4796,7 @@ function wireResultEditor(panel, report, editing = null) {
 // und Detail-Tabelle synchron.
 function syncLabsAfterResultChange() {
   const names = analyteNames(labs.reports);
-  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = names[0] ?? null;
+  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = defaultTrendAnalyte(labs.reports);
   renderLabsShell();
 }
 
@@ -5094,7 +5162,7 @@ function openActivityModal(row, opts = {}) {
   const customValue = isEdit && !isPreset ? val(row.type) : '';
   const dateValue = isEdit && row.performed_at
     ? String(row.performed_at).slice(0, 16)
-    : localDateTimeValue(new Date());
+    : nowDateTimeValue(new Date());
 
   openModal({
     title: isEdit ? t('health.activity.edit') : t('health.activity.add'),
@@ -5110,7 +5178,7 @@ function openActivityModal(row, opts = {}) {
         ${formRowsHtml([
           formRowHtml({
             label: t('health.activity.field.type'),
-            labelFor: 'activity-type',
+            labelFor: 'activity-type', labelExtra: REQUIRED_MARK,
             field: true,
             control: `<select class="form-input" id="activity-type" required>${activityTypeSelectMarkup(isEdit ? row.type : null)}</select>`,
           }),
@@ -6088,7 +6156,7 @@ function openNutritionModal(row) {
   const val = (v) => (v == null ? '' : String(v));
   const whenValue = isEdit && row.consumed_at
     ? String(row.consumed_at).slice(0, 16)
-    : localDateTimeValue(new Date());
+    : nowDateTimeValue(new Date());
   const visibility = row?.visibility || defaultNutritionVisibility();
 
   openModal({
@@ -6099,7 +6167,7 @@ function openNutritionModal(row) {
         ${formRowsHtml([
           formRowHtml({
             label: t('health.nutrition.field.title'),
-            labelFor: 'nutrition-title',
+            labelFor: 'nutrition-title', labelExtra: REQUIRED_MARK,
             field: true,
             control: `<input class="form-input" id="nutrition-title" type="text" required maxlength="200" value="${esc(val(row?.title))}">`,
           }),
@@ -7801,7 +7869,10 @@ function cycleMonthLabel(anchorKey) {
  *                         'predicted' | null), `pms`, `intimacy`
  */
 function cycleDayLabel(c, { symptom = null, pms = false, intimacy = false } = {}) {
-  const parts = [formatDate(c.dateKey)];
+  // DIE SICHTBARE ZIFFER ZUERST (R20, WCAG 2.5.3 Label in Name): die Zelle
+  // zeigt „1", ihr Name begann mit „01.10.2026" - wer per Sprache „1"
+  // ansagt, traf nichts. Danach das volle Datum, wie bisher.
+  const parts = [String(Number(String(c.dateKey).slice(8, 10))), formatDate(c.dateKey)];
   if (c.isToday) parts.push(t('health.cycle.legend.today'));
   if (c.phase === PHASE.MENSTRUATION) parts.push(t('health.cycle.legend.period'));
   else if (c.phase === PHASE.FERTILE) parts.push(t('health.cycle.legend.fertile'));
@@ -9623,6 +9694,8 @@ export const __test = {
   dueRowMarkup,
   prnRowMarkup,
   medCardMarkup,
+  // R20: der Medikament-Dialog in einem Schritt (Entwurf des Einnahmeplans).
+  openMedModal,
   medLogHistoryMarkup,
   labDetailMarkup,
   activityRowMarkup,

@@ -197,6 +197,7 @@ export function createToggleRow(options) {
  * @param {object} options
  * @param {string} options.label
  * @param {string|null} [options.labelFor]  id des Bedienelements - dann ist das Label ein `<label for>`
+ * @param {string} [options.labelExtra]  rohes HTML hinter dem Label, etwa `REQUIRED_MARK`
  * @param {string|null} [options.labelId]   id am Label, fuer `aria-labelledby` einer Gruppe
  * @param {string} [options.description]    Sekundaerzeile: ein Hinweis, der nur DIESE Zeile betrifft
  * @param {string|null} [options.descriptionId]
@@ -208,21 +209,26 @@ export function settingRowHtml({
   label,
   labelFor = null,
   labelId = null,
+  labelExtra = '',
   description = '',
   descriptionId = null,
   control = '',
   extra = '',
   stacked = false,
+  field = false,
   className = '',
   attrs = {},
 }) {
+  // `field`: die Zeile ist der Traeger eines Feldfehlers (reportFieldError,
+  // components/modal.js) - die Meldung steht dann unter der Zeile, ueber beide
+  // Spalten, statt das Feld zu quetschen (layout.css, `.form-row`).
   // DIE EINSTELLUNGSZEILE IST EINE FORMULARZEILE (R18, 2026-10-07): derselbe
   // Baustein wie in den Erfassungsdialogen (utils/form-row.js). Die Klassen
   // `settings-setting-row*` bleiben vorn - unter ihnen fuehrt settings.css die
   // Masse des Blatts -, `form-row*` kommt dazu und bringt, was in der Zeile
   // steht: die randlose Auswahl, das Datum als Wert, das zusammengesetzte Feld.
   return formRowHtml({
-    label, labelFor, labelId, description, descriptionId, control, extra, stacked, className, attrs,
+    label, labelFor, labelId, labelExtra, description, descriptionId, control, extra, stacked, field, className, attrs,
     variant: 'settings-setting-row',
   });
 }

@@ -42,6 +42,9 @@
         "errorOccurred": "Något gick fel.",
         "unexpectedError": "Ett oväntat fel inträffade.",
         "errorDetails": "Tekniska detaljer",
+        "pageFailedTitle": "Sidan {{page}} går inte att öppna just nu",
+        "pageFailedHint": "Allt annat fungerar som vanligt.",
+        "toOverview": "Till översikten",
         "errorGeneric": "Ett fel uppstod.",
         "updateAvailable": "Uppdatering tillgänglig - ladda om sidan för att få den senaste versionen.",
         "titleRequired": "Titel krävs",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "Lägg till {{title}} i inköpslistan",
         "emailInUse": "Den här e-postadressen hör redan till ett annat konto.",
+        "emailInvalid": "Ange en giltig e-postadress.",
         "sessionUnreachableTitle": "Anslutningen bröts",
+        "serverNotReadyTitle": "Servern är inte redo just nu",
+        "rateLimitedTitle": "För många förfrågningar",
         "sessionRetryHint": "Du förblir inloggad. Nytt försök om {{seconds}} s.",
         "sessionRetrying": "Försöker igen…",
         "searchNoResultsTitle": "Inga träffar",
         "searchNoResultsDescription": "Inget matchar din sökning.",
         "searchNoResultsFilteredDescription": "Inget matchar din sökning och dina filter.",
-        "searchReset": "Återställ sökning"
+        "searchReset": "Återställ sökning",
+        "passwordMinLength": "Minst 8 tecken."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "Ta bort den här lånebetalningen?",
         "loanRemainingAmount": "Kvar",
         "loanRemainingPrincipal": "Återstående skuld",
+        "loanOwedToYou": "Har du kvar att få",
         "loanStillToPay": "Kvar att betala",
         "loanPrincipalAmount": "Lånebelopp",
         "loanRemainingInstallments": "Delbetalningar kvar",
         "loanPaidAmount": "Betalt",
+        "loanReceivedAmount": "Återbetalt",
         "loansEmpty": "Inga aktiva lån.",
         "loanInstallmentMeta": "{{paid}} av {{total}} delbetalningar betalda",
         "loanRemainingOf": "av {{total}}",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "Minsta återstående skuld först",
         "loanSortActive": "Sortering: {{sort}}",
         "loanPaidStatus": "Betalt",
-        "markLoanPaid": "Markera betalt",
+        "loanBookInstallment": "Bokför avbetalning",
+        "loanReceiveRepayment": "Återbetalning mottagen",
         "loanBorrowerLabel": "Låntagare",
         "loanDirectionLabel": "Typ av lån",
         "loanDirectionLent": "Utlånat (jag får tillbaka)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "Kreditkort",
         "accountType_investment": "Investering",
         "accountType_other": "Övrigt",
-        "viewAccountTransactions": "Visa transaktioner för {{name}}",
-        "currentBalance": "Aktuellt saldo",
         "clearAccountFilter": "Rensa kontofilter",
         "archivedBadge": "Arkiverad",
         "showArchivedAccounts": "Visa arkiverade",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "Värden i trendkurvan",
         "statsPointLabel": "{{period}}: inkomster {{income}}, utgifter {{expenses}}",
         "statsPointLabelCumulative": "Till och med {{period}}: inkomster {{income}}, utgifter {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} planerat",
         "receiptsLabel": "Kvitton",
         "receiptsHint": "Kvitto eller faktura för den här posten.",
         "receiptDocumentName": "Kvitto: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "Efter datum",
         "ledgerSortAmount": "Efter belopp",
         "ledgerSortActive": "Sortering: {{sort}}",
-        "ledgerAccountsAll": "Alla konton"
+        "ledgerAccountsAll": "Alla konton",
+        "showAccountTransactions": "Visa transaktioner"
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",
@@ -1876,6 +1886,8 @@
         "confirmPasswordLabel": "Bekräfta nytt lösenord",
         "savePassword": "Spara lösenord",
         "passwordMismatch": "Lösenord stämmer inte överens.",
+        "currentPasswordWrong": "Det nuvarande lösenordet stämmer inte.",
+        "passwordTooShort": "Minst 8 tecken.",
         "passwordSavedToast": "Lösenordet har ändrats.",
         "oidcLinkTitle": "Enkel inloggning",
         "oidcLinkHint": "Koppla ditt SSO-konto till det här kontot, så att inloggning via leverantören leder hit i stället för att skapa ett andra konto.",
@@ -1985,6 +1997,7 @@
         "familyRoleGrandparent": "Far-/morförälder",
         "familyRoleRelative": "Släkting",
         "familyRoleOther": "Familjemedlem",
+        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”.",
         "systemAdminLabel": "Systemadministratör",
         "systemAdminHint": "Systemadministratörer kan hantera inställningar, integrationer, API-token och familjekonton.",
         "systemAdminBadge": "Systemadmin",
@@ -2001,7 +2014,7 @@
         "removeMemberNamed": "Ta bort {{name}}",
         "memberDeactivatedToast": "{{name}} har inaktiverats. Posterna finns kvar.",
         "memberFormerBadge": "Tidigare medlem",
-        "memberOrderHint": "Den här ordningen gäller för hela hushållet: kalendern, schemat och alla listor med personer följer den. Ändra den genom att dra i ett handtag eller fokusera det och trycka på piltangenterna. Nya medlemmar kommer efteråt, sorterade efter namn.",
+        "memberOrderHint": "Den här ordningen gäller i hela hushållet. Dra i ett handtag eller använd piltangenterna för att ändra den.",
         "logout": "Logga ut",
         "logoutConfirm": "Logga ut från den här enheten?",
         "synchronizing": "Synkroniseras...",
@@ -2030,7 +2043,7 @@
         "pwaInstallTitle": "Installera Yuvomi på den här enheten",
         "pwaInstallChecking": "Kontrollerar om installation är tillgänglig...",
         "pwaInstallReady": "Yuvomi kan installeras som app på den här enheten.",
-        "pwaInstallUnavailable": "Installation är inte tillgänglig i den här webbläsaren just nu.",
+        "pwaInstallUnavailable": "Den här webbläsaren erbjuder inte installation här. I Chrome och Edge hittar du den i webbläsarmenyn, i Safari under Dela > Lägg till i Dock eller Lägg till på hemskärmen. Utan en HTTPS-adress erbjuder ingen webbläsare den.",
         "pwaInstallInstalled": "Yuvomi är redan installerat på den här enheten.",
         "pwaInstallIosHint": "På iPhone eller iPad använder du Dela-menyn och väljer Lägg till på hemskärmen.",
         "pwaInstallButton": "Installera app",
@@ -2218,7 +2231,7 @@
         "deleteCardDAVAccountConfirm": "De synkroniserade kontakterna finns kvar men förlorar sin CardDAV-koppling.",
         "housekeepingPaymentsTitle": "Betalningsuppgifter",
         "housekeepingPaymentTasksLabel": "Skapa en betalningsuppgift vid varje städpersonals incheckning",
-        "housekeepingPaymentTasksHint": "När den är aktiverad skapar varje incheckning en uppgift för att betala personalen. Att slutföra den uppgiften markerar besöksbetalningen som betald.",
+        "housekeepingPaymentTasksHint": "När den är aktiverad skapar varje incheckning en uppgift för att betala personalen. Att slutföra den uppgiften markerar besöksbetalningen som betald. Bara den som checkar in och administratörerna ser den.",
         "housekeepingPaymentTasksSaved": "Inställningen för städpersonal har sparats.",
         "backupSchedulerDisabled": "Inaktiverad",
         "backupSchedulerEnabled": "Aktiverad",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "Den här enheten är fortfarande parkopplad. Återkalla den först.",
         "feedExportIncludeBirthdays": "Inkludera födelsedagar",
         "feedExportIncludeBirthdaysHint": "Stäng av när du prenumererar på det separata födelsedagsflödet för att undvika dubbla födelsedagar och namnsdagar.",
-        "birthdayFeedHint": "Alla med länken kan se alla sparade födelsedagar och namnsdagar i hushållet, även utan påminnelser. Använd den bara på dina egna enheter."
+        "birthdayFeedHint": "Alla med länken kan se alla sparade födelsedagar och namnsdagar i hushållet, även utan påminnelser. Använd den bara på dina egna enheter.",
+        "skipToSheet": "Gå till inställningen",
+        "screensaverOffTitle": "Fotoskärmsläckare",
+        "screensaverNeedsImmich": "Skärmsläckaren startar när en administratör har anslutit Immich. Sedan ställer du in väntetid, klocka och bildutsnitt för den här enheten här.",
+        "screensaverConnectImmich": "Anslut Immich",
+        "weatherPlaceLabel": "Plats",
+        "weatherPlaceHint": "Sökningen görs hos vädertjänsten Open-Meteo. Bara ortnamnet skickas.",
+        "weatherPlacePlaceholder": "Stad eller postnummer",
+        "weatherPlaceSearch": "Sök",
+        "weatherPlaceCurrent": "Nu: {{place}}",
+        "weatherPlaceNone": "Ingen plats vald ännu.",
+        "weatherPlaceResultsLabel": "Hittade platser",
+        "weatherPlacePick": "Välj din plats i listan.",
+        "weatherPlaceChosen": "{{place}} vald. Spara för att använda den.",
+        "weatherPlaceRequired": "Sök efter en plats och välj den i listan.",
+        "weatherPlaceTooShort": "Skriv minst två tecken.",
+        "weatherPlaceNotFound": "Ingen plats med det namnet hittades. Lägg till landet, t.ex. ”Lund, Sverige”.",
+        "weatherPlaceUnavailable": "Platssökningen går inte att nå just nu. Försök igen om en stund eller ange koordinaterna för hand.",
+        "weatherManualTitle": "Koordinater för hand"
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",
@@ -3380,7 +3411,8 @@
         "resultCountMany": "{{count}} resultat",
         "goTo": "Gå till",
         "newSection": "Skapa ny",
-        "recentLabel": "Nyligen öppnade"
+        "recentLabel": "Nyligen öppnade",
+        "createTaskNamed": "Skapa ”{{title}}” som uppgift"
     },
     "birthdays": {
         "inDays_one": "om {{count}} dag",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - återansluter…",
-        "staleData": "Offline - senast uppdaterad: {{time}}"
+        "staleData": "Offline - senast uppdaterad: {{time}}",
+        "pageTitle": "Du är offline",
+        "pageDescription": "Den här sidan behöver en anslutning. Så fort enheten är online igen laddas den av sig själv."
     },
     "emptyHint": {
         "recipes": "Ett recept går direkt till måltidsplanen eller till inköpslistan.",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "Exempel: badrum",
         "taskFrequency": "Frekvens (dagar)",
         "taskCreatedToast": "Städuppgift skapad.",
-        "dashboard": "Översikt",
         "reports": "Rapporter",
         "visitsThisMonth": "Besök denna månad",
         "lastVisit": "Senaste besök",
@@ -4007,7 +4040,12 @@
         "currentMonth": "Nuvarande",
         "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
         "settledAdminOnly": "Bara en admin kan ändra eller ta bort",
-        "reportVisitsCount": "Besök"
+        "reportVisitsCount": "Besök",
+        "amountsPermissionLabel": "Se löner och betalningar",
+        "errorAmountsHidden": "Bara den som får se beloppen för hushållshjälpen kan markera en betalning.",
+        "notHereToday": "Inte här än i dag",
+        "tabVisits": "Besök",
+        "tabChores": "Sysslor"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -4040,7 +4078,6 @@
         "noBalances": "Alla är kvitt.",
         "noExpenses": "Inga utgifter matchar vyn.",
         "noActivity": "Ingen aktivitet än.",
-        "owes": "är skyldig",
         "system": "System",
         "quickGroceries": "Lägg till matbutiksutgift",
         "quickSchool": "Dela skolutgifter",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} till {{payee}}, {{amount}}. En motbokning häver betalningen och saldona blir som förut. Betalningen finns kvar i aktiviteten, markerad som återförd.",
         "loadMoreActivity": "Läs in fler",
         "expenseDeleted": "Borttagen",
-        "youAreOwedInGroup": "Du får tillbaka i {{group}}",
-        "youOweInGroup": "Du är skyldig i {{group}}"
+        "youAreOwedInGroup": "{{group}}: Du får tillbaka",
+        "youOweInGroup": "{{group}}: Du är skyldig",
+        "debtYouOwe": "Du är skyldig {{name}}",
+        "debtOwesYou": "{{name}} är skyldig dig",
+        "debtOwes": "{{from}} är skyldig {{to}}"
     },
     "wmo": {
         "0": "Klart",
@@ -4256,7 +4296,8 @@
         "submit": "Skicka länk",
         "sent": "Om ett matchande konto finns har en återställningslänk skickats.",
         "backToLogin": "Tillbaka till inloggningen",
-        "unavailable": "Det här hushållet erbjuder ingen lösenordsåterställning. Kontakta administratören för ditt hushåll."
+        "unavailable": "Det här hushållet erbjuder ingen lösenordsåterställning. Kontakta administratören för ditt hushåll.",
+        "identifierRequired": "Ange ditt användarnamn eller din e-postadress."
     },
     "resetPassword": {
         "title": "Ange ett nytt lösenord",
@@ -4286,6 +4327,15 @@
         "test": "Testa anslutning",
         "testSuccess": "Testmeddelandet skickades.",
         "testFailed": "Testet misslyckades: {{error}}",
+        "portInvalid": "Ange en port från {{min}} till {{max}}.",
+        "testFailedNotConfigured": "Ange först SMTP-värd och avsändaradress.",
+        "testFailedAuth": "Servern avvisade användarnamnet eller lösenordet.",
+        "testFailedConnection": "Servern går inte att nå på den här värden och porten.",
+        "testFailedTls": "Den krypterade anslutningen misslyckades. Kontrollera kryptering och port.",
+        "testFailedRejected": "Servern tog inte emot testmejlet. Kontrollera avsändaradressen.",
+        "testFailedUnknown": "Testmejlet kunde inte skickas.",
+        "testNoRecipient": "Testmejlet skickas till din egen e-postadress, som saknas. Lägg till den under Konto → E-post.",
+        "testNoRecipientLink": "Öppna konto",
         "saveFailed": "Sparandet misslyckades: {{error}}",
         "saved": "Inställningarna sparades."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Dagligen",
                 "none": "Inga tidpunkter ännu.",
                 "delete": "Ta bort tidpunkt",
-                "newHint": "Spara medicinen för att kunna lägga till tidpunkter.",
                 "timeRequired": "Tid krävs."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Ingen matchande typ i detta hushåll",
         "mappingProfileStatusAmbiguousType": "Tvetydigt - flera typer delar detta namn",
         "icsCalendarName": "Sophämtning",
-        "icsPickupSummary": "Hämtning: {{name}}"
+        "icsPickupSummary": "Hämtning: {{name}}",
+        "intervalDecrease": "Minska intervallet",
+        "intervalIncrease": "Öka intervallet"
     },
     "rewards": {
         "title": "Belöningar",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Rensa urvalet",
         "continuesUntil": "…fortsätter till {{time}}",
         "overviewEmptyTitle": "Välj personer att jämföra",
-        "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida."
+        "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida.",
+        "presetCodes": {
+            "early": "M",
+            "late": "K",
+            "night": "N",
+            "day": "D",
+            "vacation": "SE",
+            "sick": "SJ",
+            "exam": "T",
+            "lecture": "F",
+            "seminar": "SEM",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Med tider"
     },
     "pairDisplay": {
         "title": "Parkoppla platta",

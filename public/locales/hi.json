@@ -42,6 +42,9 @@
         "errorOccurred": "कुछ गलत हो गया।",
         "unexpectedError": "एक अप्रत्याशित त्रुटि हुई।",
         "errorDetails": "तकनीकी विवरण",
+        "pageFailedTitle": "{{page}} अभी नहीं खुल पा रहा है",
+        "pageFailedHint": "बाकी सभी हिस्से पहले की तरह काम करते हैं।",
+        "toOverview": "डैशबोर्ड पर जाएँ",
         "errorGeneric": "एक त्रुटि हुई।",
         "updateAvailable": "अपडेट उपलब्ध है - नवीनतम संस्करण के लिए पृष्ठ पुनः लोड करें।",
         "titleRequired": "शीर्षक आवश्यक है",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "{{title}} खरीदारी सूची में जोड़ें",
         "emailInUse": "यह ईमेल पता पहले से किसी दूसरे खाते का है।",
+        "emailInvalid": "एक मान्य ईमेल पता दर्ज करें।",
         "sessionUnreachableTitle": "कनेक्शन टूट गया",
+        "serverNotReadyTitle": "सर्वर अभी तैयार नहीं है",
+        "rateLimitedTitle": "बहुत अधिक अनुरोध",
         "sessionRetryHint": "आप साइन इन रहेंगे। {{seconds}} सेकंड में फिर से कोशिश होगी।",
         "sessionRetrying": "फिर से कोशिश हो रही है…",
         "searchNoResultsTitle": "कोई परिणाम नहीं",
         "searchNoResultsDescription": "आपकी खोज से कुछ भी मेल नहीं खाता।",
         "searchNoResultsFilteredDescription": "आपकी खोज और फ़िल्टर से कुछ भी मेल नहीं खाता।",
-        "searchReset": "खोज रीसेट करें"
+        "searchReset": "खोज रीसेट करें",
+        "passwordMinLength": "कम से कम 8 अक्षर।"
     },
     "kitchen": {
         "noShoppingLists": "अभी कोई खरीद सूची नहीं है.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "यह ऋण भुगतान हटाएँ?",
         "loanRemainingAmount": "बाकी",
         "loanRemainingPrincipal": "शेष मूलधन",
+        "loanOwedToYou": "अभी आपको मिलना है",
         "loanStillToPay": "भुगतान शेष",
         "loanPrincipalAmount": "ऋण राशि",
         "loanRemainingInstallments": "बाकी किस्तें",
         "loanPaidAmount": "भुगतान किया",
+        "loanReceivedAmount": "वापस मिला",
         "loansEmpty": "कोई सक्रिय उधार नहीं।",
         "loanInstallmentMeta": "{{total}} में से {{paid}} किस्तें चुकाई गईं",
         "loanRemainingOf": "{{total}} में से",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "सबसे कम शेष मूलधन पहले",
         "loanSortActive": "क्रम: {{sort}}",
         "loanPaidStatus": "चुकाया गया",
-        "markLoanPaid": "भुगतान दर्ज करें",
+        "loanBookInstallment": "किस्त दर्ज करें",
+        "loanReceiveRepayment": "वापसी मिली",
         "loanBorrowerLabel": "व्यक्ति",
         "loanDirectionLabel": "ऋण का प्रकार",
         "loanDirectionLent": "दिया गया (मुझे वापस मिलेगा)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "क्रेडिट कार्ड",
         "accountType_investment": "निवेश",
         "accountType_other": "अन्य",
-        "viewAccountTransactions": "{{name}} के लेन-देन दिखाएं",
-        "currentBalance": "वर्तमान शेष",
         "clearAccountFilter": "खाता फ़िल्टर हटाएं",
         "archivedBadge": "संग्रहीत",
         "showArchivedAccounts": "संग्रहीत दिखाएं",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "रुझान वक्र के मान",
         "statsPointLabel": "{{period}}: आय {{income}}, व्यय {{expenses}}",
         "statsPointLabelCumulative": "{{period}} तक: आय {{income}}, व्यय {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} योजनाबद्ध",
         "receiptsLabel": "रसीदें",
         "receiptsHint": "इस लेनदेन की रसीद या बिल।",
         "receiptDocumentName": "रसीद: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "तारीख के अनुसार",
         "ledgerSortAmount": "राशि के अनुसार",
         "ledgerSortActive": "क्रम: {{sort}}",
-        "ledgerAccountsAll": "सभी खाते"
+        "ledgerAccountsAll": "सभी खाते",
+        "showAccountTransactions": "लेन-देन दिखाएं"
     },
     "settings": {
         "healthCycleEnableLabel": "घर में चक्र उपलब्ध कराएँ",
@@ -1876,6 +1886,8 @@
         "confirmPasswordLabel": "नया पासवर्ड पुष्टि करें",
         "savePassword": "पासवर्ड सहेजें",
         "passwordMismatch": "पासवर्ड मेल नहीं खाते।",
+        "currentPasswordWrong": "मौजूदा पासवर्ड सही नहीं है।",
+        "passwordTooShort": "कम से कम 8 अक्षर।",
         "passwordSavedToast": "पासवर्ड सफलतापूर्वक बदला गया।",
         "oidcLinkTitle": "सिंगल साइन-ऑन",
         "oidcLinkHint": "अपने SSO खाते को इस खाते से जोड़ें, ताकि प्रदाता के ज़रिए साइन इन करने पर आप यहीं पहुँचें और दूसरा खाता न बने।",
@@ -1985,6 +1997,7 @@
         "familyRoleGrandparent": "दादा-दादी/नाना-नानी",
         "familyRoleRelative": "रिश्तेदार",
         "familyRoleOther": "परिवार सदस्य",
+        "childStartHint": "नए बच्चों के खाते बजट और उपवास के बिना शुरू होते हैं और घरेलू सहायक केवल पढ़ने के लिए, वेतन और भुगतान के बिना देखते हैं। इसे बाद में “भूमिकाएँ और अनुमतियाँ” में बदला जा सकता है।",
         "systemAdminLabel": "सिस्टम एडमिन",
         "systemAdminHint": "सिस्टम एडमिन सेटिंग्स, इंटीग्रेशन, API टोकन और परिवार खातों को प्रबंधित कर सकते हैं।",
         "systemAdminBadge": "सिस्टम एडमिन",
@@ -2001,7 +2014,7 @@
         "removeMemberNamed": "{{name}} को हटाएं",
         "memberDeactivatedToast": "{{name}} का खाता निष्क्रिय किया गया। प्रविष्टियां बनी रहेंगी।",
         "memberFormerBadge": "पूर्व सदस्य",
-        "memberOrderHint": "यह क्रम पूरे परिवार पर लागू होता है: कैलेंडर, समय-सारणी और लोगों की हर सूची इसी का पालन करती है। बदलने के लिए हैंडल खींचें, या उस पर फ़ोकस करके तीर कुंजियाँ दबाएँ। नए सदस्य इसके बाद नाम के क्रम में आते हैं।",
+        "memberOrderHint": "यह क्रम पूरे घर में लागू होता है। बदलने के लिए हैंडल खींचें या तीर कुंजियों का उपयोग करें।",
         "logout": "लॉग आउट",
         "logoutConfirm": "इस डिवाइस से लॉग आउट करें?",
         "synchronizing": "सिंक हो रहा है…",
@@ -2030,7 +2043,7 @@
         "pwaInstallTitle": "इस डिवाइस पर Yuvomi इंस्टॉल करें",
         "pwaInstallChecking": "इंस्टॉल उपलब्धता जांची जा रही है...",
         "pwaInstallReady": "Yuvomi को इस डिवाइस पर ऐप के रूप में इंस्टॉल किया जा सकता है।",
-        "pwaInstallUnavailable": "इस ब्राउज़र में अभी इंस्टॉल उपलब्ध नहीं है।",
+        "pwaInstallUnavailable": "यह ब्राउज़र यहाँ इंस्टॉल करने का विकल्प नहीं देता। Chrome और Edge में यह ब्राउज़र मेनू में मिलता है, Safari में शेयर > Dock में जोड़ें या होम स्क्रीन में जोड़ें में। HTTPS पते के बिना कोई भी ब्राउज़र यह विकल्प नहीं देता।",
         "pwaInstallInstalled": "Yuvomi इस डिवाइस पर पहले से इंस्टॉल है।",
         "pwaInstallIosHint": "iPhone या iPad पर शेयर मेनू खोलें और Add to Home Screen चुनें।",
         "pwaInstallButton": "ऐप इंस्टॉल करें",
@@ -2218,7 +2231,7 @@
         "deleteCardDAVAccountConfirm": "सिंक किए गए संपर्क बने रहेंगे, लेकिन उनका CardDAV लिंक हट जाएगा।",
         "housekeepingPaymentsTitle": "भुगतान कार्य",
         "housekeepingPaymentTasksLabel": "हर चेक-इन पर भुगतान कार्य बनाएँ",
-        "housekeepingPaymentTasksHint": "सक्षम होने पर हर चेक-इन पर गृहकार्य करने वाले को भुगतान का कार्य बनता है। उस कार्य को पूरा करने पर विज़िट भुगतान हुआ चिह्नित हो जाती है।",
+        "housekeepingPaymentTasksHint": "सक्षम होने पर हर चेक-इन पर गृहकार्य करने वाले को भुगतान का कार्य बनता है। उस कार्य को पूरा करने पर विज़िट भुगतान हुआ चिह्नित हो जाती है। इसे केवल चेक-इन करने वाला व्यक्ति और व्यवस्थापक देख सकते हैं।",
         "housekeepingPaymentTasksSaved": "गृहकार्य भुगतान सेटिंग सहेजी गई।",
         "backupSchedulerDisabled": "बंद",
         "backupSchedulerEnabled": "चालू",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "यह डिवाइस अभी जुड़ा हुआ है। पहले इसे रद्द करें।",
         "feedExportIncludeBirthdays": "जन्मदिन शामिल करें",
         "feedExportIncludeBirthdaysHint": "अलग जन्मदिन फ़ीड की सदस्यता लेते समय इसे बंद करें ताकि जन्मदिन और नाम-दिवस दो बार न दिखें।",
-        "birthdayFeedHint": "इस लिंक वाला कोई भी व्यक्ति घर के सभी सहेजे गए जन्मदिन और नाम-दिवस देख सकता है, रिमाइंडर बंद होने पर भी। इसे केवल अपने उपकरणों पर इस्तेमाल करें।"
+        "birthdayFeedHint": "इस लिंक वाला कोई भी व्यक्ति घर के सभी सहेजे गए जन्मदिन और नाम-दिवस देख सकता है, रिमाइंडर बंद होने पर भी। इसे केवल अपने उपकरणों पर इस्तेमाल करें।",
+        "skipToSheet": "सेटिंग पर जाएँ",
+        "screensaverOffTitle": "फ़ोटो स्क्रीनसेवर",
+        "screensaverNeedsImmich": "किसी व्यवस्थापक के Immich जोड़ने पर स्क्रीनसेवर शुरू होता है। उसके बाद इस डिवाइस के लिए प्रतीक्षा, घड़ी और फ़ोटो फ़िट यहीं सेट करें।",
+        "screensaverConnectImmich": "Immich जोड़ें",
+        "weatherPlaceLabel": "स्थान",
+        "weatherPlaceHint": "खोज मौसम सेवा Open-Meteo पर होती है। केवल स्थान का नाम भेजा जाता है।",
+        "weatherPlacePlaceholder": "शहर या पिन कोड",
+        "weatherPlaceSearch": "खोजें",
+        "weatherPlaceCurrent": "वर्तमान: {{place}}",
+        "weatherPlaceNone": "अभी कोई स्थान नहीं चुना गया।",
+        "weatherPlaceResultsLabel": "मिले हुए स्थान",
+        "weatherPlacePick": "सूची से अपना स्थान चुनें।",
+        "weatherPlaceChosen": "{{place}} चुना गया। लागू करने के लिए सहेजें।",
+        "weatherPlaceRequired": "कोई स्थान खोजें और सूची से उसे चुनें।",
+        "weatherPlaceTooShort": "कम से कम दो अक्षर दर्ज करें।",
+        "weatherPlaceNotFound": "इस नाम का कोई स्थान नहीं मिला। देश जोड़ें, जैसे “Aurangabad, India”।",
+        "weatherPlaceUnavailable": "स्थान खोज अभी उपलब्ध नहीं है। थोड़ी देर में फिर कोशिश करें या निर्देशांक हाथ से दर्ज करें।",
+        "weatherManualTitle": "निर्देशांक हाथ से"
     },
     "login": {
         "tagline": "अपने पारिवारिक प्लानर में फिर से आपका स्वागत है।",
@@ -3380,7 +3411,8 @@
         "resultCountMany": "{{count}} परिणाम",
         "goTo": "यहाँ जाएँ",
         "newSection": "नया बनाएँ",
-        "recentLabel": "हाल ही में खोले गए"
+        "recentLabel": "हाल ही में खोले गए",
+        "createTaskNamed": "“{{title}}” को कार्य के रूप में बनाएँ"
     },
     "birthdays": {
         "inDays_one": "{{count}} दिन में",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "ऑफ़लाइन - फिर से कनेक्ट किया जा रहा है…",
-        "staleData": "ऑफ़लाइन - अंतिम अपडेट: {{time}}"
+        "staleData": "ऑफ़लाइन - अंतिम अपडेट: {{time}}",
+        "pageTitle": "आप ऑफ़लाइन हैं",
+        "pageDescription": "इस पेज को कनेक्शन चाहिए। जैसे ही आपका डिवाइस फिर से ऑनलाइन होगा, यह अपने आप लोड हो जाएगा।"
     },
     "emptyHint": {
         "recipes": "एक रेसिपी सीधे भोजन योजना या खरीद सूची में जाती है.",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "उदाहरण: बाथरूम",
         "taskFrequency": "आवृत्ति (दिन)",
         "taskCreatedToast": "गृहकार्य कार्य बनाया गया।",
-        "dashboard": "अवलोकन",
         "reports": "रिपोर्ट",
         "visitsThisMonth": "इस माह विज़िट",
         "lastVisit": "अंतिम विज़िट",
@@ -4007,7 +4040,12 @@
         "currentMonth": "वर्तमान",
         "noVisitReportsInMonth": "{{month}} में कोई विज़िट दर्ज नहीं हुई।",
         "settledAdminOnly": "केवल एडमिन ही इसे बदल या हटा सकता है",
-        "reportVisitsCount": "विज़िट"
+        "reportVisitsCount": "विज़िट",
+        "amountsPermissionLabel": "वेतन और भुगतान देखें",
+        "errorAmountsHidden": "भुगतान वही दर्ज कर सकता है जिसे घरेलू सहायक की राशि देखने की अनुमति है।",
+        "notHereToday": "आज अभी तक नहीं आईं",
+        "tabVisits": "विज़िट",
+        "tabChores": "घर के काम"
     },
     "userMultiSelect": {
         "moreUsers": "और",
@@ -4040,7 +4078,6 @@
         "noBalances": "सबका हिसाब बराबर है।",
         "noExpenses": "इस दृश्य में कोई खर्च नहीं।",
         "noActivity": "अभी कोई गतिविधि नहीं।",
-        "owes": "देना है",
         "system": "सिस्टम",
         "quickGroceries": "सुपरमार्केट खर्च जोड़ें",
         "quickSchool": "स्कूल खर्च बांटें",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} से {{payee}}, {{amount}}. एक उलटी प्रविष्टि भुगतान को रद्द करती है और शेष पहले जैसे हो जाते हैं. भुगतान गतिविधि में रद्द के रूप में बना रहता है.",
         "loadMoreActivity": "और लोड करें",
         "expenseDeleted": "हटाया गया",
-        "youAreOwedInGroup": "{{group}} में तुम्हें मिलना है",
-        "youOweInGroup": "{{group}} में तुम्हें देना है"
+        "youAreOwedInGroup": "{{group}}: तुम्हें मिलना है",
+        "youOweInGroup": "{{group}}: तुम्हें देना है",
+        "debtYouOwe": "आपको {{name}} को देना है",
+        "debtOwesYou": "{{name}} से आपको मिलना है",
+        "debtOwes": "{{from}} को {{to}} को देना है"
     },
     "wmo": {
         "0": "साफ आकाश",
@@ -4256,7 +4296,8 @@
         "submit": "लिंक भेजें",
         "sent": "यदि कोई मिलता-जुलता खाता मौजूद है, तो रीसेट लिंक भेज दिया गया है।",
         "backToLogin": "साइन इन पर वापस जाएँ",
-        "unavailable": "यह घर पासवर्ड रीसेट की सुविधा नहीं देता। कृपया अपने घर के प्रशासक से संपर्क करें।"
+        "unavailable": "यह घर पासवर्ड रीसेट की सुविधा नहीं देता। कृपया अपने घर के प्रशासक से संपर्क करें।",
+        "identifierRequired": "अपना उपयोगकर्ता नाम या ईमेल पता दर्ज करें।"
     },
     "resetPassword": {
         "title": "नया पासवर्ड सेट करें",
@@ -4286,6 +4327,15 @@
         "test": "कनेक्शन जाँचें",
         "testSuccess": "परीक्षण ईमेल सफलतापूर्वक भेजा गया।",
         "testFailed": "परीक्षण विफल: {{error}}",
+        "portInvalid": "{{min}} से {{max}} तक का पोर्ट दर्ज करें।",
+        "testFailedNotConfigured": "पहले SMTP होस्ट और प्रेषक पता दर्ज करें।",
+        "testFailedAuth": "सर्वर ने उपयोगकर्ता नाम या पासवर्ड अस्वीकार कर दिया।",
+        "testFailedConnection": "इस होस्ट और पोर्ट पर सर्वर तक नहीं पहुँचा जा सकता।",
+        "testFailedTls": "एन्क्रिप्टेड कनेक्शन नहीं बन सका। एन्क्रिप्शन और पोर्ट जाँचें।",
+        "testFailedRejected": "सर्वर ने परीक्षण ईमेल स्वीकार नहीं किया। प्रेषक पता जाँचें।",
+        "testFailedUnknown": "परीक्षण ईमेल नहीं भेजा जा सका।",
+        "testNoRecipient": "परीक्षण ईमेल आपके अपने ईमेल पते पर जाता है, जो अभी नहीं है। इसे खाता → ईमेल में जोड़ें।",
+        "testNoRecipientLink": "खाता खोलें",
         "saveFailed": "सहेजना विफल: {{error}}",
         "saved": "सेटिंग्स सहेजी गईं।"
     },
@@ -4821,7 +4871,6 @@
                 "daily": "प्रतिदिन",
                 "none": "अभी तक कोई समय नहीं।",
                 "delete": "समय हटाएं",
-                "newHint": "समय जोड़ने के लिए दवा सहेजें।",
                 "timeRequired": "समय आवश्यक है।"
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "इस परिवार में कोई मेल खाता प्रकार नहीं",
         "mappingProfileStatusAmbiguousType": "अस्पष्ट - कई प्रकारों का यही नाम है",
         "icsCalendarName": "कचरा संग्रहण",
-        "icsPickupSummary": "संग्रहण: {{name}}"
+        "icsPickupSummary": "संग्रहण: {{name}}",
+        "intervalDecrease": "अंतराल घटाएँ",
+        "intervalIncrease": "अंतराल बढ़ाएँ"
     },
     "rewards": {
         "title": "पुरस्कार",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "चयन साफ़ करें",
         "continuesUntil": "…{{time}} तक जारी है",
         "overviewEmptyTitle": "तुलना के लिए लोग चुनें",
-        "overviewEmptyDescription": "साप्ताहिक समय-सारिणी साथ-साथ देखने के लिए ऊपर कम से कम एक सदस्य चुनें।"
+        "overviewEmptyDescription": "साप्ताहिक समय-सारिणी साथ-साथ देखने के लिए ऊपर कम से कम एक सदस्य चुनें।",
+        "presetCodes": {
+            "early": "सु",
+            "late": "शा",
+            "night": "रा",
+            "day": "दि",
+            "vacation": "छु",
+            "sick": "बी",
+            "exam": "प",
+            "lecture": "व्या",
+            "seminar": "सं",
+            "lab": "प्र"
+        },
+        "typesWithTime": "समय के साथ"
     },
     "pairDisplay": {
         "title": "टैबलेट जोड़ें",

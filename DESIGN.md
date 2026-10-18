@@ -511,7 +511,9 @@ Ausschalter (in reduced-transparency und prefers-contrast auf 0):
   hinter der Glastafel der Zugangsseiten und im Ladebild - den zwei Orten, an denen nichts
   Opakes darueber liegt. Ohne Filter, ohne Animation. Kein Text steht direkt darauf
   (Sekundaertext fiele im Kern auf 2,96:1): auf den Zugangsseiten steht alles auf der
-  Tafel, der Schriftzug des Ladebilds in Label-Farbe.
+  Tafel, der Schriftzug des Ladebilds in Label-Farbe. Das Ladebild ist seit R20 eine stehende
+  Skizze der Shell (Kopf mit Siegel, drei leere Kartenflaechen, Kapsel bzw. Seitenleiste), ohne
+  Puls; `role="progressbar"` mit dem Markennamen, die Ansage kommt vom Screenreader.
 
 **Die App selbst hat keinen Backdrop mehr.** Bis R18 liefen hinter dem Inhalt vier
 driftende, weichgezeichnete Farbfelder (`.lg-blob`) und ein Akzentverlauf auf der Shell -
@@ -736,6 +738,12 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   im eigenen Modul (Gesundheit: Vitalkurve, Aktivitaet, Fastenwoche) traegt den Modulton:
   Messwert im Vollton, Ziel bzw. Vergleich in der getoenten Stufe (Tinte + 5 %, 3:1 in beiden
   Themes). Die Fastenwoche lief bis R19 auf Serie 1/2 und war die einzige Ausnahme.
+  **Schraffur als zweite Kodierung (R20):** bei Tritanopie liegen Serie 2/7 (dE 5,6) und 3/6
+  (6,2) unter 8; statt neuer Farben tragen Serie 6 und 7 eine 45-Grad-Schraffur
+  (`--chart-texture-ink`, `--chart-texture-tile`, `categoryTexture()` in
+  `utils/budget-category-colors.js`) in Donut, Kategorie-, Unterkategorie- und Planbalken. Die
+  Balkenkachel ist um 1/Skala breiter, weil der Balken per scaleX waechst. `test:budget-ui`
+  rechnet nach, dass jedes Paar unter 8 genau eine schraffierte Seite hat.
 - **Prioritaeten** (`--color-priority-low..urgent`): unveraendert aus dem Bestand, die
   Helligkeits-Trennung (High ~1,8x Urgent) ist farbfehlsicht-verifiziert. **Die
   Badge-Fuellung ist seit 2026-08-18 entfallen** (Skalen-Regel, Zweig Rangmarke): der Ton
@@ -1262,6 +1270,13 @@ das Verhaeltnis haelt.
 - **Titel im Kopf:** der Groessenwechsel des Large Title faellt weiter in einen Frame (keine
   `font-size`-Transition); der Titel blendet an der neuen Stelle ein (`opacity`,
   `--duration-xs`), ebenso der angedockte Titel der scrollenden Seiten (ein und aus).
+  **Einklappen ohne Sprung (R20):** gedeckelte Koepfe (Kalender, Budget, Gesundheitsbereiche)
+  und die Faltzeile der Kueche wechseln ihren Zustand in EINEM Layout; was dabei springt (Zeilen
+  des Kopfes, alles darunter), gleitet per FLIP mit `transform` (`--duration-md`). Ein
+  Inline-`transform` haelt die alte Lage zwei Frames, bevor die Animation uebernimmt - eine sofort
+  gestartete Compositor-Animation zaehlt die Layout-Shift-Messung nicht. Gemessen 390px: CLS
+  Kalender 0,061 -> 0,001, Budget 0,059 -> 0, Einkauf 0,058 -> 0,001 (`holdThenGlide`,
+  utils/ux.js). Unter reduzierter Bewegung steht der Wechsel; der Titel blendet (`--motion-blend`).
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
   der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
   Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
@@ -1363,10 +1378,15 @@ nebeneinander (420 + 24 + ~560). Bei 1440 nimmt die Listenspur
 Ueber 1344px Modulflaeche (Content-Spalte 1280 plus zwei Gutter) wird der Baustein nicht
 breiter, sondern steht mittig: Liste und Detail fluchten mit dem Kopf, der seinen Inhalt auf
 die Content-Spalte zieht (1920: beide Kanten bei 430 und 1710 statt 252 und 1888).
+Auf diesem Deckel (ab 84rem Modulflaeche) nimmt die Liste `--layout-list-wide` (640px) statt der
+40 %-Formel, das Detail die 680px daneben (R20, Re-Critique 2026-10-17: die Kontakte kuerzten bei
+1920 neun E-Mails und brachen die Chips um, waehrend das Detail 768px fuer kurze Felder hatte).
+Am Tablet unter der Schwelle (640-1023px) laeuft die Liste so breit wie ihr Kopf statt auf dem
+Lesemass (834: vorher 98px rechts leer).
 Die eine Ausnahme ist der Kalender mit Seitenleiste (R19): ab 86.25rem Kalenderflaeche nimmt
 seine Leiste den Rand ein, den die Inhaltsspalte sonst leer laesst (bei 1920 zusammen 420px), und
 Kopf, Leiste und Raster stehen von Seitenrand zu Seitenrand (252-1888). Seine Kante ist dann die,
-die jedes Modul bei 1280 und 1440 hat. Agenda und Suche haben keine Leiste und bleiben auf der Spalte.
+die jedes Modul bei 1280 und 1440 hat. Nur die Suche hat keine Leiste; die Agenda behaelt sie seit R20 ohne „Als Naechstes“ (das ist die Agenda selbst) - vorher sprang der Inhalt beim Ansichtswechsel von x 536 auf 220.
 Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am Desktop mit
 `--page-inline-pad` statt mit eigenen 32/40px und ohne ihr altes Hoechstmass von 1680px. Vorher
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
@@ -1385,6 +1405,14 @@ Kopf-Aktion mit `dock: true` (`detailPaneHeaderEl`) bzw. Enter auf der gewaehlte
 Spalte an (`dockNextModal`, components/modal.js), das naechste `openModal()` nimmt sie - Aufgaben,
 Kontakte, Inventar, Geburtstage (ueber detail-view.js) und Rezepte (`test:modal-dialog`,
 `test:master-detail`).
+
+**Waehrend gewaehlt wird, gehoert der untere Rand der Auswahl** (R20, Muster Apple Erinnerungen).
+Traegt die Seitenwurzel `.app-page.is-selecting` (Aufgaben, Kontakte), treten der FAB ueberall und
+unter 1024px auch die Kapsel ab; die Pille rueckt an deren Platz. Die ganze Zeile waehlt, die
+gewaehlte ist im App-Akzent getoent, der Wisch-Pfeil faellt weg, und die Spalten-Markierung der
+offenen Zeile schweigt (layout.css „Der Auswahlmodus nimmt der Shell ihre Bedienung ab").
+Eine Sammelaktion mit `paneOnly` steht nur in der Spalte (Aufgaben: „Archivieren"), weil die
+einzeilige Pille keine vierte Kapsel in jeder Sprache traegt.
 
 **Mehrfachauswahl steht in der Detailspalte** (R19, 2026-10-16, Muster Apple Mail). Ab der
 Schwelle zeigt die Spalte waehrend einer Auswahl „N ausgewaehlt" mit den Sammelaktionen als
@@ -1652,7 +1680,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 |---|---|---|---|
 | Bearbeiten/Loeschen/Mehr an einer Zeile | **Zeilenaktionen (Entscheidung Ulas, 2026-10-07; ersetzt die Lesart "alles sichtbar" aus ignore.md):** je Zeile HOECHSTENS ZWEI dauerhaft sichtbare Icon-Aktionen (`.row-action`); alles Weitere und alles Destruktive steht als Eintrag mit Icon UND Wort hinter EINEM dauerhaft sichtbaren Mehr-Knopf. Nichts wird hinter Hover oder Geste versteckt; Wischen bleibt Zusatzweg; Loeschen bleibt widerrufbar bzw. fragt nach wie vorher. Der Zieh-Griff und sein Auf/Ab-Paar zaehlen nicht. Keine Textkapsel ("Bearbeiten"/"Loeschen" als `.btn`) in einer Listenzeile. Benannte Ausnahmen: die Mahlzeit-Karte (kein Papierkorb, Loeschen im Dialog der Karte), die Werkzeugleiste im Kopf des Dokumentbetrachters (keine Listenzeile). Guards: `test:control-dialect` `row-action-count`, `row-text-capsule`, `row-danger-visible` (Ratchet) | `rowActionHtml()` / `rowActionEl()` und `rowMenuHtml({ id, label, items })` (utils/row-action.js; baut auf `popoverMenuHtml`) | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld), Enter oeffnet sie (`utils/palette-combobox.js`, R16) | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld, nachkommende Treffer lassen sie an ihrer Zeile), Enter oeffnet sie (`utils/palette-combobox.js`, R16). Reihenfolge seit R20: Gehe zu, Daten, Neu anlegen; ein Namensanfang schlaegt ein Teilstueck (`paletteRank`), das Verb holt Anlege-Befehle erst ab drei Zeichen, gemischte Sektionen tragen das Modulsiegel an der Zeile, und ohne Treffer steht der Befehl, die Eingabe als Aufgabe anzulegen | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
 | Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
 | Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, am Anfangsrand] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select). **Das Verb (R17, E6): Anlegen = "Hinzufuegen" (`common.add`), Bearbeiten = "Speichern" (`common.save`), in jedem Dialog;** eine benannte Handlung behaelt ihr Verb (Hochladen, Einloesen, Freigeben, Zahlung eintragen). Neben einem absendenden Primaerknopf steht immer Abbrechen; ein Blatt, dessen Schalter sofort wirken (Teilnehmer der Belohnungen), schliesst mit "Fertig" allein, ein Leseblatt mit "Schliessen" vor der Handlung. Gehalten in `test:frontend-audit` ueber `test/dialog-grammar.js` (liest das Markup der oeffnenden Funktion, beurteilt die Beschriftung am deutschen Locale-Wert). Den Anfangsrand haelt EINE Regel in layout.css an `.modal-panel__delete` (setzt `decorateFooterDelete`, RTL gespiegelt), kein `margin` je Modul (R16) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon; "Erstellen"/"Aufgabe erstellen"/"Darlehen erstellen" neben "Hinzufuegen"; ein Primaerknopf ohne Abbrechen (Belohnungen bis R17); `btn--primary` linksbuendig im Formular (Haushaltshilfe bis R17) |
@@ -1676,7 +1704,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Die Pfeile stehen neutral (R19)**, kein Modul faerbt sie um (der Essensplan trug sie im Akzent; Guard `test:frontend-audit`). Im Essensplan bleibt der Stepper in der Zeile UNTER der Kuechen-Leiste - die Leiste ist der gemeinsame Kopf von vier Reitern. **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
 | Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`). Seit R18 FUEHRT je Geld-Reiter eine Zahl: `lead: true` in der Kurzzeile, `.metric-card--lead` in der Reihe `.metric-grid--led` (Display-Stufe in der Seitenspalte, sonst treten die uebrigen zurueck) | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js, utils/metric-card.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
 | Reiter-Skelett im Budget (R16) | Kennzahlen (s. o.), dann je Abschnitt `.u-section-title` AUF DER BUEHNE mit den Werkzeugen rechts (`.section-toolbar`), darunter der Zeilentraeger (`.row-carrier`). Karten nur, wo ein OBJEKT eine Karte ist (Darlehen, Gruppe, Konto). Statistik: Verlauf und Anteilsring teilen Zeile 1, die Balken nehmen darunter die Bahn; mobil steht der Ring als Kopf der Kategorieliste | budget.js, subscriptions.js, split-expenses.js, budget-stats.js | Titel in der Karte (`.subscriptions-list-section`, `.split-card`), Kartentitel 17px als Abschnittstitel, Ring in einer Leiste, die unter ihm leer bleibt |
-| Pflichtfeld | der Stern ist EIN Element hinter dem Label: `${REQUIRED_MARK}` (`.required-marker`, aus dem Baum genommen); die Pflicht sagt das Feld (`required`) | utils/html.js | " *" im Locale-Text, handgebauter Span je Seite |
+| Pflichtfeld | der Stern ist EIN Element hinter dem Label: `${REQUIRED_MARK}` (`.required-marker`, aus dem Baum genommen); die Pflicht sagt das Feld (`required`) - IMMER, auch wo kein Stern steht. Stern an jedem Pflichtfeld; ein Formular aus EINEM Feld (2FA-Code, Display koppeln) und die Anmeldeseiten tragen keinen, dort ist die Pflicht offensichtlich. Zeilen-Bausteine tragen ihn per `labelExtra` (2026-10-18, Guard in `test:frontend-audit`) | utils/html.js | " *" im Locale-Text, handgebauter Span je Seite |
 | Vor der Anmeldung | EIN Kopf mit Marke (`authHeroHtml()`; ueber einer Karte mit eigener h1 als Absatz, `heading: false`), EIN Auge an JEDEM Passwortfeld (`wirePasswordToggle()`), EIN Fehlerfeld (`authErrorHtml()`: `role="alert"` + `tabindex="-1"`, kein `aria-live` daneben) | utils/auth-ui.js; `test:auth-pages-ui` | Marke nur auf der Anmeldung, Auge nur auf zwei von vier Seiten, drei Fehlerfeld-Fassungen |
 | Option in den Einstellungen (R17, E9) | **Eine Zeile in einem Traeger je Abschnitt** (`.row-carrier.settings-group`), wie "Aktive Module": Label links, Bedienelement rechts (Schalter, Auswahl, Kurzfeld), in JEDER Breite zweispaltig - das Label bricht um, das Bedienelement ist bei der halben Traegerbreite gedeckelt (`50cqi`), ein einzelnes Textfeld (Text, E-Mail, Telefon, Adresse, Passwort) FUELLT diese Haelfte statt bei seinen 20 Zeichen zu bleiben (Re-Kritik 2026-10-17: E-Mail 201px in 680px), die Zeile ist mindestens `--target-lg` hoch. Ein Segment oder eine Chip-Gruppe steht unter dem Label (`--stacked`). Der Hinweis zu EINER Zeile ist ihre Sekundaerzeile und laeuft unter beiden Spalten; der Hinweis zur Gruppe ist ihr Fuss auf dem Grund (`.settings-group__footer`). Eine einzelne Zeile traegt keine eigene Ueberschrift. Eine Karte (`.settings-card`) bleibt dem Formular: mehrere Felder und ein Knopf (Konto, Passwort, CalDAV, SMTP, Token). Mehrfachauswahl in einer Zeile = `.filter-chip` mit `aria-pressed` (Standard-Erinnerungen) | `settingRowHtml()`, `settingSwitchRowHtml()` (settings/components.js), settings.css "Gruppierte Zeilen"; `test:settings-navigation` rendert jeden Abschnitt und haelt "keine Karte mit genau einem Bedienelement" | eine Karte je Option (Darstellung: zehn Einstellungen in acht Karten, 1714px), Kartentitel + Hinweis UEBER einem einzelnen Schalter, ein vollbreites Auswahlfeld fuer "5 Minuten", 16px-Checkbox in einer Pille neben `role="switch"` |
 | Ueberschriften im Einstellungsblatt | EINE Stufenleiter, die Groesse folgt der Tiefe: Blatt 22/700, Reichweite ("Fuer mich"/"Fuer den Haushalt") 20/600, Abschnitt 17/600, Karte 16/500; ohne Reichweite eine Stufe kuerzer (22/20/17). Die Ebene im Baum zieht `levelScopedHeadings()` per `aria-level` nach | typography.css, settings/shell.js | Reichweite als kleinste Stufe (16px sekundaer), "Termine" zweimal auf der Ebene der Reichweite; seit R17 auch zweimal dieselbe ABSCHNITTSueberschrift in einem Blatt ("Termine" fuer mich und fuer den Haushalt - der persoenliche Abschnitt heisst "Termin-Vorgaben"), drei Stufen vor dem ersten Feld (Kartentitel ueber einer einzelnen Zeile) |
@@ -2060,6 +2088,12 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   Fundstellen); eine getoente Flaeche braucht Luft zu ihrem Rand, sonst liest sie sich als
   abgeschnitten statt als Chip. Einzige Ausnahme ist das dichte Monatsraster, das seine
   engere Fassung ueber einen `.month-day`-Override behaelt.
+- **Mahlzeit-Typ-Chips (R20):** `.filter-chip[data-meal-type]` traegt den 8px-Punkt des
+  Mahlzeit-Tons (`--meal-*`) wie das Board - Kennung, nicht Zustand. Die Regel steht in
+  filter-chip.css, weil Mahlzeit- und Rezept-Dialog auf verschiedenen Routen leben.
+- **Sieben Wochentage, eine Zeile (R20):** Wochentags-Chips (Medikament-Zeitfenster,
+  Entsorgungs-Termin) stehen als Raster `repeat(7, minmax(0, 1fr))` statt umbrechender
+  Reihe: 48px hoch, je ~43px breit im 390er-Blatt. Mit 48px Mindestbreite stand "So" allein.
 
 ### Cards / Containers
 - **Corner Style:** 12px (`--radius-md`) fuer die Karte, 16px (`--radius-lg`) fuer den
@@ -2071,6 +2105,36 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   EINE Inset-Grouped-Liste (ein Traeger, Zeilen mit Haarlinien, getoente Icon-Kachel plus
   Titel plus Modul-Untertitel plus trailing Count), nicht viele Einzelkarten.
 - **Internal Padding:** 16px (`--space-4`), kompakt 12px.
+- **Gruppen-Traeger (R20):** eine Karte je Gruppe (Abfallart mit ihren Terminen) traegt
+  dieselbe Haut wie `.row-carrier` - Flaeche, `--radius-lg`, shadow-sm, keine Kontur; den
+  Abstand zwischen den Karten haelt die Liste (`gap`), nie die Karte selbst
+  (test:frontend-audit "a card per row").
+- **Kapseln auf Shell-Material (R20):** Sammel-Pille und Toast-"Rueckgaengig" bleiben 28px
+  hohe Kapseln; am Finger (`pointer: coarse`) reicht ein unsichtbarer `::after`-Saum auf
+  `--target-base`, damit Pille und `--bulk-pill-safe-zone` nicht wachsen.
+- **Saeulendiagramm mit einer Reihe (R20, Haushaltshilfe):** Saeulen auf einer Haarlinie,
+  keine volle Bahn (die las sich als Fortschritt); bezahlt im Vollton der Serie, offen als
+  `--tint-hint`-Tint derselben Serie, Legende darunter; ein leerer Monat traegt nur die
+  Grundlinie und keinen "0,00 €"-Wert, ganze Betraege ohne Nachkommastellen.
+- **Zahlen-Stepper (R20, "Alle N Wochen"):** das native `<input type="number">` bleibt das
+  Feld (Label, Tastatur), links und rechts `btn--secondary btn--icon` mit Minus/Plus; an der
+  Grenze `disabled`, der Fokus geht dann ins Feld.
+- **Ortssuche (R20, Wetter-Standort, `settings/weather-location.js`):** gestapelte Zeile
+  "Ort" mit Textfeld (`enterkeyhint="search"`, kein Seitenfilter-`type="search"`) und
+  `btn--secondary` "Suchen"; gesucht wird erst auf Enter/Knopf (Server-Proxy
+  `GET /weather/geocode`, Open-Meteo). Treffer als Knopfliste (Name primaer, Region und Land
+  sekundaer; gleichnamige Treffer derselben Region tragen den Kreis, sonst die Koordinaten),
+  Ansage ueber eine `role="status"`-Zeile, Fehler am Feld (`reportFieldError`). Breite und
+  Laenge stehen unter "Koordinaten von Hand" (`settings-disclosure`), offen nur, wenn
+  Koordinaten ohne Ortsnamen gespeichert sind.
+- **Farbstreifen der Leseansicht (R20):** `openDetailView({ accentColor })` nur mit einer
+  Farbe, die etwas sagt (Marke, Kalender) - nie der blosse Modulton; der stand 16px unter der
+  Haarlinie des Kopfs als Doppellinie (test:detail-view).
+- **Lange Unterlisten (R20, Raten):** die neuesten sechs offen, der Rest gerendert hinter
+  "Alle anzeigen (n)" - derselbe Knopf wie "Geplant" im Hauptbuch (`.budget-planned-toggle`).
+- **Dokumentraster (R20):** der Kartentitel haelt im Raster zwei Zeilen (`min-block-size:
+  2lh`), damit Meta und Leiste einer Reihe fluchten; Subgrid scheidet aus, weil die Karte ein
+  Container ist. Der Leerzustand spannt alle Spalten.
 
 ### Named Rules
 **Die Kasten-in-Kasten-Regel.** Karten sind randlos auf dem Grouped-Grund, also traegt
@@ -2099,7 +2163,12 @@ Rueckfall. Der Statuscode steht zugeklappt unter "Technische Details", nie als s
 Zeigt die Flaeche den Fehler, gibt es keinen Toast daneben. Die Sitzungspruefung beim Start
 hat denselben Zustand als Shell-Fassung (`utils/session-unreachable.js`, im Lichtfeld des
 Ladebilds): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
-und nach `Retry-After` selbst erneut.
+und nach `Retry-After` selbst erneut. Ihr Titel folgt der Ursache wie der Satz darunter
+(`unreachableTitleKey`: Verbindung, Server nicht bereit, zu viele Anfragen; R20). Scheitert ein
+SEITENWECHSEL am Netz, zeichnet `showPageUnreachable()` denselben Ton in den Inhaltsbereich
+("Du bist offline", `role="status"`, kein Zeitgeber) und baut die Seite beim `online`-Ereignis
+selbst neu; der Absturzbildschirm bleibt Fehlern im Code der Seite. Das Offline-Banner steht am
+Desktop rechts der schwebenden Seitenleiste (`--sidebar-width` + `--sidebar-float-gap`).
 
 **Die Fusszeilen-Regel (v2.6.0). Ueberschuessige Hoehe wird Atem, nicht Loch.** Eine Karte
 mit Fusszeile streckt ihren Koerper (`flex: 1`) und verankert die Fusszeile unten
@@ -2311,6 +2380,14 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
 - **Alle Feldfehler auf einmal (R19):** ein Speicherpfad meldet mit `reportFieldErrors()`
   (components/modal.js) JEDEN Fehler an seinem Feld und fokussiert das erste in
   Dokumentreihenfolge - nie einen Fehler je Klick in der Reihenfolge der Pruefung.
+- **Keine Browser-Blasen, auch in den Einstellungen (R20):** ein Formular mit `required`,
+  `minlength` oder `type="email"` traegt `novalidate` und meldet ueber `reportFieldErrors()`. In
+  den Einstellungen macht `settingRowHtml({ field: true })` die Zeile zum Traeger: die Meldung
+  steht unter der Zeile, ueber beide Spalten. Felder ohne natives Eingabeelement melden am
+  sichtbaren Traeger und fokussieren selbst: die Ablage der Dokumente (`reportDropzoneError`,
+  Meldung hinter der Ablage, `aria-invalid`/`aria-describedby` am Datei-Input, der den Fokus
+  bekommt) und die Wochentags-Chips der Entsorgung (Fokus auf den ersten Tag). Eine Absage des
+  Servers mit `reason` (`wrong_password`, `email_port_invalid`) geht an dasselbe Feld.
 - **Nachfragen ohne Sperre (R19):** `.form-hint--warning` (Tinte `--color-warning-ink`) fuer
   ungewoehnliche, aber speicherbare Werte (Vitalwerte: 650 kg). Unmoegliches ist ein
   Feldfehler, nicht diese Zeile.
@@ -2353,6 +2430,38 @@ ist die teurere Auskunft als einer, der gar nicht da ist.
 
 Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
 `test:shopping-readonly-ui`.
+
+### Kinderkonten: Startrechte und eigene Sicht (R20, entschieden 2026-10-17)
+Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
+(`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
+Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
+Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
+
+- **Betraege fehlen am Server, nicht nur im Bild.** Ohne `housekeeping_view_amounts` kommen
+  Satz, Summen, Zahlstatus und offener Lohn als `null`; die Seite zeigt dann statt
+  „Betrag · Zahlstatus" die Zeit des Besuchs („08:30-12:00"), die Zahlungskarte entfaellt
+  und die Besuche nehmen die Zeile allein (`.housekeeping-dashboard-columns--single`). Eine
+  `null` steht nie als „0,00 €".
+- **Die Zahlungsaufgabe gehoert den Erwachsenen, die bezahlen.** Sie nennt den Lohn und entsteht
+  deshalb auf Sichtbarkeit `assignees`, zugewiesen der eincheckenden Person (nur mit
+  `housekeeping_view_amounts`) und den aktiven Admins (`paymentTaskAudience`,
+  server/services/payment-task-audience.js; dieselbe Regel zieht offene Altaufgaben per Migration 250
+  und jede beim Bearbeiten ihres Besuchs nach). EINE Stelle statt eines Filters je Flaeche: die geteilte
+  Sichtbarkeitsregel haelt sie aus Liste, Detail, Uebersicht, Suche und MCP. Checkt ein Konto ohne
+  Betraege ein, wird die erste Admin-Person Erstellerin, weil die Regel die Erstellerin immer
+  durchlaesst.
+- **Die Uebersicht eines Kindes** folgt der Vorgabe mit zwei Abweichungen
+  (`childDefaultWidgetConfig`): Belohnungen zuerst und sichtbar, Budget aus. Im Heute-Blatt
+  ruecken Aufgaben, die nur anderen gehoeren, ans Ende und fallen zuerst unter „+N weitere".
+- **Die eigene Karte auf /rewards** (`.rw-own`): Stand im Large-Title-Grad, das naechste Ziel
+  mit Zeichen, Name und Preis ueber dem Balken, „Verlauf" leise und „Anfragen" primaer erst,
+  wenn der Stand reicht. Opak und randlos wie die Praemienkarte, der Modulton nur im Zeichen
+  des Ziels - kein Spiel-Look.
+- **Anlegen und Einladen** nennen die Startrechte unter der Familienrolle, nur bei Kind
+  (`settings.childStartHint`), und nur dann zeigt `aria-describedby` darauf.
+
+Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboard-today`,
+`test:dashboard-rewards`, `test:member-order`.
 
 ### Navigation
 - **Mobil:** schwebende Glas-Kapsel (radius-full) mit gleitendem Aktiv-Indikator, duenner
@@ -2440,6 +2549,13 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   misst minimiert und auf dem Rueckweg nicht), Nachlauf, Toasts und Mehr-Blatt stehen still.
   Reduzierte Bewegung: derselbe Wechsel ohne Gleiten. Entscheidung: `nextNavMinimized`,
   Verdrahtung `watchNavMinimize` (utils/ux.js). Guards: `test:ux-utils`, `test:mobile-chrome`.
+  **Seit R20 eine echte Pille (Ulas 2026-10-17, iOS 26 Tab-Bar-Minimize):** minimiert schrumpft
+  die Kapsel an ihrer Startkante auf das aktive Ziel (`.nav-item--pill`; Polster + hoechstens 64px
+  + Polster, 390px: 374 -> 80px breit, 56 hoch); die anderen Tabs blenden aus und nehmen keinen
+  Treffer, das aktive gleitet per `translate` an den Anfang, die Tab-Pille blendet aus. Die Tabs
+  bleiben minimiert und auf dem Rueckweg auf ihrer gemessenen Breite (`navPillGeometry`, gemessen
+  an der ausgefahrenen Kapsel), beide Raender stehen explizit - kein Layout-Shift. Ein Tipp auf die
+  Pille faehrt sie aus, ohne zu navigieren.
 - **Die Tabs stehen in jedem Modul auf denselben Koordinaten (R19, Persona Casey).** Ohne
   FAB verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei 390px) - ein
   Budget-Reiterwechsel nach „Statistik", Belohnungen, Haushaltshilfe oder die Einstellungen
@@ -2733,10 +2849,11 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
 
    **Nie ein Kopf ohne Ortsangabe.** Angedockt wandert Zeile 1 aus dem Bild, und der Titel
    kommt als kleiner Inline-Titel zurueck (`wireCollapsingHeader`, utils/ux.js): in die
-   Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9); und wo
-   nichts falten kann, weil die Bar-Zeile eine Tab-Leiste ist, klebt der Kopf um die Hoehe
-   des Inline-Titels tiefer und zeigt ihn in diesem Streifen ueber der Leiste (Band, R11
-   H1). Kopfhoehe und Klebekante haengen in keinem der drei Wege am Andock-Zustand.
+   Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9). Eine
+   Tab-Leiste als Bar-Zeile gibt es unter 1024px nicht mehr: seit R19 stehen die Reiter in
+   der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Die dritte Bauart dafuer (Band,
+   R11 H1) ist seit R20 entfallen - gemessen erreichte sie keine Route mehr. Kopfhoehe und
+   Klebekante haengen in keinem Weg am Andock-Zustand.
    **1a. Werkzeuge in der Titelzeile.** (R16, Critique 2026-10-05 P1 mobil.) Traegt die
    Werkzeugzeile hoechstens ZWEI Icon-Knoepfe (Such-Icon, „...") und weder Segment noch
    Stepper noch Tab-Leiste, ist sie keine Zeile wert: die Knoepfe stehen am Ende der
@@ -2946,7 +3063,13 @@ blieben 68). Ein AKTIVER Filter faltet nicht, seine Zahl bleibt (Regel 3), dann 
 Label; "Heute" ist nur ein Eintrag, wenn ein anderer Zeitraum offen ist. Nur unter 640px -
 darueber gibt es kein Menue, in das gefaltet wird. Die Reserve-Regel des Kopfs rechnet seither
 mit der ausgeklappten Hoehe (sonst pendelt eine Liste, deren Reserve zwischen Schwelle und
-Schwelle + 52px liegt). **Eingeklappt ist auch der Budgetkopf EINE Zeile (R19, Critique 2026-10-16 P2):** bis R19
+Schwelle + 52px liegt). **Seit R20 (6c, Ulas 2026-10-17) falten statt Filter und Wort die PFEILE:**
+der kompakte Kopf ist der von Apple Kalender - Zeitraum, Ansicht MIT Wort ("Agenda"), Lupe,
+Filter. Blaettern geht per Wisch, Taste (j/k) und ueber die beiden Stellvertreter "Vorherige/
+Naechste ..." oben im Ansichtsmenue; "Heute" deckt ohne Pfeile das ganze Label (`inset-inline: 0`),
+ein Tipp darauf springt zurueck, im laufenden Zeitraum ist er inert. Der Menueknopf halbiert
+eingeklappt seinen Innenrand: 390px traegt "17.10. - 16.11.2026" ungekuerzt (162/162px), 320px
+kuerzt mit Ellipse ohne Ueberlappung. **Eingeklappt ist auch der Budgetkopf EINE Zeile (R19, Critique 2026-10-16 P2):** bis R19
 blieb er in jedem Zustand bei 117px, weil der Titel eingeklappt stehen blieb und Zeile 1 mit dem
 Stepper offen hielt. Jetzt verlaesst der Titel samt Siegel das Bild (nicht den Baum), die
 Reiter ruecken in die Zeile des Zeitraums und scrollen dort, der Stepper bleibt am Zeilenende
@@ -3639,6 +3762,26 @@ Die Marke ist die Bildmarke selbst (`utils/brand-mark.js`, 64px, kompakt 48px), 
 Themes dieselbe; der Traeger gibt nur Groesse und Schatten. Der Titel ist ein Large Title
 in Label-Farbe wie jeder Seitentitel. Die Bildmarke ist als Marke gesetzt und unantastbar.
 
+### Erststart-Rundgang und Fehlerbildschirm (R20, Re-Critique 2026-10-17)
+Der **Rundgang** (dashboard.js `showOnboarding`) beginnt mit der Bildmarke (64px, Traeger
+`.onboarding-mark` wie `.auth-hero__mark`), nicht mit einem Lucide-Zeichen. Nennt ein Schritt
+ein Bedienelement, zeigt er darauf: der **Lichtring** (`.onboarding-spotlight`) liegt ueber
+Seitenleiste bzw. Kapsel (`.nav-bottom__items`) und dem sichtbaren `.page-fab`, 6px Luft,
+Radius des Ziels plus Luft, Ring 2px `--color-accent`. Den Abdunkler traegt der Ring als
+Schatten nach aussen (100vmax Spreizung, `--color-bg` 78 %), das Overlay wird dafuer klar
+(`.onboarding-overlay--spot`); ohne sichtbares Ziel bleibt die Unschaerfe. Klicks faengt das
+Overlay, der Ring ist aria-hidden, die Tafel liegt positioniert darueber.
+
+Der **Fehlerbildschirm einer Seite** (router.js `renderError`) nennt die Seite mit ihrem Namen
+aus der Navigation ("Die Seite „Kontakte" lässt sich gerade nicht öffnen"), haengt an die
+Ursache aus `friendlyError` den Satz, dass der Rest weiterlaeuft, und bietet neben "Neu laden"
+"Zur Übersicht" (nicht auf der Uebersicht selbst). Ohne Shell bleibt der allgemeine Titel. Er
+ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
+
+**Anpassen am Telefon** (unter 640px): Hoch und Runter liegen in EINER Kapsel auf
+`--color-fill-well` mit Haarlinie, Groesse, Optionen und Ausblenden stehen ohne Ring daneben;
+die Ziele bleiben 48px. Vorher vier umrandete Kreise je Zeile.
+
 ### FAB (Signature Component)
 Getoente Glas-Kapsel: der App-Akzent mit 78 % Deckung
 (`color-mix(in srgb, var(--color-accent) 78%, transparent)`) ueber
@@ -4139,7 +4282,9 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
      `chartGridMarkup()` in health.js ist die Referenz - fuenf Linien mit Werteachse, EINE
      geteilte Geometrie (`CHART`) fuer alle drei Charts des Moduls.
   4. **Ein Diagramm ist nie der alleinige Traeger.** Die Zahl steht dabei; der Balken ist der
-     zweite Kanal, nicht der Ersatz.
+     zweite Kanal, nicht der Ersatz. Ein Anteil steht leiser HINTER seinem Betrag
+     (Sekundaertext, regular, `--space-1` Abstand), auf jeder Flaeche in derselben Form aus
+     EINER Rechnung (`sharePercent()` in money.js; Budget-Uebersicht und Statistik seit #1968).
 - **Do** jeder fixierten Shell-Flaeche ueber dem Scrollport einen NACHLAUF am Inhaltsende
   geben, und zwar als Summand (`--install-prompt-tail`), nicht als weitere `:has()`-Fassung:
   FAB, Sammelaktions-Pille und Install-Banner sind drei Flaechen und waeren als Kombinatorik
@@ -4148,9 +4293,20 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   `:root:has(...)` - `html:has(<typ>)` ist Spezifitaet (0,0,2) und verliert gegen das `:root`
   der Basis.
 - **Do** den Primaerknopf eines Modulkopfs sein NOMEN zeigen lassen (`newLabel.*`:
-  „Termin", „Geburtstag"); das Verb traegt das Plus-Zeichen, der ganze Satz bleibt im
-  `aria-label`. Der kurze Text steht als `data-dock-label` am `.page-fab`, damit der
-  Router ihn beim Andocken findet (Register-Regel).
+  „Termin", „Geburtstag"); das Verb traegt das Plus-Zeichen. Der kurze Text steht als
+  `data-dock-label` am `.page-fab`, damit der Router ihn beim Andocken findet
+  (Register-Regel). Angedockt ist das sichtbare Nomen der NAME, der ganze Satz steht in
+  `data-action-label` und als Titel mit „(n)"; schwebend (ohne Text) ist der Satz das
+  `aria-label` (R20, WCAG 2.5.3 - `syncFabName()` in utils/fab.js, die eine Stelle fuer
+  Andocken, Abdocken und den Aktionswechsel je Tab).
+- **Do** ein sichtbares Etikett im Namen tragen (Label in Name, R20): wo ein `aria-label`
+  noetig ist, beginnt es mit dem, was zu sehen ist (Zyklustag „1, 01.10.2026, …"); wo die
+  Zeile mehr zeigt als ein Etikett (Kontozeile, Ausgleichszeile), gibt es KEIN `aria-label` -
+  der Inhalt ist der Name, die Handlung ein `.sr-only`-Nachsatz („…, Buchungen anzeigen").
+  Initialen in einem benannten Knopf sind Zeichnung, kein Text (`data-initials` +
+  `::before`, Kontoknopf und Belohnungen). Die Monatszelle traegt ihre Zusammenfassung als
+  `.month-day__label` (sr-only), das Sichtbare steht in `.month-day__visual` (`aria-hidden`,
+  `display: contents`).
 - **Do** die Zugehoerigkeit eines farbigen Blocks ueber eine VOLLTON-Kante tragen (3px an der
   Inline-Start-Seite), sobald der Block sie tragen kann, und Fuellung wie Tinte bei ihren
   gemessenen Rezepten lassen (Vollton-Kanten-Regel).
@@ -4238,12 +4394,13 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   Kopf steht, steht nicht noch einmal als Zeile darunter; Screenreader hoeren das Label der
   abgeloesten Zeile weiter (`subtitleLabel`). In der Aufgabe ist "Erledigen" der EINE
   Primaerknopf des Fusses.
-- **Do** dem Detail eines Rezepts OHNE Bild ein flaches Band im Kuechenton geben
-  (`recipeBandEl`, `.recipe-detail__band`: 64px hoch, Toenung `--tint-surface`, darauf ein
-  Vollton-Siegel mit dem Zeichen der ersten Mahlzeit - oder dem Besteck, wenn das Rezept fuer
-  alle oder keine gilt). Kein 3:2-Rahmen, kein grauer Block: ein Platzhalter fuer ein fehlendes Foto bleibt
-  verboten (R16), das Band behauptet kein Bild. Die Liste bleibt ohne; Rezepte mit Bild
-  behalten ihr Kopfbild. Zutatenmengen stehen in einer eigenen rechtsbuendigen,
+- **Do** das Detail eines Rezepts OHNE Bild direkt mit seinem Inhalt beginnen lassen
+  (Mahlzeit-Chips, Zutaten; den Titel traegt der Kopf des Rahmens). Das flache Band im
+  Kuechenton aus R18 ist seit R20 weg (Entscheidung Ulas 2026-10-17: am Desktop ein 480px
+  breiter Stummel ueber den Zutaten). Kein 3:2-Rahmen, kein grauer Block, kein Ersatz: ein
+  Platzhalter fuer ein fehlendes Foto bleibt verboten (R16), und ein Bild, das beim Laden
+  scheitert, nimmt seinen Rahmen mit. Die Liste bleibt ohne; Rezepte mit Bild behalten ihr
+  Kopfbild. Zutatenmengen stehen in einer eigenen rechtsbuendigen,
   tabellarischen Spalte vor dem Namen (Subgrid ueber die Liste, Rueckfall je Zeile).
 - **Do** einen Tageskopf in Worten setzen: "Heute", "Morgen", "Gestern" fuehren, dahinter
   Wochentag und Datum; die anderen Tage nennen nur diese ("Samstag, 24. Oktober", mit Jahr nur

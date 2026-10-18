@@ -42,6 +42,9 @@
         "errorOccurred": "Etwas ist schiefgelaufen.",
         "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten.",
         "errorDetails": "Technische Details",
+        "pageFailedTitle": "Die Seite „{{page}}“ lässt sich gerade nicht öffnen",
+        "pageFailedHint": "Alle anderen Bereiche funktionieren weiter.",
+        "toOverview": "Zur Übersicht",
         "errorGeneric": "Ein Fehler ist aufgetreten.",
         "updateAvailable": "Update verfügbar - lade die Seite neu, um die neueste Version zu erhalten.",
         "titleRequired": "Titel ist erforderlich",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "{{title}} auf die Einkaufsliste setzen",
         "emailInUse": "Diese E-Mail-Adresse gehört bereits zu einem anderen Konto.",
+        "emailInvalid": "Bitte eine gültige E-Mail-Adresse eingeben.",
         "sessionUnreachableTitle": "Verbindung unterbrochen",
+        "serverNotReadyTitle": "Server gerade nicht bereit",
+        "rateLimitedTitle": "Zu viele Anfragen",
         "sessionRetryHint": "Du bleibst angemeldet. Neuer Versuch in {{seconds}} s.",
         "sessionRetrying": "Neuer Versuch läuft…",
         "searchNoResultsTitle": "Keine Treffer",
         "searchNoResultsDescription": "Nichts passt zu deiner Suche.",
         "searchNoResultsFilteredDescription": "Nichts passt zu deiner Suche und den Filtern.",
-        "searchReset": "Suche zurücksetzen"
+        "searchReset": "Suche zurücksetzen",
+        "passwordMinLength": "Mindestens 8 Zeichen."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -160,7 +167,8 @@
         "resultCountMany": "{{count}} Ergebnisse",
         "goTo": "Gehe zu",
         "newSection": "Neu anlegen",
-        "recentLabel": "Zuletzt geöffnet"
+        "recentLabel": "Zuletzt geöffnet",
+        "createTaskNamed": "„{{title}}“ als Aufgabe anlegen"
     },
     "dashboard": {
         "title": "Übersicht",
@@ -1526,10 +1534,12 @@
         "deleteLoanPaymentConfirm": "Diese Darlehenszahlung löschen?",
         "loanRemainingAmount": "Offen",
         "loanRemainingPrincipal": "Restschuld",
+        "loanOwedToYou": "Steht dir noch zu",
         "loanStillToPay": "Noch zu zahlen",
         "loanPrincipalAmount": "Kreditsumme",
         "loanRemainingInstallments": "Raten offen",
         "loanPaidAmount": "Bezahlt",
+        "loanReceivedAmount": "Zurückerhalten",
         "loansEmpty": "Keine aktiven Darlehen.",
         "loanInstallmentMeta": "{{paid}} von {{total}} Raten bezahlt",
         "loanRemainingOf": "von {{total}}",
@@ -1541,7 +1551,8 @@
         "loanSortBalance": "Kleinste Restschuld zuerst",
         "loanSortActive": "Sortierung: {{sort}}",
         "loanPaidStatus": "Bezahlt",
-        "markLoanPaid": "Als bezahlt markieren",
+        "loanBookInstallment": "Rate buchen",
+        "loanReceiveRepayment": "Rückzahlung erhalten",
         "loanBorrowerLabel": "Person",
         "loanDirectionLabel": "Art des Darlehens",
         "loanDirectionLent": "Verliehen (kommt zurück)",
@@ -1709,8 +1720,6 @@
         "accountType_credit": "Kreditkarte",
         "accountType_investment": "Investment",
         "accountType_other": "Sonstiges",
-        "viewAccountTransactions": "Buchungen von {{name}} anzeigen",
-        "currentBalance": "Aktueller Saldo",
         "clearAccountFilter": "Konto-Filter entfernen",
         "archivedBadge": "Archiviert",
         "showArchivedAccounts": "Archivierte anzeigen",
@@ -1753,6 +1762,7 @@
         "statsPointsLabel": "Werte der Trendkurve",
         "statsPointLabel": "{{period}}: Einnahmen {{income}}, Ausgaben {{expenses}}",
         "statsPointLabelCumulative": "Bis {{period}}: Einnahmen {{income}}, Ausgaben {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} geplant",
         "receiptsLabel": "Belege",
         "receiptsHint": "Kassenbon oder Rechnung zu dieser Buchung.",
         "receiptDocumentName": "Beleg: {{title}} ({{date}})",
@@ -1800,7 +1810,8 @@
         "ledgerSortDate": "Nach Datum",
         "ledgerSortAmount": "Nach Betrag",
         "ledgerSortActive": "Sortierung: {{sort}}",
-        "ledgerAccountsAll": "Alle Konten"
+        "ledgerAccountsAll": "Alle Konten",
+        "showAccountTransactions": "Buchungen anzeigen"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",
@@ -2029,6 +2040,8 @@
         "confirmPasswordLabel": "Neues Passwort bestätigen",
         "savePassword": "Passwort speichern",
         "passwordMismatch": "Passwörter stimmen nicht überein.",
+        "currentPasswordWrong": "Das aktuelle Passwort stimmt nicht.",
+        "passwordTooShort": "Mindestens 8 Zeichen.",
         "passwordSavedToast": "Passwort erfolgreich geändert.",
         "oidcLinkTitle": "Single Sign-on",
         "oidcLinkHint": "Verknüpfe dein SSO-Konto mit diesem Konto, damit die Anmeldung über den Anbieter dich hierher führt statt ein zweites Konto anzulegen.",
@@ -2138,6 +2151,7 @@
         "familyRoleGrandparent": "Großelternteil",
         "familyRoleRelative": "Verwandte/r",
         "familyRoleOther": "Familienmitglied",
+        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratoren können App-Einstellungen, Integrationen, API-Tokens und Familienkonten verwalten.",
         "systemAdminBadge": "Systemadministrator",
@@ -2154,7 +2168,7 @@
         "removeMemberNamed": "{{name}} entfernen",
         "memberDeactivatedToast": "{{name}} deaktiviert. Die Einträge bleiben erhalten.",
         "memberFormerBadge": "Ehemalig",
-        "memberOrderHint": "Diese Reihenfolge gilt im ganzen Haushalt: Kalender, Stundenplan und jede Personenauswahl folgen ihr. Zum Ändern am Griff ziehen oder ihn fokussieren und die Pfeiltasten drücken. Neue Mitglieder stehen danach, nach Namen sortiert.",
+        "memberOrderHint": "Diese Reihenfolge gilt im ganzen Haushalt. Zum Ändern am Griff ziehen oder mit den Pfeiltasten verschieben.",
         "logout": "Abmelden",
         "logoutConfirm": "Von diesem Gerät abmelden?",
         "synchronizing": "Synchronisiere…",
@@ -2206,7 +2220,7 @@
         "pwaInstallTitle": "Yuvomi auf diesem Gerät installieren",
         "pwaInstallChecking": "Installationsverfügbarkeit wird geprüft...",
         "pwaInstallReady": "Yuvomi kann auf diesem Gerät als App installiert werden.",
-        "pwaInstallUnavailable": "Die Installation ist in diesem Browser derzeit nicht verfügbar.",
+        "pwaInstallUnavailable": "Dieser Browser bietet die Installation hier nicht an. In Chrome und Edge findest du sie im Browsermenü, in Safari unter Teilen > Zum Dock bzw. Zum Home-Bildschirm. Ohne HTTPS-Adresse bietet sie kein Browser an.",
         "pwaInstallInstalled": "Yuvomi ist auf diesem Gerät bereits installiert.",
         "pwaInstallIosHint": "Auf iPhone oder iPad das Teilen-Menü öffnen und Zum Home-Bildschirm auswählen.",
         "pwaInstallButton": "App installieren",
@@ -2574,7 +2588,7 @@
         "emptyStateNoAccounts": "Noch keine Konten verbunden",
         "housekeepingPaymentsTitle": "Zahlungsaufgaben",
         "housekeepingPaymentTasksLabel": "Bei jedem Einchecken eine Zahlungsaufgabe erstellen",
-        "housekeepingPaymentTasksHint": "Wenn aktiviert, wird bei jedem Einchecken eine Aufgabe zur Bezahlung der Haushaltshilfe erstellt. Das Erledigen dieser Aufgabe markiert den Besuch als bezahlt.",
+        "housekeepingPaymentTasksHint": "Wenn aktiviert, wird bei jedem Einchecken eine Aufgabe zur Bezahlung der Haushaltshilfe erstellt. Das Erledigen dieser Aufgabe markiert den Besuch als bezahlt. Diese Aufgabe sehen nur die Person, die eincheckt, und die Administratoren.",
         "housekeepingPaymentTasksSaved": "Einstellung für Haushaltshilfe-Zahlungen gespeichert.",
         "tabModules": "Module",
         "thirdPartyModulesTitle": "Module",
@@ -3199,7 +3213,25 @@
         "displayRemoveDeviceActive": "Dieses Gerät ist noch gekoppelt. Widerrufe es zuerst.",
         "feedExportIncludeBirthdays": "Geburtstage einschließen",
         "feedExportIncludeBirthdaysHint": "Bei einem separaten Geburtstagsabo ausschalten, damit Geburtstage und Namenstage nicht doppelt erscheinen.",
-        "birthdayFeedHint": "Wer diesen Link hat, kann alle im Haushalt gespeicherten Geburtstage und Namenstage sehen, auch ohne Erinnerung. Nur auf eigenen Geräten verwenden."
+        "birthdayFeedHint": "Wer diesen Link hat, kann alle im Haushalt gespeicherten Geburtstage und Namenstage sehen, auch ohne Erinnerung. Nur auf eigenen Geräten verwenden.",
+        "skipToSheet": "Zur Einstellung springen",
+        "screensaverOffTitle": "Foto-Bildschirmschoner",
+        "screensaverNeedsImmich": "Der Bildschirmschoner startet, sobald ein Admin Immich verbunden hat. Danach stellst du hier Wartezeit, Uhrzeit und Bildausschnitt für dieses Gerät ein.",
+        "screensaverConnectImmich": "Immich verbinden",
+        "weatherPlaceLabel": "Ort",
+        "weatherPlaceHint": "Gesucht wird beim Wetterdienst Open-Meteo. Dabei geht nur der Ortsname hinaus.",
+        "weatherPlacePlaceholder": "Stadt oder Postleitzahl",
+        "weatherPlaceSearch": "Suchen",
+        "weatherPlaceCurrent": "Aktuell: {{place}}",
+        "weatherPlaceNone": "Noch kein Ort gewählt.",
+        "weatherPlaceResultsLabel": "Gefundene Orte",
+        "weatherPlacePick": "Wähl deinen Ort aus der Liste.",
+        "weatherPlaceChosen": "{{place}} gewählt. Zum Übernehmen speichern.",
+        "weatherPlaceRequired": "Such einen Ort und wähl ihn aus der Liste.",
+        "weatherPlaceTooShort": "Gib mindestens zwei Zeichen ein.",
+        "weatherPlaceNotFound": "Kein Ort mit diesem Namen gefunden. Häng das Land an, z. B. „Halle, Deutschland“.",
+        "weatherPlaceUnavailable": "Die Ortssuche ist gerade nicht erreichbar. Versuch es gleich noch einmal oder trag die Koordinaten von Hand ein.",
+        "weatherManualTitle": "Koordinaten von Hand"
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - Verbindung wird wiederhergestellt…",
-        "staleData": "Offline - Stand: {{time}}"
+        "staleData": "Offline - Stand: {{time}}",
+        "pageTitle": "Du bist offline",
+        "pageDescription": "Diese Seite braucht eine Verbindung. Sobald dein Gerät wieder online ist, lädt sie von selbst."
     },
     "emptyHint": {
         "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Abhaken, nach rechts zum Ansehen.",
@@ -3882,7 +3916,6 @@
         "taskAreaPlaceholder": "Beispiel: Bad",
         "taskFrequency": "Häufigkeit (Tage)",
         "taskCreatedToast": "Aufgabe für die Haushaltshilfe erstellt.",
-        "dashboard": "Übersicht",
         "reports": "Berichte",
         "visitsThisMonth": "Besuche im Monat",
         "lastVisit": "Letzter Besuch",
@@ -4011,7 +4044,12 @@
         "currentMonth": "Aktuell",
         "noVisitReportsInMonth": "Im {{month}} wurden keine Einsätze erfasst.",
         "settledAdminOnly": "Ändern oder löschen nur durch einen Admin",
-        "reportVisitsCount": "Besuche"
+        "reportVisitsCount": "Besuche",
+        "amountsPermissionLabel": "Löhne und Zahlungen sehen",
+        "errorAmountsHidden": "Bezahlen kann nur, wer die Beträge der Haushaltshilfe sehen darf.",
+        "notHereToday": "Heute noch nicht da",
+        "tabVisits": "Besuche",
+        "tabChores": "Arbeiten"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",
@@ -4040,7 +4078,6 @@
         "noBalances": "Alles ist ausgeglichen.",
         "noExpenses": "Keine passenden Ausgaben.",
         "noActivity": "Noch keine Aktivität.",
-        "owes": "schuldet",
         "system": "System",
         "quickGroceries": "Supermarktausgabe",
         "quickSchool": "Schulkosten teilen",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} an {{payee}}, {{amount}}. Eine Gegenbuchung hebt die Zahlung auf, die Salden stehen danach wie vorher. Die Zahlung bleibt als storniert im Verlauf.",
         "loadMoreActivity": "Mehr laden",
         "expenseDeleted": "Gelöscht",
-        "youAreOwedInGroup": "Du bekommst in {{group}}",
-        "youOweInGroup": "Du schuldest in {{group}}"
+        "youAreOwedInGroup": "{{group}}: Du bekommst",
+        "youOweInGroup": "{{group}}: Du schuldest",
+        "debtYouOwe": "Du schuldest {{name}}",
+        "debtOwesYou": "{{name}} schuldet dir",
+        "debtOwes": "{{from}} schuldet {{to}}"
     },
     "wmo": {
         "0": "Klarer Himmel",
@@ -4256,7 +4296,8 @@
         "submit": "Link senden",
         "sent": "Falls ein passendes Konto existiert, wurde ein Link zum Zurücksetzen gesendet.",
         "backToLogin": "Zurück zur Anmeldung",
-        "unavailable": "Dieser Haushalt bietet kein Zurücksetzen des Passworts an. Wende dich an die Administration deines Haushalts."
+        "unavailable": "Dieser Haushalt bietet kein Zurücksetzen des Passworts an. Wende dich an die Administration deines Haushalts.",
+        "identifierRequired": "Gib deinen Benutzernamen oder deine E-Mail-Adresse ein."
     },
     "resetPassword": {
         "title": "Neues Passwort festlegen",
@@ -4286,6 +4327,15 @@
         "test": "Verbindung testen",
         "testSuccess": "Testmail erfolgreich gesendet.",
         "testFailed": "Test fehlgeschlagen: {{error}}",
+        "portInvalid": "Bitte einen Port von {{min}} bis {{max}} eingeben.",
+        "testFailedNotConfigured": "Trage zuerst SMTP-Host und Absender-Adresse ein.",
+        "testFailedAuth": "Der Server hat Benutzername oder Passwort abgelehnt.",
+        "testFailedConnection": "Der Server ist unter diesem Host und Port nicht erreichbar.",
+        "testFailedTls": "Die verschlüsselte Verbindung kam nicht zustande. Prüfe Verschlüsselung und Port.",
+        "testFailedRejected": "Der Server hat die Testmail nicht angenommen. Prüfe die Absender-Adresse.",
+        "testFailedUnknown": "Die Testmail konnte nicht gesendet werden.",
+        "testNoRecipient": "Die Testmail geht an deine eigene E-Mail-Adresse, und die fehlt noch. Trage sie unter Konto → E-Mail ein.",
+        "testNoRecipientLink": "Konto öffnen",
         "saveFailed": "Speichern fehlgeschlagen: {{error}}",
         "saved": "Einstellungen gespeichert."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Täglich",
                 "none": "Noch keine Zeitfenster.",
                 "delete": "Zeitfenster löschen",
-                "newHint": "Speichere das Medikament, dann kannst du Zeitfenster hinzufügen.",
                 "timeRequired": "Uhrzeit ist erforderlich."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Keine passende Art in diesem Haushalt",
         "mappingProfileStatusAmbiguousType": "Mehrdeutig - mehrere Typen tragen diesen Namen",
         "icsCalendarName": "Abfuhrtermine",
-        "icsPickupSummary": "Abholung: {{name}}"
+        "icsPickupSummary": "Abholung: {{name}}",
+        "intervalDecrease": "Abstand verringern",
+        "intervalIncrease": "Abstand erhöhen"
     },
     "rewards": {
         "title": "Belohnungen",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Auswahl leeren",
         "continuesUntil": "…geht bis {{time}}",
         "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
-        "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen."
+        "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen.",
+        "presetCodes": {
+            "early": "F",
+            "late": "S",
+            "night": "N",
+            "day": "T",
+            "vacation": "U",
+            "sick": "K",
+            "exam": "PR",
+            "lecture": "VL",
+            "seminar": "SE",
+            "lab": "PK"
+        },
+        "typesWithTime": "Mit Uhrzeit"
     },
     "pairDisplay": {
         "title": "Tablet koppeln",

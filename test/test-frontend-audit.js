@@ -573,7 +573,7 @@ test('an announced update stops the router from loading further page modules (#6
   // fliegt dann als SyntaxError auf. Erlaubt ist deshalb nur noch der Reload.
   assert.match(router, /shellStale\s*=\s*true;/, 'SW_UPDATED must mark the running shell as stale');
   assert.match(router, /if \(shellStale && reloadOnce\(\)\)/, 'importPage() must reload instead of importing a page module');
-  assert.match(router, /function prefetchRoute\(path(?:, \{ now = false \} = \{\})?\) \{[\s\S]*?if \(shellStale\) return;/, 'prefetchRoute() must stop warming modules after an update');
+  assert.match(router, /function prefetchRoute\(path(?:, \{ now = false(?:, priority = null)? \} = \{\})?\) \{[\s\S]*?if \(shellStale\) return;/, 'prefetchRoute() must stop warming modules after an update');
   assert.doesNotMatch(
     router,
     /SW_UPDATED[\s\S]{0,400}moduleCache\.clear\(\)/,
@@ -1673,6 +1673,16 @@ test('personal device leaf owns PWA installation state and disconnect cleanup', 
   assert.match(source, /id="pwa-install-status"[^>]*aria-live=/);
   assert.match(source, /id="pwa-install-error"[^>]*role="alert"/);
   assert.match(source, /id="pwa-install-btn"[^>]*aria-describedby="pwa-install-status pwa-install-error"/);
+  // R20 (Re-Critique 2026-10-17 a5 P2-9): kein deaktivierter Primaerknopf ohne
+  // Weg dahinter. Installiert und nicht verfuegbar verschwindet der Knopf, der
+  // Status traegt die Auskunft (wo es die Installation gibt).
+  const branch = (from, to) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
+  assert.match(branch("t('settings.pwaInstallInstalled')", 'return;'), /button\.hidden = true/, 'installiert: kein Knopf');
+  assert.match(branch("t('settings.pwaInstallUnavailable')", '};'), /button\.hidden = true/, 'nicht verfuegbar: kein Knopf');
+  assert.match(branch("t('settings.pwaInstallReady')", 'return;'), /button\.disabled = false/);
+  assert.match(source, /button\.hidden = false;\s*\n\s*if \(state\.installed\)/, 'jeder Zustand setzt den Knopf zuerst wieder sichtbar');
+  const de = JSON.parse(read('../public/locales/de.json')).settings.pwaInstallUnavailable;
+  assert.match(de, /Browsermenü[\s\S]*Safari[\s\S]*HTTPS/, 'der Status nennt den Weg statt nur "nicht verfuegbar"');
 });
 
 test('module-specific settings leaves exist and export async render functions', () => {
@@ -2103,10 +2113,11 @@ test('sync-contacts leaf owns CardDAV account management', () => {
   // (nicht das App-Passwort), Formularfehler sind feldbezogen, und der Sync
   // meldet keinen Erfolg ohne aktiviertes Adressbuch.
   assert.match(source, /disconnectAccountConfirmTitle', \{ name: account\.name \}/);
-  // Fremdserver-Passwort: weder das App-Passwort anbieten (current-password)
-  // noch ein generiertes vorschlagen (new-password).
-  assert.match(source, /id="cardav-password"[^>]*autocomplete="off"/);
-  assert.doesNotMatch(source, /autocomplete="(current|new)-password"/);
+  // Fremdserver-Passwort: nie das App-Passwort anbieten (current-password).
+  // new-password statt off: "off" ignorieren viele Browser an Passwortfeldern
+  // und fuellen dann doch das gespeicherte ein (MDN, Codex-Review zu #2055).
+  assert.match(source, /id="cardav-password"[^>]*autocomplete="new-password"/);
+  assert.doesNotMatch(source, /autocomplete="current-password"/);
   assert.match(source, /cardavCredentialsTrustHint/);
   assert.match(source, /wireBlurValidation\(form\)/);
   assert.match(source, /if \(!validateAll\(form\)\) return;/);
@@ -6867,13 +6878,42 @@ test('route failures expose a localized recoverable alert instead of raw technic
   // Renderers (`error` -> `role="alert"`, utils/empty-state.js) statt aus einem
   // setAttribute hier. Geprueft wird deshalb die Variante - die Rolle selbst
   // haelt der Renderer-Guard weiter oben fest.
-  assert.match(router, /function renderError\(container,\s*err\)[\s\S]*emptyStateEl\(\{[\s\S]{0,200}?variant:\s*'error'/);
-  assert.match(router, /function renderError\(container,\s*err\)[\s\S]*description:\s*friendlyError\(err\)/);
+  // Seit der Re-Critique 2026-10-17 nimmt renderError den Seitennamen mit
+  // (Test darunter); die Ursache bleibt friendlyError(err).
+  assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*emptyStateEl\(\{[\s\S]{0,1200}?variant:\s*'error'/);
+  assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*const cause = friendlyError\(err\);[\s\S]*description:[^\n]*: cause,/);
   assert.match(router, /state\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.match(friendly, /Failed to fetch\|NetworkError\|Load failed/i);
   assert.match(friendly, /return t\(['"]common\.errorServer['"]\)/);
   assert.match(friendly, /err\?\.name === ['"]TypeError['"][\s\S]*return t\(['"]common\.unexpectedError['"]\)/);
   assert.match(notesPage, /catch \(err\)\s*\{[\s\S]*console\.error\([\s\S]*throw err;/);
+});
+
+// Re-Critique 2026-10-17 (A1, Shell): der Fehlerbildschirm einer Seite war
+// austauschbar - "Etwas ist schiefgelaufen." und nur "Neu laden", obwohl die
+// Shell steht und nur EINE Seite gescheitert ist. Er nennt jetzt die Seite mit
+// ihrem Namen aus der Navigation, sagt, dass der Rest weiterlaeuft, und bietet
+// den Weg zur Uebersicht (ausser auf der Uebersicht selbst). Ohne Shell (Start
+// gescheitert) bleibt der allgemeine Titel.
+test('Re-Critique 2026-10-17: der Fehlerbildschirm nennt die Seite und fuehrt zur Uebersicht', () => {
+  const router = read('../public/router.js');
+  const fn = router.slice(router.indexOf('function renderError('), router.indexOf('function errorDetails('));
+  assert.match(fn, /^function renderError\(container, err, \{ page = null, home = false \} = \{\}\)/);
+  assert.match(fn, /title: page \? t\('common\.pageFailedTitle', \{ page \}\) : t\('common\.errorOccurred'\)/);
+  assert.match(fn, /description: page \? `\$\{cause\} \$\{t\('common\.pageFailedHint'\)\}` : cause,/);
+  assert.match(fn, /actions: home\s*\? \[reload, \{ label: t\('common\.toOverview'\)[^\n]*onClick: \(\) => navigate\('\/'\) \}\]\s*: \[reload\]/);
+  assert.match(fn, /className: 'page-crash'/);
+  // Der Aufrufer im Seitenwechsel reicht Namen und Rueckweg herein; der Start
+  // ohne Shell ruft ohne.
+  assert.match(router, /renderError\(errorHost, err, \{\s*page: navCatalog\(\)\.find\(\(n\) => n\.path === route\.path\)\?\.label \?\? null,\s*home: route\.path !== '\/',\s*\}\)/);
+  assert.match(router, /renderError\(document\.getElementById\('app'\), err\);/);
+  // Region-Fokusziel ohne Rahmen um die halbe Seite (wie .page-unreachable).
+  assert.match(read('../public/styles/layout.css'), /\.page-crash:focus,\s*\.page-crash:focus-visible \{\s*outline: none;/);
+  for (const loc of readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
+    const common = JSON.parse(read(`../public/locales/${loc}`)).common;
+    assert.match(common.pageFailedTitle, /\{\{page\}\}/, loc);
+    assert.ok(common.pageFailedHint && common.toOverview, loc);
+  }
 });
 
 test('Notes keeps user colours off the reading surface', () => {
@@ -7185,6 +7225,7 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
   const input = { value: '', focus() { doc.activeElement = input; }, select() {} };
   const trigger = { name: 'Suche in der Seitenleiste' };
   const returned = [];
+  const holds = { inert: 0 };
   let pushes = 0;
   const env = {
     overlay, input, document: doc,
@@ -7200,11 +7241,13 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
     createFocusTrap: () => () => {},
     returnFocus: (el) => returned.push(el),
     combo: { clear() {}, refresh() {} },
+    inertOutside: () => { holds.inert += 1; return () => { holds.inert -= 1; }; },
   };
   const make = new Function(...Object.keys(env), `
     let _searchTrapHandler = null;
     let lastFocusedBeforeSearch = null;
     let searchOverlayToken = null;
+    let releaseSearchBackground = null;
     let searchTimer = null;
     ${fn('openSearch')}
     ${fn('closeSearch')}
@@ -7218,8 +7261,10 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
   assert.equal(listeners.filter((l) => l.type === 'keydown').length, 1, 'genau ein Focus-Trap');
   assert.equal(pushes, 1, 'ein Marker fuer die Zurueck-Geste');
   assert.equal(doc.activeElement, input, 'der Fokus bleibt im Suchfeld');
+  assert.equal(holds.inert, 1, 'die Seite hinter der Suche ist einmal gesperrt, auch nach dem zweiten ⌘K');
   closeSearch();
   assert.equal(listeners.length, 0, 'nach dem Schliessen haengt kein Trap mehr am Overlay');
+  assert.equal(holds.inert, 0, 'nach dem Schliessen ist die Seite wieder frei');
   assert.deepEqual(returned, [trigger], 'der Fokus geht an den Ausloeser zurueck, nicht ins versteckte Suchfeld');
 });
 
@@ -8402,7 +8447,9 @@ const r18Lum = (hex) => relLum(hexToRgb(hex));
 test('R18: der Schalterknopf ist in jedem Theme heller als seine Bahn - aus und an', () => {
   const rules = [...eachRule(read('../public/styles/layout.css'))];
   const bg = (selector) => {
-    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)).pop();
+    // Forced Colors zaehlt nicht: dort stehen Systemfarben statt der Theme-Tokens.
+    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)
+      && !r.at.some((at) => /forced-colors/.test(at))).pop();
     assert.ok(rule, `Regel ${selector} mit Hintergrund nicht gefunden - der Guard misst nichts`);
     const token = rule.body.match(/background(?:-color)?\s*:\s*var\(\s*(--[\w-]+)\s*\)/)?.[1];
     assert.ok(token, `${selector} setzt keinen Token-Hintergrund`);
@@ -9667,7 +9714,8 @@ test('die Statusbar folgt der ausdruecklichen Theme-Wahl, nicht nur dem System',
 
 test('modal Enter submits the form instead of advancing to the next field (audit 1.4)', () => {
   const src = read('../public/components/modal.js');
-  const enterBlock = src.match(/if \(e\.key === 'Enter'\) \{[\s\S]*?\n {4}\}/);
+  // Waehrend einer IME-Umwandlung gehoert Enter der Komposition (test:ux-utils).
+  const enterBlock = src.match(/if \(e\.key === 'Enter'(?: && !isImeComposing\(e\))?\) \{[\s\S]*?\n {4}\}/);
   assert.ok(enterBlock, 'expected an Enter keydown handler');
   assert.match(enterBlock[0], /submitBtn\.click\(\)/, 'Enter must trigger the submit button');
   assert.doesNotMatch(enterBlock[0], /next\.focus\(\)/, 'Enter must not advance focus to the next field');
@@ -15209,6 +15257,78 @@ test('die Deaktiviert-Farbe steht an keinem erreichbaren Bedienelement', () => {
 });
 
 /**
+ * Beide Dokumente sagen dem Browser vor dem ersten Stylesheet, dass sie hell
+ * UND dunkel koennen (Modern-Web-Guidance-Audit, Befund 17). Ohne das Meta
+ * malt er Leinwand, Scrollleisten und Formularelemente bis zum CSS hell - im
+ * Dark ein weisser Blitz. offline.html traegt die Angabe zusaetzlich im CSS,
+ * weil sie ohne tokens.css steht.
+ */
+test('index.html and offline.html declare color-scheme before any stylesheet', () => {
+  for (const file of ['../public/index.html', '../public/offline.html']) {
+    const html = read(file);
+    const meta = html.match(/<meta\b[^>]*\bname=["']color-scheme["'][^>]*>/)?.[0];
+    assert.ok(meta, `${file}: <meta name="color-scheme"> fehlt`);
+    assert.equal(meta.match(/\bcontent=["']([^"']+)["']/)?.[1], 'light dark', `${file}: content`);
+    assert.ok(html.indexOf(meta) < html.search(/<link\b[^>]*rel=["']stylesheet|<style\b/), `${file}: das Meta steht vor dem ersten Stylesheet`);
+  }
+  const offline = read('../public/offline.html');
+  const css = offline.slice(offline.indexOf('<style>'), offline.indexOf('</style>'));
+  const schemes = [];
+  for (const { selector, body } of eachRule(css.replace(/^<style>/, ''))) {
+    const value = body.match(/(?:^|;)\s*color-scheme:\s*([^;]+)/)?.[1]?.trim();
+    if (value) schemes.push([selector.replace(/\s+/g, ' ').trim(), value]);
+  }
+  assert.deepEqual(schemes, [
+    [':root', 'light'],
+    [':root:not([data-theme="light"])', 'dark'],
+    [':root[data-theme="dark"]', 'dark'],
+  ], 'offline.html: color-scheme hell an :root, dunkel in beiden Dark-Bloecken');
+});
+
+/**
+ * Eine AUSDRUECKLICHE Wahl schlaegt das System auch vor dem CSS: theme-init.js
+ * legt das color-scheme-Meta auf sie fest. Sonst malte ein dunkles System die
+ * Leinwand dunkel, obwohl hell gewaehlt ist (und umgekehrt), bis tokens.css da
+ * ist. Ohne Wahl bleibt "light dark", dort ist das System die richtige Quelle;
+ * die Wand in der Nacht ist dunkel.
+ */
+test('theme-init.js pins the color-scheme meta to an explicit theme', () => {
+  const source = read('../public/theme-init.js');
+  const run = (entries, hours = 12) => {
+    const map = new Map(Object.entries(entries));
+    const storage = {
+      get length() { return map.size; },
+      key: (i) => [...map.keys()][i] ?? null,
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(k, String(v)); },
+      removeItem: (k) => { map.delete(k); },
+    };
+    const attrs = new Map();
+    const root = {
+      setAttribute: (k, v) => { attrs.set(k, String(v)); },
+      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+      removeAttribute: (k) => { attrs.delete(k); },
+      hasAttribute: (k) => attrs.has(k),
+    };
+    const meta = { content: 'light dark', getAttribute: () => meta.content, setAttribute: (k, v) => { if (k === 'content') meta.content = v; } };
+    const document = {
+      documentElement: root,
+      querySelectorAll: () => [],
+      querySelector: (sel) => (sel === 'meta[name="color-scheme"]' ? meta : null),
+    };
+    const DeviceDate = class extends Date { getHours() { return hours; } };
+    new Function('localStorage', 'sessionStorage', 'document', 'location', 'Date', 'window', source)(
+      storage, storage, document, { pathname: '/' }, DeviceDate, {},
+    );
+    return meta.content;
+  };
+  assert.equal(run({}), 'light dark', 'ohne Wahl folgt die Leinwand dem System');
+  assert.equal(run({ 'yuvomi-theme': 'light' }), 'light');
+  assert.equal(run({ 'yuvomi-theme': 'dark' }), 'dark');
+  assert.equal(run({ 'yuvomi-theme': 'light', 'yuvomi-wall-mode': '1' }, 23), 'dark', 'die Wand ist nachts dunkel');
+});
+
+/**
  * Die Statusleiste der installierten PWA IST der Seitengrund.
  *
  * `<meta name="theme-color">` nimmt an keiner Kaskade teil - der Wert muss als
@@ -18273,6 +18393,16 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
   assert.ok(listMin >= 420 && listMax <= 520 && listMin < listMax,
     `PAGE-019: Listenbahn ${listMin}-${listMax}px liegt nicht in 420-520px`);
 
+  // Die zweite Stufe (Re-Critique 2026-10-17): sobald der Baustein auf seinem
+  // Deckel steht (Content-Spalte + 2 Desktop-Gutter), nimmt die Liste
+  // --layout-list-wide. Die Zahl der Abfrage ist genau dieser Deckel.
+  const capPx = Number(tokens.match(/--content-max-width:\s*([0-9]+)px/)[1])
+    + 2 * Number(tokens.match(/--space-8:\s*([0-9]+)px/)[1]);
+  assert.match(tokens, /:root[\s\S]*@media[^{]*\{[^}]*--page-gutter:\s*var\(--space-8\)/, 'der Desktop-Gutter ist --space-8');
+  const capRem = capPx / 16;
+  const listWide = rem('--layout-list-wide') * 16;
+  assert.ok(listWide > listMax && listWide <= 720, `PAGE-019: --layout-list-wide ${listWide}px muss zwischen Listenbahn und Lesemass liegen`);
+  let wideGrid = null;
   let containerRule = null;
   let hiddenOutside = false;
   let shownInside = false;
@@ -18285,6 +18415,11 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     if (!/@container\s+module-surface/.test(chain)) continue;
     const width = chain.match(/min-width:\s*([0-9.]+)rem/);
     assert.ok(width, `PAGE-019: @container module-surface ohne min-width in rem (${chain})`);
+    if (Number(width[1]) === capRem) {
+      assert.equal(sel, '.split-view', `PAGE-019: die Deckel-Stufe ${capRem}rem traegt nur die Listenbahn`);
+      wideGrid = body;
+      continue;
+    }
     assert.equal(Number(width[1]), threshold,
       `PAGE-019: Schwelle in layout.css ${width[1]}rem, tokens.css --layout-split-threshold ${threshold}rem - `
       + '@container kann keine Variable lesen, beide Stellen muessen gleich stehen');
@@ -18300,6 +18435,7 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
   let splitQueries = 0;
   for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
     for (const m of read(`../public/styles/${file}`).matchAll(splitQuery)) {
+      if (file === 'layout.css' && m[1] === 'module-surface' && `${m[2]}${m[3]}` === `${capRem}rem`) continue;
       splitQueries += 1;
       assert.equal(`${m[2]}${m[3]}`, `${threshold}rem`,
         `PAGE-019: ${file} schaltet @container ${m[1]} bei ${m[2]}${m[3]}, tokens.css --layout-split-threshold steht bei ${threshold}rem`);
@@ -18329,6 +18465,29 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     'PAGE-019: .split-view muss ab der Schwelle auf --content-max-width + 2 Gutter gedeckelt sein (Fluchtlinie Kopf)');
   assert.match(gridInside, /margin-inline:\s*auto/,
     'PAGE-019: der gedeckelte Baustein steht mittig wie die Content-Spalte des Kopfs');
+  assert.ok(wideGrid && /grid-template-columns:\s*var\(--layout-list-wide\)\s+minmax\(0,\s*1fr\)/.test(wideGrid),
+    `PAGE-019: ab ${capRem}rem (Deckel) nimmt die Liste --layout-list-wide - sonst kuerzt sie bei 1920, waehrend daneben Platz steht`);
+  // Tablet unter der Schwelle: die Liste steht auf der Breite ihres Kopfs.
+  const tablet = [...eachRule(layout)].find(({ selector, at }) => selector.trim() === '.app-page--list-detail > *'
+    && at.join(' ').includes('(min-width: 640px) and (max-width: 1023px)'));
+  assert.ok(tablet && /--page-measure:\s*100%/.test(tablet.body), 'PAGE-019: am Tablet laeuft die Liste so breit wie ihr Kopf');
+});
+
+// Re-Critique 2026-10-17 (A2): in einer Gruppe mit nur einer Zeile blendete
+// list-row.css den Sortiergriff per `display: none` aus, tasks.css nahm dort
+// seine Spalte weg - Menge, Avatare und Mehr-Knopf standen in der Einzelzeile
+// um die Griffbreite weiter rechts (Einkauf 390: x 314 statt 276, Aufgaben
+// 324 statt 282). Der Griff bleibt unsichtbar stehen, die Spalte bleibt.
+test('Zeilen: der Griff der Einzelzeile haelt seinen Platz, die Bedienzone springt nicht', () => {
+  const listRow = [...eachRule(read('../public/styles/list-row.css'))]
+    .find(({ selector, at }) => !at.length && selector.includes('.row-carrier > .swipe-row:only-child .list-row__drag'));
+  assert.ok(listRow, 'die Einzelzeilen-Regel des Griffs fehlt');
+  assert.match(listRow.body, /visibility:\s*hidden/, 'unsichtbar, nicht entfernt');
+  assert.doesNotMatch(listRow.body, /display:\s*none/, 'display: none nimmt der Bedienzone die Breite');
+  const tasks = read('../public/styles/tasks.css');
+  assert.doesNotMatch(tasks, /\.swipe-row:not\(:only-child\) \.task-card__main:has\(> \.list-row__drag\)/,
+    'die Griffspalte der Aufgabenzeile gilt auch in der Einzelzeile');
+  assert.match(tasks, /\.task-card__main:has\(> \.list-row__drag\) \{\s*grid-template-columns: auto minmax\(0, 1fr\) auto auto;/);
 });
 
 test('PAGE-020: eine Aussenkante je Modul - kein Reiter schaltet das Mass oder den Kopf um', () => {
@@ -18790,7 +18949,8 @@ test('router: ein AbortController je Seitenaufbau, abgebrochen vor dem naechsten
   const router = withoutBlockComments(read('../public/router.js'));
   const renderPage = router.slice(router.indexOf('async function renderPage('));
   assert.ok(renderPage.length > 100, 'renderPage() nicht gefunden');
-  const abortAt = renderPage.indexOf('_pageController?.abort();');
+  // R20: mit festem Grund (PAGE_LEFT, router.js) - derselbe Abbruch an derselben Stelle.
+  const abortAt = renderPage.indexOf('_pageController?.abort(PAGE_LEFT);');
   const createAt = renderPage.indexOf('_pageController = new AbortController();');
   const renderAt = renderPage.indexOf('module.render(target, context)');
   assert.ok(abortAt > 0 && createAt > abortAt && renderAt > createAt,
@@ -21877,4 +22037,598 @@ test('R19: die Nadel der Notizkarte zeichnet so gross wie die Zeilenaktion daneb
   const layout = [...eachRule(read('../public/styles/layout.css'))].filter((r) => !r.at.length);
   const size = layout.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.row-action svg'));
   assert.ok(size && size.selector.includes('.note-card__pin svg'), 'Nadel und Zeilenaktion teilen EINE Groessenregel');
+});
+
+// R20 D1 (Re-Critique 2026-10-17, A2 P1-2): das Kaestchen der Einkaufszeile
+// zog seine Kante aus der Kartenkante (--color-border) und stand gerendert bei
+// 1,32:1 hell und 1,47:1 dunkel - das meistgetippte Bedienelement des Moduls
+// war das blasseste. Es teilt jetzt die Ruhe des Abhakkreises (.check-ring,
+// 2px --color-text-tertiary): EINE Tonregel fuer alles, was sich abhaken
+// laesst, und 3:1 (WCAG 1.4.11) auf Grund und eigener Flaeche.
+test('R20: das Einkaufskaestchen traegt die Ruhe des Abhakkreises und haelt 3:1', () => {
+  const shopping = [...eachRule(read('../public/styles/shopping.css'))].filter((r) => !r.at.length);
+  const box = shopping.find((r) => r.selector.trim() === '.item-check::before');
+  assert.ok(box, 'shopping.css fuehrt das Kaestchen als `.item-check::before`');
+  const ring = [...eachRule(read('../public/styles/list-row.css'))].find((r) => r.selector.trim() === '.check-ring::after');
+  const edgeOf = (body) => body.match(/border:\s*([^;]+);/)?.[1].trim();
+  assert.equal(edgeOf(box.body), edgeOf(ring.body), 'Kaestchen und Abhakkreis tragen dieselbe Kante');
+  const token = edgeOf(box.body).match(/var\((--[\w-]+)\)/)?.[1];
+  const { light, dark } = themeTokenMaps();
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const edge = resolveColor(token, map);
+    for (const ground of ['--color-surface', '--color-bg']) {
+      const ratio = contrastRatio(edge, resolveColor(ground, map));
+      assert.ok(ratio >= 3, `${theme}: Kaestchenkante ${token} auf ${ground} nur ${ratio.toFixed(2)}:1`);
+    }
+  }
+});
+
+// R20 D3 (Re-Critique 2026-10-17, A1 P2-5 / A2 P2-2): der Auswahlmodus der
+// Aufgaben am Telefon - Kapsel und FAB blieben unter der Pille stehen, der
+// Wisch-Pfeil blieb an der Zeile, ein Tipp auf die Metazeile waehlte nicht,
+// die gewaehlte Zeile war nur am Kreis zu erkennen, und am Desktop las sich
+// die Markierung der offenen Zeile bei „0 ausgewaehlt" wie ein erster Haken.
+test('R20: der Auswahlmodus nimmt Kapsel, FAB und Wisch-Pfeil weg, die ganze Zeile waehlt', () => {
+  const layout = [...eachRule(read('../public/styles/layout.css'))];
+  const top = (sel) => layout.find((r) => !r.at.length && r.selector.trim() === sel);
+  const narrow = (sel) => layout.find((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)) && r.selector.trim() === sel);
+  assert.match(top('html:has(.app-page.is-selecting) .page-fab')?.body ?? '', /display:\s*none/, 'der FAB tritt ab - in der Shell, fuer jede Seite mit Modus');
+  assert.match(narrow('html:has(.app-page.is-selecting) .nav-bottom')?.body ?? '', /display:\s*none/, 'mobil tritt auch die Kapsel ab');
+  assert.ok(narrow('html:has(.app-page.is-selecting) .shell-bottom-stack:not([data-dock])'), 'die Pille rueckt an den Platz der Kapsel');
+  assert.match(top('.app-page.is-selecting .swipe-row::after')?.body ?? '', /content:\s*none/, 'kein Wisch-Pfeil an einer Zeile, die man waehlt');
+  assert.doesNotMatch(read('../public/styles/contacts.css'), /html:has\(\.contacts-page\.is-selecting\)/, 'keine zweite Fassung in den Kontakten');
+
+  const tasks = read('../public/pages/tasks.js');
+  const list = tasks.slice(tasks.indexOf('function renderTaskList('), tasks.indexOf('function renderTaskList(') + 600);
+  assert.match(list, /classList\.toggle\('is-selecting', state\.bulkSelectMode\)/, 'der Modus steht an der Seitenwurzel');
+  const wire = tasks.slice(tasks.indexOf('function wireTaskList('), tasks.indexOf("const action = target.dataset.action;", tasks.indexOf('function wireTaskList(')));
+  assert.match(wire, /if \(!target\) \{[\s\S]*state\.bulkSelectMode[\s\S]*toggleTaskSelection\(circle, container\)/, 'ein Tipp ohne Ziel waehlt im Modus die Zeile');
+  assert.match(tasks, /task-card--selected/, 'die gewaehlte Zeile traegt eine Klasse');
+  const css = [...eachRule(read('../public/styles/tasks.css'))].filter((r) => !r.at.length);
+  assert.ok(css.some((r) => r.selector.includes('.tasks-page .task-card--selected > .task-card__main') && /--color-accent/.test(r.body)), 'die gewaehlte Zeile ist im App-Akzent getoent');
+  assert.ok(css.some((r) => r.selector.trim() === '.tasks-page.is-selecting .task-card.is-selected:not(.task-card--selected)' && /transparent/.test(r.body)), 'die Spalten-Markierung schweigt waehrend der Auswahl');
+});
+
+// R20 D4 (Re-Critique 2026-10-17, A1 P2-6): der Wand-Modus verlor den Fokus an
+// <body> - nach dem Start und nach Esc -, die Timer-Kapseln hatten kein
+// sichtbares Wort, und die Zaehlmarke deckte bei 1280x800 79 bis 118px² der
+// Initialen zu.
+test('R20: der Wand-Modus fuehrt den Fokus, benennt den Timer und laesst die Initialen frei', () => {
+  const dash = read('../public/pages/dashboard.js');
+  assert.match(dash, /<div class="wall" id="wall-surface" tabindex="-1"/, 'die Flaeche ist der Landeplatz des Fokus');
+  const enter = dash.slice(dash.indexOf("querySelector('#dashboard-wall-enter')?.addEventListener('click'"));
+  assert.match(enter.slice(0, 200), /_wallFocusIntent = 'enter'/, 'der Start merkt sich, wohin der Fokus soll');
+  const wall = dash.slice(dash.indexOf('function rebuildWall('), dash.indexOf('function renderWallWeather('));
+  assert.match(wall, /captureRebuildFocus\(/, 'der stille Neuaufbau nimmt den Fokus mit');
+  assert.match(wall, /takeWallFocusIntent\('enter'\) \? '#wall-surface'/, 'nach dem Start steht er auf der Flaeche');
+  const leave = dash.slice(dash.indexOf('function wireWallExit('), dash.indexOf('function wireWallExit(') + 400);
+  assert.match(leave, /_wallFocusIntent = 'leave'/, 'der Ausstieg merkt sich den Rueckweg');
+  assert.match(dash, /takeWallFocusIntent\('leave'\) \? \['#dashboard-wall-enter', '\.dashboard-tools-btn'\]/, 'nach Esc steht er auf dem Knopf, der die Wand wieder oeffnet');
+
+  const timer = read('../public/components/wall-timer.js');
+  assert.match(timer, /role="group" aria-labelledby="wall-timer-presets-label"/, 'die sichtbare Zeile ist der Name der Gruppe');
+  assert.match(timer, /class="wall__timer-presets-label" id="wall-timer-presets-label"/);
+
+  const css = [...eachRule(read('../public/styles/dashboard.css'))].filter((r) => !r.at.length);
+  const count = css.find((r) => r.selector.trim() === '.wall-who__count');
+  assert.match(count?.body ?? '', /inset-inline-start:\s*calc\(100% - var\(--space-3\)\)/, 'die Marke waechst vom Gesicht weg, nicht ueber die Buchstaben');
+  assert.doesNotMatch(count?.body ?? '', /inset-inline-end/);
+  assert.ok(css.some((r) => r.selector.trim() === '.wall-who__list--tasks .wall-who__mark' && /display:\s*contents/.test(r.body)), 'mit Titeln steht die Marke hinter dem Namen');
+});
+
+// R20 D6 (Re-Critique 2026-10-17, A3 Sam): Enter auf einen leeren Monatstag
+// landete auf dem Reiter „Tag" - jetzt auf dem Hinweis im Raster des Tages.
+test('R20: ein leerer Tag gibt den Fokus an seinen Hinweis, nicht an den Reiter', () => {
+  const cal = read('../public/pages/calendar.js');
+  assert.match(cal, /class="day-view__empty-hint" id="day-empty-hint" tabindex="-1"/, 'der Hinweis kann den Fokus nehmen');
+  const fn = cal.slice(cal.indexOf('function focusFirstDayEntry('), cal.indexOf('function focusFirstDayEntry(') + 400);
+  assert.match(fn, /\?\? body\?\.querySelector\('#day-empty-hint'\)/, 'ohne Eintrag der Hinweis');
+  assert.ok(fn.indexOf('#day-empty-hint') < fn.indexOf('#cal-view-tab-day'), 'der Reiter ist nur noch der letzte Rueckfall');
+});
+
+// R20 D7 (Re-Critique 2026-10-17, A5 Sam): am Desktop 30 Tab-Stopps (Suche und
+// Seitenleiste) vor dem ersten Feld eines Einstellungsblatts. Eine Sprungmarke
+// steht als erster Stopp der Leiste und fuehrt ins Blatt.
+test('R20: die Einstellungsleiste beginnt mit einer Sprungmarke ins Blatt', () => {
+  const shell = read('../public/settings/shell.js');
+  const nav = shell.slice(shell.indexOf('function createNavigation('), shell.indexOf('function createSheetSkipLink('));
+  assert.match(nav, /createNavigationSearch\([^)]*\);\s*navigation\.prepend\(createSheetSkipLink\(\)\);/, 'VOR der Suche, also der erste Stopp');
+  const skip = shell.slice(shell.indexOf('function createSheetSkipLink('), shell.indexOf('const SKIP_TARGET'));
+  assert.match(skip, /link\.className = 'sr-only settings-shell__skip'/, 'dasselbe Muster wie die Marke der Shell');
+  assert.match(skip, /event\.preventDefault\(\)/, 'ein Fokuswechsel, kein Hash');
+  assert.match(skip, /first\.focus\(\)/);
+  assert.match(shell, /content\.id = 'settings-sheet';/);
+  const css = [...eachRule(read('../public/styles/settings.css'))];
+  assert.ok(css.some((r) => r.selector.trim() === '.settings-page:not(.settings-page--leaf) .settings-shell__skip' && /display:\s*none/.test(r.body)), 'ohne Blatt keine Marke');
+});
+
+// R20 D8 (Re-Critique 2026-10-17, A5 P2-7): das „Einnahmeprotokoll" war ein
+// `summary` mit `display: flex` - ohne Dreieck, ohne Chevron, 40px hoch, und
+// las sich wie eine Ueberschrift.
+test('R20: der Aufklapper des Einnahmeprotokolls zeigt, dass er aufgeht, und hat volle Zielhoehe', () => {
+  const health = read('../public/pages/health.js');
+  assert.match(health, /<details class="health-medlog">\s*<summary>[\s\S]*?data-lucide="chevron-down" class="health-medlog__chevron"/, 'der Chevron steht im summary');
+  const css = [...eachRule(read('../public/styles/health.css'))].filter((r) => !r.at.length);
+  const rule = (sel) => css.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(rule('.health-medlog summary'), /min-height:\s*var\(--target-base\)/, 'am Finger 48px');
+  assert.match(rule('.health-medlog[open] .health-medlog__chevron'), /rotate\(180deg\)/, 'offen dreht er sich');
+});
+
+// R20 D9 (a11y-Baseline origin/main, axe 4.14): label-content-name-mismatch auf
+// 60 Ansichten (serious) und drei Landmark-Befunde. Je Template ein Satz:
+// sichtbarer Text muss im Namen stehen (WCAG 2.5.3), sonst traegt der Inhalt den
+// Namen und die Handlung steht als sr-only-Nachsatz.
+test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptbereich', () => {
+  const router = read('../public/router.js');
+  const sync = router.slice(router.indexOf('function syncSidebarAccount('), router.indexOf('function syncSidebarAccount(') + 2200);
+  assert.match(sync, /avatar\.dataset\.initials = initials\(displayName\)/, 'Initialen des Kontoknopfs als Zeichnung');
+  assert.doesNotMatch(sync, /avatar\.textContent = initials/, 'kein Textknoten „LI" im Etikett');
+  assert.match(read('../public/styles/layout.css'), /\.nav-sidebar__avatar\[data-initials\]::before \{\s*content: attr\(data-initials\);/);
+  const rewards = read('../public/pages/rewards.js');
+  assert.match(rewards, /class="rw-avatar rw-avatar--initials" aria-hidden="true" data-initials=/);
+  assert.match(read('../public/styles/rewards.css'), /\.rw-avatar--initials::before \{ content: attr\(data-initials\); \}/);
+
+  const fab = read('../public/utils/fab.js');
+  assert.match(fab, /export function syncFabName\(/, 'eine Namensregel fuer den FAB');
+  const dock = router.slice(router.indexOf('function dockFabIntoToolbar('), router.indexOf('function markFabShortcut('));
+  assert.match(dock, /syncFabName\(fab\);/, 'angedockt heisst er, was er zeigt');
+  assert.match(router.slice(router.indexOf('function undockFabFromToolbar(')).slice(0, 600), /syncFabName\(fab\);/, 'schwebend wieder sein Satz');
+
+  const cal = read('../public/pages/calendar.js');
+  const cell = cal.slice(cal.indexOf('function renderMonthDay('), cal.indexOf('function renderMonthDay(') + 7000);
+  assert.doesNotMatch(cell, /role="gridcell"[^>]*aria-label=/, 'die Monatszelle hat kein aria-label mehr');
+  assert.match(cell, /<span class="sr-only month-day__label">\$\{esc\(monthDayAriaLabel\(/, 'dieselbe Zusammenfassung als Inhalt');
+  assert.match(cell, /<div class="month-day__visual" aria-hidden="true">/);
+  assert.match(read('../public/styles/calendar.css'), /\.month-day__visual \{\s*display: contents;/, 'die Geometrie bleibt');
+
+  assert.match(read('../public/pages/health.js'), /const parts = \[String\(Number\(String\(c\.dateKey\)\.slice\(8, 10\)\)\), formatDate\(c\.dateKey\)\];/, 'Zyklustag: die Ziffer zuerst');
+  assert.match(read('../public/utils/sub-tabs.js'), /btn\.append\(document\.createTextNode\(' '\), badge\);/, '„Einkauf 23" statt „Einkauf23"');
+  const budget = read('../public/pages/budget.js');
+  assert.match(budget, /<button class="budget-account__main" type="button" data-drill="\$\{a\.id\}">/, 'Kontozeile ohne aria-label');
+  assert.match(budget, /<span class="sr-only">, \$\{esc\(t\('budget\.showAccountTransactions'\)\)\}<\/span>/);
+  const split = read('../public/pages/split-expenses.js');
+  assert.doesNotMatch(split, /class="split-expense" data-(?:expense|recurring)-id="[^"]*"[^>]*aria-label=/, 'Ausgleichszeilen ohne aria-label');
+  assert.doesNotMatch(split, /<main class=/, 'kein zweites <main> im Budget-Reiter');
+  assert.match(read('../public/pages/housekeeping.js'), /<div class="metric-grid budget-glance-details housekeeping-task-summary" role="group"/, 'keine zweite Region „Aufgaben"');
+});
+
+// DIE !important-SPERRKLINKE (R20, Entscheidung Ulas 2026-10-18). `@layer`
+// ist vertagt, bis das Mindestziel Chrome 99 / Firefox 97 / Safari 15.4 traegt
+// (docs/DECISIONS.md); bis dahin darf die Zahl der echten `!important` nur
+// sinken. Zaehlregel: jede Deklaration mit `!important` in einer Regel, die
+// `eachRule()` in public/styles/*.css liefert - Kommentare zaehlen nicht,
+// `@media`/`@supports`/`@container` zaehlen mit, `@keyframes` nicht (dort
+// ignoriert der Browser `!important` ohnehin). vendor/ liegt nicht unter
+// public/styles. Stand 2026-10-18: 34. Wer eins entfernt, senkt die Zahl.
+const IMPORTANT_CEILING = 34;
+test('!important-Sperrklinke: echte !important-Deklarationen in public/styles werden nicht mehr', () => {
+  const dir = new URL('../public/styles/', import.meta.url);
+  const found = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(readFileSync(new URL(file, dir), 'utf8'))) {
+      for (const decl of rule.body.split(';')) {
+        if (/!\s*important/i.test(decl)) found.push(`${file}: ${rule.selector.slice(0, 50)} { ${decl.trim()} }`);
+      }
+    }
+  }
+  assert.ok(found.length > 20, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
+  assert.ok(found.length <= IMPORTANT_CEILING,
+    `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
+});
+
+/* Zugangsdaten FREMDER Dienste (CalDAV, Apple, WebDAV, DMS, SMTP, Immich,
+ * Gotify, ntfy, Webhook, Rezept-Anbieter, Backup-Schluessel) duerfen nie das
+ * Yuvomi-Passwort angeboten bekommen. `current-password` meint das Passwort
+ * DIESER Seite: der Passwortmanager fuellte es ein, und beim Speichern ging es
+ * an den fremden Server. `autocomplete="off"` hilft dort nicht - viele Browser
+ * ignorieren es an Passwortfeldern (MDN, "Turning off form autocompletion",
+ * Codex-Review zu #2055). Der Hinweis, der das Einfuellen eines gespeicherten
+ * Passworts verhindert, ist `new-password`; ein Benutzername-Feld eines fremden
+ * Kontos traegt `off`, nie `username`. Die Anmeldewerte gehoeren nur dorthin,
+ * wo es um ein Yuvomi-Konto geht: Anmeldung, eigenes Konto, neues
+ * Familienmitglied, Gastkonto.
+ */
+test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
+  const ownAccountForms = new Set([
+    'pages/login.js', 'pages/setup.js', 'pages/join.js', 'pages/reset-password.js',
+    'pages/forgot-password.js', 'pages/split-expenses.js',
+    'settings/pages/personal-account.js', 'settings/pages/admin-family.js',
+  ]);
+  const root = fileURLToPath(new URL('../public/', import.meta.url));
+  const offenders = [];
+  for (const dir of ['pages', 'settings/pages', 'settings', 'components']) {
+    for (const name of readdirSync(root + dir)) {
+      const rel = `${dir}/${name}`;
+      if (!name.endsWith('.js') || ownAccountForms.has(rel)) continue;
+      const src = read(`../public/${rel}`);
+      const lineOf = (index) => src.slice(0, index).split('\n').length;
+      src.split('\n').forEach((line, i) => {
+        if (/autocomplete="(?:current-password|username)"/.test(line)) offenders.push(`${rel}:${i + 1} (Anmeldewert)`);
+      });
+      for (const input of src.matchAll(/<input[^>]*type="password"[^>]*>/g)) {
+        if (!/autocomplete="new-password"/.test(input[0])) offenders.push(`${rel}:${lineOf(input.index)} (Passwortfeld ohne new-password)`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'Feld eines fremden Dienstes mit Anmelde-Autofill');
+});
+
+/* Esc gehoert der obersten Ebene. Das geteilte Modal schliesst bei Esc, solange
+ * kein Handler darunter `preventDefault()` gerufen hat (`onEscape` in
+ * components/modal.js). Die Combobox (Waehrung, Zyklus, Kategorie, Konto,
+ * Zahlungsart) und der Logo-Picker im Abo-Formular schlossen sich selbst, ohne
+ * das Ereignis zu verbrauchen: dasselbe Esc schloss danach das ganze Formular,
+ * ein unveraendertes sofort.
+ */
+test('Esc in Combobox und Logo-Picker des Abo-Formulars schliesst nur das Widget', () => {
+  const lines = read('../public/pages/subscriptions.js').split('\n');
+  const offenders = [];
+  lines.forEach((line, i) => {
+    if (!/event\.key === 'Escape'/.test(line)) return;
+    const branch = lines.slice(i, i + 4).join('\n');
+    if (!/event\.preventDefault\(\)/.test(branch)) offenders.push(`pages/subscriptions.js:${i + 1}`);
+  });
+  assert.deepEqual(offenders, [], 'Esc-Zweig ohne preventDefault - das Formular darunter schliesst mit');
+});
+
+/* Der Name einer Kachel kann aus dem Manifest eines Erweiterungsmoduls kommen
+ * (`widgetDisplayLabel`, utils/extension-i18n.js), und `t()` escaped seine
+ * Parameter nicht. Fuenf Stellen im Anpassen-Modus und in der Fehlerkachel
+ * setzten ihn roh ins Markup, zwei Zeilen darueber stand er in `esc()`.
+ */
+test('Dashboard: der Kachelname steht im Markup immer in esc()', () => {
+  const lines = read('../public/pages/dashboard.js').split('\n');
+  const offenders = [];
+  lines.forEach((line, i) => {
+    if (/\$\{(?!esc\()[^}]*widgetLabel\(/.test(line)) offenders.push(`pages/dashboard.js:${i + 1}`);
+  });
+  assert.deepEqual(offenders, [], 'widgetLabel() ohne esc() im Template');
+});
+
+/* Codex-Review zu #2055: Esc schloss den Logo-Picker samt fokussiertem
+ * Suchfeld, der Fokus fiel auf body und damit aus der Fokusfalle des
+ * Abo-Formulars. Das Schliessen muss den Fokus an den Oeffner zurueckgeben,
+ * wenn er im Picker stand - auf jedem Weg (Esc, X, Auswahl, Zurueck-Geste).
+ */
+test('der Logo-Picker gibt den Fokus beim Schliessen an seinen Oeffner zurueck', () => {
+  const src = read('../public/pages/subscriptions.js');
+  const start = src.indexOf('function openLogoPickerModal(');
+  assert.ok(start > 0, 'openLogoPickerModal gefunden');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.match(body, /const opener = document\.activeElement/, 'der Oeffner wird beim Oeffnen gemerkt');
+  const close = body.match(/const close = \(\) => \{[\s\S]*?\n {2}\};/);
+  assert.ok(close, 'close ist eine Funktion mit Rumpf');
+  assert.match(close[0], /overlay\.contains\(document\.activeElement\)/, 'nur zurueckgeben, wenn der Fokus im Picker stand');
+  assert.match(close[0], /\.focus\(\)/, 'der Fokus geht zurueck');
+  assert.match(body, /attachOverlay\(overlay, close\)/, 'die Zurueck-Geste nimmt denselben Weg');
+});
+
+/* Codex-Review zu #2055: Esc waehrend einer IME-Umwandlung bricht die
+ * Umwandlung ab. Der Esc-Handler des geteilten Modals schloss trotzdem das
+ * ganze Formular - im Abo-Metadatenfeld sogar ausdruecklich, weil dessen
+ * eigener Handler bei laufender Umwandlung frueh zurueckkehrt. Das Modal muss
+ * ein solches Esc ignorieren und den close-Request des <dialog> zurueckhalten.
+ */
+test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
+  const src = read('../public/components/modal.js');
+  const start = src.indexOf('function onEscape(e) {');
+  assert.ok(start > 0, 'onEscape gefunden');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const ime = body.indexOf('isImeComposing(e)');
+  assert.ok(ime > 0, 'onEscape fragt isImeComposing');
+  assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
+  assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
+});
+
+/**
+ * FORCED COLORS (Windows-Kontrastmodus, Modern-Web-Guidance-Audit Befund 5).
+ * Der Modus ersetzt Autorenfarben durch Systemfarben und streicht
+ * `box-shadow` und Hintergrundbilder. Was einen Zustand nur ueber Farbe,
+ * Toenung oder Schatten zeigt, verschwindet: der Schalter (Bahn und Knopf
+ * werden Canvas), der aktive Filter-Chip, das aktive Segment (Gleitkapsel
+ * und Eintrag) und der Fokus im Eingabefeld (nur Kante + Schatten). Jeder
+ * dieser Zustaende braucht im Modus eine Systemfarbe oder einen Umriss, und
+ * zwar in DEM Blatt, das den Baustein definiert - sonst gewinnt die
+ * Basisregel ueber die Ladereihenfolge.
+ */
+test('forced colors: switches, active chips, active segments and focused fields keep a visible state', () => {
+  const forced = (file) => [...eachRule(withoutBlockComments(read(file)))]
+    .filter((rule) => rule.at.some((at) => /forced-colors:\s*active/.test(at)));
+  const has = (file, selector, decl) => forced(file).some((rule) => (
+    rule.selector.split(',').map((s) => s.replace(/\s+/g, ' ').trim()).includes(selector) && decl.test(rule.body)
+  ));
+  const SYS = '(?:Highlight|HighlightText|ButtonText|ButtonFace|CanvasText|Canvas|GrayText|LinkText)';
+  const expected = [
+    ['../public/styles/layout.css', '.toggle__track', new RegExp(`outline:[^;]*\\b${SYS}\\b`)],
+    ['../public/styles/layout.css', '.toggle__track::after', new RegExp(`background(?:-color)?:\\s*${SYS}\\b`)],
+    ['../public/styles/layout.css', '.toggle input:checked + .toggle__track', /background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/layout.css', '.toggle input:checked + .toggle__track::after', /background(?:-color)?:\s*HighlightText\b/],
+    ['../public/styles/layout.css', '.toggle input:disabled + .toggle__track', /outline-color:\s*GrayText\b/],
+    ['../public/styles/layout.css', '.form-input:focus', /outline:[^;]*\bHighlight\b/],
+    ['../public/styles/layout.css', '.input:focus', /outline:[^;]*\bHighlight\b/],
+    // Text auf Highlight braucht `forced-color-adjust: none`: sonst legt
+    // Chrome eine Canvas-Flaeche hinter den Text (Backplate), und
+    // HighlightText verschwindet darauf - im Browser gemessen.
+    ['../public/styles/filter-chip.css', '.filter-chip--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b[\s\S]*color:\s*HighlightText\b/],
+    ['../public/styles/sub-tabs.css', '.sub-tab--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/sub-tabs.css', '.seg-indicator', /display:\s*none\b/],
+    // Mit `forced-color-adjust: none` bildet der Modus auch den Fokusring nicht
+    // mehr ab - er braucht selbst eine Systemfarbe (Codex-Review zu #2058).
+    ['../public/styles/filter-chip.css', '.filter-chip--active:focus-visible', /outline:[^;]*\bCanvasText\b/],
+    ['../public/styles/sub-tabs.css', '.sub-tab--active:focus-visible', /outline:[^;]*\bCanvasText\b/],
+    ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]:focus-visible', /outline:[^;]*\bCanvasText\b/],
+  ];
+  const missing = expected.filter(([file, selector, decl]) => !has(file, selector, decl))
+    .map(([file, selector, decl]) => `${file.replace('../public/styles/', '')}: ${selector} ${decl}`);
+  assert.deepEqual(missing, [], `Ohne Forced-Colors-Regel verschwindet der Zustand:\n${missing.join('\n')}`);
+});
+
+/**
+ * EINE EIGENE MODALE EBENE SPERRT IHREN HINTERGRUND (Modern-Web-Guidance-
+ * Audit, Befund 10). `aria-modal="true"` ist nur eine Bitte an den
+ * Screenreader; ohne `inert` lief der virtuelle Cursor in die Seite dahinter,
+ * und Klick und Tab erreichten sie. Wer eine solche Ebene baut statt
+ * `openModal()` (natives <dialog>), ruft `inertOutside()` aus
+ * utils/background-inert.js - je Ebene einmal - und gibt frei.
+ */
+test('every custom aria-modal layer makes its background inert and releases it', () => {
+  const offenders = [];
+  const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !f.endsWith('.min.js'));
+  for (const file of files) {
+    if (file.endsWith('/background-inert.js') || file.endsWith('/components/modal.js')) continue;
+    const src = withoutCommentsKeepingLines(read(file));
+    const layers = (src.match(/aria-modal(?:="true"|['"],\s*['"]true['"])/g) ?? []).length;
+    if (!layers) continue;
+    const calls = (src.match(/\binertOutside\(/g) ?? []).length;
+    const released = /\brelease\w*(?:\?\.)?\(\)|_releaseBackground\(\)/.test(src);
+    if (calls < layers || !released) offenders.push(`${file}: ${layers} Ebene(n), ${calls} inertOutside(), Freigabe ${released ? 'ja' : 'nein'}`);
+    // ERST DEN AUSLOESER MERKEN, DANN SPERREN (Codex-Review zu #2058): wird der
+    // Vorfahr des fokussierten Knopfs inert, gibt der Browser den Fokus ab, und
+    // ein danach gelesenes `document.activeElement` waere body.
+    for (const m of src.matchAll(/\binertOutside\(/g)) {
+      const fnStart = Math.max(src.lastIndexOf('\nfunction ', m.index), src.lastIndexOf('\n  function ', m.index));
+      const fnEnd = src.indexOf('\n}\n', m.index);
+      const capture = src.slice(fnStart, fnEnd).search(/=\s*document\.activeElement\b/);
+      if (capture >= 0 && fnStart + capture > m.index) offenders.push(`${file}: liest document.activeElement erst nach inertOutside()`);
+    }
+  }
+  assert.deepEqual(offenders, [], `Ebene ohne gesperrten Hintergrund:\n${offenders.join('\n')}`);
+});
+
+/**
+ * STERN UND PFLICHT SAGEN DASSELBE (Modern-Web-Guidance-Audit, Befund 16;
+ * DESIGN.md, Zeile "Pflichtfeld"). Der Stern ist `aria-hidden` - ein Feld mit
+ * Stern, aber ohne `required`, war fuer den Screenreader ein Kannfeld. Und
+ * ein `required`-Feld ohne Stern verschwieg es den Sehenden, wo das Formular
+ * Pflicht- und Kannfelder mischt. AUSNAHME nach der Regel: ein Formular aus
+ * EINEM Feld (dort ist die Pflicht offensichtlich, ein Stern nur Rauschen) und
+ * die Anmeldeseiten, deren Felder alle Pflicht sind.
+ */
+test('a starred label marks a required field, and a required field in a mixed form carries the star', () => {
+  const AUTH = /\/(login|setup|join|reset-password|forgot-password)\.js$/;
+  const SINGLE_FIELD = new Set([
+    'public/settings/pages/personal-account.js #two-factor-code', // nur der Code
+    'public/settings/pages/personal-account.js #two-factor-confirm-code', // nur der Code
+    'public/settings/pages/admin-displays.js #display-name', // das Koppelformular hat nur den Namen
+  ]);
+  const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !AUTH.test(f));
+  // Das Objekt-Literal um eine Stelle: `{ label, labelFor, labelExtra, control }`
+  // der Zeilen-Bausteine (formRowHtml und Verwandte, Codex-Review zu #2059).
+  const enclosingObject = (src, at) => {
+    let depth = 0;
+    let start = at;
+    for (; start > 0; start -= 1) {
+      if (src[start] === '}') depth += 1;
+      else if (src[start] === '{') { if (depth === 0) break; depth -= 1; }
+    }
+    let end = at;
+    for (depth = 0; end < src.length; end += 1) {
+      if (src[end] === '{') depth += 1;
+      else if (src[end] === '}') { if (depth === 0) break; depth -= 1; }
+    }
+    return src.slice(start, end + 1);
+  };
+  const starNoReq = [];
+  const reqNoStar = [];
+  // Welche Zeilen-Bausteine `labelExtra` annehmen: die Funktionen, deren
+  // Parameterobjekt es nennt.
+  const takesLabelExtra = new Set();
+  for (const file of files) {
+    for (const m of read(file).matchAll(/function (\w+)\(\{([^)]*?)\}\s*=?\s*\{?\}?\)/g)) {
+      if (/\blabelExtra\b/.test(m[2])) takesLabelExtra.add(m[1]);
+    }
+  }
+  assert.ok(takesLabelExtra.has('formRowHtml') && takesLabelExtra.has('settingRowHtml'), `Bausteine mit labelExtra: ${[...takesLabelExtra]}`);
+  let seen = 0;
+  for (const file of files) {
+    const src = read(file);
+    const rel = file.slice('../'.length);
+    const labels = [...src.matchAll(/<label\b[^>]*\bfor="([\w-]+)"[^>]*>([\s\S]*?)<\/label>/g)].map((m) => [m[1], m[2]]);
+    for (const m of src.matchAll(/\blabelFor:\s*['"]([\w-]+)['"]/g)) {
+      const obj = enclosingObject(src, m.index);
+      const extra = obj.match(/\blabelExtra:\s*([^,\n]+)/)?.[1] ?? '';
+      // Der Baustein muss `labelExtra` auch NEHMEN - settingRowHtml() verschluckte
+      // ihn bis hierher still, der Stern stand nur im Quelltext.
+      const builder = src.slice(0, src.indexOf(obj)).match(/(\w+)\(\s*$/)?.[1];
+      if (extra && builder && !takesLabelExtra.has(builder)) starNoReq.push(`${rel} #${m[1]}: ${builder}() nimmt kein labelExtra`);
+      labels.push([m[1], extra]);
+    }
+    const controls = new Map([...src.matchAll(/<(?:input|select|textarea)\b([^>]*)>/g)]
+      .map((m) => [m[1].match(/\bid="([\w-]+)"/)?.[1], m[1]]).filter(([id]) => id));
+    for (const [id, text] of labels) {
+      const attrs = controls.get(id);
+      if (!attrs) continue;
+      seen += 1;
+      const starred = /REQUIRED_MARK|required-marker/.test(text);
+      // Auch bedingt (`${isEdit ? '' : 'required'}`) - dann haengt der Stern an derselben Bedingung.
+      const required = /\srequired\b|'required'/.test(attrs);
+      if (starred && !required) starNoReq.push(`${rel} #${id}`);
+      // Nur bedingt Pflicht (`${isEdit ? 'required' : ''}`), aber der Stern steht
+      // immer: das Kannfeld beim Anlegen sah aus wie Pflicht (Codex-Review zu #2059).
+      const conditionalReq = /[?:]\s*'required'/.test(attrs) && !/\srequired\b/.test(attrs.replace(/'required'/g, ''));
+      const conditionalStar = /[?:]\s*REQUIRED_MARK\b/.test(text);
+      if (starred && conditionalReq && !conditionalStar) starNoReq.push(`${rel} #${id}: Stern immer, Pflicht nur bedingt`);
+      if (!starred && required && !/type="(?:checkbox|radio|hidden)"/.test(attrs) && !SINGLE_FIELD.has(`${rel} #${id}`)) reqNoStar.push(`${rel} #${id}`);
+    }
+  }
+  assert.ok(seen > 250, `nur ${seen} Label-Feld-Paare gefunden - der Guard liest die Formulare nicht mehr`);
+  assert.deepEqual(starNoReq, [], `Stern ohne required - der Screenreader hoert ein Kannfeld:\n${starNoReq.join('\n')}`);
+  assert.deepEqual(reqNoStar, [], `required ohne Stern in einem gemischten Formular:\n${reqNoStar.join('\n')}`);
+});
+
+/**
+ * DIE RUECKKEHR IN DEN TAB LAEDT NUR, WAS ALT IST (Modern-Web-Guidance-Audit,
+ * Befund 13). Jeder Wechsel zurueck in den Tab holte `/dashboard` samt
+ * Erinnerungen neu und baute die ganze Uebersicht auf - auch nach fuenf
+ * Sekunden in einem anderen Tab. Jetzt nur, wenn der letzte Stand aelter als
+ * eine Minute ist oder der Haushaltstag gewechselt hat; Gruss, Datum und Uhr
+ * ziehen weiter immer nach. Gefahren wird die ECHTE Pruefung aus dashboard.js.
+ */
+test('dashboard: returning to the tab refreshes only a stale overview', () => {
+  const src = read('../public/pages/dashboard.js');
+  const start = src.indexOf('function staleOnReturn(');
+  assert.ok(start > 0, 'staleOnReturn() fehlt in dashboard.js');
+  const body = src.slice(start, src.indexOf('\n}\n', start) + 3);
+  const minMs = Number(src.match(/const RETURN_REFRESH_MIN_MS = ([\d_]+);/)?.[1]?.replace(/_/g, ''));
+  assert.equal(minMs, 60_000, 'eine Minute Mindestalter');
+  const staleOnReturn = new Function('RETURN_REFRESH_MIN_MS', `${body}; return staleOnReturn;`)(minMs);
+  const at = new Date('2026-10-18T10:00:00Z');
+  const later = (ms) => new Date(at.getTime() + ms);
+  assert.equal(staleOnReturn({ loadedAt: null, loadedDay: null }, { now: at, today: '2026-10-18' }), true, 'nie geladen');
+  assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(5_000), today: '2026-10-18' }), false, 'fuenf Sekunden weg: kein Neuaufbau');
+  assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(60_000), today: '2026-10-18' }), true, 'eine Minute: neu laden');
+  assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(5_000), today: '2026-10-19' }), true, 'der Tag hat gewechselt');
+
+  const handler = src.slice(src.indexOf("document.addEventListener('visibilitychange'"), src.indexOf("document.addEventListener('visibilitychange'") + 2200);
+  assert.match(handler, /if \(staleOnReturn\(\{ loadedAt: freshAt, loadedDay: freshDay \}, \{ now: new Date\(\), today: householdToday\(\) \}\)\) refreshDashboardData\(\);/,
+    'der Handler fragt staleOnReturn(), bevor er neu laedt');
+  assert.deepEqual(src.match(/lastLoadedAt = new Date\(\);/g), ['lastLoadedAt = new Date();'], 'jeder Ladepunkt geht durch markLoaded()');
+  assert.match(src, /const markLoaded = \(day, \{ partial = false \} = \{\}\) => \{ lastLoadedAt = new Date\(\); if \(!partial\) \{ freshAt = lastLoadedAt; freshDay = day; \} \};/,
+    'markLoaded() rechnet den Tag nicht selbst aus, ein Teilstand zaehlt nicht als frisch');
+  // Der Server legt den Tag beim EINGANG der Anfrage fest. Kommt die Antwort
+  // nach Mitternacht an, ist sie trotzdem der alte Tag - gemerkt wird also der
+  // Tag von vor der Anfrage, sonst haelt die Rueckkehr gestern fuer heute.
+  const calls = [...src.matchAll(/markLoaded\((\w+)(, \{ partial: true \})?\);/g)];
+  assert.equal(calls.length, 3, 'drei Ladepunkte');
+  for (const call of calls) {
+    const arg = call[1];
+    const decl = src.lastIndexOf(`const ${arg} = householdToday();`, call.index);
+    assert.ok(decl > 0, `${arg} ist nicht vor dem Ladepunkt festgehalten`);
+    assert.match(src.slice(decl, call.index), /api\.get\(overviewRequest\(/, `${arg} wird vor der Anfrage festgehalten, nicht danach`);
+  }
+  // Der Filterwechsel holt nur /dashboard und reicht Erinnerungen und
+  // Dienstplan vom alten Stand weiter - das ist kein frischer Stand, sonst
+  // unterdrueckte die Rueckkehr in den Tab binnen einer Minute deren Refresh.
+  const partialOf = (head) => {
+    const at = src.indexOf(head);
+    assert.ok(at > 0, `${head} fehlt`);
+    return /markLoaded\(\w+, \{ partial: true \}\);/.test(src.slice(at, src.indexOf('\n  }\n', at)));
+  };
+  assert.equal(partialOf('async function reloadIfQueryChanged('), true, 'der Filterwechsel ist ein Teilstand');
+  assert.equal(partialOf('async function refreshDashboardData('), false, 'der stille Refresh holt alles und ist frisch');
+});
+
+/**
+ * DAS VORWAERMEN IM LEERLAUF DRAENGT SICH NICHT VOR (Modern-Web-Guidance-
+ * Audit, Befund 11). `warmPrimaryRoutes()` legt fuer jedes Hauptziel ein
+ * `modulepreload` an - rund 19 Module, ~2 MB JS -, und modulepreload laedt mit
+ * hoher Prioritaet. Was nur vielleicht gebraucht wird, traegt
+ * `fetchpriority="low"`; ein Vorwaermen aus einer Absicht (Zeiger/Fokus auf
+ * einem Link) und die Startroute bleiben beim Standard. Gefahren werden die
+ * ECHTEN Funktionen aus router.js.
+ */
+test('router: idle warm-up preloads at low priority, intent and the start route do not', () => {
+  const router = read('../public/router.js');
+  const fn = (head) => {
+    const start = router.indexOf(head);
+    assert.ok(start >= 0, `${head} nicht gefunden`);
+    return router.slice(start, router.indexOf('\n}\n', start) + 3);
+  };
+  const links = [];
+  const env = {
+    document: { createElement: () => ({}), head: { appendChild: (l) => links.push(l) } },
+    allRoutes: () => [{ path: '/tasks', page: '/pages/tasks.js', module: 'tasks' }, { path: '/notes', page: '/pages/notes.js', module: 'notes' }],
+    moduleCache: new Map(),
+    shellStale: false,
+    navItems: () => [{ path: '/tasks' }, { path: '/notes' }],
+    routerState: { currentPath: '/' },
+    navigator: { connection: null },
+    window: {},
+    requestIdleCallback: undefined,
+    setTimeout: (f) => f(),
+  };
+  const make = new Function(...Object.keys(env), `
+    const _prefetchedPages = new Set();
+    const _prefetchedStyles = new Set();
+    ${fn('function prefetchRoute(')}
+    ${fn('function warmPrimaryRoutes(')}
+    return { prefetchRoute, warmPrimaryRoutes };`);
+  const { prefetchRoute, warmPrimaryRoutes } = make(...Object.values(env));
+  warmPrimaryRoutes();
+  const warm = links.filter((l) => l.rel === 'modulepreload');
+  assert.equal(warm.length, 2, 'beide Hauptziele vorgewaermt');
+  assert.deepEqual(warm.map((l) => l.fetchPriority), ['low', 'low'], 'das Vorwaermen im Leerlauf laedt mit niedriger Prioritaet');
+  links.length = 0;
+  env.allRoutes = undefined;
+  const intent = make(...Object.values({ ...env, allRoutes: () => [{ path: '/budget', page: '/pages/budget.js', module: 'budget' }] }));
+  intent.prefetchRoute('/budget');
+  assert.equal(links.find((l) => l.rel === 'modulepreload')?.fetchPriority, undefined, 'ein Vorwaermen aus Absicht bleibt beim Standard');
+});
+
+/**
+ * EIN @import KOSTET KEINE EIGENE RUNDREISE (Modern-Web-Guidance-Audit,
+ * Befund 12). dashboard.css, health.css und budget.css ziehen weitere Blaetter
+ * per `@import` - der Browser sieht sie erst, wenn das erste Blatt geladen und
+ * gelesen ist. Der Router laedt sie deshalb gleich mit (`preload`), sobald er
+ * das Seitenblatt laedt oder vorwaermt. Die Tabelle dafuer (PAGE_STYLE_IMPORTS)
+ * muss genau die @import-Zeilen der Blaetter nennen.
+ */
+test('router: every page sheet @import is preloaded alongside its sheet', () => {
+  const router = read('../public/router.js');
+  const table = router.match(/const PAGE_STYLE_IMPORTS = Object\.freeze\((\{[\s\S]*?\})\);/)?.[1];
+  assert.ok(table, 'PAGE_STYLE_IMPORTS fehlt in router.js');
+  const declared = new Function(`return ${table};`)();
+  const actual = {};
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url))) {
+    if (!file.endsWith('.css')) continue;
+    const imports = [...read(`../public/styles/${file}`).matchAll(/^@import url\('([^']+)'\);/gm)].map((m) => m[1]);
+    if (imports.length) actual[`/styles/${file}`] = imports;
+  }
+  assert.deepEqual(declared, actual, 'PAGE_STYLE_IMPORTS weicht von den @import-Zeilen ab');
+  const load = router.slice(router.indexOf('function loadPageStyle('), router.indexOf('function loadPageStyle(') + 1600);
+  assert.match(load, /preloadStyleImports\(href\);/, 'loadPageStyle() laedt die Importe mit');
+  const prefetch = router.slice(router.indexOf('function prefetchRoute('), router.indexOf('function prefetchRoute(') + 2600);
+  assert.match(prefetch, /preloadStyleImports\(cssHref\);/, 'prefetchRoute() waermt die Importe mit vor');
+});
+
+/**
+ * LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST (Modern-Web-Guidance-Audit,
+ * Befund 18; Guide defer-rendering-heavy-content). Gemessen bei 4x CPU: der
+ * Wechsel nach /contacts mit 500 Kontakten hielt die Seite 781 ms am Stueck
+ * (22.000 Knoten), /recipes mit 300 Rezepten 460 ms; mit `content-visibility`
+ * je Zeile 568 bzw. 357 ms. Die Zeilenhoehe steht als `contain-intrinsic-size`
+ * dabei, sonst springt der Bildlaufbalken. Notizen bleiben aussen vor: ihr
+ * Raster (Masonry/grid-lanes) verteilt Karten nach Hoehe auf Spalten, und
+ * Platzhalterhoehen liessen Karten beim Scrollen die Spalte wechseln.
+ */
+test('long contact and recipe lists skip rendering rows out of view', () => {
+  const expect = [
+    ['../public/styles/contacts.css', '.contact-group__list > .contact-item'],
+    ['../public/styles/recipes.css', '.recipes-list .recipe-row-item'],
+  ];
+  for (const [file, selector] of expect) {
+    const rule = [...eachRule(read(file))].find((r) => r.selector.replace(/\s+/g, ' ').trim() === selector
+      && r.at.some((at) => /@supports \(content-visibility: auto\)/.test(at)));
+    assert.ok(rule, `${file}: ${selector} ohne content-visibility unter @supports`);
+    assert.match(rule.body, /content-visibility:\s*auto/);
+    const size = rule.body.match(/contain-intrinsic-size:\s*(auto none auto \d+px)/)?.[1];
+    assert.ok(size, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+    // `auto none` versteht Chrome erst ab 117; Chrome 87-116 kennt
+    // content-visibility schon und verwuerfe nur die Hoehe - Zeilen ohne
+    // Platzhalter. Die Weiche fragt deshalb den ganzen Wert ab.
+    assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')),
+      `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
+  }
+  assert.ok(![...eachRule(read('../public/styles/notes.css'))].some((r) => /content-visibility/.test(r.body)), 'Notizen bleiben ohne (Masonry-Spalten)');
 });

@@ -19,7 +19,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.77.2';
+const APP_RELEASE        = '2.78.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -34,7 +34,10 @@ const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 
 // GET-API-Pfade (nach /api/v1), die für Read-only-Offline gecacht werden dürfen.
 // NUR Lese-Endpunkte — niemals /auth/* oder Mutationen. Prefix-Match.
-const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard'];
+// `/people` sind die Profilbilder (server/routes/people.js): Aufgaben, Termine
+// und Uebersicht tragen ihre Adresse statt der Data-URL, offline braucht die
+// Zeile ihr Bild aus demselben Cache.
+const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard', '/people'];
 // Pfade UNTER einem Whitelist-Prefix, die trotzdem nie gecacht werden.
 const API_CACHE_EXCLUDE = ['/shopping/versions'];
 
@@ -44,6 +47,7 @@ const APP_SHELL = [
   '/index.html',
   '/api.js',
   '/lang-init.js',
+  '/boot-fetch.js',
   '/router.js',
   '/i18n.js',
   '/rrule-ui.js',
@@ -249,6 +253,7 @@ const APP_SHELL = [
   '/utils/toast-placement.js',
   '/utils/toast-show.js',
   '/utils/toast-surface.js',
+  '/utils/background-inert.js',
   '/utils/today-sheet.js',
   '/utils/unknown-route.js',
   '/utils/page-mount.js',
@@ -536,7 +541,7 @@ self.addEventListener('fetch', (event) => {
           // Im Bypass-Fenster (nach SW-Update) API-Requests nicht anfassen:
           // frisch ans Netz, weder aus Cache bedienen noch hineinschreiben.
           if (Date.now() < bypassCacheUntil) return fetch(request);
-          return networkFirstApi(request);
+          return networkFirstApi(request, event);
         })
       );
     }
@@ -725,11 +730,66 @@ async function networkFirst(request, cacheName, event) {
 }
 
 // --------------------------------------------------------
+// Profilbilder einer gecachten Liste (server/routes/people.js)
+// --------------------------------------------------------
+const AVATAR_PATH_RE = /^\/api\/v1\/people\/\d+\/avatar$/;
+const AVATAR_URL_RE = /^\/api\/v1\/people\/\d+\/avatar\?v=[0-9a-f]{32}$/;
+// NUR DIESE FELDER, dieselben wie AVATAR_FIELDS in
+// server/services/person-avatar.js (test:sw-api-cache haelt beide gleich). Ein
+// Titel oder eine Beschreibung mit eingetippten Bildpfaden loeste sonst je
+// Treffer einen Abruf aus, bei jedem Laden wieder (Codex-Review zu #2056).
+const AVATAR_FIELDS = new Set([
+  'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
+]);
+
+/** Die Bildadressen aus den Bildfeldern einer Antwort, jede einmal. */
+function avatarPathsIn(value, found = new Set()) {
+  if (Array.isArray(value)) {
+    for (const item of value) avatarPathsIn(item, found);
+  } else if (value && typeof value === 'object') {
+    for (const [key, inner] of Object.entries(value)) {
+      if (AVATAR_FIELDS.has(key)) {
+        if (typeof inner === 'string' && AVATAR_URL_RE.test(inner)) found.add(inner);
+      } else {
+        avatarPathsIn(inner, found);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Legt die Profilbilder, deren Adresse in einer Listen-Antwort steht, in den
+ * API-Cache - nur aus den Bildfeldern, jede Adresse einmal, auch wenn sie in
+ * hundert Zeilen steht, und nur, wenn sie noch nicht dort liegt (die Adresse
+ * wechselt mit dem Bild).
+ * @param {string} baseUrl Adresse der Liste, gegen die die Pfade aufgeloest werden
+ * @param {string} text Rumpf der Liste
+ */
+async function precacheAvatars(baseUrl, text) {
+  let body;
+  try { body = JSON.parse(text); } catch { return; }
+  const paths = [...avatarPathsIn(body)];
+  if (!paths.length) return;
+  const cache = await caches.open(API_CACHE);
+  await Promise.all(paths.map(async (path) => {
+    const url = new URL(path, baseUrl).href;
+    if (await cache.match(url)) return;
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (res.ok && res.type === 'basic') await cache.put(url, res);
+    } catch {
+      // Offline oder abgewiesen: beim naechsten Laden der Liste wieder.
+    }
+  }));
+}
+
+// --------------------------------------------------------
 // Strategie: Network-First für GET-API (Read-only-Offline)
 // Erfolg → Antwort klonen, x-cached-at-Header ergänzen, in API_CACHE legen.
 // Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}.
 // --------------------------------------------------------
-async function networkFirstApi(request) {
+async function networkFirstApi(request, event) {
   try {
     const response = await fetch(request);
     // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen.
@@ -744,6 +804,15 @@ async function networkFirstApi(request) {
         statusText: cloned.statusText,
         headers,
       }));
+      // Bilder, deren Adresse in der Liste steht, gleich mitnehmen - sonst
+      // fehlt offline jedes, dessen Zeile nie auf dem Schirm war
+      // (loading="lazy"). Die Liste wartet nicht darauf, das fetch-Event
+      // schon: `waitUntil` haelt den Worker am Leben, bis die Bilder im Cache
+      // liegen - sonst darf der Browser ihn nach der Antwort beenden.
+      if (!AVATAR_PATH_RE.test(new URL(request.url).pathname)) {
+        const prefetch = response.clone().text().then((text) => precacheAvatars(request.url, text)).catch(() => {});
+        if (event && typeof event.waitUntil === 'function') event.waitUntil(prefetch);
+      }
     }
     return response;
   } catch {

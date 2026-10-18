@@ -5,7 +5,7 @@ import {
   parseDateInput,
   t,
 } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { AVATAR_COLORS } from '/utils/color.js';
@@ -223,6 +223,33 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
  * Schalter ist eine Zeile des Traegers (formSwitchRowHtml). Jede Feldzeile ist die
  * Fehlergruppe ihres Felds (`field: true`). Der Kopf mit Bild im
  * Bearbeiten-Dialog bleibt, wie im Konto, ein Kopf. */
+/* WAS EIN NEUES KINDERKONTO MITBRINGT (R20). Die Rolle `child` legt beim
+ * Anlegen und beim Annehmen einer Einladung eigene Startrechte an
+ * (CHILD_START_PERMISSIONS in server/permissions.js): kein Budget, kein
+ * Fasten, die Haushaltshilfe nur zum Lesen und ohne Betraege. Wer das Kind
+ * anlegt, soll es hier lesen, nicht erst im Rechte-Blatt finden. Der Hinweis
+ * steht nur bei gewaehlter Rolle Kind, und nur dann zeigt `aria-describedby`
+ * am Feld auf ihn - ein per ID verwiesener Text wird auch versteckt
+ * vorgelesen (accname), der Verweis muss also mit dem Hinweis gehen. */
+function childStartHintHtml(id) {
+  return `<p class="form-hint" id="${id}" hidden>${esc(t('settings.childStartHint'))}</p>`;
+}
+
+function bindChildStartHint(panel, selectId, hintId) {
+  const select = panel.querySelector(`#${selectId}`);
+  const hint = panel.querySelector(`#${hintId}`);
+  if (!select || !hint) return;
+  const sync = () => {
+    const child = select.value === 'child';
+    hint.hidden = !child;
+    if (child) select.setAttribute('aria-describedby', hint.id);
+    else select.removeAttribute('aria-describedby');
+  };
+  select.addEventListener('change', sync);
+  sync();
+  return sync;
+}
+
 function switchRowHtml({ id, label, hint = '', checked = false }) {
   return formSwitchRowHtml({ label, checked, hint, hintId: hint ? `${id}-hint` : null, attrs: { id } });
 }
@@ -232,11 +259,11 @@ function addMemberFormHtml() {
         <form id="add-member-form" class="settings-form">
           ${formRowsHtml([
             formRowHtml({
-              label: t('settings.usernameLabel'), labelFor: 'new-username', field: true,
+              label: t('settings.usernameLabel'), labelFor: 'new-username', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="text" id="new-username" required autocomplete="off" />',
             }),
             formRowHtml({
-              label: t('settings.displayNameLabel'), labelFor: 'new-display-name', field: true,
+              label: t('settings.displayNameLabel'), labelFor: 'new-display-name', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="text" id="new-display-name" required />',
             }),
             formRowHtml({
@@ -247,13 +274,14 @@ function addMemberFormHtml() {
               id: 'new-member-sso-only', label: t('settings.memberSsoOnlyLabel'), hint: t('settings.memberSsoOnlyHint'),
             }) : '',
             formRowHtml({
-              label: t('settings.memberPasswordLabel'), labelFor: 'new-member-password', field: true,
+              label: t('settings.memberPasswordLabel'), labelFor: 'new-member-password', labelExtra: REQUIRED_MARK, field: true,
               attrs: { id: 'new-member-password-group' },
               control: '<input class="form-input" type="password" id="new-member-password" minlength="8" required autocomplete="new-password" />',
             }),
             formRowHtml({
               label: t('settings.familyRoleLabel'), labelFor: 'new-family-role',
               control: `<select class="form-input" id="new-family-role">${buildFamilyRoleOptions()}</select>`,
+              extra: childStartHintHtml('new-member-child-hint'),
             }),
             formRowHtml({
               label: t('settings.memberPhoneLabel'), labelFor: 'new-member-phone', field: true,
@@ -294,6 +322,7 @@ function addInviteFormHtml() {
             formRowHtml({
               label: t('settings.familyRoleLabel'), labelFor: 'invite-family-role',
               control: `<select class="form-input" id="invite-family-role">${buildFamilyRoleOptions()}</select>`,
+              extra: childStartHintHtml('invite-child-hint'),
             }),
             formRowHtml({
               label: t('settings.invites.presetLabel'), labelFor: 'invite-permission-preset',
@@ -339,14 +368,15 @@ function renderPage(container) {
         <ul class="settings-members row-divided" id="members-list"></ul>
         <p class="form-hint" id="members-order-hint" hidden>${t('settings.memberOrderHint')}</p>
         <div class="sr-only" role="status" aria-live="polite" id="members-order-announce"></div>
-        ${/* EINLADEN IST DER WEG (R19, Critique 2026-10-16). Einladen stand
-             als ruhiger Knopf in einer eigenen Karte UNTER der Zwei-Faktor-
-             Pflicht, das direkte Anlegen (mit vergebenem Passwort) oben an der
-             Liste - der seltenere Weg war der sichtbarere. Jetzt stehen beide
-             unter der Liste, Einladen gefuellt vorn: die eingeladene Person
-             waehlt ihr Passwort selbst. Beide mit Icon statt "+"-Zeichen. */ ''}
+        ${/* EINLADEN STEHT BEI DEN EINLADUNGEN (R20, Re-Critique 2026-10-17,
+             A3 P3). R19 hatte Einladen gefuellt neben "Mitglied hinzufuegen"
+             unter die Mitgliederliste gestellt; die Karte "Einladungen"
+             darunter blieb ohne Handlung, und der Knopf, der eine Einladung
+             anlegt, stand in der Karte, die keine zeigt. Jetzt traegt jede
+             Karte ihren Weg: die Mitglieder das direkte Anlegen (ruhig), die
+             Einladungen das Einladen (gefuellt, der haeufigere Weg - die
+             eingeladene Person waehlt ihr Passwort selbst). */ ''}
         <div class="settings-member-actions">
-          <button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"></i>${t('settings.invites.add')}</button>
           <button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus" aria-hidden="true"></i>${t('settings.addMember')}</button>
         </div>
       </div>
@@ -355,6 +385,9 @@ function renderPage(container) {
         <h3 class="settings-card__title">${t('settings.invites.title')}</h3>
         <p class="form-hint">${t('settings.invites.intro')}</p>
         <ul class="settings-members row-divided" id="invites-list"></ul>
+        <div class="settings-member-actions">
+          <button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"></i>${t('settings.invites.add')}</button>
+        </div>
       </div>
 
       <!-- Zeilen im Traeger (R17, E9): der Schalter, darunter als zweite Zeile
@@ -749,13 +782,15 @@ function bindInviteEvents(container, initialInvites) {
             : t('settings.invites.presetHintRoleOpen', { role: roleName });
           presetHint.textContent = appendCapabilityState(
             base,
-            capabilityStateText('health_use_fasting', profile, profile.modules?.health === 'none'),
+            // Ein neues Kinderkonto startet ohne Fasten (R20), was das Profil auch sagt.
+            capabilityStateText('health_use_fasting', profile, profile.modules?.health === 'none' || role === 'child'),
           );
         }
 
         presetSelect?.addEventListener('change', updatePresetHint);
         roleSelect?.addEventListener('change', updatePresetHint);
         updatePresetHint();
+        const syncChildHint = bindChildStartHint(panel, 'invite-family-role', 'invite-child-hint');
 
         panel.querySelector('#cancel-add-invite')?.addEventListener('click', () => closeModal());
 
@@ -782,6 +817,7 @@ function bindInviteEvents(container, initialInvites) {
             renderInviteList(container, invites);
             form.reset();
             updatePresetHint();
+            syncChildHint?.();
             // Der Klartext-Token kommt nur aus dieser einen Antwort. Der Dialog
             // bleibt deshalb offen: wuerde er sich wie beim Mitglied-Anlegen
             // schliessen, waere der Link im selben Moment weg, in dem er entsteht.
@@ -940,12 +976,12 @@ async function openEditMemberModal(member, currentUser, users, container) {
           ${avatarEditorHtml(member, 'edit-member')}
           <div class="settings-profile-editor__fields">
             <div class="form-group">
-              <label class="form-label" for="edit-member-username">${t('settings.usernameLabel')}</label>
+              <label class="form-label" for="edit-member-username">${t('settings.usernameLabel')}${REQUIRED_MARK}</label>
               <input class="form-input" type="text" id="edit-member-username" value="${esc(member.username)}" required autocomplete="off" />
             </div>
             <div class="settings-name-color-row">
               <div class="form-group settings-name-color-row__name">
-                <label class="form-label" for="edit-member-display-name">${t('settings.displayNameLabel')}</label>
+                <label class="form-label" for="edit-member-display-name">${t('settings.displayNameLabel')}${REQUIRED_MARK}</label>
                 <input class="form-input" type="text" id="edit-member-display-name" value="${esc(member.display_name)}" required maxlength="128" />
               </div>
               <div class="form-group settings-color-field">
@@ -1149,6 +1185,7 @@ function openAddMemberModal(container, currentUser, users) {
       form.querySelector('#new-member-sso-only')
         ?.addEventListener('change', () => syncSsoOnlyField(panel));
       syncSsoOnlyField(panel);
+      bindChildStartHint(panel, 'new-family-role', 'new-member-child-hint');
       panel.querySelector('#cancel-add-member')?.addEventListener('click', () => closeModal());
 
       form.addEventListener('submit', async (event) => {
@@ -1314,4 +1351,4 @@ export async function render(container, { user } = {}) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { avatarHtml, memberHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };
+export const __test = { childStartHintHtml, bindChildStartHint, addMemberFormHtml, addInviteFormHtml, avatarHtml, memberHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };

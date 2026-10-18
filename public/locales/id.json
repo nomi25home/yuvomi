@@ -42,6 +42,9 @@
         "errorOccurred": "Terjadi kesalahan.",
         "unexpectedError": "Terjadi kesalahan yang tidak terduga.",
         "errorDetails": "Detail teknis",
+        "pageFailedTitle": "{{page}} tidak bisa dibuka sekarang",
+        "pageFailedHint": "Semua bagian lain tetap berfungsi.",
+        "toOverview": "Ke Ringkasan",
         "errorGeneric": "Terjadi kesalahan.",
         "updateAvailable": "Pembaruan tersedia - muat ulang halaman untuk mendapatkan versi terbaru.",
         "titleRequired": "Judul wajib diisi",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "Tambahkan {{title}} ke daftar belanja",
         "emailInUse": "Alamat email ini sudah dimiliki akun lain.",
+        "emailInvalid": "Masukkan alamat email yang valid.",
         "sessionUnreachableTitle": "Koneksi terputus",
+        "serverNotReadyTitle": "Server belum siap saat ini",
+        "rateLimitedTitle": "Terlalu banyak permintaan",
         "sessionRetryHint": "Kamu tetap masuk. Mencoba lagi dalam {{seconds}} dtk.",
         "sessionRetrying": "Mencoba lagi…",
         "searchNoResultsTitle": "Tidak ada hasil",
         "searchNoResultsDescription": "Tidak ada yang cocok dengan pencarianmu.",
         "searchNoResultsFilteredDescription": "Tidak ada yang cocok dengan pencarian dan filtermu.",
-        "searchReset": "Atur ulang pencarian"
+        "searchReset": "Atur ulang pencarian",
+        "passwordMinLength": "Minimal 8 karakter."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -160,7 +167,8 @@
         "resultCountMany": "{{count}} hasil",
         "goTo": "Buka",
         "newSection": "Buat baru",
-        "recentLabel": "Baru dibuka"
+        "recentLabel": "Baru dibuka",
+        "createTaskNamed": "Buat “{{title}}” sebagai tugas"
     },
     "dashboard": {
         "title": "Ringkasan",
@@ -1526,10 +1534,12 @@
         "deleteLoanPaymentConfirm": "Hapus pembayaran pinjaman ini?",
         "loanRemainingAmount": "Tersisa",
         "loanRemainingPrincipal": "Sisa pokok pinjaman",
+        "loanOwedToYou": "Masih menjadi hakmu",
         "loanStillToPay": "Sisa yang harus dibayar",
         "loanPrincipalAmount": "Jumlah pinjaman",
         "loanRemainingInstallments": "Cicilan tersisa",
         "loanPaidAmount": "Terbayar",
+        "loanReceivedAmount": "Sudah kembali",
         "loansEmpty": "Tidak ada pinjaman aktif.",
         "loanInstallmentMeta": "{{paid}} dari {{total}} cicilan terbayar",
         "loanRemainingOf": "dari {{total}}",
@@ -1541,7 +1551,8 @@
         "loanSortBalance": "Sisa pokok terkecil dahulu",
         "loanSortActive": "Urutan: {{sort}}",
         "loanPaidStatus": "Terbayar",
-        "markLoanPaid": "Tandai terbayar",
+        "loanBookInstallment": "Catat cicilan",
+        "loanReceiveRepayment": "Pengembalian diterima",
         "loanBorrowerLabel": "Orang",
         "loanDirectionLabel": "Jenis pinjaman",
         "loanDirectionLent": "Dipinjamkan (dikembalikan ke saya)",
@@ -1709,8 +1720,6 @@
         "accountType_credit": "Kartu kredit",
         "accountType_investment": "Investasi",
         "accountType_other": "Lainnya",
-        "viewAccountTransactions": "Tampilkan transaksi {{name}}",
-        "currentBalance": "Saldo saat ini",
         "clearAccountFilter": "Hapus filter akun",
         "archivedBadge": "Diarsipkan",
         "showArchivedAccounts": "Tampilkan yang diarsipkan",
@@ -1753,6 +1762,7 @@
         "statsPointsLabel": "Nilai kurva tren",
         "statsPointLabel": "{{period}}: pemasukan {{income}}, pengeluaran {{expenses}}",
         "statsPointLabelCumulative": "Hingga {{period}}: pemasukan {{income}}, pengeluaran {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} terencana",
         "receiptsLabel": "Bukti",
         "receiptsHint": "Struk atau faktur untuk transaksi ini.",
         "receiptDocumentName": "Bukti: {{title}} ({{date}})",
@@ -1800,7 +1810,8 @@
         "ledgerSortDate": "Menurut tanggal",
         "ledgerSortAmount": "Menurut jumlah",
         "ledgerSortActive": "Urutan: {{sort}}",
-        "ledgerAccountsAll": "Semua akun"
+        "ledgerAccountsAll": "Semua akun",
+        "showAccountTransactions": "Tampilkan transaksi"
     },
     "settings": {
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",
@@ -2029,6 +2040,8 @@
         "confirmPasswordLabel": "Konfirmasi kata sandi baru",
         "savePassword": "Simpan kata sandi",
         "passwordMismatch": "Kata sandi tidak cocok.",
+        "currentPasswordWrong": "Kata sandi saat ini salah.",
+        "passwordTooShort": "Minimal 8 karakter.",
         "passwordSavedToast": "Kata sandi berhasil diubah.",
         "oidcLinkTitle": "Single sign-on",
         "oidcLinkHint": "Tautkan akun SSO Anda ke akun ini agar masuk melalui penyedia membawa Anda ke sini, bukan membuat akun kedua.",
@@ -2138,6 +2151,7 @@
         "familyRoleGrandparent": "Kakek/Nenek",
         "familyRoleRelative": "Kerabat",
         "familyRoleOther": "Anggota keluarga",
+        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”.",
         "systemAdminLabel": "Administrator sistem",
         "systemAdminHint": "Administrator sistem dapat mengelola pengaturan aplikasi, integrasi, token API, dan akun keluarga.",
         "systemAdminBadge": "Administrator sistem",
@@ -2154,7 +2168,7 @@
         "removeMemberNamed": "Keluarkan {{name}}",
         "memberDeactivatedToast": "{{name}} dinonaktifkan. Entri tetap disimpan.",
         "memberFormerBadge": "Mantan anggota",
-        "memberOrderHint": "Urutan ini berlaku untuk seluruh rumah tangga: kalender, jadwal, dan setiap daftar orang mengikutinya. Untuk mengubahnya, seret gagangnya atau fokuskan lalu tekan tombol panah. Anggota baru berada setelahnya, diurutkan menurut nama.",
+        "memberOrderHint": "Urutan ini berlaku di seluruh rumah tangga. Seret pegangan atau gunakan tombol panah untuk mengubahnya.",
         "logout": "Keluar",
         "logoutConfirm": "Keluar dari perangkat ini?",
         "synchronizing": "Menyinkronkan…",
@@ -2183,7 +2197,7 @@
         "pwaInstallTitle": "Instal Yuvomi di perangkat ini",
         "pwaInstallChecking": "Memeriksa ketersediaan pemasangan...",
         "pwaInstallReady": "Yuvomi dapat diinstal sebagai aplikasi di perangkat ini.",
-        "pwaInstallUnavailable": "Pemasangan saat ini tidak tersedia di browser ini.",
+        "pwaInstallUnavailable": "Browser ini tidak menawarkan pemasangan di sini. Di Chrome dan Edge kamu menemukannya di menu browser, di Safari pada Bagikan > Tambahkan ke Dock atau Tambahkan ke Layar Utama. Tanpa alamat HTTPS, tidak ada browser yang menawarkannya.",
         "pwaInstallInstalled": "Yuvomi sudah terinstal di perangkat ini.",
         "pwaInstallIosHint": "Di iPhone atau iPad, buka menu Bagikan dan pilih Tambahkan ke Layar Utama.",
         "pwaInstallButton": "Instal aplikasi",
@@ -2551,7 +2565,7 @@
         "emptyStateNoAccounts": "Belum ada akun tersambung",
         "housekeepingPaymentsTitle": "Tugas pembayaran",
         "housekeepingPaymentTasksLabel": "Buat tugas pembayaran pada setiap check-in",
-        "housekeepingPaymentTasksHint": "Jika diaktifkan, tugas untuk membayar asisten rumah tangga dibuat pada setiap check-in. Menyelesaikan tugas ini menandai kunjungan sebagai terbayar.",
+        "housekeepingPaymentTasksHint": "Jika diaktifkan, tugas untuk membayar asisten rumah tangga dibuat pada setiap check-in. Menyelesaikan tugas ini menandai kunjungan sebagai terbayar. Hanya orang yang melakukan check-in dan admin yang dapat melihatnya.",
         "housekeepingPaymentTasksSaved": "Pengaturan pembayaran asisten rumah tangga disimpan.",
         "tabModules": "Modul",
         "thirdPartyModulesTitle": "Modul",
@@ -3199,7 +3213,25 @@
         "displayRemoveDeviceActive": "Perangkat ini masih dipasangkan. Cabut dulu.",
         "feedExportIncludeBirthdays": "Sertakan ulang tahun",
         "feedExportIncludeBirthdaysHint": "Nonaktifkan saat berlangganan feed ulang tahun terpisah agar ulang tahun dan hari nama tidak muncul dua kali.",
-        "birthdayFeedHint": "Siapa pun yang memiliki tautan ini dapat melihat semua ulang tahun dan hari nama tersimpan dalam rumah tangga, termasuk tanpa pengingat. Gunakan hanya di perangkat Anda sendiri."
+        "birthdayFeedHint": "Siapa pun yang memiliki tautan ini dapat melihat semua ulang tahun dan hari nama tersimpan dalam rumah tangga, termasuk tanpa pengingat. Gunakan hanya di perangkat Anda sendiri.",
+        "skipToSheet": "Langsung ke pengaturan",
+        "screensaverOffTitle": "Screensaver foto",
+        "screensaverNeedsImmich": "Screensaver dimulai setelah admin menghubungkan Immich. Setelah itu kamu mengatur jeda, jam, dan potongan foto untuk perangkat ini di sini.",
+        "screensaverConnectImmich": "Hubungkan Immich",
+        "weatherPlaceLabel": "Tempat",
+        "weatherPlaceHint": "Pencarian dilakukan di layanan cuaca Open-Meteo. Hanya nama tempat yang dikirim.",
+        "weatherPlacePlaceholder": "Kota atau kode pos",
+        "weatherPlaceSearch": "Cari",
+        "weatherPlaceCurrent": "Saat ini: {{place}}",
+        "weatherPlaceNone": "Belum ada tempat yang dipilih.",
+        "weatherPlaceResultsLabel": "Tempat yang ditemukan",
+        "weatherPlacePick": "Pilih tempatmu dari daftar.",
+        "weatherPlaceChosen": "{{place}} dipilih. Simpan untuk menerapkannya.",
+        "weatherPlaceRequired": "Cari tempat lalu pilih dari daftar.",
+        "weatherPlaceTooShort": "Masukkan minimal dua karakter.",
+        "weatherPlaceNotFound": "Tidak ada tempat dengan nama ini. Tambahkan negaranya, mis. “Padang, Indonesia”.",
+        "weatherPlaceUnavailable": "Pencarian tempat sedang tidak dapat dijangkau. Coba lagi sebentar lagi atau masukkan koordinat secara manual.",
+        "weatherManualTitle": "Koordinat manual"
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - memulihkan koneksi…",
-        "staleData": "Offline - per: {{time}}"
+        "staleData": "Offline - per: {{time}}",
+        "pageTitle": "Kamu sedang offline",
+        "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya."
     },
     "emptyHint": {
         "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk melihat.",
@@ -3882,7 +3916,6 @@
         "taskAreaPlaceholder": "Contoh: Kamar mandi",
         "taskFrequency": "Frekuensi (hari)",
         "taskCreatedToast": "Tugas asisten rumah tangga dibuat.",
-        "dashboard": "Ringkasan",
         "reports": "Laporan",
         "visitsThisMonth": "Kunjungan bulan ini",
         "lastVisit": "Kunjungan terakhir",
@@ -4011,7 +4044,12 @@
         "currentMonth": "Saat ini",
         "noVisitReportsInMonth": "Tidak ada kunjungan tercatat pada {{month}}.",
         "settledAdminOnly": "Hanya admin yang dapat mengubah atau menghapusnya",
-        "reportVisitsCount": "Kunjungan"
+        "reportVisitsCount": "Kunjungan",
+        "amountsPermissionLabel": "Lihat upah dan pembayaran",
+        "errorAmountsHidden": "Hanya yang boleh melihat jumlah untuk asisten rumah tangga yang dapat menandai pembayaran.",
+        "notHereToday": "Hari ini belum datang",
+        "tabVisits": "Kunjungan",
+        "tabChores": "Pekerjaan rumah"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
@@ -4040,7 +4078,6 @@
         "noBalances": "Semua sudah lunas.",
         "noExpenses": "Tidak ada pengeluaran yang cocok.",
         "noActivity": "Belum ada aktivitas.",
-        "owes": "berutang",
         "system": "Sistem",
         "quickGroceries": "Pengeluaran swalayan",
         "quickSchool": "Bagi biaya sekolah",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} ke {{payee}}, {{amount}}. Entri balik membatalkan pembayaran dan saldo kembali seperti semula. Pembayaran tetap ada di aktivitas dengan tanda dibatalkan.",
         "loadMoreActivity": "Muat lebih banyak",
         "expenseDeleted": "Dihapus",
-        "youAreOwedInGroup": "Kamu dapat di {{group}}",
-        "youOweInGroup": "Kamu berutang di {{group}}"
+        "youAreOwedInGroup": "{{group}}: Kamu dapat",
+        "youOweInGroup": "{{group}}: Kamu berutang",
+        "debtYouOwe": "Anda berutang kepada {{name}}",
+        "debtOwesYou": "{{name}} berutang kepada Anda",
+        "debtOwes": "{{from}} berutang kepada {{to}}"
     },
     "wmo": {
         "0": "Langit cerah",
@@ -4256,7 +4296,8 @@
         "submit": "Kirim tautan",
         "sent": "Jika ada akun yang cocok, tautan atur ulang telah dikirim.",
         "backToLogin": "Kembali ke halaman masuk",
-        "unavailable": "Rumah tangga ini tidak menyediakan pengaturan ulang kata sandi. Silakan hubungi administrator rumah tangga Anda."
+        "unavailable": "Rumah tangga ini tidak menyediakan pengaturan ulang kata sandi. Silakan hubungi administrator rumah tangga Anda.",
+        "identifierRequired": "Masukkan nama pengguna atau alamat email Anda."
     },
     "resetPassword": {
         "title": "Tetapkan kata sandi baru",
@@ -4286,6 +4327,15 @@
         "test": "Uji koneksi",
         "testSuccess": "Email uji berhasil dikirim.",
         "testFailed": "Uji coba gagal: {{error}}",
+        "portInvalid": "Masukkan port dari {{min}} sampai {{max}}.",
+        "testFailedNotConfigured": "Masukkan dulu host SMTP dan alamat pengirim.",
+        "testFailedAuth": "Server menolak nama pengguna atau kata sandi.",
+        "testFailedConnection": "Server tidak dapat dijangkau di host dan port ini.",
+        "testFailedTls": "Koneksi terenkripsi gagal. Periksa enkripsi dan port.",
+        "testFailedRejected": "Server tidak menerima email uji. Periksa alamat pengirim.",
+        "testFailedUnknown": "Email uji tidak dapat dikirim.",
+        "testNoRecipient": "Email uji dikirim ke alamat emailmu sendiri, yang belum diisi. Tambahkan di Akun → Email.",
+        "testNoRecipientLink": "Buka akun",
         "saveFailed": "Gagal menyimpan: {{error}}",
         "saved": "Pengaturan disimpan."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Harian",
                 "none": "Belum ada slot waktu.",
                 "delete": "Hapus slot waktu",
-                "newHint": "Simpan obat, lalu Anda dapat menambahkan slot waktu.",
                 "timeRequired": "Waktu wajib diisi."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Tidak ada jenis yang cocok di rumah tangga ini",
         "mappingProfileStatusAmbiguousType": "Ambigu - beberapa jenis memiliki nama yang sama",
         "icsCalendarName": "Pengangkutan sampah",
-        "icsPickupSummary": "Pengangkutan: {{name}}"
+        "icsPickupSummary": "Pengangkutan: {{name}}",
+        "intervalDecrease": "Kurangi interval",
+        "intervalIncrease": "Tambah interval"
     },
     "rewards": {
         "title": "Hadiah",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Hapus pilihan",
         "continuesUntil": "…berlanjut hingga {{time}}",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
-        "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan."
+        "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan.",
+        "presetCodes": {
+            "early": "P",
+            "late": "SO",
+            "night": "M",
+            "day": "SI",
+            "vacation": "C",
+            "sick": "S",
+            "exam": "U",
+            "lecture": "K",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Dengan jam"
     },
     "pairDisplay": {
         "title": "Pasangkan tablet",

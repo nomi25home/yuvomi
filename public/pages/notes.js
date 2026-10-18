@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
-import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
@@ -275,7 +275,14 @@ export async function render(container, { user, signal }) {
              2026-09-26). Zwischen Kopf und Port kostete sie dauerhaft 65px
              (Port ab y=179 statt 114), die auch der Kopf-Kollaps nicht
              zurueckholte (A8); hier scrollt sie mit dem Raster weg. -->
-        <div class="notes-filters page-chip-row" id="notes-filters" hidden></div>
+        <!-- DIE REIHE HAELT IHREN PLATZ, BIS DIE DATEN DA SIND (R20, Re-Critique
+             2026-10-17 a2 P2-3: CLS 0,067). Sie stand verborgen und erschien
+             nach dem Laden - das Raster sprang um ihre Hoehe nach unten. In
+             einem Haushalt mit zwei Personen steht sie fast immer; ohne
+             Auswahl faellt sie nach dem Laden weg (renderFilters). -->
+        <div class="notes-filters page-chip-row" id="notes-filters" aria-hidden="true" data-pending>
+          <span class="skeleton notes-filters__skeleton"></span><span class="skeleton notes-filters__skeleton"></span><span class="skeleton notes-filters__skeleton"></span>
+        </div>
         <div id="notes-grid" class="notes-grid" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 3 })}</div>
       </div>
       <button class="page-fab" id="fab-new-note" aria-label="${t('notes.addNoteLabel')}" data-dock-label="${t('newLabel.notes')}">
@@ -403,6 +410,8 @@ function renderFilters() {
   ));
 
   row.hidden = creators.length < 2 && filterCategories.length === 0;
+  row.removeAttribute('aria-hidden');
+  delete row.dataset.pending;
   const focused = row.contains(document.activeElement) ? document.activeElement : null;
   const focusKey = ['creator', 'categoryId', 'clearCategories'].find((key) => focused && Object.hasOwn(focused.dataset, key));
   const focusValue = focusKey ? focused.dataset[focusKey] : null;
@@ -1294,7 +1303,7 @@ function openNoteModal({ mode, note = null }) {
             direction,
           });
           activeCategoryOption = movement.activeIndex;
-        } else if (event.key === 'Enter') {
+        } else if (event.key === 'Enter' && !isImeComposing(event)) {
           event.preventDefault();
           const options = [...categoryList.querySelectorAll('[role="option"]')];
           const active = options[activeCategoryOption];

@@ -42,6 +42,9 @@
         "errorOccurred": "出现了问题。",
         "unexpectedError": "发生了意外错误。",
         "errorDetails": "技术详情",
+        "pageFailedTitle": "暂时无法打开{{page}}",
+        "pageFailedHint": "其他所有功能照常可用。",
+        "toOverview": "前往概览",
         "errorGeneric": "发生了错误。",
         "updateAvailable": "有更新 - 重新加载页面以获取最新版本。",
         "titleRequired": "标题为必填项",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "将{{title}}加入购物清单",
         "emailInUse": "此电子邮件地址已属于另一个账户。",
+        "emailInvalid": "请输入有效的电子邮件地址。",
         "sessionUnreachableTitle": "连接中断",
+        "serverNotReadyTitle": "服务器暂未就绪",
+        "rateLimitedTitle": "请求过多",
         "sessionRetryHint": "你仍保持登录状态。{{seconds}} 秒后重试。",
         "sessionRetrying": "正在重试…",
         "searchNoResultsTitle": "无结果",
         "searchNoResultsDescription": "没有与你的搜索匹配的内容。",
         "searchNoResultsFilteredDescription": "没有与你的搜索和筛选条件匹配的内容。",
-        "searchReset": "重置搜索"
+        "searchReset": "重置搜索",
+        "passwordMinLength": "至少 8 个字符。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "删除这笔借款还款？",
         "loanRemainingAmount": "剩余金额",
         "loanRemainingPrincipal": "剩余本金",
+        "loanOwedToYou": "待收回",
         "loanStillToPay": "尚需支付",
         "loanPrincipalAmount": "贷款金额",
         "loanRemainingInstallments": "剩余期数",
         "loanPaidAmount": "已还金额",
+        "loanReceivedAmount": "已收回",
         "loansEmpty": "没有进行中的借款。",
         "loanInstallmentMeta": "已还 {{paid}} / {{total}} 期",
         "loanRemainingOf": "共 {{total}}",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "剩余本金最少的在前",
         "loanSortActive": "排序：{{sort}}",
         "loanPaidStatus": "已还清",
-        "markLoanPaid": "标记已还",
+        "loanBookInstallment": "记录还款",
+        "loanReceiveRepayment": "已收到还款",
         "loanBorrowerLabel": "借款人",
         "loanDirectionLabel": "借贷类型",
         "loanDirectionLent": "借出（我收回还款）",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "信用卡",
         "accountType_investment": "投资",
         "accountType_other": "其他",
-        "viewAccountTransactions": "查看{{name}}的交易",
-        "currentBalance": "当前余额",
         "clearAccountFilter": "清除账户筛选",
         "archivedBadge": "已归档",
         "showArchivedAccounts": "显示已归档",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "走势曲线数值",
         "statsPointLabel": "{{period}}：收入 {{income}}，支出 {{expenses}}",
         "statsPointLabelCumulative": "截至 {{period}}：收入 {{income}}，支出 {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} 计划中",
         "receiptsLabel": "凭证",
         "receiptsHint": "这笔交易的收据或发票。",
         "receiptDocumentName": "凭证：{{title}}（{{date}}）",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "按日期",
         "ledgerSortAmount": "按金额",
         "ledgerSortActive": "排序：{{sort}}",
-        "ledgerAccountsAll": "所有账户"
+        "ledgerAccountsAll": "所有账户",
+        "showAccountTransactions": "查看交易"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供周期",
@@ -1876,6 +1886,8 @@
         "confirmPasswordLabel": "确认新密码",
         "savePassword": "保存密码",
         "passwordMismatch": "两次密码不一致。",
+        "currentPasswordWrong": "当前密码不正确。",
+        "passwordTooShort": "至少 8 个字符。",
         "passwordSavedToast": "密码修改成功。",
         "oidcLinkTitle": "单点登录",
         "oidcLinkHint": "将你的 SSO 账户与此账户关联，这样通过提供方登录会带你到这里，而不是新建第二个账户。",
@@ -1985,6 +1997,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "亲属",
         "familyRoleOther": "家庭成员",
+        "childStartHint": "新的儿童账户开始时没有预算和断食功能，家政只能查看，不显示工资和付款。之后可在“角色与权限”中更改。",
         "systemAdminLabel": "系统管理员",
         "systemAdminHint": "系统管理员可以管理应用设置、集成、API 令牌和家庭账户。",
         "systemAdminBadge": "系统管理员",
@@ -2001,7 +2014,7 @@
         "removeMemberNamed": "移除 {{name}}",
         "memberDeactivatedToast": "{{name}} 已停用。相关条目已保留。",
         "memberFormerBadge": "前成员",
-        "memberOrderHint": "此顺序适用于整个家庭：日历、课程表和每个人员列表都遵循它。要更改顺序，请拖动手柄，或聚焦手柄后按方向键。新成员排在其后，按姓名排序。",
+        "memberOrderHint": "此顺序适用于整个家庭。拖动手柄或使用方向键即可更改。",
         "logout": "退出登录",
         "logoutConfirm": "从此设备退出登录？",
         "synchronizing": "同步中…",
@@ -2030,7 +2043,7 @@
         "pwaInstallTitle": "在此设备上安装 Yuvomi",
         "pwaInstallChecking": "正在检查是否可安装...",
         "pwaInstallReady": "Yuvomi 可以作为应用安装到此设备。",
-        "pwaInstallUnavailable": "当前浏览器暂不支持安装。",
+        "pwaInstallUnavailable": "此浏览器在这里不提供安装。在 Chrome 和 Edge 中可在浏览器菜单里找到，在 Safari 中位于“共享”>“添加到程序坞”或“添加到主屏幕”。没有 HTTPS 地址时，任何浏览器都不提供安装。",
         "pwaInstallInstalled": "Yuvomi 已安装在此设备上。",
         "pwaInstallIosHint": "在 iPhone 或 iPad 上，使用共享菜单并选择添加到主屏幕。",
         "pwaInstallButton": "安装应用",
@@ -2218,7 +2231,7 @@
         "deleteCardDAVAccountConfirm": "已同步的联系人会保留，但会失去与 CardDAV 的关联。",
         "housekeepingPaymentsTitle": "付款任务",
         "housekeepingPaymentTasksLabel": "每次签到时创建付款任务",
-        "housekeepingPaymentTasksHint": "启用后，每次签到都会创建一个支付家务人员的任务。完成该任务即将本次上门标记为已付。",
+        "housekeepingPaymentTasksHint": "启用后，每次签到都会创建一个支付家务人员的任务。完成该任务即将本次上门标记为已付。只有签到的人和管理员能看到该任务。",
         "housekeepingPaymentTasksSaved": "已保存家务付款设置。",
         "backupSchedulerDisabled": "已禁用",
         "backupSchedulerEnabled": "已启用",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "这台设备仍处于配对状态。请先撤销它。",
         "feedExportIncludeBirthdays": "包含生日",
         "feedExportIncludeBirthdaysHint": "订阅独立生日订阅源时关闭此选项，避免生日和命名日重复显示。",
-        "birthdayFeedHint": "任何拥有此链接的人都可以查看家庭中保存的所有生日和命名日，包括已关闭提醒的记录。请仅在您自己的设备上使用。"
+        "birthdayFeedHint": "任何拥有此链接的人都可以查看家庭中保存的所有生日和命名日，包括已关闭提醒的记录。请仅在您自己的设备上使用。",
+        "skipToSheet": "跳到设置",
+        "screensaverOffTitle": "照片屏保",
+        "screensaverNeedsImmich": "管理员连接 Immich 后，屏保才会启动。之后可在这里为此设备设置等待时间、时钟和照片裁切。",
+        "screensaverConnectImmich": "连接 Immich",
+        "weatherPlaceLabel": "地点",
+        "weatherPlaceHint": "搜索由天气服务 Open-Meteo 完成，只会发送地名。",
+        "weatherPlacePlaceholder": "城市或邮政编码",
+        "weatherPlaceSearch": "搜索",
+        "weatherPlaceCurrent": "当前：{{place}}",
+        "weatherPlaceNone": "尚未选择地点。",
+        "weatherPlaceResultsLabel": "找到的地点",
+        "weatherPlacePick": "请从列表中选择你的地点。",
+        "weatherPlaceChosen": "已选择 {{place}}。保存后生效。",
+        "weatherPlaceRequired": "请搜索地点并从列表中选择。",
+        "weatherPlaceTooShort": "请至少输入两个字符。",
+        "weatherPlaceNotFound": "未找到此名称的地点。请加上国家，例如“朝阳, 中国”。",
+        "weatherPlaceUnavailable": "地点搜索暂时无法访问。请稍后重试，或手动输入坐标。",
+        "weatherManualTitle": "手动输入坐标"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",
@@ -3380,7 +3411,8 @@
         "resultCountMany": "{{count}} 个结果",
         "goTo": "前往",
         "newSection": "新建",
-        "recentLabel": "最近打开"
+        "recentLabel": "最近打开",
+        "createTaskNamed": "将“{{title}}”创建为任务"
     },
     "birthdays": {
         "inDays_one": "{{count}}天后",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "离线 - 正在重新连接…",
-        "staleData": "离线 - 数据截至：{{time}}"
+        "staleData": "离线 - 数据截至：{{time}}",
+        "pageTitle": "你已离线",
+        "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。"
     },
     "emptyHint": {
         "recipes": "食谱可以直接进入用餐计划或购物清单。",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "例如：浴室",
         "taskFrequency": "频率（天）",
         "taskCreatedToast": "家务任务已创建。",
-        "dashboard": "概览",
         "reports": "报告",
         "visitsThisMonth": "本月上门次数",
         "lastVisit": "上次上门",
@@ -4007,7 +4040,12 @@
         "currentMonth": "当前",
         "noVisitReportsInMonth": "{{month}}没有上门服务记录。",
         "settledAdminOnly": "只有管理员可以修改或删除",
-        "reportVisitsCount": "上门次数"
+        "reportVisitsCount": "上门次数",
+        "amountsPermissionLabel": "查看工资和付款",
+        "errorAmountsHidden": "只有可以查看家政金额的人才能标记付款。",
+        "notHereToday": "今天还没到",
+        "tabVisits": "上门",
+        "tabChores": "家务"
     },
     "userMultiSelect": {
         "moreUsers": "更多",
@@ -4040,7 +4078,6 @@
         "noBalances": "所有人都已结清。",
         "noExpenses": "没有符合条件的支出。",
         "noActivity": "暂无动态。",
-        "owes": "欠",
         "system": "系统",
         "quickGroceries": "添加超市支出",
         "quickSchool": "分摊学校费用",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} 付给 {{payee}}，{{amount}}。一笔反向记账会抵消该付款，余额恢复到之前的状态。该付款仍保留在动态中，并标记为已冲销。",
         "loadMoreActivity": "加载更多",
         "expenseDeleted": "已删除",
-        "youAreOwedInGroup": "在{{group}}中你应收",
-        "youOweInGroup": "在{{group}}中你应付"
+        "youAreOwedInGroup": "{{group}}：你应收",
+        "youOweInGroup": "{{group}}：你应付",
+        "debtYouOwe": "你欠 {{name}}",
+        "debtOwesYou": "{{name}} 欠你",
+        "debtOwes": "{{from}} 欠 {{to}}"
     },
     "wmo": {
         "0": "晴天",
@@ -4256,7 +4296,8 @@
         "submit": "发送链接",
         "sent": "如果存在匹配的账户，重置链接已发送。",
         "backToLogin": "返回登录",
-        "unavailable": "此家庭未提供密码重置。请联系您家庭的管理员。"
+        "unavailable": "此家庭未提供密码重置。请联系您家庭的管理员。",
+        "identifierRequired": "请输入你的用户名或电子邮件地址。"
     },
     "resetPassword": {
         "title": "设置新密码",
@@ -4286,6 +4327,15 @@
         "test": "测试连接",
         "testSuccess": "测试邮件已成功发送。",
         "testFailed": "测试失败：{{error}}",
+        "portInvalid": "请输入 {{min}} 到 {{max}} 之间的端口。",
+        "testFailedNotConfigured": "请先填写 SMTP 主机和发件人地址。",
+        "testFailedAuth": "服务器拒绝了用户名或密码。",
+        "testFailedConnection": "无法通过此主机和端口连接到服务器。",
+        "testFailedTls": "加密连接失败。请检查加密方式和端口。",
+        "testFailedRejected": "服务器未接受测试邮件。请检查发件人地址。",
+        "testFailedUnknown": "无法发送测试邮件。",
+        "testNoRecipient": "测试邮件会发到你自己的邮箱地址，但它还没有填写。请在“账户 → 邮箱”中添加。",
+        "testNoRecipientLink": "打开账户",
         "saveFailed": "保存失败：{{error}}",
         "saved": "设置已保存。"
     },
@@ -4821,7 +4871,6 @@
                 "daily": "每天",
                 "none": "暂无时间。",
                 "delete": "删除时间",
-                "newHint": "保存药物后即可添加时间。",
                 "timeRequired": "时间为必填项。"
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "此家庭中没有匹配的类型",
         "mappingProfileStatusAmbiguousType": "有歧义 - 多个类型使用相同名称",
         "icsCalendarName": "垃圾收运",
-        "icsPickupSummary": "收运：{{name}}"
+        "icsPickupSummary": "收运：{{name}}",
+        "intervalDecrease": "缩短间隔",
+        "intervalIncrease": "延长间隔"
     },
     "rewards": {
         "title": "奖励",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "清除选择",
         "continuesUntil": "…持续到 {{time}}",
         "overviewEmptyTitle": "选择要比较的成员",
-        "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。"
+        "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。",
+        "presetCodes": {
+            "early": "早",
+            "late": "晚",
+            "night": "夜",
+            "day": "白",
+            "vacation": "休",
+            "sick": "病",
+            "exam": "考",
+            "lecture": "讲",
+            "seminar": "研",
+            "lab": "实"
+        },
+        "typesWithTime": "有时间"
     },
     "pairDisplay": {
         "title": "配对平板",

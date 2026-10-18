@@ -44,6 +44,9 @@
         "errorOccurred": "Coś poszło nie tak.",
         "unexpectedError": "Wystąpił nieoczekiwany błąd.",
         "errorDetails": "Szczegóły techniczne",
+        "pageFailedTitle": "Nie można teraz otworzyć strony {{page}}",
+        "pageFailedHint": "Wszystkie pozostałe sekcje działają dalej.",
+        "toOverview": "Do pulpitu",
         "errorGeneric": "Wystąpił błąd.",
         "updateAvailable": "Dostępna aktualizacja - odśwież stronę, aby uzyskać najnowszą wersję.",
         "titleRequired": "Tytuł jest wymagany",
@@ -86,13 +89,17 @@
         },
         "toShoppingListNamed": "Dodaj {{title}} na listę zakupów",
         "emailInUse": "Ten adres e-mail należy już do innego konta.",
+        "emailInvalid": "Wpisz prawidłowy adres e-mail.",
         "sessionUnreachableTitle": "Połączenie przerwane",
+        "serverNotReadyTitle": "Serwer nie jest teraz gotowy",
+        "rateLimitedTitle": "Zbyt wiele żądań",
         "sessionRetryHint": "Sesja pozostaje aktywna. Kolejna próba za {{seconds}} s.",
         "sessionRetrying": "Ponawianie…",
         "searchNoResultsTitle": "Brak wyników",
         "searchNoResultsDescription": "Nic nie pasuje do wyszukiwania.",
         "searchNoResultsFilteredDescription": "Nic nie pasuje do wyszukiwania i filtrów.",
-        "searchReset": "Resetuj wyszukiwanie"
+        "searchReset": "Resetuj wyszukiwanie",
+        "passwordMinLength": "Co najmniej 8 znaków."
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",
@@ -168,7 +175,8 @@
         "resultCountMany": "{{count}} wyników",
         "goTo": "Przejdź do",
         "newSection": "Utwórz nowe",
-        "recentLabel": "Ostatnio otwierane"
+        "recentLabel": "Ostatnio otwierane",
+        "createTaskNamed": "Utwórz „{{title}}” jako zadanie"
     },
     "dashboard": {
         "title": "Pulpit",
@@ -1680,10 +1688,12 @@
         "deleteLoanPaymentConfirm": "Usunąć tę ratę pożyczki?",
         "loanRemainingAmount": "Pozostało",
         "loanRemainingPrincipal": "Pozostały kapitał",
+        "loanOwedToYou": "Jeszcze ci należy",
         "loanStillToPay": "Pozostało do zapłaty",
         "loanPrincipalAmount": "Kwota kredytu",
         "loanRemainingInstallments": "Raty pozostałe",
         "loanPaidAmount": "Zapłacono",
+        "loanReceivedAmount": "Zwrócono",
         "loansEmpty": "Brak aktywnych pożyczek.",
         "loanInstallmentMeta": "{{paid}} z {{total}} rat zapłaconych",
         "loanRemainingOf": "z {{total}}",
@@ -1695,7 +1705,8 @@
         "loanSortBalance": "Najmniejszy pozostały kapitał najpierw",
         "loanSortActive": "Sortowanie: {{sort}}",
         "loanPaidStatus": "Zapłacona",
-        "markLoanPaid": "Oznacz jako zapłaconą",
+        "loanBookInstallment": "Zaksięguj ratę",
+        "loanReceiveRepayment": "Zwrot otrzymany",
         "loanBorrowerLabel": "Osoba",
         "loanDirectionLabel": "Rodzaj pożyczki",
         "loanDirectionLent": "Udzielona (dostaję zwrot)",
@@ -1863,8 +1874,6 @@
         "accountType_credit": "Karta kredytowa",
         "accountType_investment": "Inwestycje",
         "accountType_other": "Inne",
-        "viewAccountTransactions": "Pokaż operacje konta {{name}}",
-        "currentBalance": "Bieżące saldo",
         "clearAccountFilter": "Usuń filtr konta",
         "archivedBadge": "Zarchiwizowane",
         "showArchivedAccounts": "Pokaż zarchiwizowane",
@@ -1907,6 +1916,7 @@
         "statsPointsLabel": "Wartości krzywej trendu",
         "statsPointLabel": "{{period}}: przychody {{income}}, wydatki {{expenses}}",
         "statsPointLabelCumulative": "Do {{period}}: przychody {{income}}, wydatki {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} zaplanowane",
         "receiptsLabel": "Dowody",
         "receiptsHint": "Paragon lub faktura do tej transakcji.",
         "receiptDocumentName": "Dowód: {{title}} ({{date}})",
@@ -1956,7 +1966,8 @@
         "ledgerSortDate": "Według daty",
         "ledgerSortAmount": "Według kwoty",
         "ledgerSortActive": "Sortowanie: {{sort}}",
-        "ledgerAccountsAll": "Wszystkie konta"
+        "ledgerAccountsAll": "Wszystkie konta",
+        "showAccountTransactions": "Pokaż operacje konta"
     },
     "settings": {
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",
@@ -2191,6 +2202,8 @@
         "confirmPasswordLabel": "Potwierdź nowe hasło",
         "savePassword": "Zapisz hasło",
         "passwordMismatch": "Hasła nie są zgodne.",
+        "currentPasswordWrong": "Obecne hasło jest nieprawidłowe.",
+        "passwordTooShort": "Co najmniej 8 znaków.",
         "passwordSavedToast": "Hasło zostało pomyślnie zmienione.",
         "oidcLinkTitle": "Logowanie jednokrotne",
         "oidcLinkHint": "Powiąż swoje konto SSO z tym kontem, aby logowanie przez dostawcę prowadziło tutaj zamiast tworzyć drugie konto.",
@@ -2300,6 +2313,7 @@
         "familyRoleGrandparent": "Dziadkowie",
         "familyRoleRelative": "Krewny/Krewna",
         "familyRoleOther": "Członek rodziny",
+        "childStartHint": "Nowe konta dzieci zaczynają bez Budżetu i postu, a pomoc domową widzą tylko do odczytu, bez wynagrodzeń i płatności. Możesz to później zmienić w sekcji „Role i uprawnienia”.",
         "systemAdminLabel": "Administrator systemu",
         "systemAdminHint": "Administratorzy systemu mogą zarządzać ustawieniami aplikacji, integracjami, tokenami API i kontami rodzinnymi.",
         "systemAdminBadge": "Administrator systemu",
@@ -2316,7 +2330,7 @@
         "removeMemberNamed": "Usuń konto {{name}}",
         "memberDeactivatedToast": "Konto {{name}} zostało dezaktywowane. Wpisy pozostają.",
         "memberFormerBadge": "Były członek",
-        "memberOrderHint": "Ta kolejność obowiązuje w całym gospodarstwie domowym: kalendarz, plan zajęć i każda lista osób są z nią zgodne. Aby ją zmienić, przeciągnij uchwyt albo ustaw na nim fokus i naciśnij klawisze strzałek. Nowi członkowie pojawiają się za nią, posortowani według imienia.",
+        "memberOrderHint": "Ta kolejność obowiązuje w całym gospodarstwie. Przeciągnij uchwyt albo użyj strzałek, aby ją zmienić.",
         "logout": "Wyloguj",
         "logoutConfirm": "Wylogować się z tego urządzenia?",
         "synchronizing": "Synchronizowanie…",
@@ -2345,7 +2359,7 @@
         "pwaInstallTitle": "Zainstaluj Yuvomi na tym urządzeniu",
         "pwaInstallChecking": "Sprawdzanie dostępności instalacji...",
         "pwaInstallReady": "Yuvomi można zainstalować jako aplikację na tym urządzeniu.",
-        "pwaInstallUnavailable": "Instalacja nie jest teraz dostępna w tej przeglądarce.",
+        "pwaInstallUnavailable": "Ta przeglądarka nie oferuje tu instalacji. W Chrome i Edge znajdziesz ją w menu przeglądarki, w Safari w Udostępnij > Dodaj do Docka lub Do ekranu początkowego. Bez adresu HTTPS żadna przeglądarka jej nie oferuje.",
         "pwaInstallInstalled": "Yuvomi jest już zainstalowany na tym urządzeniu.",
         "pwaInstallIosHint": "Na iPhonie lub iPadzie użyj menu Udostępnij i wybierz Dodaj do ekranu początkowego.",
         "pwaInstallButton": "Zainstaluj aplikację",
@@ -2733,7 +2747,7 @@
         "emptyStateNoAccounts": "Brak połączonych kont",
         "housekeepingPaymentsTitle": "Zadania płatności",
         "housekeepingPaymentTasksLabel": "Przy każdym zameldowaniu utwórz zadanie płatności",
-        "housekeepingPaymentTasksHint": "Po włączeniu, przy każdym zameldowaniu zostanie utworzone zadanie płatności za pomoc domową. Ukończenie tego zadania oznacza wizytę jako opłaconą.",
+        "housekeepingPaymentTasksHint": "Po włączeniu, przy każdym zameldowaniu zostanie utworzone zadanie płatności za pomoc domową. Ukończenie tego zadania oznacza wizytę jako opłaconą. Widzi je tylko osoba, która melduje przyjście, oraz administratorzy.",
         "housekeepingPaymentTasksSaved": "Ustawienia płatności za pomoc domową zapisane.",
         "tabModules": "Modules",
         "thirdPartyModulesTitle": "Modules",
@@ -3401,7 +3415,25 @@
         "displayRemoveDeviceActive": "To urządzenie jest nadal sparowane. Najpierw je unieważnij.",
         "feedExportIncludeBirthdays": "Uwzględniaj urodziny",
         "feedExportIncludeBirthdaysHint": "Wyłącz przy osobnej subskrypcji urodzin, aby uniknąć podwójnych urodzin i imienin.",
-        "birthdayFeedHint": "Każdy, kto ma ten link, może zobaczyć wszystkie urodziny i imieniny zapisane w gospodarstwie domowym, także bez przypomnień. Używaj go tylko na własnych urządzeniach."
+        "birthdayFeedHint": "Każdy, kto ma ten link, może zobaczyć wszystkie urodziny i imieniny zapisane w gospodarstwie domowym, także bez przypomnień. Używaj go tylko na własnych urządzeniach.",
+        "skipToSheet": "Przejdź do ustawienia",
+        "screensaverOffTitle": "Wygaszacz ze zdjęciami",
+        "screensaverNeedsImmich": "Wygaszacz uruchomi się, gdy administrator połączy Immich. Potem ustawisz tu dla tego urządzenia czas oczekiwania, zegar i kadrowanie zdjęć.",
+        "screensaverConnectImmich": "Połącz Immich",
+        "weatherPlaceLabel": "Miejsce",
+        "weatherPlaceHint": "Wyszukiwanie odbywa się w serwisie pogodowym Open-Meteo. Wysyłana jest tylko nazwa miejsca.",
+        "weatherPlacePlaceholder": "Miasto lub kod pocztowy",
+        "weatherPlaceSearch": "Szukaj",
+        "weatherPlaceCurrent": "Obecnie: {{place}}",
+        "weatherPlaceNone": "Nie wybrano jeszcze miejsca.",
+        "weatherPlaceResultsLabel": "Znalezione miejsca",
+        "weatherPlacePick": "Wybierz swoje miejsce z listy.",
+        "weatherPlaceChosen": "Wybrano: {{place}}. Zapisz, aby zastosować.",
+        "weatherPlaceRequired": "Wyszukaj miejsce i wybierz je z listy.",
+        "weatherPlaceTooShort": "Wpisz co najmniej dwa znaki.",
+        "weatherPlaceNotFound": "Nie znaleziono miejsca o tej nazwie. Dodaj kraj, np. „Opole, Polska”.",
+        "weatherPlaceUnavailable": "Wyszukiwanie miejsc jest teraz niedostępne. Spróbuj ponownie za chwilę albo wpisz współrzędne ręcznie.",
+        "weatherManualTitle": "Współrzędne ręcznie"
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",
@@ -3710,7 +3742,9 @@
     },
     "offline": {
         "banner": "Offline - przywracanie połączenia…",
-        "staleData": "Offline - stan z: {{time}}"
+        "staleData": "Offline - stan z: {{time}}",
+        "pageTitle": "Jesteś offline",
+        "pageDescription": "Ta strona wymaga połączenia. Gdy tylko urządzenie znów będzie online, załaduje się sama."
     },
     "emptyHint": {
         "tasks": "Stuknij +, aby utworzyć pierwsze zadanie. Przesuń kartę w lewo, aby oznaczyć jako ukończone, w prawo, aby wyświetlić.",
@@ -4110,7 +4144,6 @@
         "taskAreaPlaceholder": "Przykład: Łazienka",
         "taskFrequency": "Częstotliwość (dni)",
         "taskCreatedToast": "Zadanie sprzątania utworzone.",
-        "dashboard": "Przegląd",
         "reports": "Raporty",
         "visitsThisMonth": "Wizyty w miesiącu",
         "lastVisit": "Ostatnia wizyta",
@@ -4239,7 +4272,12 @@
         "currentMonth": "Bieżący",
         "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
         "settledAdminOnly": "Zmienić lub usunąć może tylko admin",
-        "reportVisitsCount": "Wizyty"
+        "reportVisitsCount": "Wizyty",
+        "amountsPermissionLabel": "Widzieć wynagrodzenia i płatności",
+        "errorAmountsHidden": "Płatność może oznaczyć tylko osoba, która widzi kwoty pomocy domowej.",
+        "notHereToday": "Dziś jeszcze jej nie ma",
+        "tabVisits": "Wizyty",
+        "tabChores": "Prace domowe"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",
@@ -4268,7 +4306,6 @@
         "noBalances": "Wszyscy są rozliczeni.",
         "noExpenses": "Brak pasujących wydatków.",
         "noActivity": "Brak aktywności.",
-        "owes": "jest winny",
         "system": "System",
         "quickGroceries": "Dodaj wydatek w sklepie",
         "quickSchool": "Podziel koszty szkolne",
@@ -4424,8 +4461,11 @@
         "reversePaymentConfirmDetail": "{{payer}} dla {{payee}}, {{amount}}. Zapis przeciwny anuluje płatność, a salda wracają do poprzedniego stanu. Płatność pozostaje w aktywności oznaczona jako stornowana.",
         "loadMoreActivity": "Wczytaj więcej",
         "expenseDeleted": "Usunięto",
-        "youAreOwedInGroup": "Należy ci się w {{group}}",
-        "youOweInGroup": "Jesteś winien w {{group}}"
+        "youAreOwedInGroup": "{{group}}: Należy ci się",
+        "youOweInGroup": "{{group}}: Jesteś winien",
+        "debtYouOwe": "Do oddania dla {{name}}",
+        "debtOwesYou": "{{name}} ma ci oddać",
+        "debtOwes": "{{from}} jest winien {{to}}"
     },
     "wmo": {
         "0": "Bezchmurnie",
@@ -4492,7 +4532,8 @@
         "submit": "Wyślij link",
         "sent": "Jeśli pasujące konto istnieje, link do zresetowania hasła został wysłany.",
         "backToLogin": "Powrót do logowania",
-        "unavailable": "To gospodarstwo domowe nie oferuje resetowania hasła. Skontaktuj się z administratorem swojego gospodarstwa domowego."
+        "unavailable": "To gospodarstwo domowe nie oferuje resetowania hasła. Skontaktuj się z administratorem swojego gospodarstwa domowego.",
+        "identifierRequired": "Wpisz swoją nazwę użytkownika lub adres e-mail."
     },
     "resetPassword": {
         "title": "Ustaw nowe hasło",
@@ -4522,6 +4563,15 @@
         "test": "Testuj połączenie",
         "testSuccess": "Testowy e-mail został wysłany.",
         "testFailed": "Test nie powiódł się: {{error}}",
+        "portInvalid": "Wpisz port od {{min}} do {{max}}.",
+        "testFailedNotConfigured": "Najpierw wpisz host SMTP i adres nadawcy.",
+        "testFailedAuth": "Serwer odrzucił nazwę użytkownika lub hasło.",
+        "testFailedConnection": "Serwer jest nieosiągalny pod tym hostem i portem.",
+        "testFailedTls": "Nie udało się nawiązać szyfrowanego połączenia. Sprawdź szyfrowanie i port.",
+        "testFailedRejected": "Serwer nie przyjął wiadomości testowej. Sprawdź adres nadawcy.",
+        "testFailedUnknown": "Nie udało się wysłać wiadomości testowej.",
+        "testNoRecipient": "Wiadomość testowa trafia na twój adres e-mail, którego jeszcze brakuje. Dodaj go w Konto → E-mail.",
+        "testNoRecipientLink": "Otwórz konto",
         "saveFailed": "Zapisywanie nie powiodło się: {{error}}",
         "saved": "Ustawienia zapisane."
     },
@@ -5067,7 +5117,6 @@
                 "daily": "Codziennie",
                 "none": "Brak pór.",
                 "delete": "Usuń porę",
-                "newHint": "Zapisz lek, aby móc dodać pory.",
                 "timeRequired": "Godzina jest wymagana."
             },
             "weekday": {
@@ -5990,7 +6039,9 @@
         "mappingProfileStatusUnmatchedType": "Brak pasującego rodzaju w tym gospodarstwie",
         "mappingProfileStatusAmbiguousType": "Niejednoznaczne - kilka typów ma tę samą nazwę",
         "icsCalendarName": "Odbiór odpadów",
-        "icsPickupSummary": "Odbiór: {{name}}"
+        "icsPickupSummary": "Odbiór: {{name}}",
+        "intervalDecrease": "Zmniejsz odstęp",
+        "intervalIncrease": "Zwiększ odstęp"
     },
     "rewards": {
         "title": "Nagrody",
@@ -6662,7 +6713,20 @@
         "overviewClearSelection": "Wyczyść wybór",
         "continuesUntil": "…trwa do {{time}}",
         "overviewEmptyTitle": "Wybierz osoby do porównania",
-        "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie."
+        "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie.",
+        "presetCodes": {
+            "early": "P",
+            "late": "PP",
+            "night": "N",
+            "day": "D",
+            "vacation": "U",
+            "sick": "CH",
+            "exam": "E",
+            "lecture": "W",
+            "seminar": "S",
+            "lab": "L"
+        },
+        "typesWithTime": "Z godzinami"
     },
     "pairDisplay": {
         "title": "Sparuj tablet",

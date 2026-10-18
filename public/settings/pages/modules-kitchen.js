@@ -12,8 +12,7 @@ import { getPreferences, savePreferences } from '/settings/preferences-cache.js'
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
-const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 // Muss zur Serverpruefung in routes/preferences.js passen; der Server kappt
@@ -347,7 +346,7 @@ function bindProviderAddButton(container) {
             formRowHtml({
               label: t('settings.recipeProviderTokenLabel'), labelFor: 'recipe-provider-token', labelExtra: REQUIRED_MARK, field: true,
               description: t('settings.recipeProviderTokenHintMealie'), descriptionId: 'recipe-provider-token-hint',
-              control: '<input class="form-input" type="password" id="recipe-provider-token" required autocomplete="off" aria-describedby="recipe-provider-token-hint" />',
+              control: '<input class="form-input" type="password" id="recipe-provider-token" required autocomplete="new-password" aria-describedby="recipe-provider-token-hint" />',
             }),
           ])}
           <div id="recipe-provider-add-error" class="form-error" role="alert" hidden></div>

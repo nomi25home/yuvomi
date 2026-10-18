@@ -42,6 +42,9 @@
         "errorOccurred": "مشکلی پیش آمد.",
         "unexpectedError": "خطای غیرمنتظره‌ای رخ داد.",
         "errorDetails": "جزئیات فنی",
+        "pageFailedTitle": "{{page}} الان باز نمی‌شود",
+        "pageFailedHint": "بقیهٔ بخش‌ها همچنان کار می‌کنند.",
+        "toOverview": "رفتن به نمای کلی",
         "errorGeneric": "خطایی رخ داد.",
         "updateAvailable": "به‌روزرسانی موجود است - برای دریافت آخرین نسخه صفحه را دوباره بارگذاری کنید.",
         "titleRequired": "عنوان الزامی است",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "افزودن {{title}} به فهرست خرید",
         "emailInUse": "این نشانی ایمیل از قبل متعلق به حساب دیگری است.",
+        "emailInvalid": "یک نشانی ایمیل معتبر وارد کنید.",
         "sessionUnreachableTitle": "اتصال قطع شد",
+        "serverNotReadyTitle": "سرور فعلاً آماده نیست",
+        "rateLimitedTitle": "درخواست‌های زیاد",
         "sessionRetryHint": "همچنان وارد حساب هستید. تلاش دوباره تا {{seconds}} ثانیه دیگر.",
         "sessionRetrying": "در حال تلاش دوباره…",
         "searchNoResultsTitle": "نتیجه‌ای یافت نشد",
         "searchNoResultsDescription": "چیزی با جستجوی شما مطابقت ندارد.",
         "searchNoResultsFilteredDescription": "چیزی با جستجو و فیلترهای شما مطابقت ندارد.",
-        "searchReset": "بازنشانی جستجو"
+        "searchReset": "بازنشانی جستجو",
+        "passwordMinLength": "دست‌کم ۸ نویسه."
     },
     "kitchen": {
         "noShoppingLists": "هنوز فهرست خریدی وجود ندارد.",
@@ -160,7 +167,8 @@
         "resultCountMany": "{{count}} نتیجه",
         "goTo": "رفتن به",
         "newSection": "ساختن مورد تازه",
-        "recentLabel": "اخیراً باز شده"
+        "recentLabel": "اخیراً باز شده",
+        "createTaskNamed": "ایجاد «{{title}}» به‌عنوان کار"
     },
     "dashboard": {
         "title": "نمای کلی",
@@ -1526,10 +1534,12 @@
         "deleteLoanPaymentConfirm": "این پرداخت وام حذف شود؟",
         "loanRemainingAmount": "باقی‌مانده",
         "loanRemainingPrincipal": "مانده اصل وام",
+        "loanOwedToYou": "هنوز طلب داری",
         "loanStillToPay": "باقی‌مانده پرداخت",
         "loanPrincipalAmount": "مبلغ وام",
         "loanRemainingInstallments": "اقساط باقی‌مانده",
         "loanPaidAmount": "پرداخت‌شده",
+        "loanReceivedAmount": "دریافت‌شده",
         "loansEmpty": "وام فعالی نیست.",
         "loanInstallmentMeta": "{{paid}} از {{total}} قسط پرداخت شده",
         "loanRemainingOf": "از {{total}}",
@@ -1541,7 +1551,8 @@
         "loanSortBalance": "کمترین مانده اول",
         "loanSortActive": "مرتب‌سازی: {{sort}}",
         "loanPaidStatus": "پرداخت‌شده",
-        "markLoanPaid": "علامت‌گذاری به عنوان پرداخت‌شده",
+        "loanBookInstallment": "ثبت قسط",
+        "loanReceiveRepayment": "بازپرداخت دریافت شد",
         "loanBorrowerLabel": "شخص",
         "loanDirectionLabel": "نوع وام",
         "loanDirectionLent": "قرض‌داده‌شده (به من بازپرداخت می‌شود)",
@@ -1709,8 +1720,6 @@
         "accountType_credit": "کارت اعتباری",
         "accountType_investment": "سرمایه‌گذاری",
         "accountType_other": "سایر",
-        "viewAccountTransactions": "نمایش تراکنش‌های {{name}}",
-        "currentBalance": "موجودی فعلی",
         "clearAccountFilter": "حذف فیلتر حساب",
         "archivedBadge": "بایگانی‌شده",
         "showArchivedAccounts": "نمایش بایگانی‌شده‌ها",
@@ -1753,6 +1762,7 @@
         "statsPointsLabel": "مقادیر نمودار روند",
         "statsPointLabel": "{{period}}: درآمد {{income}}، هزینه {{expenses}}",
         "statsPointLabelCumulative": "تا {{period}}: درآمد {{income}}، هزینه {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} برنامه‌ریزی‌شده",
         "receiptsLabel": "رسیدها",
         "receiptsHint": "رسید یا فاکتور این تراکنش.",
         "receiptDocumentName": "رسید: {{title}} ({{date}})",
@@ -1800,7 +1810,8 @@
         "ledgerSortDate": "بر اساس تاریخ",
         "ledgerSortAmount": "بر اساس مبلغ",
         "ledgerSortActive": "مرتب‌سازی: {{sort}}",
-        "ledgerAccountsAll": "همه حساب‌ها"
+        "ledgerAccountsAll": "همه حساب‌ها",
+        "showAccountTransactions": "نمایش تراکنش‌ها"
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",
@@ -2029,6 +2040,8 @@
         "confirmPasswordLabel": "تأیید رمز عبور جدید",
         "savePassword": "ذخیره رمز عبور",
         "passwordMismatch": "رمزهای عبور مطابقت ندارند.",
+        "currentPasswordWrong": "رمز عبور فعلی درست نیست.",
+        "passwordTooShort": "حداقل ۸ نویسه.",
         "passwordSavedToast": "رمز عبور با موفقیت تغییر کرد.",
         "oidcLinkTitle": "ورود یکپارچه",
         "oidcLinkHint": "حساب SSO خود را به این حساب پیوند بزنید تا ورود از طریق ارائه‌دهنده شما را به اینجا بیاورد و حساب دومی نسازد.",
@@ -2138,6 +2151,7 @@
         "familyRoleGrandparent": "پدربزرگ/مادربزرگ",
         "familyRoleRelative": "خویشاوند",
         "familyRoleOther": "عضو خانواده",
+        "childStartHint": "حساب‌های جدید کودک بدون بودجه و روزه شروع می‌شوند و کمک منزل را فقط برای خواندن و بدون دستمزد و پرداخت می‌بینند. بعداً می‌توانید آن را در «نقش‌ها و دسترسی‌ها» تغییر دهید.",
         "systemAdminLabel": "مدیر سیستم",
         "systemAdminHint": "مدیران سیستم می‌توانند تنظیمات برنامه، یکپارچه‌سازی‌ها، توکن‌های API و حساب‌های خانواده را مدیریت کنند.",
         "systemAdminBadge": "مدیر سیستم",
@@ -2154,7 +2168,7 @@
         "removeMemberNamed": "برداشتن {{name}}",
         "memberDeactivatedToast": "حساب {{name}} غیرفعال شد. موارد باقی می‌مانند.",
         "memberFormerBadge": "عضو پیشین",
-        "memberOrderHint": "این ترتیب برای کل خانوار است: تقویم، برنامهٔ زمانی و هر فهرست افراد از آن پیروی می‌کنند. برای تغییر، دستگیره را بکشید یا روی آن فوکوس کنید و کلیدهای جهت‌نما را بزنید. اعضای جدید پس از آن و به ترتیب نام می‌آیند.",
+        "memberOrderHint": "این ترتیب در کل خانوار اعمال می‌شود. برای تغییر، دستگیره را بکش یا از کلیدهای جهت استفاده کن.",
         "logout": "خروج",
         "logoutConfirm": "از این دستگاه خارج می‌شوید؟",
         "synchronizing": "در حال همگام‌سازی…",
@@ -2183,7 +2197,7 @@
         "pwaInstallTitle": "نصب Yuvomi روی این دستگاه",
         "pwaInstallChecking": "در حال بررسی امکان نصب...",
         "pwaInstallReady": "می‌توان Yuvomi را به عنوان برنامه روی این دستگاه نصب کرد.",
-        "pwaInstallUnavailable": "نصب در این مرورگر در حال حاضر در دسترس نیست.",
+        "pwaInstallUnavailable": "این مرورگر در اینجا نصب را پیشنهاد نمی‌کند. در Chrome و Edge آن را در منوی مرورگر پیدا می‌کنی و در Safari از اشتراک‌گذاری > افزودن به Dock یا افزودن به صفحهٔ اصلی. بدون نشانی HTTPS هیچ مرورگری آن را پیشنهاد نمی‌کند.",
         "pwaInstallInstalled": "Yuvomi از پیش روی این دستگاه نصب شده است.",
         "pwaInstallIosHint": "در iPhone یا iPad منوی اشتراک‌گذاری را باز کرده و افزودن به صفحه اصلی را انتخاب کنید.",
         "pwaInstallButton": "نصب برنامه",
@@ -2551,7 +2565,7 @@
         "emptyStateNoAccounts": "هنوز حسابی متصل نیست",
         "housekeepingPaymentsTitle": "کارهای پرداخت",
         "housekeepingPaymentTasksLabel": "در هر ورود، یک کار پرداخت ایجاد شود",
-        "housekeepingPaymentTasksHint": "اگر فعال باشد، در هر ورود یک کار برای پرداخت به خدمتکار خانه ایجاد می‌شود. انجام این کار، بازدید را به عنوان پرداخت‌شده علامت می‌زند.",
+        "housekeepingPaymentTasksHint": "اگر فعال باشد، در هر ورود یک کار برای پرداخت به خدمتکار خانه ایجاد می‌شود. انجام این کار، بازدید را به عنوان پرداخت‌شده علامت می‌زند. فقط کسی که ورود را ثبت می‌کند و مدیران آن را می‌بینند.",
         "housekeepingPaymentTasksSaved": "تنظیم پرداخت خدمتکار خانه ذخیره شد.",
         "tabModules": "ماژول‌ها",
         "thirdPartyModulesTitle": "ماژول‌ها",
@@ -3199,7 +3213,25 @@
         "displayRemoveDeviceActive": "این دستگاه هنوز جفت است. ابتدا آن را باطل کنید.",
         "feedExportIncludeBirthdays": "شامل کردن تولدها",
         "feedExportIncludeBirthdaysHint": "هنگام اشتراک در خوراک جداگانه تولدها، این گزینه را خاموش کنید تا تولدها و روزهای نام تکرار نشوند.",
-        "birthdayFeedHint": "هر کسی با این پیوند می‌تواند همه تولدها و روزهای نام ذخیره‌شده در خانواده را ببیند، حتی بدون یادآوری. فقط در دستگاه‌های خودتان استفاده کنید."
+        "birthdayFeedHint": "هر کسی با این پیوند می‌تواند همه تولدها و روزهای نام ذخیره‌شده در خانواده را ببیند، حتی بدون یادآوری. فقط در دستگاه‌های خودتان استفاده کنید.",
+        "skipToSheet": "رفتن به تنظیم",
+        "screensaverOffTitle": "محافظ صفحه با عکس",
+        "screensaverNeedsImmich": "محافظ صفحه وقتی شروع می‌شود که یک مدیر Immich را وصل کند. بعد از آن، زمان انتظار، ساعت و برش عکس را برای این دستگاه همین‌جا تنظیم می‌کنی.",
+        "screensaverConnectImmich": "وصل کردن Immich",
+        "weatherPlaceLabel": "مکان",
+        "weatherPlaceHint": "جست‌وجو در سرویس هواشناسی Open-Meteo انجام می‌شود. فقط نام مکان ارسال می‌شود.",
+        "weatherPlacePlaceholder": "شهر یا کد پستی",
+        "weatherPlaceSearch": "جست‌وجو",
+        "weatherPlaceCurrent": "فعلی: {{place}}",
+        "weatherPlaceNone": "هنوز مکانی انتخاب نشده است.",
+        "weatherPlaceResultsLabel": "مکان‌های یافت‌شده",
+        "weatherPlacePick": "مکان خود را از فهرست انتخاب کن.",
+        "weatherPlaceChosen": "{{place}} انتخاب شد. برای اعمال، ذخیره کن.",
+        "weatherPlaceRequired": "یک مکان جست‌وجو کن و آن را از فهرست انتخاب کن.",
+        "weatherPlaceTooShort": "دست‌کم دو نویسه وارد کن.",
+        "weatherPlaceNotFound": "مکانی با این نام پیدا نشد. نام کشور را اضافه کن، مثلاً «تبریز، ایران».",
+        "weatherPlaceUnavailable": "جست‌وجوی مکان اکنون در دسترس نیست. کمی بعد دوباره امتحان کن یا مختصات را دستی وارد کن.",
+        "weatherManualTitle": "مختصات به‌صورت دستی"
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "آفلاین - در حال بازیابی اتصال…",
-        "staleData": "آفلاین - وضعیت: {{time}}"
+        "staleData": "آفلاین - وضعیت: {{time}}",
+        "pageTitle": "آفلاین هستید",
+        "pageDescription": "این صفحه به اتصال نیاز دارد. به‌محض آنلاین شدن دوباره دستگاه، خودش بارگیری می‌شود."
     },
     "emptyHint": {
         "tasks": "برای ساخت اولین کار خود روی + بزنید. یک کارت را برای انجام‌شدن به چپ و برای مشاهده به راست بکشید.",
@@ -3882,7 +3916,6 @@
         "taskAreaPlaceholder": "مثال: حمام",
         "taskFrequency": "دفعات (روز)",
         "taskCreatedToast": "کار نظافت خانه ایجاد شد.",
-        "dashboard": "نمای کلی",
         "reports": "گزارش‌ها",
         "visitsThisMonth": "بازدیدهای این ماه",
         "lastVisit": "آخرین بازدید",
@@ -4011,7 +4044,12 @@
         "currentMonth": "جاری",
         "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
         "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند",
-        "reportVisitsCount": "بازدیدها"
+        "reportVisitsCount": "بازدیدها",
+        "amountsPermissionLabel": "دیدن دستمزدها و پرداخت‌ها",
+        "errorAmountsHidden": "فقط کسی که اجازه دیدن مبالغ کمک منزل را دارد می‌تواند پرداخت را ثبت کند.",
+        "notHereToday": "امروز هنوز نیامده",
+        "tabVisits": "بازدیدها",
+        "tabChores": "کارهای خانه"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",
@@ -4040,7 +4078,6 @@
         "noBalances": "همه‌چیز تسویه شده است.",
         "noExpenses": "هزینه منطبقی نیست.",
         "noActivity": "هنوز فعالیتی نیست.",
-        "owes": "بدهکار است",
         "system": "سیستم",
         "quickGroceries": "هزینه سوپرمارکت",
         "quickSchool": "تقسیم هزینه مدرسه",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} به {{payee}}، {{amount}}. یک ثبت معکوس پرداخت را لغو می‌کند و مانده‌ها به حالت قبل برمی‌گردند. پرداخت با علامت برگشت‌خورده در فعالیت می‌ماند.",
         "loadMoreActivity": "بارگذاری بیشتر",
         "expenseDeleted": "حذف‌شده",
-        "youAreOwedInGroup": "طلب تو در {{group}}",
-        "youOweInGroup": "بدهی تو در {{group}}"
+        "youAreOwedInGroup": "{{group}}: طلب تو",
+        "youOweInGroup": "{{group}}: بدهی تو",
+        "debtYouOwe": "به {{name}} بدهکارید",
+        "debtOwesYou": "{{name}} به شما بدهکار است",
+        "debtOwes": "{{from}} به {{to}} بدهکار است"
     },
     "wmo": {
         "0": "آسمان صاف",
@@ -4256,7 +4296,8 @@
         "submit": "ارسال پیوند",
         "sent": "اگر حساب مطابقی وجود داشته باشد، پیوند بازنشانی ارسال شد.",
         "backToLogin": "بازگشت به ورود",
-        "unavailable": "این خانوار امکان بازنشانی رمز عبور را ارائه نمی‌دهد. لطفاً با مدیر خانوار خود تماس بگیرید."
+        "unavailable": "این خانوار امکان بازنشانی رمز عبور را ارائه نمی‌دهد. لطفاً با مدیر خانوار خود تماس بگیرید.",
+        "identifierRequired": "نام کاربری یا نشانی ایمیل خود را وارد کنید."
     },
     "resetPassword": {
         "title": "تعیین رمز عبور جدید",
@@ -4286,6 +4327,15 @@
         "test": "آزمایش اتصال",
         "testSuccess": "ایمیل آزمایشی با موفقیت ارسال شد.",
         "testFailed": "آزمایش ناموفق بود: {{error}}",
+        "portInvalid": "یک درگاه از {{min}} تا {{max}} وارد کنید.",
+        "testFailedNotConfigured": "ابتدا میزبان SMTP و نشانی فرستنده را وارد کنید.",
+        "testFailedAuth": "سرور نام کاربری یا رمز عبور را نپذیرفت.",
+        "testFailedConnection": "سرور در این میزبان و درگاه در دسترس نیست.",
+        "testFailedTls": "اتصال رمزگذاری‌شده برقرار نشد. رمزگذاری و درگاه را بررسی کنید.",
+        "testFailedRejected": "سرور ایمیل آزمایشی را نپذیرفت. نشانی فرستنده را بررسی کنید.",
+        "testFailedUnknown": "ایمیل آزمایشی ارسال نشد.",
+        "testNoRecipient": "ایمیل آزمایشی به نشانی خود شما فرستاده می‌شود که هنوز ثبت نشده است. آن را در حساب ← ایمیل وارد کنید.",
+        "testNoRecipientLink": "باز کردن حساب",
         "saveFailed": "ذخیره‌سازی ناموفق بود: {{error}}",
         "saved": "تنظیمات ذخیره شد."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "روزانه",
                 "none": "هنوز بازه زمانی‌ای نیست.",
                 "delete": "حذف بازه زمانی",
-                "newHint": "دارو را ذخیره کنید، سپس می‌توانید بازه‌های زمانی اضافه کنید.",
                 "timeRequired": "زمان الزامی است."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "نوع مطابقی در این خانوار نیست",
         "mappingProfileStatusAmbiguousType": "مبهم - چند نوع این نام را دارند",
         "icsCalendarName": "جمع‌آوری زباله",
-        "icsPickupSummary": "جمع‌آوری: {{name}}"
+        "icsPickupSummary": "جمع‌آوری: {{name}}",
+        "intervalDecrease": "کاهش فاصله",
+        "intervalIncrease": "افزایش فاصله"
     },
     "rewards": {
         "title": "پاداش‌ها",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "پاک کردن انتخاب",
         "continuesUntil": "…تا {{time}} ادامه دارد",
         "overviewEmptyTitle": "افرادی را برای مقایسه انتخاب کن",
-        "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی."
+        "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی.",
+        "presetCodes": {
+            "early": "ص",
+            "late": "ع",
+            "night": "ش",
+            "day": "ر",
+            "vacation": "مر",
+            "sick": "بی",
+            "exam": "ام",
+            "lecture": "سخ",
+            "seminar": "سم",
+            "lab": "آز"
+        },
+        "typesWithTime": "با ساعت"
     },
     "pairDisplay": {
         "title": "جفت‌سازی تبلت",

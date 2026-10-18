@@ -47,6 +47,11 @@ const STUBS = {
       logout: async () => ({ ok: true }),
       updateProfile: async () => ({ user: null }),
     };
+    export const email = {
+      getConfig: async () => ({ data: null }),
+      saveConfig: async () => ({ data: null }),
+      test: async () => ({ data: null }),
+    };
     export const notifications = {
       providers: async () => ({ data: [] }),
       listChannels: async () => ({ data: [] }),
@@ -209,6 +214,11 @@ const STUBS = {
       globalThis.__reportFieldError?.(...args);
       return false;
     };
+    // Das Gegenstueck: wer sehen will, dass ein Handler einen alten
+    // Feldfehler raeumt, setzt globalThis.__clearFieldError.
+    export const clearFieldError = (...args) => {
+      globalThis.__clearFieldError?.(...args);
+    };
     // Wie das Original (components/modal.js): alle Eintraege mit Feld, je Feld
     // der erste - ueber __reportFieldError gemeldet, in der Reihenfolge der
     // Liste (eine Dokumentreihenfolge kennt der Stub nicht).
@@ -339,6 +349,8 @@ const STUBS = {
     export const drawChartOnce = () => 0;
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
+    // Reine Pruefung ohne DOM - der Stub rechnet wie das Original.
+    export const isImeComposing = (event) => Boolean(event?.isComposing || event?.keyCode === 229);
   `,
   // Inhaltswechsel und Listenbewegung (R16): ohne Layout gibt es nichts zu
   // bewegen - der Tausch selbst muss trotzdem laufen, genau einmal und
@@ -385,6 +397,12 @@ const STUBS = {
     // Der Pflichtstern (R16): dieselbe Zeichenkette wie in public/utils/html.js;
     // test-frontend-audit.js haelt das Original fest.
     export const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
+    // Rechnet wie das Original (test:detail-view prueft es dort).
+    export const externalHref = (value) => {
+      const url = String(value ?? '').trim();
+      // Doppelte Backslashes: der Stub ist ein Template-Literal.
+      return /^https?:\\/\\/\\S/i.test(url) ? url : '';
+    };
     // Wie __renderUserMultiSelect weiter unten: Suiten, die pruefen wollen, WAS
     // ein Aufrufer dem Markdown-Renderer uebergibt (die Checklisten-Optionen
     // etwa), setzen globalThis.__renderMarkdownLight. Ohne das bleibt es beim

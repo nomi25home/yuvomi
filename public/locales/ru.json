@@ -44,6 +44,9 @@
         "errorOccurred": "Что-то пошло не так.",
         "unexpectedError": "Произошла непредвиденная ошибка.",
         "errorDetails": "Технические подробности",
+        "pageFailedTitle": "Раздел «{{page}}» сейчас не открывается",
+        "pageFailedHint": "Все остальные разделы работают как обычно.",
+        "toOverview": "К обзору",
         "errorGeneric": "Произошла ошибка.",
         "updateAvailable": "Доступно обновление - перезагрузите страницу для получения последней версии.",
         "titleRequired": "Заголовок обязателен",
@@ -86,13 +89,17 @@
         },
         "toShoppingListNamed": "Добавить {{title}} в список покупок",
         "emailInUse": "Этот адрес электронной почты уже принадлежит другой учётной записи.",
+        "emailInvalid": "Введи действительный адрес электронной почты.",
         "sessionUnreachableTitle": "Соединение прервано",
+        "serverNotReadyTitle": "Сервер сейчас не готов",
+        "rateLimitedTitle": "Слишком много запросов",
         "sessionRetryHint": "Сеанс сохраняется. Новая попытка через {{seconds}} с.",
         "sessionRetrying": "Повторная попытка…",
         "searchNoResultsTitle": "Ничего не найдено",
         "searchNoResultsDescription": "Ничего не подходит под ваш запрос.",
         "searchNoResultsFilteredDescription": "Ничего не подходит под ваш запрос и фильтры.",
-        "searchReset": "Сбросить поиск"
+        "searchReset": "Сбросить поиск",
+        "passwordMinLength": "Не менее 8 символов."
     },
     "kitchen": {
         "noShoppingLists": "Списка покупок ещё нет.",
@@ -1665,10 +1672,12 @@
         "deleteLoanPaymentConfirm": "Удалить этот платеж по займу?",
         "loanRemainingAmount": "Осталось",
         "loanRemainingPrincipal": "Остаток основного долга",
+        "loanOwedToYou": "Ещё причитается тебе",
         "loanStillToPay": "Осталось выплатить",
         "loanPrincipalAmount": "Сумма кредита",
         "loanRemainingInstallments": "Осталось платежей",
         "loanPaidAmount": "Оплачено",
+        "loanReceivedAmount": "Возвращено",
         "loansEmpty": "Нет активных займов.",
         "loanInstallmentMeta": "Оплачено {{paid}} из {{total}} платежей",
         "loanRemainingOf": "из {{total}}",
@@ -1680,7 +1689,8 @@
         "loanSortBalance": "Сначала наименьший остаток долга",
         "loanSortActive": "Сортировка: {{sort}}",
         "loanPaidStatus": "Оплачено",
-        "markLoanPaid": "Отметить оплату",
+        "loanBookInstallment": "Записать платёж",
+        "loanReceiveRepayment": "Возврат получен",
         "loanBorrowerLabel": "Человек",
         "loanDirectionLabel": "Тип займа",
         "loanDirectionLent": "Выдан (мне возвращают)",
@@ -1848,8 +1858,6 @@
         "accountType_credit": "Кредитная карта",
         "accountType_investment": "Инвестиции",
         "accountType_other": "Другое",
-        "viewAccountTransactions": "Показать операции по счёту {{name}}",
-        "currentBalance": "Текущий баланс",
         "clearAccountFilter": "Убрать фильтр счёта",
         "archivedBadge": "В архиве",
         "showArchivedAccounts": "Показать архивные",
@@ -1892,6 +1900,7 @@
         "statsPointsLabel": "Значения кривой",
         "statsPointLabel": "{{period}}: доходы {{income}}, расходы {{expenses}}",
         "statsPointLabelCumulative": "До {{period}}: доходы {{income}}, расходы {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} запланировано",
         "receiptsLabel": "Чеки",
         "receiptsHint": "Чек или счёт по этой операции.",
         "receiptDocumentName": "Чек: {{title}} ({{date}})",
@@ -1941,7 +1950,8 @@
         "ledgerSortDate": "По дате",
         "ledgerSortAmount": "По сумме",
         "ledgerSortActive": "Сортировка: {{sort}}",
-        "ledgerAccountsAll": "Все счета"
+        "ledgerAccountsAll": "Все счета",
+        "showAccountTransactions": "Показать операции по счёту"
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",
@@ -2036,6 +2046,8 @@
         "confirmPasswordLabel": "Подтвердить новый пароль",
         "savePassword": "Сохранить пароль",
         "passwordMismatch": "Пароли не совпадают.",
+        "currentPasswordWrong": "Текущий пароль неверен.",
+        "passwordTooShort": "Не менее 8 символов.",
         "passwordSavedToast": "Пароль успешно изменён.",
         "oidcLinkTitle": "Единый вход",
         "oidcLinkHint": "Свяжите свою учётную запись SSO с этой, чтобы вход через поставщика приводил сюда, а не создавал вторую учётную запись.",
@@ -2145,6 +2157,7 @@
         "familyRoleGrandparent": "Дедушка/бабушка",
         "familyRoleRelative": "Родственник",
         "familyRoleOther": "Член семьи",
+        "childStartHint": "Новые детские аккаунты начинают без бюджета и голодания и видят помощь по дому только для чтения, без оплаты и платежей. Позже это можно изменить в разделе «Роли и права».",
         "systemAdminLabel": "Системный администратор",
         "systemAdminHint": "Системные администраторы могут управлять настройками, интеграциями, API-токенами и семейными аккаунтами.",
         "systemAdminBadge": "Системный администратор",
@@ -2161,7 +2174,7 @@
         "removeMemberNamed": "Убрать {{name}}",
         "memberDeactivatedToast": "Учётная запись {{name}} отключена. Записи сохранены.",
         "memberFormerBadge": "Бывший участник",
-        "memberOrderHint": "Этот порядок действует для всего домохозяйства: ему следуют календарь, расписание и каждый список людей. Чтобы изменить его, перетащите маркер или установите на него фокус и нажимайте клавиши со стрелками. Новые участники идут после него, по имени.",
+        "memberOrderHint": "Этот порядок действует во всём доме. Чтобы изменить его, перетащи ручку или используй стрелки.",
         "logout": "Выйти",
         "logoutConfirm": "Выйти на этом устройстве?",
         "synchronizing": "Синхронизация…",
@@ -2190,7 +2203,7 @@
         "pwaInstallTitle": "Установить Yuvomi на это устройство",
         "pwaInstallChecking": "Проверка доступности установки...",
         "pwaInstallReady": "Yuvomi можно установить как приложение на этом устройстве.",
-        "pwaInstallUnavailable": "Установка сейчас недоступна в этом браузере.",
+        "pwaInstallUnavailable": "Этот браузер здесь не предлагает установку. В Chrome и Edge она есть в меню браузера, в Safari через «Поделиться» > «Добавить в Dock» или «На экран „Домой“». Без адреса HTTPS её не предлагает ни один браузер.",
         "pwaInstallInstalled": "Yuvomi уже установлен на этом устройстве.",
         "pwaInstallIosHint": "На iPhone или iPad откройте меню Поделиться и выберите На экран Домой.",
         "pwaInstallButton": "Установить приложение",
@@ -2384,7 +2397,7 @@
         "deleteCardDAVAccountConfirm": "Синхронизированные контакты останутся, но потеряют связь с CardDAV.",
         "housekeepingPaymentsTitle": "Задачи по оплате",
         "housekeepingPaymentTasksLabel": "Создавать задачу по оплате при каждом приходе",
-        "housekeepingPaymentTasksHint": "Если включено, при каждом приходе создаётся задача по оплате уборки. Выполнение этой задачи отмечает визит как оплаченный.",
+        "housekeepingPaymentTasksHint": "Если включено, при каждом приходе создаётся задача по оплате уборки. Выполнение этой задачи отмечает визит как оплаченный. Её видят только тот, кто отмечает приход, и администраторы.",
         "housekeepingPaymentTasksSaved": "Настройка оплаты уборки сохранена.",
         "backupSchedulerDisabled": "Выключено",
         "backupSchedulerEnabled": "Включено",
@@ -3386,7 +3399,25 @@
         "displayRemoveDeviceActive": "Это устройство ещё подключено. Сначала отзовите его.",
         "feedExportIncludeBirthdays": "Включать дни рождения",
         "feedExportIncludeBirthdaysHint": "Отключите при отдельной подписке на дни рождения, чтобы дни рождения и именины не дублировались.",
-        "birthdayFeedHint": "Любой, у кого есть эта ссылка, увидит все дни рождения и именины, сохранённые в семье, даже без напоминаний. Используйте её только на собственных устройствах."
+        "birthdayFeedHint": "Любой, у кого есть эта ссылка, увидит все дни рождения и именины, сохранённые в семье, даже без напоминаний. Используйте её только на собственных устройствах.",
+        "skipToSheet": "Перейти к настройке",
+        "screensaverOffTitle": "Фотозаставка",
+        "screensaverNeedsImmich": "Заставка запустится, когда администратор подключит Immich. После этого здесь настраиваются задержка, часы и кадрирование фото для этого устройства.",
+        "screensaverConnectImmich": "Подключить Immich",
+        "weatherPlaceLabel": "Место",
+        "weatherPlaceHint": "Поиск выполняется в погодном сервисе Open-Meteo. Передаётся только название места.",
+        "weatherPlacePlaceholder": "Город или почтовый индекс",
+        "weatherPlaceSearch": "Найти",
+        "weatherPlaceCurrent": "Сейчас: {{place}}",
+        "weatherPlaceNone": "Место ещё не выбрано.",
+        "weatherPlaceResultsLabel": "Найденные места",
+        "weatherPlacePick": "Выбери своё место из списка.",
+        "weatherPlaceChosen": "Выбрано: {{place}}. Сохрани, чтобы применить.",
+        "weatherPlaceRequired": "Найди место и выбери его из списка.",
+        "weatherPlaceTooShort": "Введи не меньше двух символов.",
+        "weatherPlaceNotFound": "Место с таким названием не найдено. Добавь страну, например «Кировск, Россия».",
+        "weatherPlaceUnavailable": "Поиск мест сейчас недоступен. Попробуй чуть позже или введи координаты вручную.",
+        "weatherManualTitle": "Координаты вручную"
     },
     "login": {
         "tagline": "С возвращением в ваш семейный планировщик.",
@@ -3588,7 +3619,8 @@
         "resultCountMany": "{{count}} результатов",
         "goTo": "Перейти к",
         "newSection": "Создать",
-        "recentLabel": "Недавно открытые"
+        "recentLabel": "Недавно открытые",
+        "createTaskNamed": "Создать «{{title}}» как задачу"
     },
     "birthdays": {
         "inDays_one": "через {{count}} день",
@@ -3710,7 +3742,9 @@
     },
     "offline": {
         "banner": "Офлайн - переподключение…",
-        "staleData": "Офлайн - по состоянию на: {{time}}"
+        "staleData": "Офлайн - по состоянию на: {{time}}",
+        "pageTitle": "Ты офлайн",
+        "pageDescription": "Этой странице нужно подключение. Как только устройство снова будет онлайн, она загрузится сама."
     },
     "emptyHint": {
         "recipes": "Рецепт попадает прямо в план питания или в список покупок.",
@@ -4106,7 +4140,6 @@
         "taskAreaPlaceholder": "Например: ванная",
         "taskFrequency": "Периодичность (дни)",
         "taskCreatedToast": "Задача по уборке создана.",
-        "dashboard": "Обзор",
         "reports": "Отчёты",
         "visitsThisMonth": "Визитов за месяц",
         "lastVisit": "Последний визит",
@@ -4235,7 +4268,12 @@
         "currentMonth": "Текущий",
         "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
         "settledAdminOnly": "Изменить или удалить может только администратор",
-        "reportVisitsCount": "Визиты"
+        "reportVisitsCount": "Визиты",
+        "amountsPermissionLabel": "Видеть оплату и платежи",
+        "errorAmountsHidden": "Отметить оплату может только тот, кому видны суммы помощницы по дому.",
+        "notHereToday": "Сегодня ещё не пришла",
+        "tabVisits": "Визиты",
+        "tabChores": "Дела по дому"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",
@@ -4268,7 +4306,6 @@
         "noBalances": "Все расчеты закрыты.",
         "noExpenses": "Нет расходов для этого вида.",
         "noActivity": "Активности пока нет.",
-        "owes": "должен",
         "system": "Система",
         "quickGroceries": "Расход в супермаркете",
         "quickSchool": "Разделить школьные расходы",
@@ -4424,8 +4461,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Обратная проводка отменяет платеж, и балансы возвращаются к прежним. Платеж остается в активности с пометкой «сторнирован».",
         "loadMoreActivity": "Загрузить ещё",
         "expenseDeleted": "Удален",
-        "youAreOwedInGroup": "Тебе должны в {{group}}",
-        "youOweInGroup": "Ты должен в {{group}}"
+        "youAreOwedInGroup": "{{group}}: Тебе должны",
+        "youOweInGroup": "{{group}}: Ты должен",
+        "debtYouOwe": "Ваш долг: {{name}}",
+        "debtOwesYou": "Долг вам: {{name}}",
+        "debtOwes": "{{from}} должен {{to}}"
     },
     "wmo": {
         "0": "Ясное небо",
@@ -4492,7 +4532,8 @@
         "submit": "Отправить ссылку",
         "sent": "Если подходящая учётная запись существует, ссылка для сброса отправлена.",
         "backToLogin": "Вернуться ко входу",
-        "unavailable": "В этом домохозяйстве сброс пароля не предусмотрен. Обратитесь к администратору вашего домохозяйства."
+        "unavailable": "В этом домохозяйстве сброс пароля не предусмотрен. Обратитесь к администратору вашего домохозяйства.",
+        "identifierRequired": "Введите имя пользователя или адрес электронной почты."
     },
     "resetPassword": {
         "title": "Задать новый пароль",
@@ -4522,6 +4563,15 @@
         "test": "Проверить соединение",
         "testSuccess": "Тестовое письмо успешно отправлено.",
         "testFailed": "Тест не удался: {{error}}",
+        "portInvalid": "Введи порт от {{min}} до {{max}}.",
+        "testFailedNotConfigured": "Сначала введи SMTP-сервер и адрес отправителя.",
+        "testFailedAuth": "Сервер отклонил имя пользователя или пароль.",
+        "testFailedConnection": "Сервер недоступен по этому адресу и порту.",
+        "testFailedTls": "Не удалось установить зашифрованное соединение. Проверь шифрование и порт.",
+        "testFailedRejected": "Сервер не принял тестовое письмо. Проверь адрес отправителя.",
+        "testFailedUnknown": "Не удалось отправить тестовое письмо.",
+        "testNoRecipient": "Тестовое письмо отправляется на твой адрес, а он ещё не указан. Добавь его в Аккаунт → Эл. почта.",
+        "testNoRecipientLink": "Открыть аккаунт",
         "saveFailed": "Не удалось сохранить: {{error}}",
         "saved": "Настройки сохранены."
     },
@@ -5067,7 +5117,6 @@
                 "daily": "Ежедневно",
                 "none": "Пока нет времени приёма.",
                 "delete": "Удалить время",
-                "newHint": "Сохраните лекарство, чтобы добавить время приёма.",
                 "timeRequired": "Время обязательно."
             },
             "weekday": {
@@ -5990,7 +6039,9 @@
         "mappingProfileStatusUnmatchedType": "В этой семье нет соответствующего вида",
         "mappingProfileStatusAmbiguousType": "Неоднозначно - несколько типов имеют одинаковое имя",
         "icsCalendarName": "Вывоз мусора",
-        "icsPickupSummary": "Вывоз: {{name}}"
+        "icsPickupSummary": "Вывоз: {{name}}",
+        "intervalDecrease": "Уменьшить интервал",
+        "intervalIncrease": "Увеличить интервал"
     },
     "rewards": {
         "title": "Награды",
@@ -6662,7 +6713,20 @@
         "overviewClearSelection": "Сбросить выбор",
         "continuesUntil": "…продолжается до {{time}}",
         "overviewEmptyTitle": "Выберите людей для сравнения",
-        "overviewEmptyDescription": "Выберите выше хотя бы одного члена семьи, чтобы увидеть недельные расписания рядом друг с другом."
+        "overviewEmptyDescription": "Выберите выше хотя бы одного члена семьи, чтобы увидеть недельные расписания рядом друг с другом.",
+        "presetCodes": {
+            "early": "У",
+            "late": "В",
+            "night": "Н",
+            "day": "Д",
+            "vacation": "О",
+            "sick": "Б",
+            "exam": "Э",
+            "lecture": "Л",
+            "seminar": "С",
+            "lab": "ЛР"
+        },
+        "typesWithTime": "Со временем"
     },
     "pairDisplay": {
         "title": "Подключение планшета",

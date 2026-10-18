@@ -42,6 +42,9 @@
         "errorOccurred": "Bir şeyler ters gitti.",
         "unexpectedError": "Beklenmeyen bir hata oluştu.",
         "errorDetails": "Teknik ayrıntılar",
+        "pageFailedTitle": "{{page}} sayfası şu anda açılamıyor",
+        "pageFailedHint": "Diğer tüm bölümler çalışmaya devam ediyor.",
+        "toOverview": "Genel bakışa git",
         "errorGeneric": "Bir hata oluştu.",
         "updateAvailable": "Güncelleme mevcut - en son sürümü almak için sayfayı yenileyin.",
         "titleRequired": "Başlık zorunludur",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "{{title}} yemeğini alışveriş listesine ekle",
         "emailInUse": "Bu e-posta adresi zaten başka bir hesaba ait.",
+        "emailInvalid": "Geçerli bir e-posta adresi gir.",
         "sessionUnreachableTitle": "Bağlantı kesildi",
+        "serverNotReadyTitle": "Sunucu şu anda hazır değil",
+        "rateLimitedTitle": "Çok fazla istek",
         "sessionRetryHint": "Oturumun açık kalır. {{seconds}} sn sonra yeniden denenecek.",
         "sessionRetrying": "Yeniden deneniyor…",
         "searchNoResultsTitle": "Sonuç yok",
         "searchNoResultsDescription": "Aramanızla eşleşen bir şey yok.",
         "searchNoResultsFilteredDescription": "Aramanız ve filtrelerinizle eşleşen bir şey yok.",
-        "searchReset": "Aramayı sıfırla"
+        "searchReset": "Aramayı sıfırla",
+        "passwordMinLength": "En az 8 karakter."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "Bu kredi ödemesi silinsin mi?",
         "loanRemainingAmount": "Kalan",
         "loanRemainingPrincipal": "Kalan anapara",
+        "loanOwedToYou": "Hâlâ alacağın",
         "loanStillToPay": "Ödenecek tutar",
         "loanPrincipalAmount": "Kredi tutarı",
         "loanRemainingInstallments": "Kalan taksit",
         "loanPaidAmount": "Ödenen",
+        "loanReceivedAmount": "Geri alınan",
         "loansEmpty": "Aktif borç yok.",
         "loanInstallmentMeta": "{{paid}} / {{total}} taksit ödendi",
         "loanRemainingOf": "{{total}} içinden",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "En düşük kalan anapara önce",
         "loanSortActive": "Sıralama: {{sort}}",
         "loanPaidStatus": "Ödendi",
-        "markLoanPaid": "Ödendi işaretle",
+        "loanBookInstallment": "Taksiti kaydet",
+        "loanReceiveRepayment": "Geri ödeme alındı",
         "loanBorrowerLabel": "Kişi",
         "loanDirectionLabel": "Kredi türü",
         "loanDirectionLent": "Verilen (bana geri ödeniyor)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "Kredi kartı",
         "accountType_investment": "Yatırım",
         "accountType_other": "Diğer",
-        "viewAccountTransactions": "{{name}} hareketlerini göster",
-        "currentBalance": "Güncel bakiye",
         "clearAccountFilter": "Hesap filtresini kaldır",
         "archivedBadge": "Arşivlendi",
         "showArchivedAccounts": "Arşivlenenleri göster",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "Eğri değerleri",
         "statsPointLabel": "{{period}}: gelir {{income}}, gider {{expenses}}",
         "statsPointLabelCumulative": "{{period}} tarihine kadar: gelir {{income}}, gider {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} planlanan",
         "receiptsLabel": "Fişler",
         "receiptsHint": "Bu işleme ait fiş veya fatura.",
         "receiptDocumentName": "Fiş: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "Tarihe göre",
         "ledgerSortAmount": "Tutara göre",
         "ledgerSortActive": "Sıralama: {{sort}}",
-        "ledgerAccountsAll": "Tüm hesaplar"
+        "ledgerAccountsAll": "Tüm hesaplar",
+        "showAccountTransactions": "Hareketleri göster"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",
@@ -1876,6 +1886,8 @@
         "confirmPasswordLabel": "Yeni şifreyi onayla",
         "savePassword": "Şifreyi kaydet",
         "passwordMismatch": "Şifreler eşleşmiyor.",
+        "currentPasswordWrong": "Mevcut şifre doğru değil.",
+        "passwordTooShort": "En az 8 karakter.",
         "passwordSavedToast": "Şifre başarıyla değiştirildi.",
         "oidcLinkTitle": "Çoklu oturum açma",
         "oidcLinkHint": "SSO hesabını bu hesapla bağla; böylece sağlayıcı üzerinden giriş ikinci bir hesap oluşturmak yerine seni buraya getirir.",
@@ -1985,6 +1997,7 @@
         "familyRoleGrandparent": "Büyükanne/Büyükbaba",
         "familyRoleRelative": "Akraba",
         "familyRoleOther": "Aile üyesi",
+        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz.",
         "systemAdminLabel": "Sistem yöneticisi",
         "systemAdminHint": "Sistem yöneticileri ayarları, entegrasyonları, API tokenlarını ve aile hesaplarını yönetebilir.",
         "systemAdminBadge": "Sistem yöneticisi",
@@ -2001,7 +2014,7 @@
         "removeMemberNamed": "{{name}} hesabını kaldır",
         "memberDeactivatedToast": "{{name}} devre dışı bırakıldı. Kayıtlar korunuyor.",
         "memberFormerBadge": "Eski üye",
-        "memberOrderHint": "Bu sıra tüm hane için geçerlidir: takvim, ders programı ve her kişi listesi onu izler. Değiştirmek için bir tutamacı sürükleyin veya ona odaklanıp ok tuşlarına basın. Yeni üyeler ada göre sıralanarak sonra gelir.",
+        "memberOrderHint": "Bu sıra tüm hanede geçerlidir. Değiştirmek için tutamacı sürükle veya ok tuşlarını kullan.",
         "logout": "Çıkış yap",
         "logoutConfirm": "Bu cihazdan çıkış yapılsın mı?",
         "synchronizing": "Senkronize ediliyor…",
@@ -2030,7 +2043,7 @@
         "pwaInstallTitle": "Yuvomi’u bu cihaza yükle",
         "pwaInstallChecking": "Yükleme uygunluğu kontrol ediliyor...",
         "pwaInstallReady": "Yuvomi bu cihaza uygulama olarak yüklenebilir.",
-        "pwaInstallUnavailable": "Yükleme şu anda bu tarayıcıda kullanılamıyor.",
+        "pwaInstallUnavailable": "Bu tarayıcı burada yüklemeyi sunmuyor. Chrome ve Edge'de tarayıcı menüsünde, Safari'de Paylaş > Dock'a Ekle veya Ana Ekrana Ekle altında bulursun. HTTPS adresi olmadan hiçbir tarayıcı bunu sunmaz.",
         "pwaInstallInstalled": "Yuvomi bu cihazda zaten yüklü.",
         "pwaInstallIosHint": "iPhone veya iPad’de Paylaş menüsünü kullanıp Ana Ekrana Ekle’yi seçin.",
         "pwaInstallButton": "Uygulamayı yükle",
@@ -2218,7 +2231,7 @@
         "deleteCardDAVAccountConfirm": "Eşitlenen kişiler kalır, ancak CardDAV bağlantısını kaybeder.",
         "housekeepingPaymentsTitle": "Ödeme görevleri",
         "housekeepingPaymentTasksLabel": "Her girişte bir ödeme görevi oluştur",
-        "housekeepingPaymentTasksHint": "Etkinleştirildiğinde her girişte ev işleri için bir ödeme görevi oluşturulur. Bu görevi tamamlamak ziyareti ödendi olarak işaretler.",
+        "housekeepingPaymentTasksHint": "Etkinleştirildiğinde her girişte ev işleri için bir ödeme görevi oluşturulur. Bu görevi tamamlamak ziyareti ödendi olarak işaretler. Bu görevi yalnızca girişi yapan kişi ve yöneticiler görür.",
         "housekeepingPaymentTasksSaved": "Ev işleri ödeme ayarı kaydedildi.",
         "backupSchedulerDisabled": "Devre dışı",
         "backupSchedulerEnabled": "Etkin",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "Bu cihaz hâlâ eşleştirilmiş. Önce iptal edin.",
         "feedExportIncludeBirthdays": "Doğum günlerini dahil et",
         "feedExportIncludeBirthdaysHint": "Ayrı doğum günü akışına abone olduğunuzda doğum günlerinin ve isim günlerinin yinelenmesini önlemek için kapatın.",
-        "birthdayFeedHint": "Bu bağlantıya sahip herkes, hatırlatıcıları kapalı olanlar dahil evde kayıtlı tüm doğum günlerini ve isim günlerini görebilir. Yalnızca kendi cihazlarınızda kullanın."
+        "birthdayFeedHint": "Bu bağlantıya sahip herkes, hatırlatıcıları kapalı olanlar dahil evde kayıtlı tüm doğum günlerini ve isim günlerini görebilir. Yalnızca kendi cihazlarınızda kullanın.",
+        "skipToSheet": "Ayara geç",
+        "screensaverOffTitle": "Fotoğraf ekran koruyucu",
+        "screensaverNeedsImmich": "Ekran koruyucu, bir yönetici Immich'i bağladığında başlar. Ardından bu cihaz için bekleme süresini, saati ve fotoğraf kadrajını burada ayarlarsın.",
+        "screensaverConnectImmich": "Immich'i bağla",
+        "weatherPlaceLabel": "Yer",
+        "weatherPlaceHint": "Arama, hava durumu hizmeti Open-Meteo üzerinde yapılır. Yalnızca yer adı gönderilir.",
+        "weatherPlacePlaceholder": "Şehir veya posta kodu",
+        "weatherPlaceSearch": "Ara",
+        "weatherPlaceCurrent": "Şu an: {{place}}",
+        "weatherPlaceNone": "Henüz bir yer seçilmedi.",
+        "weatherPlaceResultsLabel": "Bulunan yerler",
+        "weatherPlacePick": "Listeden yerini seç.",
+        "weatherPlaceChosen": "{{place}} seçildi. Uygulamak için kaydet.",
+        "weatherPlaceRequired": "Bir yer ara ve listeden seç.",
+        "weatherPlaceTooShort": "En az iki karakter gir.",
+        "weatherPlaceNotFound": "Bu adla bir yer bulunamadı. Ülkeyi ekle, örn. “Ereğli, Türkiye”.",
+        "weatherPlaceUnavailable": "Yer arama şu anda erişilemiyor. Birazdan yeniden dene ya da koordinatları elle gir.",
+        "weatherManualTitle": "Koordinatları elle gir"
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",
@@ -3380,7 +3411,8 @@
         "resultCountMany": "{{count}} sonuç",
         "goTo": "Git",
         "newSection": "Yeni oluştur",
-        "recentLabel": "Son açılanlar"
+        "recentLabel": "Son açılanlar",
+        "createTaskNamed": "“{{title}}” görevini oluştur"
     },
     "birthdays": {
         "inDays_one": "{{count}} gün sonra",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Çevrimdışı - yeniden bağlanılıyor…",
-        "staleData": "Çevrimdışı - son güncelleme: {{time}}"
+        "staleData": "Çevrimdışı - son güncelleme: {{time}}",
+        "pageTitle": "Çevrimdışısın",
+        "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir."
     },
     "emptyHint": {
         "recipes": "Bir tarif doğrudan öğün planına ya da alışveriş listesine gider.",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "Örnek: Banyo",
         "taskFrequency": "Sıklık (gün)",
         "taskCreatedToast": "Ev işi görevi oluşturuldu.",
-        "dashboard": "Genel bakış",
         "reports": "Raporlar",
         "visitsThisMonth": "Bu ayki ziyaretler",
         "lastVisit": "Son ziyaret",
@@ -4007,7 +4040,12 @@
         "currentMonth": "Bu Ay",
         "noVisitReportsInMonth": "{{month}} döneminde ziyaret kaydedilmedi.",
         "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir",
-        "reportVisitsCount": "Ziyaretler"
+        "reportVisitsCount": "Ziyaretler",
+        "amountsPermissionLabel": "Ücretleri ve ödemeleri görme",
+        "errorAmountsHidden": "Ödemeyi yalnızca ev yardımcısı tutarlarını görebilen kişi işaretleyebilir.",
+        "notHereToday": "Bugün henüz gelmedi",
+        "tabVisits": "Ziyaretler",
+        "tabChores": "Ev işleri"
     },
     "userMultiSelect": {
         "moreUsers": "daha",
@@ -4040,7 +4078,6 @@
         "noBalances": "Herkes hesaplaştı.",
         "noExpenses": "Bu görünüme uygun gider yok.",
         "noActivity": "Henüz etkinlik yok.",
-        "owes": "borçlu",
         "system": "Sistem",
         "quickGroceries": "Market gideri ekle",
         "quickSchool": "Okul giderlerini böl",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Ters kayıt ödemeyi geçersiz kılar ve bakiyeler önceki haline döner. Ödeme, iptal edildi olarak etkinlikte kalır.",
         "loadMoreActivity": "Daha fazla yükle",
         "expenseDeleted": "Silindi",
-        "youAreOwedInGroup": "{{group}} içinde alacağın",
-        "youOweInGroup": "{{group}} içinde borcun"
+        "youAreOwedInGroup": "{{group}}: Alacağın",
+        "youOweInGroup": "{{group}}: Borcun",
+        "debtYouOwe": "{{name}} kişisine borçlusun",
+        "debtOwesYou": "{{name}} sana borçlu",
+        "debtOwes": "{{from}}, {{to}} kişisine borçlu"
     },
     "wmo": {
         "0": "Açık",
@@ -4256,7 +4296,8 @@
         "submit": "Bağlantıyı gönder",
         "sent": "Eşleşen bir hesap varsa, sıfırlama bağlantısı gönderildi.",
         "backToLogin": "Girişe dön",
-        "unavailable": "Bu hane şifre sıfırlama sunmuyor. Lütfen hane yöneticinizle iletişime geçin."
+        "unavailable": "Bu hane şifre sıfırlama sunmuyor. Lütfen hane yöneticinizle iletişime geçin.",
+        "identifierRequired": "Kullanıcı adınızı veya e-posta adresinizi girin."
     },
     "resetPassword": {
         "title": "Yeni parola belirle",
@@ -4286,6 +4327,15 @@
         "test": "Bağlantıyı test et",
         "testSuccess": "Test e-postası başarıyla gönderildi.",
         "testFailed": "Test başarısız: {{error}}",
+        "portInvalid": "{{min}} ile {{max}} arasında bir port gir.",
+        "testFailedNotConfigured": "Önce SMTP sunucusunu ve gönderen adresini gir.",
+        "testFailedAuth": "Sunucu kullanıcı adını veya şifreyi reddetti.",
+        "testFailedConnection": "Sunucuya bu ana bilgisayar ve port üzerinden ulaşılamıyor.",
+        "testFailedTls": "Şifreli bağlantı kurulamadı. Şifrelemeyi ve portu kontrol et.",
+        "testFailedRejected": "Sunucu test e-postasını kabul etmedi. Gönderen adresini kontrol et.",
+        "testFailedUnknown": "Test e-postası gönderilemedi.",
+        "testNoRecipient": "Test e-postası kendi e-posta adresine gider, ama adres henüz yok. Hesap → E-posta altında ekle.",
+        "testNoRecipientLink": "Hesabı aç",
         "saveFailed": "Kaydetme başarısız: {{error}}",
         "saved": "Ayarlar kaydedildi."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Her gün",
                 "none": "Henüz saat yok.",
                 "delete": "Saati sil",
-                "newHint": "Saat ekleyebilmek için ilacı kaydedin.",
                 "timeRequired": "Saat zorunludur."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Bu ev halkında eşleşen tür yok",
         "mappingProfileStatusAmbiguousType": "Belirsiz - birden fazla tür bu adı taşıyor",
         "icsCalendarName": "Atık toplama",
-        "icsPickupSummary": "Toplama: {{name}}"
+        "icsPickupSummary": "Toplama: {{name}}",
+        "intervalDecrease": "Aralığı azalt",
+        "intervalIncrease": "Aralığı artır"
     },
     "rewards": {
         "title": "Ödüller",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Seçimi temizle",
         "continuesUntil": "…{{time}} saatine kadar sürüyor",
         "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
-        "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç."
+        "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç.",
+        "presetCodes": {
+            "early": "S",
+            "late": "A",
+            "night": "G",
+            "day": "GÜ",
+            "vacation": "İ",
+            "sick": "H",
+            "exam": "SN",
+            "lecture": "D",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Saatli"
     },
     "pairDisplay": {
         "title": "Tableti eşleştir",

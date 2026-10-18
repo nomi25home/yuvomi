@@ -5,7 +5,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -21,7 +21,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { mountEmptyState, mountLoadError, mountSearchEmpty } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
-import { recipeThumbEl, recipeHeroEl, recipeBandEl } from '/utils/recipe-thumb.js';
+import { recipeThumbEl, recipeHeroEl } from '/utils/recipe-thumb.js';
 import { navModuleAccess } from '/permissions.js';
 import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
 import { openDetailView, closeDetailView, detailFooterEl, withPrimaryEdit } from '/components/detail-view.js';
@@ -255,6 +255,7 @@ function recipeThumb(recipe) {
     recipeId: recipe.id,
     hasImage: recipe.provider_has_image,
     hasOwnImage: recipe.has_own_image,
+    imageVersion: recipe.provider_updated_at,
     className: 'recipe-row__thumb',
   });
 }
@@ -1138,16 +1139,13 @@ function fillRecipeDetail(detail, recipe) {
   const ingredients = recipe.ingredients ?? [];
   const mealTypes = normalizeRecipeMealTypes(recipe.meal_types);
   // Das eigene Bild als Kopf des Details (R16) - ohne Bild kein Platzhalterblock
-  // (utils/recipe-thumb.js). Seit R18 tritt an seine Stelle ein flaches Band im
-  // Kuechenton mit dem Zeichen der ersten Mahlzeit, zu der das Rezept passt -
-  // auch dann, wenn das Bild beim Laden scheitert. Die Liste bleibt ohne.
-  // Das Zeichen der Mahlzeit nur, wo sie unterscheidet: gilt das Rezept fuer
-  // alle vier (oder fuer keine), waere "Fruehstueck" ueber einem Curry eine
-  // Falschaussage - dann steht das Besteck der Kueche.
-  const slots = mealTypeList();
-  const distinct = mealTypes.length > 0 && mealTypes.length < slots.length;
-  const band = () => recipeBandEl({ icon: distinct ? slots.find((option) => mealTypes.includes(option.key))?.icon : undefined });
-  detail.appendChild(recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image, fallback: band }) ?? band());
+  // (utils/recipe-thumb.js). OHNE BILD BEGINNT DAS DETAIL MIT SEINEM INHALT
+  // (R20, Entscheidung Ulas 2026-10-17): das flache Band im Kuechenton aus R18
+  // ist weg - am Desktop stand es als 480px breiter Stummel ueber den Zutaten,
+  // und den Titel traegt der Kopf des Rahmens ohnehin. Scheitert ein Bild beim
+  // Laden, nimmt es seinen Rahmen mit (keine Luecke, kein Ersatz).
+  const hero = recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image });
+  if (hero) detail.appendChild(hero);
 
   // Chips nur, wenn sie unterscheiden: gilt ein Rezept für alle Mahlzeiten,
   // ist die volle Chip-Reihe reine Ornamentik (Audit A1-21). Das
@@ -1226,10 +1224,11 @@ function fillRecipeDetail(detail, recipe) {
   const addToShopping = shoppingTransferButton(recipe, ingredients);
   if (addToShopping) detailActions.appendChild(addToShopping);
 
-  if (recipe.recipe_url) {
+  const recipeHref = externalHref(recipe.recipe_url);
+  if (recipeHref) {
     const link = document.createElement('a');
     link.className = 'btn btn--ghost';
-    link.href = recipe.recipe_url;
+    link.href = recipeHref;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.insertAdjacentHTML('beforeend',

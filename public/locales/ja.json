@@ -42,6 +42,9 @@
         "errorOccurred": "問題が発生しました。",
         "unexpectedError": "予期しないエラーが発生しました。",
         "errorDetails": "技術的な詳細",
+        "pageFailedTitle": "{{page}}を今は開けません",
+        "pageFailedHint": "ほかの機能はそのまま使えます。",
+        "toOverview": "ダッシュボードへ",
         "errorGeneric": "エラーが発生しました。",
         "updateAvailable": "アップデートがあります - 最新版を使うためにページを再読み込みしてください。",
         "titleRequired": "タイトルは必須です",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "{{title}}を買い物リストへ追加",
         "emailInUse": "このメールアドレスはすでに別のアカウントで使われています。",
+        "emailInvalid": "有効なメールアドレスを入力してください。",
         "sessionUnreachableTitle": "接続が中断されました",
+        "serverNotReadyTitle": "サーバーの準備ができていません",
+        "rateLimitedTitle": "リクエストが多すぎます",
         "sessionRetryHint": "ログイン状態は保たれています。{{seconds}} 秒後に再試行します。",
         "sessionRetrying": "再試行しています…",
         "searchNoResultsTitle": "該当なし",
         "searchNoResultsDescription": "検索に一致する項目はありません。",
         "searchNoResultsFilteredDescription": "検索とフィルターに一致する項目はありません。",
-        "searchReset": "検索をリセット"
+        "searchReset": "検索をリセット",
+        "passwordMinLength": "8文字以上。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "このローン支払いを削除しますか？",
         "loanRemainingAmount": "残額",
         "loanRemainingPrincipal": "残債",
+        "loanOwedToYou": "未回収額",
         "loanStillToPay": "支払残額",
         "loanPrincipalAmount": "借入金額",
         "loanRemainingInstallments": "残り回数",
         "loanPaidAmount": "返済済み",
+        "loanReceivedAmount": "回収済み",
         "loansEmpty": "進行中の貸付はありません。",
         "loanInstallmentMeta": "{{total}} 回中 {{paid}} 回返済済み",
         "loanRemainingOf": "{{total}} のうち",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "残債の少ない順",
         "loanSortActive": "並び替え：{{sort}}",
         "loanPaidStatus": "完済",
-        "markLoanPaid": "返済済みにする",
+        "loanBookInstallment": "返済を記録",
+        "loanReceiveRepayment": "返済を受け取った",
         "loanBorrowerLabel": "相手",
         "loanDirectionLabel": "貸付・借入の別",
         "loanDirectionLent": "貸付（返済を受ける）",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "クレジットカード",
         "accountType_investment": "投資",
         "accountType_other": "その他",
-        "viewAccountTransactions": "{{name}} の記録を表示",
-        "currentBalance": "現在の残高",
         "clearAccountFilter": "口座フィルターを解除",
         "archivedBadge": "アーカイブ済み",
         "showArchivedAccounts": "アーカイブを表示",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "推移グラフの値",
         "statsPointLabel": "{{period}}: 収入 {{income}}、支出 {{expenses}}",
         "statsPointLabelCumulative": "{{period}}まで: 収入 {{income}}、支出 {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} 予定",
         "receiptsLabel": "領収書",
         "receiptsHint": "この取引のレシートまたは請求書。",
         "receiptDocumentName": "領収書: {{title}}（{{date}}）",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "日付順",
         "ledgerSortAmount": "金額順",
         "ledgerSortActive": "並べ替え: {{sort}}",
-        "ledgerAccountsAll": "すべての口座"
+        "ledgerAccountsAll": "すべての口座",
+        "showAccountTransactions": "記録を表示"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",
@@ -1876,6 +1886,8 @@
         "confirmPasswordLabel": "新しいパスワードを確認",
         "savePassword": "パスワードを保存",
         "passwordMismatch": "パスワードが一致しません。",
+        "currentPasswordWrong": "現在のパスワードが正しくありません。",
+        "passwordTooShort": "8文字以上にしてください。",
         "passwordSavedToast": "パスワードを変更しました。",
         "oidcLinkTitle": "シングルサインオン",
         "oidcLinkHint": "SSO アカウントをこのアカウントに連携すると、プロバイダー経由のログインで 2 つ目のアカウントが作られず、ここに入れます。",
@@ -1985,6 +1997,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "親族",
         "familyRoleOther": "家族メンバー",
+        "childStartHint": "新しい子どものアカウントは予算と断食なしで始まり、家事サポートは閲覧のみで給与と支払いは表示されません。あとで「役割と権限」から変更できます。",
         "systemAdminLabel": "システム管理者",
         "systemAdminHint": "システム管理者は設定、連携、APIトークン、家族アカウントを管理できます。",
         "systemAdminBadge": "システム管理者",
@@ -2001,7 +2014,7 @@
         "removeMemberNamed": "{{name}} を外す",
         "memberDeactivatedToast": "{{name}} を無効化しました。項目は残ります。",
         "memberFormerBadge": "元メンバー",
-        "memberOrderHint": "この並び順は世帯全体に適用され、カレンダー、時間割、すべてのメンバー一覧がこれに従います。変更するには、ハンドルをドラッグするか、ハンドルにフォーカスして矢印キーを押します。新しいメンバーはその後ろに名前順で並びます。",
+        "memberOrderHint": "この順番は世帯全体に適用されます。ハンドルをドラッグするか矢印キーで変更できます。",
         "logout": "ログアウト",
         "logoutConfirm": "このデバイスからログアウトしますか？",
         "synchronizing": "同期中…",
@@ -2030,7 +2043,7 @@
         "pwaInstallTitle": "このデバイスに Yuvomi をインストール",
         "pwaInstallChecking": "インストール可否を確認しています...",
         "pwaInstallReady": "Yuvomi はこのデバイスにアプリとしてインストールできます。",
-        "pwaInstallUnavailable": "このブラウザーでは現在インストールできません。",
+        "pwaInstallUnavailable": "このブラウザーでは、ここからインストールできません。Chrome と Edge ではブラウザーのメニューから、Safari では［共有］>［Dock に追加］または［ホーム画面に追加］からインストールできます。HTTPS のアドレスでない場合、どのブラウザーでもインストールできません。",
         "pwaInstallInstalled": "Yuvomi はこのデバイスにすでにインストールされています。",
         "pwaInstallIosHint": "iPhone または iPad では、共有メニューからホーム画面に追加を選択してください。",
         "pwaInstallButton": "アプリをインストール",
@@ -2218,7 +2231,7 @@
         "deleteCardDAVAccountConfirm": "同期済みの連絡先は残りますが、CardDAV との関連付けは失われます。",
         "housekeepingPaymentsTitle": "支払いタスク",
         "housekeepingPaymentTasksLabel": "チェックインごとに支払いタスクを作成する",
-        "housekeepingPaymentTasksHint": "有効にすると、チェックインのたびに家事担当者への支払いタスクが作成されます。そのタスクを完了すると、訪問が支払い済みになります。",
+        "housekeepingPaymentTasksHint": "有効にすると、チェックインのたびに家事担当者への支払いタスクが作成されます。そのタスクを完了すると、訪問が支払い済みになります。このタスクは、チェックインした人と管理者だけが見られます。",
         "housekeepingPaymentTasksSaved": "家事の支払い設定を保存しました。",
         "backupSchedulerDisabled": "無効",
         "backupSchedulerEnabled": "有効",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "この端末はまだペアリングされています。先に失効させてください。",
         "feedExportIncludeBirthdays": "誕生日を含める",
         "feedExportIncludeBirthdaysHint": "独立した誕生日フィードを購読する場合はオフにして、誕生日と名前の日の重複を防いでください。",
-        "birthdayFeedHint": "このリンクを知っている人は、リマインダーがオフのものも含め、世帯に保存されたすべての誕生日と名前の日を閲覧できます。自分の端末でのみ使用してください。"
+        "birthdayFeedHint": "このリンクを知っている人は、リマインダーがオフのものも含め、世帯に保存されたすべての誕生日と名前の日を閲覧できます。自分の端末でのみ使用してください。",
+        "skipToSheet": "設定へスキップ",
+        "screensaverOffTitle": "写真スクリーンセーバー",
+        "screensaverNeedsImmich": "管理者が Immich を接続すると、スクリーンセーバーが動きます。その後、この端末の待ち時間、時計、写真の表示方法をここで設定できます。",
+        "screensaverConnectImmich": "Immich を接続",
+        "weatherPlaceLabel": "場所",
+        "weatherPlaceHint": "検索は天気サービス Open-Meteo で行われます。送信されるのは地名だけです。",
+        "weatherPlacePlaceholder": "都市名または郵便番号",
+        "weatherPlaceSearch": "検索",
+        "weatherPlaceCurrent": "現在: {{place}}",
+        "weatherPlaceNone": "まだ場所が選ばれていません。",
+        "weatherPlaceResultsLabel": "見つかった場所",
+        "weatherPlacePick": "リストから場所を選んでください。",
+        "weatherPlaceChosen": "{{place}} を選びました。保存すると反映されます。",
+        "weatherPlaceRequired": "場所を検索して、リストから選んでください。",
+        "weatherPlaceTooShort": "2文字以上入力してください。",
+        "weatherPlaceNotFound": "この名前の場所は見つかりませんでした。国名を付けてください（例: 「府中, 日本」）。",
+        "weatherPlaceUnavailable": "現在、場所の検索に接続できません。少し待ってから再試行するか、座標を手動で入力してください。",
+        "weatherManualTitle": "座標を手動で入力"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",
@@ -3380,7 +3411,8 @@
         "resultCountMany": "{{count}} 件の結果",
         "goTo": "移動",
         "newSection": "新規作成",
-        "recentLabel": "最近開いた項目"
+        "recentLabel": "最近開いた項目",
+        "createTaskNamed": "「{{title}}」をタスクとして作成"
     },
     "birthdays": {
         "inDays_one": "あと{{count}}日",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "オフライン - 再接続しています…",
-        "staleData": "オフライン - 最終更新: {{time}}"
+        "staleData": "オフライン - 最終更新: {{time}}",
+        "pageTitle": "オフラインです",
+        "pageDescription": "このページには接続が必要です。端末がオンラインに戻ると自動で読み込まれます。"
     },
     "emptyHint": {
         "recipes": "レシピは献立にも買い物リストにも直接送れます。",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "例: 浴室",
         "taskFrequency": "頻度 (日)",
         "taskCreatedToast": "家事タスクを作成しました。",
-        "dashboard": "概要",
         "reports": "レポート",
         "visitsThisMonth": "今月の訪問",
         "lastVisit": "最終訪問",
@@ -4007,7 +4040,12 @@
         "currentMonth": "今月",
         "noVisitReportsInMonth": "{{month}}の訪問記録はありません。",
         "settledAdminOnly": "変更・削除できるのは管理者だけです",
-        "reportVisitsCount": "訪問"
+        "reportVisitsCount": "訪問",
+        "amountsPermissionLabel": "給与と支払いを表示",
+        "errorAmountsHidden": "支払いを記録できるのは、家事サポートの金額を見られる人だけです。",
+        "notHereToday": "今日はまだ来ていません",
+        "tabVisits": "訪問",
+        "tabChores": "家事"
     },
     "userMultiSelect": {
         "moreUsers": "他",
@@ -4040,7 +4078,6 @@
         "noBalances": "すべて精算済みです。",
         "noExpenses": "この表示に一致する費用はありません。",
         "noActivity": "まだアクティビティはありません。",
-        "owes": "が支払う相手",
         "system": "システム",
         "quickGroceries": "スーパーの費用を追加",
         "quickSchool": "学校費用を分割",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} から {{payee}}、{{amount}}。反対仕訳で支払いが打ち消され、残高は元に戻ります。支払いは取り消し済みとしてアクティビティに残ります。",
         "loadMoreActivity": "さらに読み込む",
         "expenseDeleted": "削除済み",
-        "youAreOwedInGroup": "{{group}}で受け取る額",
-        "youOweInGroup": "{{group}}で支払う額"
+        "youAreOwedInGroup": "{{group}}: 受け取る額",
+        "youOweInGroup": "{{group}}: 支払う額",
+        "debtYouOwe": "{{name}}さんに支払い",
+        "debtOwesYou": "{{name}}さんから受け取り",
+        "debtOwes": "{{from}}さんから{{to}}さんへ支払い"
     },
     "wmo": {
         "0": "快晴",
@@ -4256,7 +4296,8 @@
         "submit": "リンクを送信",
         "sent": "該当するアカウントがあれば、再設定用のリンクを送信しました。",
         "backToLogin": "ログインに戻る",
-        "unavailable": "この世帯ではパスワードの再設定を提供していません。世帯の管理者にお問い合わせください。"
+        "unavailable": "この世帯ではパスワードの再設定を提供していません。世帯の管理者にお問い合わせください。",
+        "identifierRequired": "ユーザー名またはメールアドレスを入力してください。"
     },
     "resetPassword": {
         "title": "新しいパスワードを設定",
@@ -4286,6 +4327,15 @@
         "test": "接続をテスト",
         "testSuccess": "テストメールを送信しました。",
         "testFailed": "テストに失敗しました: {{error}}",
+        "portInvalid": "{{min}}〜{{max}} のポートを入力してください。",
+        "testFailedNotConfigured": "先に SMTP ホストと送信元アドレスを入力してください。",
+        "testFailedAuth": "サーバーがユーザー名またはパスワードを拒否しました。",
+        "testFailedConnection": "このホストとポートではサーバーに接続できません。",
+        "testFailedTls": "暗号化接続を確立できませんでした。暗号化方式とポートを確認してください。",
+        "testFailedRejected": "サーバーがテストメールを受け付けませんでした。送信元アドレスを確認してください。",
+        "testFailedUnknown": "テストメールを送信できませんでした。",
+        "testNoRecipient": "テストメールはあなた自身のアドレスに送られますが、まだ登録されていません。アカウント → メールで追加してください。",
+        "testNoRecipientLink": "アカウントを開く",
         "saveFailed": "保存に失敗しました: {{error}}",
         "saved": "設定を保存しました。"
     },
@@ -4821,7 +4871,6 @@
                 "daily": "毎日",
                 "none": "時間帯はまだありません。",
                 "delete": "時間帯を削除",
-                "newHint": "薬を保存すると時間帯を追加できます。",
                 "timeRequired": "時刻は必須です。"
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "この世帯に一致する種類がありません",
         "mappingProfileStatusAmbiguousType": "あいまい - 同じ名前の種類が複数あります",
         "icsCalendarName": "ゴミ収集",
-        "icsPickupSummary": "収集: {{name}}"
+        "icsPickupSummary": "収集: {{name}}",
+        "intervalDecrease": "間隔を短くする",
+        "intervalIncrease": "間隔を長くする"
     },
     "rewards": {
         "title": "ごほうび",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "選択をクリア",
         "continuesUntil": "…{{time}}まで継続",
         "overviewEmptyTitle": "比較するメンバーを選択",
-        "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
+        "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。",
+        "presetCodes": {
+            "early": "早",
+            "late": "遅",
+            "night": "夜",
+            "day": "日",
+            "vacation": "休",
+            "sick": "病",
+            "exam": "試",
+            "lecture": "講",
+            "seminar": "ゼ",
+            "lab": "実"
+        },
+        "typesWithTime": "時間あり"
     },
     "pairDisplay": {
         "title": "タブレットをペアリング",

@@ -45,9 +45,8 @@
  * Loading-Screen
  * -------------------------------------------------------- */
 .app-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  position: relative;
   /* vh-Zwilling fuer Browser ohne dvh (#1276), siehe .app-shell. */
   min-height: 100vh;
   min-height: 100dvh;
@@ -69,12 +68,83 @@
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  animation: pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+/* DIE SKIZZE DER SHELL (R20, Re-Critique 2026-10-17 a6 P2: 4,8 s ein
+ * pulsierender Schriftzug am kalten Telefon). Sie steht still - eine
+ * Schleife ueber Sekunden sagt "es haengt", eine ruhige Skizze sagt "gleich
+ * hier". Geometrie wie die Shell: Kopf mit Siegel auf dem Seitenrand, Karten
+ * im Raster der Uebersicht, unten die Kapsel auf ihrer Hoehe (am Desktop die
+ * schwebende Seitenleiste). Die Flaechen sind die der echten Karten, nur leer. */
+.app-loading__page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: calc(var(--safe-area-inset-top) + var(--space-4)) var(--page-gutter) var(--space-4);
+}
+
+.app-loading__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  margin-block-end: var(--space-2);
+}
+
+.app-loading__seal {
+  flex: 0 0 auto;
+  inline-size: var(--target-sm);
+  block-size: var(--target-sm);
+}
+
+.app-loading__card {
+  block-size: 9rem;
+  border-radius: var(--radius-glass-card);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.app-loading__card + .app-loading__card { block-size: 6rem; }
+.app-loading__card:last-child { block-size: 12rem; }
+
+.app-loading__capsule {
+  position: fixed;
+  inset-inline: var(--nav-bar-gutter);
+  bottom: calc(var(--safe-area-inset-bottom) + var(--space-2));
+  max-inline-size: var(--nav-capsule-max);
+  margin-inline: auto;
+  block-size: var(--nav-height-mobile);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background-color: var(--glass-bg-elevated);
+  box-shadow: var(--glass-shadow-capsule);
+}
+
+.app-loading__rail {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .app-loading__capsule {
+    display: none;
+  }
+
+  .app-loading__rail {
+    display: block;
+    position: fixed;
+    inset-block: var(--sidebar-float-gap);
+    inset-inline-start: var(--sidebar-float-gap);
+    inline-size: calc(var(--sidebar-width-expanded) - var(--sidebar-float-gap));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-glass-card);
+    background-color: var(--glass-bg-elevated);
+    box-shadow: var(--glass-shadow-md);
+  }
+
+  .app-loading__page {
+    margin-inline-start: var(--sidebar-width-expanded);
+    max-inline-size: calc(var(--content-max-width) + 2 * var(--page-gutter));
+  }
 }
 
 /* Sitzung gerade nicht pruefbar (utils/session-unreachable.js, Critique R19):
@@ -715,6 +785,12 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
   content: "";
   display: block;
   block-size: var(--shell-tail);
+  /* KEIN LAYOUT-SHIFT AUS DEM NACHLAUF (R20, E1-Befund Schichtplan 390: CLS
+   * 0,114). Der Platzhalter steht hinter dem Root und rutscht mit, sobald die
+   * Seite ihren Inhalt bekommt - von y=0 auf y=508. Er malt nichts, zaehlte
+   * aber als sichtbare Box; unsichtbar behaelt er seinen Platz und faellt aus
+   * der Messung. */
+  visibility: hidden;
 }
 
 /* #main-content wird nach jeder Navigation programmatisch fokussiert, damit
@@ -725,6 +801,19 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
  * :focus-visible werten und ein Outline um den ganzen Inhaltsbereich zeichnen. */
 .app-content:focus,
 .app-content:focus-visible {
+  outline: none;
+}
+
+/* Dasselbe Region-Fokus-Ziel fuer den Zustand "Seite nicht erreichbar"
+ * (utils/session-unreachable.js showPageUnreachable): er nimmt den Fokus, damit
+ * die Tastatur nicht im abgeraeumten Baum haengt, und zeigte dafuer einen
+ * Rahmen um die halbe Seite. Der Knopf darin traegt seinen Ring weiter.
+ * Ebenso der Fehlerbildschirm einer gescheiterten Seite (router.js
+ * renderError, `.page-crash`). */
+.page-unreachable:focus,
+.page-unreachable:focus-visible,
+.page-crash:focus,
+.page-crash:focus-visible {
   outline: none;
 }
 
@@ -1863,6 +1952,23 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* Zeile mit Modulsiegel (R20, „Gehe zu" und „Neu anlegen"): das Siegel steht
+ * vor Titel und Zweitzeile und spannt ueber beide, wie in der Seitenleiste. */
+.search-result--sealed {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: center;
+}
+
+.search-result--sealed > .search-result__seal {
+  grid-row: 1 / span 2;
+}
+
+.search-result--sealed > :not(.search-result__seal) {
+  grid-column: 2;
+}
+
 .search-result:active {
   background-color: var(--color-surface-hover);
 }
@@ -2486,8 +2592,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  *
  * Reduzierte Bewegung: derselbe Zustandswechsel ohne Gleiten (unten). */
 @media (max-width: 1023px) {
-  .nav-bottom__items {
-    transition: min-height var(--duration-md) var(--ease-out);
+  /* Mit `.nav-bottom` davor: glass.css laedt spaeter und setzt an
+   * `.nav-bottom__items` die Uebergaenge von Flaeche und Schatten - gleiche
+   * Spezifitaet, also gewann es, und Hoehe wie Breite schalteten hart. */
+  .nav-bottom .nav-bottom__items {
+    transition:
+      background-color var(--transition-fast),
+      box-shadow var(--transition-fast),
+      min-height var(--duration-md) var(--ease-out),
+      inline-size var(--duration-md) var(--ease-out);
   }
 
   .nav-bottom .nav-item__label {
@@ -2510,6 +2623,71 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
     max-block-size: 0;
     overflow: hidden;
     opacity: 0;
+  }
+
+  /* DIE PILLE (R20, Entscheidung Ulas 2026-10-17; iOS 26 Tab-Bar-Minimize).
+   * Minimiert schrumpft die Kapsel an ihrer Startkante auf das aktive Ziel
+   * (`.nav-item--pill`): Polster + Ziel + Polster, gemessen an der
+   * ausgefahrenen Kapsel (watchNavMinimize, utils/ux.js). Vorher wurde sie nur
+   * flacher und gab 8px frei; jetzt liegt rechts daneben bis zum FAB Inhalt.
+   *
+   * WAS SICH BEWEGT: die Breite der Kapsel (Layout nur in ihrem eigenen,
+   * ausser Fluss liegenden Teilbaum - fuenf Ziele), das aktive Ziel per
+   * `translate` und die Deckkraft der uebrigen. KEIN LAYOUT-SHIFT: die
+   * Startkante steht (beide Raender explizit statt `auto`, sonst zentrierte
+   * die schmale Pille sich am Tablet), und die Tabs bleiben auf ihrer
+   * gemessenen Breite stehen, minimiert UND auf dem Rueckweg (`--settling`) -
+   * ein mitschrumpfender Flex-Slot liesse sie wandern. Die Kapsel schneidet
+   * ab, was ueber ihre Kante steht; die ausgeblendeten Tabs nehmen keinen
+   * Treffer (`visibility`). Ein Tipp auf die Pille faehrt sie aus.
+   * Reduzierte Bewegung: derselbe Wechsel ohne Gleiten (Block unten). */
+  .nav-bottom__items {
+    margin-inline: max(0px, (100% - var(--nav-capsule-max)) / 2) auto;
+  }
+
+  .nav-bottom .nav-item {
+    transition:
+      color var(--transition-fast),
+      opacity var(--duration-sm) var(--ease-out),
+      visibility var(--duration-sm),
+      translate var(--duration-md) var(--ease-out);
+  }
+
+  /* NUR WO `translate` GILT (Review R20): Chromium kennt die Eigenschaft erst
+   * ab Version 104, `overflow: clip` ab 90. Darunter (der Chromebook aus #1276
+   * steht bei Chrome 91) schrumpfte die Kapsel, das aktive Ziel bliebe auf
+   * seinem Platz und fiele aus dem Schnitt - die Pille stuende leer. Ohne
+   * die Eigenschaft minimiert die Kapsel wie in R19: flacher, ohne Labels,
+   * in voller Breite. */
+  @supports (translate: 0) {
+    .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
+      inline-size: var(--nav-pill-width, 100%);
+    }
+
+    :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-bottom__items {
+      overflow: clip;
+    }
+
+    :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-item {
+      flex: none;
+      inline-size: var(--nav-item-width, auto);
+    }
+
+    .nav-bottom--minimized:not(:focus-within) .nav-item:not(.nav-item--pill) {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .nav-bottom--minimized:not(:focus-within) .nav-item--pill {
+      translate: var(--nav-pill-shift, 0px) 0;
+    }
+
+    /* Die Tab-Pille der Leiste zeigt den Ort; in der Pille sagt es das Ziel
+     * selbst (Akzent, gefuelltes Zeichen) - eine zweite Flaeche darin stuende
+     * auf der alten Hoehe und Stelle. */
+    .nav-bottom--minimized:not(:focus-within) .nav-bottom__indicator {
+      opacity: 0;
+    }
   }
 
   .page-fab:not(.page-fab-group > .page-fab),
@@ -2535,7 +2713,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 }
 
 @media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
-  .nav-bottom__items,
+  .nav-bottom .nav-bottom__items,
+  .nav-bottom .nav-item,
   .nav-bottom .nav-item__label,
   .page-fab:not(.page-fab-group > .page-fab),
   .page-fab-group {
@@ -3422,6 +3601,29 @@ html.fab-steady .page-fab {
   }
 }
 
+/* AUF DER CONTENT-SPALTE NIMMT DIE LISTE MEHR (Re-Critique 2026-10-17, A1
+ * P2-8). Ab 84rem Modulflaeche (Content-Spalte 1280 plus zwei 32px-Gutter,
+ * siehe Deckel oben) ist der Baustein 1344px breit und waechst nicht mehr; die
+ * Liste bekommt dann `--layout-list-wide` (640px), das Detail die 680px
+ * daneben. Darunter gilt die 40-%-Formel unveraendert. */
+@container module-surface (min-width: 84rem) {
+  .split-view {
+    grid-template-columns: var(--layout-list-wide) minmax(0, 1fr);
+  }
+}
+
+/* Unter der Schwelle am Tablet (640-1023px): Kopf und Liste stehen auf
+ * derselben Breite. Der Kopf der Liste-und-Detail-Seiten laeuft ueber die volle
+ * Spalte, die Liste endete auf dem Lesemass - bei 834 standen rechts 98px
+ * leer, waehrend die E-Mails der Kontakte gekuerzt wurden (Re-Critique
+ * 2026-10-17, A1). Telefone liegen ohnehin unter 720px, der Desktop zeigt
+ * ab der Schwelle Liste und Detail. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-page--list-detail > * {
+    --page-measure: 100%;
+  }
+}
+
 /* DIE AUSWAHL STEHT IN DER SPALTE (Critique R19, Muster Apple Mail).
  * Waehrend einer Mehrfachauswahl zeigt die Detailspalte „N ausgewaehlt" mit den
  * Sammelaktionen (utils/master-detail.js, setSelectionBulk); Detail und
@@ -4091,54 +4293,6 @@ html.fab-steady .page-fab {
     min-block-size: var(--dock-fold-bar-h, auto);
   }
 
-  /* DAS BAND (R11 H1): wo auch nichts falten kann - die Bar-Zeile ist eine
-   * Tab-Leiste ueber die ganze Breite (Schichtplan, Haushaltshilfe,
-   * Belohnungen) -, klebt der Kopf um die Hoehe des angedockten Titels tiefer
-   * (`--dock-band-h`, gemessen von `wireCollapsingHeader`). Im so sichtbaren
-   * untersten Streifen der Lead-Zone steht angedockt der Titel, absolut und
-   * damit ohne eigene Zeile; die Lead-Zone selbst blendet aus. Hoehe und
-   * Klebekante haengen nicht am Andock-Zustand - nichts kann pendeln.
-   * Ausgeklappt ist der Titel gerendert, aber unsichtbar: nur so ist er
-   * messbar, bevor er gebraucht wird. */
-  .page-toolbar--stacked.page-toolbar--dock-band {
-    top: calc(-1 * (var(--page-toolbar-lead, 0px) - var(--dock-band-h, 0px)));
-  }
-
-  .page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title {
-    display: block;
-    position: absolute;
-    inset-block-start: calc(var(--page-toolbar-lead, 0px) - var(--dock-band-h, 0px) + var(--dock-band-pad, 0px));
-    inset-inline: var(--page-inline-pad);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    visibility: hidden;
-    pointer-events: none;
-  }
-
-  .page-toolbar--stacked.page-toolbar--dock-band.is-docked > .page-toolbar__dock-title {
-    visibility: visible;
-  }
-
-  /* Im Band tauschen Large Title und angedockter Titel per Deckkraft
-   * (`visibility` schaltet am Ende bzw. Anfang derselben Dauer mit). */
-  .page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title {
-    transition:
-      opacity var(--duration-xs) var(--ease-out),
-      visibility var(--duration-xs) var(--ease-out);
-  }
-
-  .page-toolbar--stacked.page-toolbar--dock-band > [data-dock-lead] {
-    transition: opacity var(--duration-xs) var(--ease-out);
-  }
-
-  /* Opazitaet statt `visibility`: der Large Title bleibt die Ueberschrift der
-   * Seite im Baum; er ist angedockt nur nicht zu sehen. */
-  .page-toolbar--stacked.page-toolbar--dock-band.is-docked > [data-dock-lead] {
-    opacity: 0;
-    pointer-events: none;
-  }
-
   /* Die Trennlinie erscheint erst, wenn die Leiste angedockt ist - am
    * Scroll-Anfang steht der Large Title nahtlos auf dem Seitengrund.
    * `--stacked` setzt der Helfer nur, wenn es überhaupt eine Lead-Zone gibt;
@@ -4306,10 +4460,13 @@ html.fab-steady .page-fab {
  * die Zeile zurueck), mit einem Suchbegriff und mit offenem Werkzeugmenue -
  * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. */
 @media (max-width: 1023px) {
+  /* Der Rand springt (EIN Layout); die Liste darunter gleitet per FLIP aus
+   * ihrer alten Lage nach (wireCollapsingHeader, R20) - vorher lief hier der
+   * Rand selbst 250 ms und legte die Liste in jedem Frame neu (CLS 0,06).
+   * Die Zeile selbst gleitet per `translate` hinter die Leiste, gleich lang
+   * wie das FLIP darunter. */
   .page-toolbar--fold-row {
-    transition:
-      margin-block-end var(--duration-lg) var(--ease-in-out),
-      translate var(--duration-lg) var(--ease-in-out);
+    transition: translate var(--duration-md) var(--ease-out);
   }
 
   .page-toolbar--fold-row > * {
@@ -4328,10 +4485,16 @@ html.fab-steady .page-fab {
   }
 }
 
+/* Reduzierte Bewegung: die Zeile springt (kein Gleiten), ihr Inhalt blendet
+ * (`--motion-fade` in reset.css) - zurueck oben kommt er weich, statt hart
+ * dazustehen (R20). */
 @media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
-  .page-toolbar--fold-row,
-  .page-toolbar--fold-row > * {
+  .page-toolbar--fold-row {
     transition: none;
+  }
+
+  .page-toolbar--fold-row > * {
+    transition: opacity var(--duration-sm) var(--ease-out);
   }
 }
 
@@ -5132,12 +5295,19 @@ a.popover-menu__item {
   margin-inline-start: auto;
 }
 
-/* Reduzierte Bewegung: kein Wachsen, nur die Blende - sie bewegt nichts. Der
- * Ausgang entfaellt (ohne `display` in der Liste schliesst das Menue sofort). */
+/* Reduzierte Bewegung: kein Wachsen, nur die Blende - sie bewegt nichts.
+ * SEIT R20 AUCH IM AUSGANG (Re-Critique 2026-10-17, a6 P3): ohne `display` und
+ * `overlay` in der Liste schloss das Menue dort hart, waehrend es weich
+ * aufging - "Bewegung faellt weg, Ueberblenden bleibt" galt nur halb. Dieselbe
+ * Rueckfall-Reihenfolge wie oben: ohne `allow-discrete` bleibt die erste. */
 @media (prefers-reduced-motion: reduce) {
   .popover-menu {
     transform: none;
     transition: opacity var(--duration-md) var(--ease-out);
+    transition:
+      opacity var(--duration-xs) var(--ease-out),
+      overlay var(--duration-xs) allow-discrete,
+      display var(--duration-xs) allow-discrete;
   }
 
   .popover-menu:popover-open {
@@ -5837,6 +6007,12 @@ p.field-hint--warn[hidden] {
     font-weight: var(--font-weight-semibold);
     line-height: 1;
     flex-shrink: 0;
+  }
+
+  /* Die Initialen als Zeichnung (R20, router.js syncSidebarAccount): kein
+   * Textknoten, also kein Teil des sichtbaren Etiketts des Kontoknopfs. */
+  .nav-sidebar__avatar[data-initials]::before {
+    content: attr(data-initials);
   }
 
   .nav-sidebar__avatar--on-color {
@@ -9195,6 +9371,39 @@ textarea::placeholder {
   display: none;
 }
 
+/* DER AUSWAHLMODUS NIMMT DER SHELL IHRE BEDIENUNG AB (R20, Re-Critique
+ * 2026-10-17 A1 P2-5; Muster: Apples Erinnerungen und Mail, deren Tab- bzw.
+ * Werkzeugleiste beim Bearbeiten der Auswahlleiste weicht). Waehrend eine
+ * Liste waehlt, stand unten die Kapsel unter der Pille und der FAB daneben:
+ * drei Bedienschichten fuer EINE Aufgabe, und „Neue Aufgabe" mitten in einer
+ * Sammelaktion. Jetzt bleibt die Pille allein:
+ *   - der FAB tritt ab, ueberall (die Kontakte taten das seit Etappe 6 fuer
+ *     sich; die Regel steht jetzt hier, einmal fuer jede Seite mit Modus), und
+ *     mit ihm sein Nachlauf (`--fab-safe-zone`);
+ *   - unter der Seitenleisten-Schwelle auch die Kapsel; die Pille rueckt an
+ *     ihren Platz am unteren Rand, die Reserve des Inhalts bleibt.
+ * Ohne `:has()` (Safari < 15.4) bleibt beides stehen - der Zustand von vorher,
+ * kein Bruch. */
+html:has(.app-page.is-selecting) .page-fab {
+  display: none;
+}
+
+html:has(.app-page.is-selecting) {
+  --fab-safe-zone: 0px;
+}
+
+@media (max-width: 1023px) {
+  /* Die Pille rueckt an den Platz der Kapsel; die Reserve des Inhalts bleibt,
+   * damit die letzte Zeile nicht unter der Pille liegt. */
+  html:has(.app-page.is-selecting) .shell-bottom-stack:not([data-dock]) {
+    bottom: calc(var(--safe-area-inset-bottom) + var(--space-4));
+  }
+
+  html:has(.app-page.is-selecting) .nav-bottom {
+    display: none;
+  }
+}
+
 .toast-container,
 .bulk-pill-layer {
   display: flex;
@@ -9401,6 +9610,28 @@ textarea::placeholder {
 
 .list-bulkbar__action:disabled:active {
   transform: none;
+}
+
+/* DIE TREFFERFLAECHE IST FINGERGROSS, DIE KAPSEL NICHT (R20, Re-Critique
+ * 2026-10-17 a2 P2-6). Die Kapseln messen 28px - in der Daumenzone ueber der
+ * Kapsel-Leiste zu wenig fuer einen Finger. Eine groessere Kapsel haette die
+ * Pille und damit --bulk-pill-safe-zone mitgezogen; stattdessen reicht ein
+ * unsichtbarer Saum auf --target-base hinaus, senkrecht ueber den Innenrand
+ * der Pille. Waagerecht nur um den halben Abstand, damit sich zwei Nachbarn
+ * nicht ueberdecken. */
+@media (pointer: coarse) {
+  .toast__undo,
+  .list-bulkbar__action {
+    position: relative;
+  }
+
+  .toast__undo::after,
+  .list-bulkbar__action::after {
+    content: '';
+    position: absolute;
+    inset-block: calc((100% - var(--target-base)) / 2);
+    inset-inline: calc(var(--space-2) / -2);
+  }
 }
 
 .toast--danger  { background-color: var(--color-danger);  color: var(--toast-danger-text); }
@@ -10004,6 +10235,14 @@ textarea::placeholder {
   content: none;
 }
 
+/* IM AUSWAHLMODUS KEIN WISCH-CHEVRON (R20). Die Zeile ist dann ein Ziel zum
+ * Waehlen, kein Weg ins Detail und keine Wischflaeche - der Pfeil am Rand
+ * versprach beides. Gesetzt wird der Modus an der Seitenwurzel
+ * (`.app-page.is-selecting`, Aufgaben und Kontakte). */
+.app-page.is-selecting .swipe-row::after {
+  content: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .swipe-row::after { display: none; }
 }
@@ -10084,6 +10323,25 @@ textarea::placeholder {
   gap: var(--space-1);
 }
 
+/* ZWEI SPALTEN AM ZEIGER (R20). Zwanzig Kuerzel untereinander fuellten den
+ * Dialog bis unter die Falz (1440x900: 852px Einzelspalte). Gelesen wird
+ * spaltenweise - links die Wege, rechts die Kalenderkuerzel -, deshalb
+ * `grid-auto-flow: column` mit der halben Zeilenzahl aus `--help-rows`
+ * (router.js showHelpModal). Ohne Trennlinien: eine Linie unter der letzten
+ * Zeile der linken Spalte stuende neben der Mitte der rechten. */
+.shortcuts-list--columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--help-rows, 10), auto);
+  grid-auto-flow: column;
+  column-gap: var(--space-6);
+  row-gap: 0;
+}
+
+.shortcuts-list--columns > .help-row {
+  border-bottom: none;
+}
+
 .shortcuts-row,
 .help-row {
   display: flex;
@@ -10153,6 +10411,20 @@ textarea::placeholder {
 
 .offline-banner[hidden] {
   display: none;
+}
+
+/* AM DESKTOP UEBER DEM INHALT, NICHT UEBER DER SEITENLEISTE (Re-Critique
+ * 2026-10-17): volle Breite verdeckte Logo, Suche und Einklappen der
+ * schwebenden Tafel. Das Banner beginnt rechts der Tafel und folgt dem
+ * Einklappen ueber dieselbe Variable wie der Inhalt (`.app-content`
+ * margin-left); der Inhalt rueckt weiter um `--offline-banner-height` nach unten. */
+@media (min-width: 1024px) {
+  .offline-banner {
+    /* Die Tafel steht um `--sidebar-float-gap` von der Kante ab und ragt
+     * damit um denselben Abstand in die Spalte (gemessen: Tafel endet bei
+     * 228px, der Inhalt beginnt bei 220px). */
+    left: calc(var(--sidebar-width) + var(--sidebar-float-gap));
+  }
 }
 
 @keyframes offline-banner-in {
@@ -10378,6 +10650,23 @@ textarea.input { resize: vertical; }
   .modal-panel  { border: 2px solid CanvasText; }
   .nav-item[aria-current="page"],
   .nav-item--active { border-bottom: 2px solid Highlight; }
+
+  /* DER SCHALTER. Bahn und Knopf tragen nur Flaeche - der Modus macht beide
+   * zu Canvas, und vom Schalter blieb nichts. Die Bahn bekommt einen Umriss
+   * (`outline`, nicht `border`: eine Kante schoebe den Knopf aus seiner
+   * Mitte), der Knopf eine Systemfarbe, "an" die Hervorhebungsfarbe. */
+  .toggle__track { outline: 1px solid ButtonText; }
+  .toggle__track::after { background-color: ButtonText; box-shadow: none; }
+  .toggle input:checked + .toggle__track { background-color: Highlight; outline-color: Highlight; }
+  .toggle input:checked + .toggle__track::after { background-color: HighlightText; }
+  .toggle input:disabled + .toggle__track { outline-color: GrayText; }
+  .toggle input:disabled + .toggle__track::after { background-color: GrayText; }
+  .toggle input:focus-visible + .toggle__track { outline-color: Highlight; }
+
+  /* DER FOKUS IM FELD war nur Kante + Schatten: die Kante zwingt der Modus auf
+   * dieselbe Systemfarbe wie in Ruhe, den Schatten streicht er. */
+  .input:focus,
+  .form-input:focus { outline: 2px solid Highlight; outline-offset: 0; }
 }
 
 /* ============================================================

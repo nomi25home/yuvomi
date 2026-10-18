@@ -29,7 +29,7 @@ import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import { iconElement } from '/utils/lucide-icons.js';
-import { expandIn, durationToken, easingToken } from '/utils/ux.js';
+import { expandIn, durationToken, easingToken, isImeComposing } from '/utils/ux.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -285,8 +285,14 @@ function enterSubmitTarget(active, container) {
 
 function trapFocus(container, initialFocus = 'first-field') {
   focusTrapHandler = (e) => {
-    // Tab-Trap: Fokus innerhalb des Modals halten
+    // Tab-Trap: Fokus innerhalb des Modals halten - NUR ohne natives
+    // <dialog> (Safari < 15.4). Ein modaler Dialog haelt den Fokus selbst, und
+    // der Fang am Panel sprang vom letzten Feld zurueck aufs erste: der
+    // Toast-Stapel, der waehrend des Dialogs IN ihm neben dem Panel liegt
+    // (_syncTopLayerGuests), war so per Tastatur nie zu erreichen, sein
+    // "Rueckgaengig" nur mit der Maus (Modern-Web-Guidance-Audit, Befund 9).
     if (e.key === 'Tab') {
+      if (container.closest?.('dialog')?.open) return;
       const focusable = container.querySelectorAll(FOCUSABLE);
       if (!focusable.length) return;
       const first = focusable[0];
@@ -305,7 +311,8 @@ function trapFocus(container, initialFocus = 'first-field') {
     // Enter in einzeiligen Inputs/Selects → Formular absenden (Standard-Web-
     // Konvention, Audit 1.4). Textareas behalten ihr Standardverhalten (Zeilen-
     // umbruch), Submit-/Button-Elemente lösen ohnehin ihren eigenen Klick aus.
-    if (e.key === 'Enter') {
+    // Waehrend einer IME-Umwandlung bestaetigt Enter das Schriftzeichen.
+    if (e.key === 'Enter' && !isImeComposing(e)) {
       const active = document.activeElement;
       const isInput = active.tagName === 'INPUT' && active.type !== 'submit' && active.type !== 'button';
       const isSelect = active.tagName === 'SELECT';
@@ -608,6 +615,13 @@ export function swapFieldsKeepingDirtyBase(panel, swap) {
 function onEscape(e) {
   if (e === _escKeptBelow) _escKeptBelow = null;
   if (e.key !== 'Escape' || e.defaultPrevented || !activeOverlay) return;
+  // Esc waehrend einer IME-Umwandlung bricht die Umwandlung ab, nicht das
+  // Formular. preventDefault haelt den close-Request des <dialog> zurueck
+  // (Codex-Review zu #2055).
+  if (isImeComposing(e)) {
+    e.preventDefault();
+    return;
+  }
   const owner = e.target?.closest?.('[popover], dialog, .modal-overlay') ?? null;
   if (owner && owner !== activeOverlay) {
     if (owner.matches('[popover], dialog')) return;
@@ -674,6 +688,20 @@ function _topmostSharedDialog() {
   return open[open.length - 1] ?? null;
 }
 
+/**
+ * DIE SAMMELAKTIONS-PILLE ZIEHT MIT, ABER NICHT BEDIENBAR. Sie steht im selben
+ * Stapel wie die Toasts, gehoert aber zur Seite hinter dem Dialog: ihre
+ * Aktionen (auch Loeschen) waren per Tab und Klick erreichbar, sobald der
+ * Dialog den Fokus dem Browser ueberliess (Codex-Review zu #2058). Inert nur,
+ * solange sie im Dialog wohnt, und nur, wenn sie es vorher nicht schon war.
+ */
+function _holdBulkPill(guest, hold) {
+  const pill = guest.querySelector?.('.bulk-pill-layer');
+  if (!pill) return;
+  if (hold && !pill.inert) { pill.inert = true; pill._inertByModal = true; }
+  if (!hold && pill._inertByModal) { pill.inert = false; pill._inertByModal = false; }
+}
+
 /** Gaeste in den obersten Dialog holen oder nach Hause schicken. `leaving` zieht sie sicher heraus. */
 function _syncTopLayerGuests(leaving = null) {
   if (typeof document.querySelectorAll !== 'function') return;
@@ -684,11 +712,13 @@ function _syncTopLayerGuests(leaving = null) {
       if (guest.parentElement === host) continue;
       if (!_guestHome.has(guest)) _guestHome.set(guest, { parent: guest.parentElement, next: guest.nextSibling });
       host.append(guest);
+      _holdBulkPill(guest, true);
       continue;
     }
     const home = _guestHome.get(guest);
     if (!home) continue;
     _guestHome.delete(guest);
+    _holdBulkPill(guest, false);
     if (!home.parent?.isConnected) { document.body.append(guest); continue; }
     home.parent.insertBefore(guest, home.next?.parentNode === home.parent ? home.next : null);
   }
@@ -2764,18 +2794,35 @@ export function reportFieldError(input, message, { focus = true, live = !(focus 
     const clear = () => {
       input.removeEventListener('input', clear);
       input.removeEventListener('change', clear);
-      group.classList?.remove('form-field--error');
-      input.setAttribute?.('aria-invalid', 'false');
-      const el = typeof group.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
-      if (el?.dataset?.defaultText !== undefined) {
-        el.textContent = el.dataset.defaultText;
-        delete el.dataset.defaultText;
-      }
+      _clearFieldErrorIn(group, input);
     };
     input.addEventListener('input', clear);
     input.addEventListener('change', clear);
   }
   return false;
+}
+
+function _clearFieldErrorIn(group, input) {
+  group.classList?.remove('form-field--error');
+  input.setAttribute?.('aria-invalid', 'false');
+  const el = typeof group.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
+  if (el?.dataset?.defaultText !== undefined) {
+    el.textContent = el.dataset.defaultText;
+    delete el.dataset.defaultText;
+  }
+}
+
+/**
+ * Raeumt einen Feldfehler, den `reportFieldError()` gesetzt hat, ohne dass im
+ * Feld getippt wurde - fuer Handler, die denselben Wert erneut pruefen (eine
+ * Suche, die beim zweiten Versuch klappt). Sonst raeumt ihn erst die naechste
+ * Eingabe, und das Feld stuende mit dem alten Fehler neben gueltigen Treffern.
+ */
+export function clearFieldError(input) {
+  if (!input) return;
+  const group = (typeof input.closest === 'function' ? input.closest('.form-field') : null) ?? input.parentElement;
+  if (!group) return;
+  _clearFieldErrorIn(group, input);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { emptyHintEl } from '/utils/empty-state.js';
 import {
   closeModal,
@@ -18,7 +18,6 @@ import { withBusy } from '/utils/ux.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
-const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
 import { renderSkeletonList } from '/utils/skeleton.js';
 
 function formatSyncTime(value) {
@@ -501,9 +500,11 @@ async function loadAccounts(container, user) {
  * leer und optional - leer lassen heißt „bestehendes behalten"; die Adressbuch-
  * Auswahl bleibt in jedem Fall erhalten.
  *
- * Passwortfeld: autocomplete="off". Gefragt ist ein bestehendes Passwort für
- * einen FREMDEN Server - "current-password" bietet das Yuvomi-Passwort an,
- * "new-password" schlägt ein generiertes vor. Beides ist hier falsch.
+ * Passwortfeld: autocomplete="new-password". Gefragt ist ein bestehendes
+ * Passwort für einen FREMDEN Server - "current-password" bietet das
+ * Yuvomi-Passwort an, und "off" ignorieren viele Browser an Passwortfeldern
+ * (MDN). "new-password" ist der Hinweis, der kein gespeichertes Passwort
+ * einfüllt; dass der Manager eines vorschlägt, ist der kleinere Schaden.
  *
  * @param {Object|null} account - null = neues Konto
  * @param {() => Promise<void>} onDone
@@ -543,7 +544,7 @@ function openAccountModal(account, onDone) {
             label: t('settings.cardavPasswordLabel'), labelFor: 'cardav-password',
             labelExtra: isEdit ? '' : REQUIRED_MARK, field: true,
             control: `<input class="form-input" type="password" id="cardav-password" ${isEdit ? '' : 'required'}
-                 autocomplete="off"
+                 autocomplete="new-password"
                  aria-describedby="${isEdit ? 'cardav-password-keep ' : ''}cardav-password-hint" />`,
             extra: `${isEdit ? `<small class="form-hint" id="cardav-password-keep">${t('settings.cardavPasswordKeepHint')}</small>` : ''}`
               + `<small class="form-hint" id="cardav-password-hint">${t('settings.cardavPasswordHint')}</small>`,

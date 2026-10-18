@@ -7,13 +7,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Task, calendar and Overview lists load much faster in households with profile pictures.**
+  Every task, event, note, housekeeping visit and money ledger row used to carry the full profile
+  picture of its person, and a task twice. With 200 tasks and five pictures the task list weighed
+  17 MB, and over plain HTTP in a home network about 13 MB of it crossed the wire on every load. The
+  rows now carry a short picture address instead, and the browser loads each picture once (now
+  about 215 KB, under 5 KB compressed). Pictures still show offline where the list does.
+  **API:** requests with an API token see no change and keep receiving data URLs. For the app
+  itself (session and wall display) the fields `assigned_avatar`, `assigned_users[].avatar_data`
+  (tasks, events), `creator_avatar` (notes), `worker_avatar_data` (housekeeping visits),
+  `user_avatar` and `person_avatar` (completion feed, money ledger) hold
+  `/api/v1/people/{id}/avatar?v=...`, served by the new `GET /api/v1/people/{id}/avatar`. Member
+  lists and the profile endpoints keep the data URL.
+- **The Overview no longer rebuilds every time you switch back to its tab.** Returning to the tab
+  reloaded the whole Overview, even after a few seconds elsewhere. It now reloads only when its data
+  is older than a minute or the day has changed; the greeting, date and clock still update at once.
+- **Pages with an extra stylesheet show up sooner.** The Overview, Health and Budget pull in further
+  stylesheets that the browser only discovered after loading the first one. They now load in
+  parallel.
+- **Warming up the other pages in the background no longer competes with the page you are on.**
+  After the start, Yuvomi preloads the main pages while the browser is idle; these downloads now ask
+  for low priority.
+- **Long contact and recipe lists open faster.** The browser now skips rows outside the visible
+  area until you scroll near them. Measured on a slowed-down device, opening 500 contacts blocked
+  the page for about 0.8 s, now about 0.55 s; 300 recipes went from about 0.45 s to under 0.4 s.
+
+### Fixed
+
+- **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
+  On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
+  instead of only those on screen, and each picture went to Mealie or Tandoor again on every visit.
+  With 500 recipes that used up the request budget of a whole minute, and every other page answered
+  with an error until it refilled. The list now loads only the pictures you scroll to, a picture the
+  browser already has is confirmed by Yuvomi without asking Mealie or Tandoor again, and pictures
+  (recipes and profile pictures) have a budget of their own, so they can no longer block the rest
+  of the app.
+  **API:** `GET /api/v1/recipes/{id}/provider-thumbnail` takes an optional `?v=`, the recipe's
+  `provider_updated_at` (meal rows carry it as `recipe_image_version`). The response is
+  `private, no-cache` with an ETag derived from that version, and `If-None-Match` answers 304
+  without a request to the provider.
+- **An open row menu closes when the list scrolls.** With a mouse wheel, trackpad or keyboard the
+  menu stayed where it opened while its row scrolled away, so "Delete" ended up under a different
+  entry. Like menus on iOS and macOS, it now closes as soon as the content beneath it moves, in
+  lists, headers and sheets alike; scrolling inside a long menu keeps it open (#2041).
+- **On the overview, the people of an event sit at the end of its line in right-to-left
+  languages.** In Arabic and Persian they sat right after the event's title instead. Left-to-right
+  layouts are unchanged.
+- **Typing Japanese, Korean or Chinese no longer saves half a word.** In these languages Enter
+  first confirms the character conversion. Dialogs, tag and mention fields, suggestion lists and
+  the comboboxes used to act on that Enter and saved or picked the text while it was still being
+  written; they now wait for the conversion to finish. Esc, which cancels a conversion, no longer
+  closes the dialog either.
+- **New health entries start at the household's time.** Vitals, activity and nutrition prefilled
+  "now" from the device clock, while Yuvomi reads the value in the household time zone. On a phone
+  set to another zone, for example while travelling, saving the default stored a shifted time and
+  sometimes the wrong day.
+- **Esc in a picker of the subscription form closes only the picker.** The lists for currency,
+  cycle, category, account and payment method and the logo search used to close the whole form
+  with the same keystroke. Closing the logo search puts the keyboard focus back on its button.
+- **Open browser tabs no longer reload extension translations every 30 seconds.** With extension
+  modules installed, each open tab fetched every language file of every module twice a minute, also
+  in the background. They now load again only when a module was installed, updated or changed its
+  languages, and a tab in the background skips the check.
+- **Switches, active filters and tabs stay visible in Windows high contrast mode.** The mode
+  replaces the app's colours with system colours and drops shadows. A switch then disappeared
+  completely, the active filter chip and the active tab looked like the others, and a focused input
+  field showed no focus. Each of them now uses the system highlight colour or an outline there.
+- **The page no longer flashes white in dark mode before the styles load.** The app and the offline
+  page now tell the browser up front that they support light and dark, so the background, scrollbars
+  and form fields start in the right colour. A theme you picked yourself wins over the system setting
+  from the first frame too.
+- **"Undo" in a toast is reachable with the keyboard while a dialog is open.** Tab used to jump from
+  the dialog's last button back to its first, past the toast. A dialog now leaves keeping the focus
+  inside to the browser.
+- **The More sheet, search, the welcome tour and the pickers inside forms lock the page behind
+  them.** These layers only asked screen readers to stay inside; the page behind them could still
+  be reached with Tab, a click or the virtual cursor. It is now inert while the layer is open. After
+  the welcome tour, the keyboard focus returns to the page content instead of getting lost.
+- **Setting a password tells you the rule before you try.** First-time setup, joining by
+  invitation and resetting a password showed "at least 8 characters" only as an error after
+  submitting. The rule now stands under the field. An error on these pages and on "Forgot password"
+  also marks the field it means, so a screen reader names it there, and "Forgot password" with an
+  empty field says what is missing instead of only moving the cursor.
+- **Required fields say so to screen readers, and every form shows which fields are required.** In
+  the budget's entry, account and loan dialogs and the waste type dialog the asterisk was only
+  visual; the field now reports itself as required. About thirty fields required an entry without
+  the asterisk, among them adding and editing members, your profile and password change, API tokens,
+  document management, Immich, Apple Calendar, calendar subscriptions, folders, documents, health
+  entries and medication, pairing, bonus points and shopping items. Forms with a single field and
+  the sign-in pages stay without it.
+
+### Security
+
+- **Contact websites and recipe links only open http and https addresses.** A website from a
+  synced address book or a recipe link from the API or a recipe provider could carry a
+  `javascript:` address and became a clickable link. Such values now show as plain text or no link.
+- **Password managers no longer offer your Yuvomi password for other services.** The password and
+  token fields for CalDAV, Apple Calendar, WebDAV backup and storage, document management, email,
+  Immich and push notifications asked for the sign-in of this site, so a password manager could fill
+  in your Yuvomi password and send it to that server on save. They now mark themselves as a new
+  password, the hint that keeps a saved password out (an "off" is ignored by many browsers on password
+  fields); the CardDAV form, the recipe provider token and the backup key field do the same.
+- **Widget names from extension modules are escaped on the Overview.** In customize mode and on the
+  error tile the name went into the page unescaped.
+
+## [2.78.0] - 2026-10-18
+
 ### Added
 
+- **New child accounts start with child defaults.** An account created or invited with the family
+  role Child no longer starts with Budget and fasting, and sees Housekeeping read-only without wages
+  and payments: the server leaves rates, totals, payment state and the unpaid amount out of every
+  Housekeeping answer and the Overview tile, refuses check-in, check-out and paying, and the page
+  shows who comes and when instead. A new permission "See wages and payments" lets you change this
+  per role or member under Settings -> Roles & permissions, where the add and invite forms point.
+  Existing accounts keep their rights, and changing someone's role later does not change them.
+  A child's Overview shows their own points first and the Budget card off while they follow the
+  default layout, and their own and unassigned tasks come before their parents' in "Today". On
+  Rewards a child sees their own card: points, the next reward with its price, the way there, and
+  "Request" once the points are enough.
+- **Find the weather location by name.** Settings -> My weather and the household weather now
+  start with a place search: type a city or postcode, press Search and pick the place from the list;
+  latitude and longitude fill in by themselves. Places with the same name show their region and
+  country (and their district where that is the only difference). The search runs through your
+  Yuvomi server at Open-Meteo, the same service as the weather, and only the place name leaves it.
+  The coordinate fields stay available under "Coordinates by hand", and "Locate me" works as before.
+  The API has a new `GET /api/v1/weather/geocode` endpoint for the same search.
 - **The search palette remembers where you went.** Press Cmd+K (Ctrl+K) with an empty field to see
   the last five modules and settings pages you opened from it, above the module shortcuts. Only the
   destination is kept on this device, never the name of an entry, and signing out clears it, so a
   shared tablet shows the next person nothing of yours. The dialog behind "?" is now called
-  "Keyboard shortcuts", which is what it lists.
+  "Keyboard shortcuts", which is what it lists. Names that start with what you typed come first,
+  your entries come before the "Create" commands, modules and commands show their icon, and when
+  nothing matches the palette offers to create what you typed as a task.
 - **Extension modules can add a Settings sheet** (#1856). An optional manifest field places a module
   under Settings -> Modules, with personal sections for members and household sections for
   administrators. Disabled modules disappear from the list; module APIs remain responsible
@@ -26,19 +154,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing calendar feed is on by default; turn it off when using both feeds to avoid duplicates.
 
 - **Sort the budget ledger and filter it by account.** The menu at the head of the transaction list
-  sorts by date or by amount (largest first, remembered on this device) and shows one account's
-  statement, the same filter the Accounts tab opens. A note under the title says when the list is
-  sorted by amount; a tap on it opens the menu.
+  sorts by date or by amount (expenses first, then income, each largest first, remembered on this
+  device) and shows one account's statement, the same filter the Accounts tab opens; the balance
+  and the categories beside the list then count that account too. Sorted by
+  amount, planned and booked entries stay in their own sections. A note under the title says when
+  the list is sorted by amount; a tap on it opens the menu.
 - **The calendar has a sidebar on wide screens.** From about 1600px the month, week and day views
   show a small month to jump to any day, your calendars and people as switches (the same ones as in
   the filter menu), and the next five appointments. Today is marked in the same colour as in the
   grid, the chosen day with a ring, and when everyone shares a surname the people show first names
   only, so the next appointments fit on the screen. When the next appointments cannot be loaded,
-  the sidebar says why and offers "Try again" instead of claiming nothing is coming up. The period
+  the sidebar says why and offers "Try again" instead of claiming nothing is coming up. The agenda
+  keeps the sidebar with the small month and the switches (without the next appointments, which the
+  agenda itself lists), so switching views no longer moves the calendar sideways, and the sidebar
+  stands there from the first picture instead of pushing the calendar aside after it loaded. The period
   in the header ("October 2026") is now set as a title instead of in body text weight.
 
 ### Changed
 
+- **Settings -> Members: inviting sits with the invitations.** "Create invitation" moved from under
+  the member list into the Invitations card, which had no action of its own; "Add member" stays
+  under the list. The note on the member order is two short sentences instead of five lines.
+
+- **The welcome tour shows Yuvomi and the real buttons.** It opens with the Yuvomi mark instead
+  of a generic house, and its steps on navigation and on the + button light up exactly that
+  control on your screen - the tab bar or the sidebar, and the + button where it sits on this
+  device - while the rest of the page dims.
+
+- **A page that fails to open says which one, and that the rest works.** Instead of "Something
+  went wrong", the error screen names the page ("Contacts can't be opened right now"), says that
+  everything else keeps working, and offers "Go to Overview" next to "Reload".
+
+- **Lists next to their details use the room on wide screens and tablets.** From about 1900px the
+  list beside the details (contacts, tasks, inventory, birthdays, recipes) is wider, so contacts
+  show their full e-mail addresses and the category chips fit on one line. On a tablet the list now
+  runs as wide as its header instead of leaving a strip free on the right.
+
+- **Customizing the Overview on a phone is calmer.** Each widget row had four outlined round
+  buttons; move up and down now share one capsule, and size and hide stand as plain icons beside
+  it, with the same touch targets.
+
+- **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
+  the ingredients is gone; the details open with the meals and the ingredients, under the
+  recipe's name. Recipes with a picture keep it.
+
+- **Selecting tasks clears the screen for the selection.** While you select several tasks on a phone,
+  the tab bar and the add button step aside and the selection bar takes their place. A tap anywhere
+  on a row selects it, a selected row is tinted, and the swipe arrow no longer shows. On a computer
+  the selection column also offers "Archive", for open tasks too, and the task shown before you
+  started selecting no longer looks selected. Contacts follow the same rule.
+
+- **A housekeeping payment task is only for the adults who pay.** The task a check-in creates names
+  the wage, so it is now assigned to the person who checked in and to the admins, and only they see
+  it - in Tasks, the Overview, search and connected AI assistants alike. When an account that cannot
+  see wages checks in, the task goes to the admins instead. Open payment tasks created before this
+  change move to the same people when you update; a completed one follows as soon as its visit is
+  edited, checked out or paid. When an account loses the right to see wages - in its own permissions,
+  its family role's profile or by a new family role - it also leaves the payment tasks it already
+  had. The switch in Settings -> Modules -> Household help says who sees it.
 - **Every settings page and dialog uses the same rows.** Fields stand as rows with the label on the
   left and the field on the right, and a hint underneath where one helps, instead of fields stacked
   under their labels in a card. That covers the e-mail server and the account page, Kitchen (meal
@@ -67,31 +240,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inviting someone is the first choice on the Members page.** "Create invitation" now sits as the
   main button right under the member list, next to "Add member", instead of in a card further down;
   both carry an icon instead of a "+" sign, and your own row says "Me" after your name.
+- **Shift types speak your language and stand in the order of the day.** The short codes of the
+  templates are now localized (in German "F · Frühschicht" and "K · Krank" instead of English "E"
+  and "S"), lessons are numbered 1 to 4, and existing shift types keep theirs. The list groups
+  shift types with times by their start, and all-day ones like vacation and sick leave apart. Once
+  a household has shift types, the template buttons sit as a quiet "Quick start" line under the
+  list instead of beside the heading.
 - **Shift statistics update as you choose.** Picking a person or a period recalculates right away,
   so the "Show statistics" button is gone. Both lists start on the same line, and a period without
-  shifts shows one empty message instead of zeros and two empty cards.
+  shifts shows one empty message instead of zeros and two empty cards, and offers "Print" only
+  when there is something to print.
 - **The housekeeping payment chart always shows six months.** Months without a visit appear
-  with 0 € instead of being left out, and the bars share the width of the card, so two payments no
-  longer sit alone at its left edge.
+  instead of being left out, and the bars share the width of the card, so two payments no
+  longer sit alone at its left edge. Each month is a column on a baseline: the paid part solid,
+  the part still open lighter, with a legend for both; an empty month carries no "0.00 €", and
+  whole amounts drop their cents so "380 €" fits on a phone.
 - **A PDF preview shows the whole first page.** On a computer the preview fitted the page to its
   width and showed less than half of it; it now fits the full page, and "Open in new tab" stays the
   way to read it in detail.
-- **Recipes have a real search field on a phone.** The row under the kitchen tabs held only a
-  magnifying glass; it now holds the search field itself, so you can tap and type right away.
+- **Recipes and Pantry have a real search field on a phone.** The row under the kitchen tabs held
+  only a magnifying glass (in Pantry next to the storage places); it now holds the search field
+  itself, so you can tap and type right away.
 - **Breakfast, snack and dinner are told apart at a glance.** Dinner is now indigo instead of the
   app's violet, so it no longer looks like a button, and snacks are berry instead of an orange that
-  was hard to tell from breakfast amber, also with red-green colour blindness.
+  was hard to tell from breakfast amber, also with red-green colour blindness. The meal type
+  choices in the meal and recipe dialogs carry the same coloured dot as the plan.
 - **Subscription costs and their budget share one card.** The summary reads "113.60 € of 90.00 €"
   with the budget bar underneath instead of two cards side by side, so the row always has three
   cards. On a wide screen each subscription's description now appears once, next to its name.
 - **Empty progress bars no longer look like holes in dark mode.** The track behind budget plans,
   loans, subscriptions, Health goals and the overview's budget card, and the circle behind reward
   history icons, sit as a soft well in the card instead of near-black.
-- **A budget category keeps its colour in every month.** Colours follow a category's place in your
-  category list instead of how much it cost this month, so "Housing" no longer turns from violet to
-  teal when another category is more expensive. The ring in Reports leaves a small gap between
-  segments, groups the rest in grey, and the light chart colours were adjusted so that no two of
-  them look alike with red-green colour blindness.
+- **A budget category has one colour in overview, plan and statistics.** The plan says "tight" or
+  "over" in words with an icon instead of recolouring the bar. Colours follow a category's place in
+  your category list instead of how much it cost this month, so "Housing" no longer turns from
+  violet to teal when another category is more expensive. Only when two categories shown in the same
+  period would want the same colour, because there are more categories than chart colours, the
+  smaller one takes the next free colour, so no two segments of the ring share one.
+  The ring in Reports leaves a small gap between segments, groups the rest in grey, and the light
+  chart colours were adjusted so that no two of them look alike with red-green colour blindness. For
+  blue-yellow colour blindness, where petrol and green or orange and magenta still look close, green
+  and magenta are drawn striped - in the ring, in the category bars and in the plan - so a segment
+  still matches its bar.
 - **The Health settings page names the cycle plainly.** The switches say "Show cycle" for yourself
   and "Offer the cycle in the household" for everyone instead of "Show cycle tab" twice, so a
   search for "cycle" finds each once, and the jump links at the top carry the headings they lead
@@ -104,6 +294,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pinned and other notes no longer mix on wide screens.** "Other notes" starts its own row again
   below the pinned ones, so a note can no longer look pinned just because it sits under a pinned
   card. Browsers that support grid lanes pack the cards without gaps.
+- **Waste collection: the next step stands where you need it.** A waste type without a schedule
+  offers "Add schedule" right under "No schedule yet", the templates you have not used yet stay as
+  chips under your waste types, the type cards are plain surfaces like every other list, the seven
+  weekdays fit on one line on a phone, and "Every N weeks" is a stepper with minus and plus.
+- **Waste collection and Notes open without jumping.** In Waste collection the column with waste
+  types used to load below the pickups and then jump up (or shrink) once the data arrived; it now
+  appears with its content. In Notes the row of filter chips keeps its place while the notes load,
+  so the cards no longer slide down when it appears.
 - **New rows and messages appear without the list jerking.** A row that comes back after "Undo",
   an unfolded group or a field message now fades in at its full size while the rows below glide
   down, instead of growing its height frame by frame, which stuttered on slower phones.
@@ -159,9 +357,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still applies within each group. On a phone, More lists the modules in grouped rows like the
   iOS Settings app, with each name on one line and waiting counts at the end of the row, instead
   of a grid with gaps.
-- **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to its icons and
-  makes it flatter; scrolling up, reaching the top or the end of a page brings the labels back. The
-  add button stays, nothing on the page moves, and with reduced motion it switches without sliding.
+- **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to a small pill
+  at its leading edge that shows only the tab you are on, as on iOS; scrolling up, reaching the top
+  or the end of a page, or tapping the pill brings the whole bar back. The add button stays, nothing
+  on the page moves, and with reduced motion it switches without sliding.
   The tabs also stay in the same place in every module: the bar keeps the add button's spot even
   on a page without one, so neither a tab nor the bar itself moves under your finger when you
   switch budget tabs or open Rewards.
@@ -189,12 +388,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and dragging still reorders.
 - **The calendar on a phone no longer shows half-cut rows.** In the agenda, a day heading that sticks
   to the top covers the event card scrolling beneath it instead of letting a strip of its text show
-  above. The week view opens with a full hour at the top, also late in the day.
+  above. The week view opens with a full hour at the top, also late in the day, and its three days
+  start with today instead of yesterday. A new event from the + button lands on a day of those three.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone); the first Rewards tab
   is now called "Points", so a phone no longer shows "Overview" twice and nothing saying where you
-  are. The budget header
-  folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search
+  are. Household help's first two tabs are now "Visits" and "Chores" instead of repeating the tab
+  bar's "Overview" and "Tasks". The budget header
+  folds to one row while you scroll, with the tabs beside the month, and so does a Health area,
+  with the area name between the back arrow and the person. When a header folds, the content
+  below glides up instead of jumping, the same way in Calendar, Budget and Shopping. On a tablet the title, search
   and tools of Tasks, Contacts, Inventory, Notes and Documents share one row, where the search field
   gives way so the title is never cut off, and the budget title shares its row with the month.
 - **The overview appears sooner on a cold start.** The browser now asks for every module the start
@@ -202,6 +405,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them, and no longer waits for the date picker, category, icon picker, attachment, screensaver and
   sign-in styles before the first frame; each of those loads its styles when it is first shown. On
   a throttled phone (4x CPU, fast 4G) the overview's content arrived after 4.8 s instead of 5.6 s.
+  The session and settings are now asked for while the app itself still loads, instead of one
+  after the other once it has: opened again from the home screen, the overview shows its content
+  after 0.8 s instead of 1.1 s on the same phone. While it loads, a calm outline of the
+  app stands where the header, cards and tab bar will appear, instead of a pulsing name, and
+  screen readers announce it as loading in your language.
 - **Less to download on every start.** The server leaves the explanatory comments in Yuvomi's own
   scripts and stylesheets out of what it sends; the files on disk keep them, and line numbers in
   error reports still match the source. Compressed, the app's scripts shrink from 2.0 to 0.9 MB
@@ -215,7 +423,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One set of controls in every module header.** Search, view, filter and more sit in the same order
   and look the same everywhere, and every view picker is the same segmented control. The calendar
   header on a desktop is one row with a real search field (two rows instead of three on a tablet);
-  on a phone the view picker names the current view and "Today" sits on the period label. Tasks on a
+  on a phone the view picker names the current view and "Today" sits on the period label. Scrolled
+  on a phone, the calendar header folds to one row like Apple Calendar's: the period, the view by
+  name, search and filter. The arrows step aside - swipe, the keyboard or the view menu move to
+  the next period, and a tap on the period returns to today. Tasks on a
   phone keep search, filter and more beside the title, so the list starts about 50px higher. Settings
   on a desktop shows the module header like every other module.
 - **Task and calendar filters open the same sheet.** People are chips, layers and calendars are
@@ -238,15 +449,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dialogs ask in a clearer order.** The meal dialog starts with the name and offers meal types as
   chips, the inventory dialog folds purchase, warranty, photo and documents behind "More details",
   the measured-at date in health looks like a field, and activity intensity is a translated choice.
-  A budget category keeps one color in overview, plan and statistics; the plan says "tight" or "over"
-  in words with an icon.
 - **Dialogs are real dialogs.** The page behind a dialog can no longer be reached by keyboard or
   screen reader, Esc and the back gesture ask before discarding unsaved input, and the icon picker and
   image cropper look and move like every other dialog.
 - **Smoother motion.** View-switch pills glide instead of jumping while the new view builds, page
   changes finish their fade sooner so the next tap lands earlier, charts in health draw in like the
   budget reports, and an empty state no longer fades in twice. With reduced motion, dialogs, page
-  changes and theme switches crossfade instead of cutting hard.
+  changes and theme switches crossfade instead of cutting hard, and so do closing menus, rows and
+  sections that open, module titles as the header folds, and the shopping header coming back.
 - **The pantry keeps its shape on wide screens.** On a desktop the list stands at reading width and
   the "Expiring soon" panel takes the rest up to the header's edge. On a 1920px screen the panel had
   110px left for names ("Greek yo-gurt" broke mid-word) while list rows stretched to 1146px, with the
@@ -270,6 +480,162 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On a tablet every budget tab ends where its header ends.** Overview, Accounts, Plan, Loans and
+  Statistics stopped short of the month switcher above them while Subscriptions and Split ran to
+  the edge; all tabs now use the full width, so the right edge no longer moves between tabs.
+
+- **Budget category names are no longer cut short.** On a phone a transaction's category may take a
+  second line instead of ending in "…" ("Leisure and entertainment"), and the subscription charts
+  show names like "Utilities" in full next to a shorter bar.
+
+- **Budget accounts take less room on a phone.** The account type and starting balance now share
+  one line under the name and balance ("Checking · Start: 2,480.00"), so an account row is about a
+  fifth shorter and all six demo accounts fit on one screen. On very narrow phones the name gets
+  the full width instead of being cut after a few letters.
+
+- **Rows in a group of one keep their columns.** In shopping and task lists, a category or group
+  with a single entry had no drag handle, so its quantity, avatars and more button sat further
+  right than in every other group. The handle's place now stays, and the columns line up.
+
+- **Esc leaves "Customize" on the Overview.** It does what "Cancel" does and asks first if you
+  changed something; an open dialog or menu keeps its own Esc.
+- **Budget plan: hitting the plan exactly is no warning.** A fixed cost such as rent is booked in
+  full on the first of the month; its plan row stayed amber with a warning sign all month. Amber
+  now means "almost there", red still means over the plan.
+- **Loan payments show the latest six.** The list under the loans grew with every instalment (16
+  rows on a phone with a building loan); the rest now sits behind "Show all (n)". On a narrow
+  screen the dot between date and instalment no longer hangs at the end of the first line.
+- **No double line under the title of a detail.** The thin strip in the module colour under the
+  header of an inventory item, a budget entry and a shared expense is gone; it only repeated the
+  module and stood a few pixels under the header line. Subscriptions keep the strip in their brand
+  colour.
+- **Shared expenses speak to you.** A balance you are part of reads "You owe Alex Johnson" or
+  "Alex Johnson owes you" instead of naming yourself, and the summary cards put the group first
+  ("Household: You owe") instead of "You owe in Household". Every language now has its own word
+  order for "A owes B".
+- **Documents line up in the grid.** A search without results fills the whole width instead of one
+  card's cell, and a short name keeps the room of a two-line one, so the details and buttons of a
+  row of cards end on one line.
+- **Health: a new medication gets its intake schedule in the same dialog.** You no longer have to
+  save a medication first and open it again to add times: the schedule is ready while you create
+  it and is saved with it. Stock and note sit behind "More settings" (open when they hold
+  something), dose and form share a row, and the seven weekdays fit on one line, so the dialog
+  on a phone is about a fifth shorter even with the schedule in it.
+- **Health: the lab trend opens on the value that needs attention.** The chart under the lab
+  reports used to show the first value ever entered (often a normal one); it now starts with a
+  value flagged out of range in the latest report, preferring one with a history to draw.
+- **Settings: no dead "Install app" button.** Where the browser offers no installation, or Yuvomi
+  is already installed, the button is gone and the page says where installing works: in the browser
+  menu of Chrome and Edge, under Share in Safari, and only over HTTPS.
+- **Settings: the screensaver options wait for Immich.** Without an Immich connection the photo
+  screensaver never starts, yet "This device" offered its delay, clock and photo fit. It now shows
+  one row saying that an admin has to connect Immich first, and admins get a button that goes there.
+- **Settings: sheet introductions and jump links are no longer cut off.** On a phone the line under
+  a sheet's title may take three lines instead of two, so "This device", Notifications and Tasks
+  keep the end of their sentence. On wider screens the jump links at the top of a sheet wrap to a
+  second row instead of disappearing at the edge.
+- **Screen readers and voice control hear what the buttons show.** Several buttons carried a name that
+  left out their visible text, so saying what you see did not reach them: the account button in the
+  sidebar, the "New" button in a module header, kitchen tabs with a count, account rows in Budget,
+  shared expenses, points on Rewards and the days of the cycle calendar. They are now named by what
+  they show, followed by what a tap does. Shared expenses no longer add a second main area to the
+  page, and the housekeeping task summary no longer repeats the name of the task list.
+
+- **Health: the intake log looks like something you can open.** "Intake log" under the adherence card
+  had lost its arrow and read like a heading. It now carries the same chevron as other expandable
+  sections, turns it when open, and is a full-size target on a phone.
+
+- **Settings: one key press from the list to the page.** On a computer some 30 Tab presses stood
+  between the top of Settings and the first field of a page, through the search and every entry of
+  the list. The first Tab now offers "Skip to the setting", which takes you straight to the page.
+
+- **The keyboard focus stays where you work in the calendar.** Pressing Enter on an empty day in the
+  month opens that day with the focus on its "No events yet" note instead of the view tabs at the top.
+  A dialog opened with "n" and then discarded returns the focus to the "New" button, in every module,
+  instead of the top of the page.
+
+- **Wall mode keeps the keyboard focus and shows what its buttons are for.** Starting wall mode
+  puts the focus on the wall, and leaving it with Esc returns it to the button that started it,
+  instead of dropping it at the top of the page. The timer buttons carry the word "Kitchen timer",
+  and the count next to a face no longer covers the initials: it leans against the face, or follows
+  the name when task titles are shown.
+
+- **The keyboard shortcuts dialog keeps the keyboard inside.** Pressing "?" opened a panel the focus
+  never entered: Tab ran on through the page behind it, and closing it left you nowhere. It now opens
+  like every other dialog, with the focus inside, and closing it returns you to where you were. On a
+  computer the shortcuts stand in two columns, so the list fits without scrolling.
+
+- **The buttons of the selection bar and of "Undo" are easy to hit on a phone.** "To pantry",
+  "Delete" and "Undo" stay small capsules, but a finger now hits them across a full 48px, so a tap
+  in the thumb zone above the tab bar no longer misses.
+- **The shopping list's check boxes are easy to see.** An empty box was drawn in the faint line used
+  for card edges and almost vanished on both light and dark backgrounds. It now has the same edge as
+  the circle you tick off a task with, clearly visible at a glance.
+
+- **Yuvomi stays light after a long session.** A page you leave no longer stays in memory: after 44
+  page changes the app held about 11,000 page elements instead of 52,000, with a quarter of the
+  event listeners, because the old page, its drag handles and the record of the interrupted page
+  are let go.
+
+- **Long task lists open and update faster.** With some 200 tasks on a throttled phone, opening
+  Tasks no longer freezes the screen for 0.8 s (now 0.4 s), and ticking a task off takes 0.1 s
+  instead of half a second: only that row leaves the list instead of the whole list being redrawn,
+  groups further down are laid out once they come near the screen, and their icons follow
+  right after the first screen.
+
+- **Tapping the tab you are on takes you to the top.** It used to rebuild the page with a jump and
+  add a second step with the same address, so Back then seemed to do nothing; now the page glides
+  to the top and stays as it was (with reduced motion it moves there at once). Opening the same
+  address twice in a row no longer adds a step to the history either.
+
+- **Opening a module from More no longer shows the More list over the new page.** The sheet was
+  still fading out when the page changed, and for a moment its list stood frozen over the new page;
+  it now finishes before the switch, so only the page fades.
+
+- **Health: choosing another lab report keeps the keyboard focus on it.** The list was redrawn and
+  the focus fell back to the start of the page, so the next Tab began at the top again.
+
+- **Waste collection: a weekly schedule without a day says so at the days.** "Choose at least one
+  weekday" appeared as a short notice at the bottom of the screen; it now stands under the day
+  chips, and the focus moves to the first day.
+
+- **Switching pages without a connection no longer ends in "Something went wrong".** A page that
+  needs the network now says "You are offline" with "Try again", and draws itself as soon as the
+  device is back online. On a computer the offline notice sits above the content instead of
+  covering the logo, search and collapse button of the sidebar.
+
+- **A mistyped current password no longer signs you out.** Changing your password with a wrong
+  current password sent you to the sign-in page without a word and lost what you had typed, although
+  your session was fine. The page now says "The current password is not correct." at that field and
+  keeps your entries. The account page shows every missing or invalid entry at its own row instead
+  of in browser pop-ups: name, e-mail address, birthday, the three password fields and the
+  two-factor code. For API clients: `PATCH /api/v1/auth/me/password` now answers a wrong current
+  password with 400 and `reason: 'wrong_password'` instead of 401.
+- **The e-mail server settings refuse what cannot work.** A port outside 1 to 65535 or a sender
+  without an e-mail address was saved with "Settings saved" and failed only on the first message.
+  Both are now named at their field before saving or testing, and the server refuses them as well.
+  "Test connection" says in your language what went wrong (sign-in rejected, server not reachable,
+  encryption failed, message refused) instead of the mail server's English text, and when your own
+  address is missing it points to Account -> E-mail.
+
+- **Documents: uploading without a file says so at the drop zone.** The message appeared at the
+  bottom of the dialog, below the visible part of a phone screen, while the focus stayed on
+  "Upload". It now stands right under the drop zone, which turns red and scrolls into view, and the
+  focus moves to the file choice. The same goes for a file that is too large.
+
+- **Health: a blood pressure reading without a pulse no longer draws a pulse of 0.** The chart
+  counted the missing value as zero, stretched its axis down to 0 and flattened both pressure
+  curves against the edge. A missing pulse is now left out of the line and of the change shown
+  against the previous reading.
+
+- **Budget: money you lent out no longer counts as your debt.** The loans summary added both
+  directions into one "Outstanding balance", so 800 € lent to a relative showed up as debt of the
+  household. Borrowed and lent loans now stand as two figures, "Outstanding balance" and "Still owed
+  to you", with "Paid" and "Received back" next to them. The button on a loan card says what it
+  records: "Record payment" for a loan you took out, "Repayment received" for one you gave, instead
+  of "Mark paid", which booked a single installment. The API keeps its totals and adds
+  `summary.by_direction`.
+
 - **The last tap wins while a page is loading.** Tapping a second destination while the first one
   was still loading was ignored, and you stayed on the first. Now the newer tap replaces the one
   in progress: the page you left behind is never drawn, and Back skips it. A page that has
@@ -284,7 +650,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A busy or restarting server no longer signs you out.** When Yuvomi could not check the
   session on start - too many requests, a server error, a restarting NAS or no network - it showed
   the sign-in form although the session was still valid. Only a real "not signed in" answer leads
-  there now; anything else shows "Connection interrupted" with the cause, a "Try again" button and
+  there now; anything else shows a state titled after the cause ("Connection interrupted",
+  "Server not ready right now" or "Too many requests") with the cause, a "Try again" button and
   an automatic retry that waits longer each time and respects the server's `Retry-After`. Screen
   readers hear it once, not on every retry, and focus stays on "Try again" when you used it.
 
@@ -318,7 +685,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rounding remainder; changes are now rounded to the currency first. The plan target on each
   category bar was explained only in a hover tooltip and stuck to the bar's end when it exceeded the
   largest amount: the scale now covers both, and the target reads "of 1,700.00 €" under the amount,
-  with how much of it is used for screen readers.
+  with how much of it is used for screen readers. All bars of a block now share one track length, so bars and
+  targets line up instead of shifting by up to 12 % with the width of the figures beside them. In a
+  month that is still running, the legend of the cumulative chart names the same figure as the
+  "Today" point, with what is entered for the days after today as "+ ... planned".
 
 - **The welcome tour points to the right button on a computer.** Its last step said new entries
   are created with the + button at the bottom right; on a wide screen that button sits at the top

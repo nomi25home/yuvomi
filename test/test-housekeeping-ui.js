@@ -609,6 +609,40 @@ test('Uebersicht: die letzten Besuche stehen vor dem Zahlungsdiagramm', () => {
   assert.ok(liste < diagramm, 'mobil begannen die Besuche bei y760 hinter dem 252px-Diagramm');
 });
 
+// R20 (Re-Critique 2026-10-17 a5 P2-5): das Zahlungsdiagramm las sich wie
+// sechs Fortschrittskapseln ohne Legende, mit viermal "0,00 €" ueber leeren
+// Monaten und "380,00 €", das bei 390px aus seiner Spalte lief.
+test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate ohne Betrag', () => {
+  const state = hk.state();
+  state.tab = 'dashboard';
+  state.currency = 'EUR';
+  state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: 45, payment_schedule: 'weekly' }];
+  state.dashboard = {
+    visits_this_month: 3, last_visit: null, pending_tasks: 0, finished_tasks_this_month: 0, pending_payments: 280,
+    monthly_payments: [
+      { month: '2026-05', total: 0, pending: 0 },
+      { month: '2026-09', total: 145, pending: 0 },
+      { month: '2026-10', total: 380, pending: 280 },
+      { month: '2026-11', total: 57.5, pending: 57.5 },
+    ],
+  };
+  state.recentVisits = [];
+  const content = fakeContainer();
+  hk.renderDashboard(content);
+  const html = content.html;
+  const values = [...html.matchAll(/housekeeping-chart__value" aria-hidden="true">([^<]*)</g)].map((m) => m[1]);
+  assert.equal(values.length, 4, 'eine Wertzeile je Monat');
+  assert.equal(values[0], '', 'ein leerer Monat traegt keinen Betrag ("0,00 €")');
+  assert.doesNotMatch(values[2], /[.,]00/, `ganze Betraege ohne Nachkommastellen (${values[2]})`);
+  assert.match(values[3], /57[.,]5/, 'ein krummer Betrag behaelt seine Stellen');
+  const bars = [...html.matchAll(/housekeeping-chart__bar" style="([^"]*)"/g)].map((m) => m[1]);
+  assert.equal(bars.length, 3, 'ein leerer Monat hat keine Saeule, nur die Grundlinie');
+  assert.match(bars[0], /--paid-share:100\.0%/, 'ganz bezahlt');
+  assert.match(bars[1], /--paid-share:26\.3%/, '100 von 380 bezahlt, der Rest ist offen');
+  assert.match(html, /housekeeping-chart__legend[\s\S]*housekeeping\.paymentPaid[\s\S]*housekeeping\.paymentPending/, 'die Legende nennt bezahlt und ausstehend');
+  assert.match(html, /role="listitem" aria-label="[^"]*housekeeping\.paymentPending/, 'jede Saeule nennt ihren offenen Teil im Namen');
+});
+
 test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem anderen schon', () => {
   const jahr = new Date().getFullYear();
   const vorher = globalThis.__formatDayMonth;
@@ -757,7 +791,7 @@ test('Bearbeiten eines Besuchs zeichnet danach den Reiter neu, auf dem es lag', 
   }
 });
 
-test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
+test('Haushaltshilfe spricht EINEN Namen: Reiter "Besuche"/"Arbeiten", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
   const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
   assert.doesNotMatch(HK_SRC, /badge-dollar-sign/, 'Dollar-Icon bei Euro-Betraegen');
   assert.match(HK_SRC, /icon: 'banknote'/, 'Bezahlen traegt den Geldschein - seit D6 als Eintrag im Mehr-Knopf');
@@ -769,10 +803,18 @@ test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Ze
     // ebenfalls "Uebersicht" und dieser Test hielt beide gleich. Unter 768px
     // sind die Reiter dort der Titel; zwei Mal "Uebersicht" (Reiter + Kapsel)
     // und nirgends "Belohnungen" - er heisst seither "Punkte"
-    // (test:rewards-ui). Hier bleibt "Uebersicht": die Reiterleiste nennt
-    // mit "Haushaltshilfen" das Modul selbst.
-    assert.ok(loc.housekeeping.dashboard, `${file}: der Reiter "Uebersicht" hat eine Uebersetzung`);
+    // (test:rewards-ui). Seit R20 (Re-Critique a3/a5) gilt dasselbe hier:
+    // "Uebersicht" und "Aufgaben" hiessen wie zwei Tabs der Kapsel darunter,
+    // die Reiter heissen nach ihrem Inhalt - Besuche, Arbeiten.
+    assert.ok(loc.housekeeping.tabVisits && loc.housekeeping.tabChores, `${file}: beide Reiter haben eine Uebersetzung`);
+    for (const key of ['tabVisits', 'tabChores']) {
+      for (const nav of ['dashboard', 'tasks', 'calendar']) {
+        assert.notEqual(loc.housekeeping[key], loc.nav?.[nav], `${file}: Reiter ${key} heisst nicht wie der Kapsel-Tab ${nav}`);
+      }
+    }
   }
+  assert.match(HK_SRC, /renderTabButton\('dashboard', t\('housekeeping\.tabVisits'\)\)/, 'der erste Reiter heisst "Besuche"');
+  assert.match(HK_SRC, /renderTabButton\('tasks', t\('housekeeping\.tabChores'\)\)/, 'der zweite Reiter heisst "Arbeiten"');
   const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8')).housekeeping;
   assert.equal(de.pendingChores, 'Fällig');
   assert.equal(de.finishedChores, 'Erledigt im Monat');
@@ -1072,4 +1114,55 @@ test('R17/E16: ab 1024px haengt der Zeitraum in der Titelzeile, darunter unter d
   const regeln = [...eachRule(readFileSync(new URL('../public/styles/housekeeping.css', import.meta.url), 'utf8'))];
   const imKopf = regeln.find((r) => r.selector.trim() === '.page-toolbar > .housekeeping-period');
   assert.match(imKopf?.body ?? '', /padding:\s*0/, 'im Kopf faellt das eigene Zeilenpolster');
+});
+
+// ---------------------------------------------------------------------------
+// R20: ohne `housekeeping_view_amounts` (neue Kinderkonten) steht kein Geld da
+// ---------------------------------------------------------------------------
+
+test('R20: ohne Betragsrecht keine Euro-Zeile, kein Zahlungsdiagramm, keine Lohnangabe - die Zeiten bleiben', async () => {
+  const perms = await import('../public/permissions.js');
+  // So kommt ein neues Kind an: Modul nur lesen, Betraege aus - und der Server
+  // schickt die Felder als null (test-child-start-permissions.js).
+  perms.setPermissions({ admin: false, modules: { housekeeping: 'read' }, widgets: {}, capabilities: { housekeeping_view_amounts: 'none' } });
+  try {
+    const state = hk.state();
+    state.tab = 'dashboard';
+    state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: null, hourly_rate: null, payment_schedule: 'weekly' }];
+    state.dashboard = { visits_this_month: 3, last_visit: null, pending_tasks: 1, finished_tasks_this_month: 2, monthly_payments: null, pending_payments: null };
+    const visit = {
+      id: 31, worker_name: 'Maria Silva', check_in: '2026-08-06T08:00:00.000Z', check_out: '2026-08-06T11:00:00.000Z',
+      total_amount: null, daily_rate: null, extras: null, paid_at: null, rate_type: 'daily',
+      can_edit: false, can_delete: false, can_mark_paid: false,
+    };
+    state.recentVisits = [visit];
+    const content = fakeContainer();
+    hk.renderDashboard(content);
+    const html = content.html;
+    assert.doesNotMatch(html, /housekeeping-chart"/, 'das Zahlungsdiagramm entfaellt');
+    assert.match(html, /housekeeping-dashboard-columns housekeeping-dashboard-columns--single/, 'die Besuche nehmen die Zeile allein');
+    assert.doesNotMatch(html, /housekeeping\.pendingPayments/, 'keine offenen Zahlungen');
+    assert.doesNotMatch(html, /€|EUR/, 'kein Betrag, auch kein „0,00"');
+    assert.match(html, /housekeeping\.notHereToday/, 'die Personenzeile sagt, ob sie da ist, statt den Lohn zu nennen');
+    const [row] = visitRows(html);
+    assert.equal(row.meta, 'Maria Silva · 2026-08-06T08:00:00.000Z-2026-08-06T11:00:00.000Z', 'Person und Zeit statt Betrag und Zahlstatus');
+    assert.equal(hk.visitWorkDetailsHtml(visit), '', 'der Bericht nennt keinen Tagessatz');
+
+    // Und auch mit Recht: eine `null` aus einer Antwort wird nie „0,00 €".
+    perms.setPermissions({ admin: false, modules: {}, widgets: {}, capabilities: {} });
+    assert.equal(hk.amountsHidden(null), true);
+    assert.equal(hk.amountsHidden(0), false, 'eine echte 0 ist ein Betrag');
+  } finally {
+    perms.clearPermissions();
+  }
+});
+
+// R20 (handoff B2): seit B2 sehen eine Zahlungsaufgabe nur die Person, die
+// eincheckt, und die Admins - der Schalter in den Einstellungen sagt das.
+test('Einstellungen: der Hinweis zu Zahlungsaufgaben nennt, wer sie sieht', () => {
+  const localeDir = new URL('../public/locales/', import.meta.url);
+  const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8'));
+  const en = JSON.parse(readFileSync(new URL('en.json', localeDir), 'utf8'));
+  assert.match(de.settings.housekeepingPaymentTasksHint, /nur die Person, die eincheckt, und die Administratoren/);
+  assert.match(en.settings.housekeepingPaymentTasksHint, /Only the person who checks in and the administrators/);
 });

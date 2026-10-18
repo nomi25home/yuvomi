@@ -14,6 +14,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
@@ -22,6 +23,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -1334,12 +1336,17 @@ function wireCombobox(panel, id) {
       open();
       (visible[Math.min(active + 1, visible.length - 1)] || visible[0])?.focus();
     }
-    if (event.key === 'Enter' && visible.length) {
+    if (event.key === 'Enter' && visible.length && !isImeComposing(event)) {
       event.preventDefault();
       event.stopPropagation();
       selectFromKeyboard(visible[0]);
     }
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape' && !root.querySelector('.subscriptions-combobox__options').hidden) {
+      // Offene Liste: Esc schliesst nur sie. preventDefault sagt dem Modal
+      // (onEscape), dass das Esc verbraucht ist - sonst ginge das Formular mit.
+      event.preventDefault();
+      close();
+    }
   });
   options.forEach((option) => {
     option.addEventListener('pointerdown', (event) => {
@@ -1357,6 +1364,7 @@ function wireCombobox(panel, id) {
         visible[Math.max(0, Math.min(visible.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
       }
       if (event.key === 'Escape') {
+        event.preventDefault();
         close();
         search.focus();
       }
@@ -1869,7 +1877,11 @@ function logoOptionsMarkup(options) {
 }
 
 function openLogoPickerModal(panel, initialQuery, onSelect) {
-  panel.querySelector('.subscriptions-logo-picker-modal')?.remove();
+  // Der Knopf "Logo suchen", der den Picker oeffnet - dorthin geht der Fokus zurueck.
+  const opener = document.activeElement;
+  const stale = panel.querySelector('.subscriptions-logo-picker-modal');
+  stale?._releaseBackground?.();
+  stale?.remove();
   panel.insertAdjacentHTML('beforeend', `
     <div class="subscriptions-logo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-logo-picker-title">
       <div class="subscriptions-logo-picker-panel">
@@ -1896,10 +1908,22 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     </div>
   `);
   const overlay = panel.querySelector('.subscriptions-logo-picker-modal');
+  // Das Abo-Formular darunter ist gesperrt, solange der Picker offen ist
+  // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+  overlay._releaseBackground = inertOutside(overlay);
   const results = overlay.querySelector('#subscription-logo-results');
   const input = overlay.querySelector('#subscription-logo-search-input');
   let options = [];
-  const close = () => overlay.remove();
+  const close = () => {
+    // Mit dem Picker ginge das fokussierte Suchfeld weg, und der Fokus fiele auf
+    // body - aus der Fokusfalle des Abo-Formulars heraus (Codex-Review zu #2055).
+    const hadFocus = overlay.contains(document.activeElement);
+    overlay._releaseBackground();
+    overlay.remove();
+    if (!hadFocus) return;
+    const target = opener?.isConnected ? opener : panel.querySelector('#subscription-find-logo');
+    target?.focus();
+  };
   // Der Picker liegt ueber dem Abo-Formular; die Zurueck-Geste meint ihn (#871).
   attachOverlay(overlay, close);
   const search = async () => {
@@ -1932,7 +1956,12 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     close();
   });
   overlay.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape') {
+      // Esc meint den Picker, nicht das Abo-Formular darunter (onEscape in
+      // modal.js wertet preventDefault als "schon erledigt").
+      event.preventDefault();
+      close();
+    }
   });
   overlay.querySelector('#subscription-logo-picker-close').addEventListener('click', close);
   overlay.querySelector('#subscription-logo-search-form').addEventListener('submit', async (event) => {
@@ -2245,6 +2274,7 @@ function openMetadataModal() {
       // im Panel zu klicken bzw. das ganze Modal via Escape zu schließen.
       panel.querySelectorAll('.subscriptions-metadata-row__edit input').forEach((input) => {
         input.addEventListener('keydown', (event) => {
+          if (isImeComposing(event)) return;
           if (event.key !== 'Enter' && event.key !== 'Escape') return;
           event.preventDefault();
           event.stopPropagation();

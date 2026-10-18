@@ -572,7 +572,7 @@ test('Donut-Palette wiederholt keine Farbe und borgt keine Modul-Akzente', () =>
  * aufeinander. Simuliert wird nach Machado et al. (2009, Schwere 1,0) auf
  * linearem RGB; jedes Paar der Palette muss bei Deuteranopie UND Protanopie
  * mindestens dE 8 auseinanderliegen, in beiden Themes. */
-test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', () => {
+test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', async () => {
   const toLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
   const toSrgb = (c) => { c = Math.min(1, Math.max(0, c)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055); };
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -622,6 +622,52 @@ test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', () =
       }
     }
   }
+
+  // R20 (Entscheidung Ulas 2026-10-18): bei TRITANOPIE liegen Petrol/Gruen
+  // (2/7, dE 5,6) und Orange/Magenta (3/6, 6,2) unter 8. Keine neuen Farben -
+  // jedes solche Paar hat genau eine schraffierte Seite (TEXTURED_SERIES).
+  const trit = [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]];
+  const { TEXTURED_SERIES } = await import('../public/utils/budget-category-colors.js');
+  assert.ok(Array.isArray(TEXTURED_SERIES), 'TEXTURED_SERIES fehlt');
+  const close = [];
+  for (const [name, pal] of Object.entries(themes)) {
+    for (let i = 0; i < pal.length; i++) for (let j = i + 1; j < pal.length; j++) {
+      const d = de2000(lab(sim(rgb(pal[i]), trit)), lab(sim(rgb(pal[j]), trit)));
+      if (d < 8) {
+        close.push(`${i + 1}/${j + 1}`);
+        assert.ok(TEXTURED_SERIES.includes(i) !== TEXTURED_SERIES.includes(j),
+          `${name}: Serie ${i + 1}/${j + 1} bei Tritanopie dE ${d.toFixed(1)} - genau eine Seite braucht die Schraffur`);
+      }
+    }
+  }
+  assert.ok(close.includes('2/7'), `Reichweite: Petrol/Gruen ist das gemessene Paar (${close.join(', ')})`);
+});
+
+test('R20: die Schraffur folgt der Kategorie in Ring, Balken und Plan', async () => {
+  const { categoryTexture, TEXTURED_SERIES } = await import('../public/utils/budget-category-colors.js');
+  const index = new Map([['a', 1], ['b', 6], ['c', -1]]);
+  assert.equal(categoryTexture(index, 'b'), TEXTURED_SERIES.includes(6) ? 'hatch' : null);
+  assert.equal(categoryTexture(index, 'a'), null);
+  assert.equal(categoryTexture(index, 'c'), null, 'die Sammelscheibe bleibt glatt');
+  assert.equal(categoryTexture(index, 'x'), null);
+  // Jede Stelle, die die Kategoriefarbe malt, setzt auch die Textur.
+  const budget = read('../public/pages/budget.js');
+  assert.match(budget, /data-texture="\$\{categoryTexture\(colors, r\.category\)\}"/, 'Uebersicht: Kategoriebalken');
+  assert.match(budget, /data-texture="\$\{parentTexture\}"/, 'Uebersicht: Unterkategorien');
+  assert.match(budget, /categoryTexture: \(category\) => categoryTexture\(/, 'Plan bekommt die Textur');
+  assert.match(read('../public/pages/budget-plans.js'), /data-texture="\$\{texture\}"/, 'Planbalken');
+  assert.match(stats, /texture: categoryTexture\(colors, c\.category\)/, 'Donut-Segmente');
+  assert.match(stats, /stroke="url\(#budget-donut-\$\{e\.texture\}\)"/, 'das Segment malt das Muster');
+  assert.match(stats, /<pattern id="budget-donut-hatch"/);
+  assert.match(stats, /data-texture="\$\{texture\}"/, 'Statistik: Kategoriebalken');
+  // Das CSS malt sie - in Balken und Plan, mit Ausgleich der scaleX-Stauchung.
+  const css = read('../public/styles/budget.css');
+  const rules = [...eachRule(css)];
+  const fill = rules.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.budget-bar-row__fill[data-texture="hatch"]') && /background-image:/.test(r.body));
+  assert.ok(fill && /var\(--chart-texture-ink\)/.test(fill.body), 'Balken: Schraffur aus --chart-texture-ink');
+  assert.ok(fill.selector.includes('.budget-plan-row[data-texture="hatch"] .budget-plan-row__fill'), 'Planbalken in derselben Regel');
+  assert.ok(rules.some((r) => r.selector === '.budget-bar-row__fill[data-texture="hatch"]' && /background-size: calc\(var\(--chart-texture-tile\) \/ var\(--bar-scale\)\)/.test(r.body)), 'Kachel gegen scaleX ausgeglichen');
+  assert.ok(rules.some((r) => r.selector === '.budget-stats__hatch-line' && /fill: var\(--chart-texture-ink\)/.test(r.body)), 'Donut-Muster');
 });
 
 test('die Datenreihen-Tokens existieren in beiden Themes', () => {
@@ -2700,7 +2746,9 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   // Ansichtsmenue falten. Jede weitere Regel ist rot, bis sie hier steht.
   // D1 (2026-10-16): dazu das Wort im Pop-up-Knopf der Ansicht - eingeklappt
   // teilt der Knopf die Zeile mit dem Stepper und behaelt nur sein Zeichen.
-  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu-label$/];
+  // R20 6c: das Wort bleibt eingeklappt stehen, dafuer halbiert der Knopf
+  // seinen Innenrand (das Label traegt die Agenda-Spanne bei 390px ungekuerzt).
+  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu$/];
   const strangers = [...eachRule(calendarCss)]
     .filter((r) => /\.is-collapsed/.test(r.selector))
     .flatMap((r) => r.selector.split(',').map((part) => part.trim()))
@@ -3188,7 +3236,8 @@ test('R19: eine Ratenzeile nennt den Partner, die Meta-Zeile Datum und Rate', ()
   const row = budget.slice(budget.indexOf('function renderLoanPaymentEntry('), budget.indexOf('function renderLoansPage('));
   assert.match(row, /const rowTitle = loanRowTitle\(loan\);/);
   assert.doesNotMatch(row, /loanPaymentTitle/, 'kein generiertes Praefix in der Zeile');
-  assert.match(row, /const meta = `\$\{formatEntryDate\(payment\.paid_date\)\} · <span class="budget-entry__installment">\$\{esc\(installment\)\}<\/span>`;/,
+  // R20: der Trenner gehoert zur Rate und haengt beim Umbruch nicht mehr am Zeilenende.
+  assert.match(row, /const meta = `<span class="budget-entry__date">\$\{formatEntryDate\(payment\.paid_date\)\}<\/span><span class="budget-entry__installment"><span class="budget-entry__sep" aria-hidden="true">·<\/span>\$\{esc\(installment\)\}<\/span>`;/,
     'Datum · Rate x von y - das Darlehen steht schon im Titel');
   const rules = [...eachRule(budgetCss)];
   assert.ok(rules.some((r) => r.selector.trim() === '.budget-entry--loan .budget-entry__meta' && /white-space:\s*normal/.test(r.body)),
@@ -3637,12 +3686,14 @@ test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wie
   assert.match(seriesBefore, /state\.summary = summaryWith\(state\.summary, removed, -1\)/, 'Serie loeschen zeichnet die alte Bilanz');
 });
 
-// Codex an #1485: im Konto-Drilldown zeigt `state.entries` nur die Buchungen
-// EINES Kontos, `state.summary` zaehlt alle. Ein per Einzel-Bearbeitung auf ein
-// anderes Konto verschobenes Vorkommen fehlte der Liste - das Serien-Loeschen
-// rechnete nur das sichtbare heraus, obwohl der Server die ganze Serie loescht.
-// Gefahren wird die echte deleteEntrySeries mit gestubbtem Undo-Fenster und API.
-test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilterten Liste (Codex #1485)', async () => {
+// Codex an #1485: im Konto-Drilldown zeigte `state.entries` nur die Buchungen
+// EINES Kontos, `state.summary` zaehlte alle - das Serien-Loeschen durfte dort
+// nichts herausrechnen. Seit der Re-Critique 2026-10-17 folgt die Bilanz dem
+// Kontofilter (`/budget/summary?...&account_id=`): Liste und Bilanz sprechen
+// ueber dieselben Buchungen, und das sichtbare Vorkommen ist genau das, was die
+// Bilanz des Kontos verliert. Gefahren wird die echte deleteEntrySeries mit
+// gestubbtem Undo-Fenster und API.
+test('Serie loeschen im Konto-Drilldown rechnet aus der Bilanz DES KONTOS heraus (Codex #1485, Re-Critique 2026-10-17)', async () => {
   const s = budgetUi.state;
   const zuvor = {
     month: s.month, entries: s.entries, summary: s.summary, prevSummary: s.prevSummary,
@@ -3656,7 +3707,12 @@ test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilte
       { category: 'salary', income: 2000, expenses: 0, total: 2000 },
     ],
   });
-  const serverDanach = { month: '2026-06', income: 2000, expenses: 0, balance: 2000, byCategory: [{ category: 'salary', income: 2000, expenses: 0, total: 2000 }] };
+  // Die Bilanz von Konto 3: nur das eine Vorkommen.
+  const kontoBilanz = () => ({
+    month: '2026-06', income: 0, expenses: -50, balance: -50,
+    byCategory: [{ category: 'food', income: 0, expenses: -50, total: -50 }],
+  });
+  const serverDanach = { month: '2026-06', income: 0, expenses: 0, balance: 0, byCategory: [] };
   let undo = null;
   const deletes = [];
   const gets = [];
@@ -3672,20 +3728,22 @@ test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilte
     },
   };
   try {
-    Object.assign(s, { month: '2026-06', activeTab: 'budget', budgetMode: 'shared', accountFilterId: 3, entries: [hier], summary: bilanz() });
-    // Das Schwester-Vorkommen (-50, food) liegt auf Konto 4: in der Bilanz, nicht in der Liste.
+    Object.assign(s, { month: '2026-06', activeTab: 'budget', budgetMode: 'shared', accountFilterId: 3, entries: [hier], summary: kontoBilanz() });
     await budgetUi.deleteEntrySeries(11);
     assert.deepEqual(s.entries, [], 'die sichtbaren Vorkommen verlassen die Liste sofort');
-    assert.deepEqual(s.summary, bilanz(), 'gefiltert bleibt die Bilanz beim Serverstand statt halb herausgerechnet');
+    assert.equal(s.summary.expenses, 0, 'die Bilanz des Kontos verliert genau das sichtbare Vorkommen');
+    assert.equal(s.summary.balance, 0);
     assert.ok(undo, 'das Undo-Fenster oeffnet sich');
     await undo.commit({ keepalive: false });
     assert.deepEqual(deletes, ['/budget/11/series']);
-    assert.ok(gets.some((u) => u.startsWith('/budget/summary?month=2026-06')), 'nach dem Loeschen kommt die Summary vom Server');
+    const summaryGets = gets.filter((u) => u.startsWith('/budget/summary?'));
+    assert.ok(summaryGets.length > 0, 'nach dem Loeschen kommt die Summary vom Server');
+    assert.ok(summaryGets.every((u) => /[?&]account_id=3\b/.test(u)), `die Summary fragt nach dem gefilterten Konto: ${summaryGets.join(', ')}`);
     assert.deepEqual(s.summary, serverDanach);
 
-    // Undo im Drilldown laedt ebenfalls neu, statt zu rechnen.
+    // Das Undo laedt neu, statt zu rechnen.
     gets.length = 0;
-    Object.assign(s, { accountFilterId: 3, entries: [hier], summary: bilanz() });
+    Object.assign(s, { accountFilterId: 3, entries: [hier], summary: kontoBilanz() });
     undo = null;
     await budgetUi.deleteEntrySeries(11);
     await undo.restore();
@@ -5524,7 +5582,7 @@ test('R17/E4: der Aufklapper schaltet ohne Neuaufbau, auch bei Nur-lesen; geplan
     assert.equal(budgetUi.state.plannedExpandedMonth, null);
   } finally { Object.assign(budgetUi.state, vorher); }
 
-  assert.match(budget, /const READ_SAFE_ACTIONS = new Set\(\['loan-filter', 'toggle-planned'\]\)/, 'aufklappen liest nur');
+  assert.match(budget, /const READ_SAFE_ACTIONS = new Set\(\['loan-filter', 'toggle-planned', 'toggle-loan-payments'\]\)/, 'aufklappen liest nur (R20: auch die Raten)');
   assert.match(budget, /closest\('\[data-action="toggle-planned"\]'\);\s*\n\s*if \(plannedBtn\) \{ togglePlanned\(plannedBtn\); return; \}/,
     'der Klick laeuft ueber die Delegation der Liste');
 
@@ -5667,6 +5725,47 @@ test('R17: die Kurve teilt sich am heutigen Tag - nur wenn der Zeitraum eine Zuk
   const rules = [...eachRule(budgetCss)];
   const future = rules.find(({ selector }) => selector.trim() === '.budget-stats__future');
   assert.match(future?.body ?? '', /stroke-dasharray:/, 'die Zukunft ist gestrichelt');
+});
+
+test('Verlauf: die Legende nennt den Wert des Heute-Punkts, der Rest steht als geplant daneben (Re-Critique 2026-10-17)', async () => {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  // Aufsummiert, heute ist Tag 3 von 5: Punkt 2.712, ganzer Monat 3.046,11.
+  const raw = [2000, 500, 212, 0, 334.11];
+  let acc = 0;
+  const cum = raw.map((v) => (acc += v));
+  const laufend = st.trendLegendFigures(cum, raw, 2, true);
+  assert.equal(laufend.value, 2712, 'die Legende liest denselben Wert wie der beschriftete Punkt');
+  assert.equal(laufend.planned, 334.11, 'was danach eingetragen ist, steht getrennt');
+  assert.equal(Math.round(laufend.total * 100) / 100, 3046.11, 'der Vergleich mit dem Vorzeitraum rechnet weiter mit dem ganzen Zeitraum');
+  const vorbei = st.trendLegendFigures(cum, raw, 4, false);
+  assert.equal(Math.round(vorbei.value * 100) / 100, 3046.11, 'ein abgeschlossener Zeitraum nennt seine Summe');
+  assert.equal(vorbei.planned, 0);
+  const fn = stats.slice(stats.indexOf('function renderTrendChart()'), stats.indexOf('/** Die Flaeche des Verlaufs'));
+  assert.match(fn, /trendLegendFigures\(incomes, rawIncomes, markIndex, todayIndex >= 0\)/);
+  assert.match(fn, /trendLegendFigures\(expenses, rawExpenses, markIndex, todayIndex >= 0\)/);
+  assert.match(fn, /markMarkup\(\{ x: chartX\(markIndex, s\.length, geo\), income: incomes\[markIndex\], expenses: expenses\[markIndex\]/,
+    'Punkt und Legende lesen dieselbe Reihe am selben Index');
+  assert.match(fn, /wireTrendPoints\(host, shown, pointKey, s, todayIndex >= 0 \? markIndex : null\)/,
+    'auch die Ableselinie startet am beschrifteten Punkt');
+});
+
+test('Statistik: alle Bahnen eines Blocks sind gleich lang - eine Skala je Block (Re-Critique 2026-10-17)', () => {
+  // Jede Zeile war ihr eigenes Raster mit `auto` als Betragsspalte; die Bahnen
+  // liefen 171 bis 191px. Die Zeilen teilen sich jetzt per subgrid die Spalten
+  // ihres Blocks.
+  const rules = [...eachRule(budgetCss)];
+  const sel = '.budget-chart-block__rows:not(.budget-overview__aside .budget-chart-block__rows)';
+  const host = rules.find((r) => r.selector.trim() === sel);
+  const row = rules.find((r) => r.selector.trim() === `${sel} > .budget-bar-row`);
+  assert.ok(host && row, 'die Blockzeilen teilen sich ein Raster');
+  assert.match(host.body, /display:\s*grid/);
+  assert.match(host.body, /grid-template-columns:\s*168px minmax\(0, 1fr\) auto/, 'dieselben Spalten wie die Einzelzeile');
+  assert.match(row.body, /grid-template-columns:\s*subgrid/);
+  assert.match(row.body, /grid-column:\s*1 \/ -1/);
+  for (const r of [host, row]) {
+    assert.match(r.at.join(' '), /@container budget-page \(min-width: 480px\)/, 'erst ab der Dreispalten-Stufe');
+    assert.match(r.at.join(' '), /@supports \(grid-template-columns: subgrid\)/, 'ohne subgrid bleibt das Zeilenraster');
+  }
 });
 
 test('R17: mobil rechnet der Verlauf auf einer hoeheren Flaeche (mindestens 160px bei 390px Fenster)', async () => {
@@ -6475,10 +6574,23 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   const css = [...eachRule(budgetCss)];
   assert.match(css.find((r) => r.selector.trim() === '.budget-account__starting-amount')?.body ?? '', /white-space:\s*nowrap/);
   const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
-  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__figures' && /display:\s*contents/.test(r.body)),
+  assert.ok(css.some((r) => phone(r) && r.selector.split(',').map((x) => x.trim()).includes('.budget-account__figures') && /display:\s*contents/.test(r.body)),
     'mobil loest sich die Saldo-Spalte auf');
-  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__starting' && /grid-column:\s*2/.test(r.body)),
-    'mobil steht der Startsaldo in der Textspalte');
+  // Re-Critique 2026-10-17 (A4): Name, Art und Start standen untereinander in
+  // der schmalen Textspalte - 110px je Konto bei 390. Mobil stehen Art und
+  // Start jetzt als EIN Satz unter Name und Saldo, ueber die volle Breite.
+  // Genau eine Fassung des Starts ist je Breite sichtbar (und damit im
+  // Barrierebaum): rechts ab 640px, in der Art-Zeile darunter.
+  assert.match(budgetJs, /<span class="budget-account__type">\$\{esc\(accountTypeLabel\(a\.type\)\)\}<span class="budget-account__type-start"> · \$\{t\('budget\.startingBalanceShort'\)\} <span class="budget-account__starting-amount">/,
+    'mobil steht der Start in der Zeile der Kontoart');
+  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__starting' && /display:\s*none/.test(r.body)),
+    'mobil faellt die rechte Startzeile weg');
+  assert.ok(css.some((r) => r.at.some((a) => /min-width:\s*640px/.test(a)) && r.selector.trim() === '.budget-account__type-start' && /display:\s*none/.test(r.body)),
+    'ab 640px faellt der Start in der Art-Zeile weg');
+  assert.ok(css.some((r) => phone(r) && /\.budget-account__type\b/.test(r.selector) && /grid-column:\s*2 \/ 4/.test(r.body)),
+    'die Art-Zeile laeuft bis unter den Saldo');
+  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__balance' && /grid-row:\s*1;/.test(r.body)),
+    'der Saldo steht in der ersten Zeile neben dem Namen');
 
   // D9: die Uebersicht faerbt mit der geteilten Zuordnung - seit R19 nach der
   // Stelle im Katalog (state.meta), nicht nach der groessten Ausgabe.
@@ -6498,7 +6610,8 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   assert.match(fillRule?.body ?? '', /background-color:\s*var\(--plan-fill/, 'Planbalken: Kategoriefarbe');
   assert.doesNotMatch(fillRule?.body ?? '', /--plan-tone-color/, 'der Zustand faerbt den Balken nicht mehr um');
   assert.match(plans, /data-lucide="\$\{stateIcon\}"/, 'der Zustand spricht mit Icon und Text');
-  assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor \} from '\/utils\/budget-category-colors\.js';/,
+  // R20: dazu categoryTexture (Schraffur bei Tritanopie) aus derselben Datei.
+  assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor(?:, categoryTexture)? \} from '\/utils\/budget-category-colors\.js';/,
     'die Statistik nimmt dieselbe Zuordnung');
 });
 
@@ -6626,4 +6739,67 @@ test('R19: die Abo-Beschreibung steht breit nur einmal', () => {
   assert.ok(hide, 'keine Regel verbirgt die Meta-Fassung breit');
   assert.equal(hide.selector.trim(), '.subscription-card__meta > .subscription-card__meta-desc',
     'gleich spezifisch wie .subscription-card__meta > span und spaeter - sonst gewinnt inline-flex');
+});
+
+
+// R20 (Re-Critique 2026-10-17, A4 P3): die Ratenliste war unbegrenzt (16 Raten,
+// mobil 1376px), und schmal hing "·" am Ende der ersten Meta-Zeile.
+test('R20: die Raten zeigen die letzten sechs, der Trenner faellt beim Umbruch mit der Rate', () => {
+  const loan = { id: 1, title: 'Bau', borrower: 'Bank', installment_count: 312, currency: 'EUR', direction: 'borrowed',
+    payments: Array.from({ length: 8 }, (_, i) => ({ id: i + 1, installment_number: i + 1, paid_date: `2026-0${i + 1}-01`, amount: 900 })) };
+  const vorher = budgetUi.state.loanPaymentsExpanded;
+  try {
+    budgetUi.state.loanPaymentsExpanded = false;
+    const html = budgetUi.renderLoanTransactions([loan]);
+    assert.equal((html.match(/budget-entry--loan budget-entry--more/g) ?? []).length, 2, 'zwei von acht hinter dem Knopf');
+    assert.match(html, /data-action="toggle-loan-payments"[^>]*aria-expanded="false"/);
+    assert.match(html, /budget\.showAllPlanned\{&quot;count&quot;:8\}/);
+    const wenige = budgetUi.renderLoanTransactions([{ ...loan, payments: loan.payments.slice(0, 6) }]);
+    assert.doesNotMatch(wenige, /toggle-loan-payments|budget-entry--more/, 'bis sechs kein Knopf');
+  } finally { budgetUi.state.loanPaymentsExpanded = vorher; }
+  const rules = [...eachRule(budgetCss)];
+  const hidden = rules.find((r) => r.selector.trim() === '.budget-loan-transactions:not(.is-expanded) .budget-entry--more');
+  assert.match(hidden?.body ?? '', /display:\s*none/);
+  const sep = rules.find((r) => r.selector.trim() === '.budget-entry__sep');
+  assert.match(sep?.body ?? '', /position:\s*absolute/);
+  assert.match(sep.body, /inset-inline-end:\s*100%/, 'links neben der Rate - beim Umbruch ausserhalb der Zeile');
+  const meta = rules.find((r) => r.selector.trim() === '.budget-entry--loan .budget-entry__meta');
+  assert.match(meta.body, /flex-wrap:\s*wrap/);
+});
+
+// Re-Critique 2026-10-17 (A4): in der Abo-Auswertung teilten sich Name und
+// Balken den Rest 1,2 : 1 - "Versorgungsdienste" kuerzte bei 390, 1280 und 1440
+// neben einem breiten Balken. Der Name nimmt seine Laenge, der Balken den Rest
+// bis hinunter auf 2.5rem.
+test('Abo-Auswertung: der Kategoriename steht vor dem Balken ungekuerzt', () => {
+  const rule = [...eachRule(read('../public/styles/subscriptions.css'))]
+    .find(({ selector, at }) => !at.length && selector.trim() === '.subscriptions-chart-rows');
+  assert.match(rule?.body ?? '', /grid-template-columns:\s*minmax\(0, max-content\) minmax\(2\.5rem, 1fr\) auto auto;/);
+});
+
+// Re-Critique 2026-10-17 (A4): die einzeilige Metazeile der Buchung kappte bei
+// 390 fuenf Kategorien ("Freizeit und Unterhal…"). Sie darf jetzt einmal
+// umbrechen und kappt erst nach der zweiten Zeile; die Ratenzeile behaelt ihr
+// eigenes Umbruchmuster.
+test('Hauptbuch: die Metazeile einer Buchung bricht einmal um, statt die Kategorie zu kappen', () => {
+  const rule = [...eachRule(read('../public/styles/budget.css'))]
+    .find(({ selector, at }) => selector.trim() === '.budget-entry:not(.budget-entry--loan) .budget-entry__meta'
+      && at.some((a) => /@supports \(-webkit-line-clamp: 2\)/.test(a)));
+  assert.ok(rule, 'die Zweizeilen-Regel fehlt');
+  assert.match(rule.body, /-webkit-line-clamp:\s*2/);
+  assert.match(rule.body, /white-space:\s*normal/);
+});
+
+// Re-Critique 2026-10-17 (A4): am Tablet (einspaltig, Container unter 960px)
+// endeten Uebersicht, Konten, Plan, Darlehen und Statistik auf dem Lesemass
+// (834: x 736), Kopf mit Monats-Stepper, Abonnements und Aufteilung bei 818.
+// Einspaltig steht jeder Reiter auf der Kante des Kopfs - auch Plan und
+// Statistik, die eigene `.app-page`-Wurzeln mit Lesemass sind.
+test('Budget einspaltig: jeder Reiter endet an der Kante des Kopfs', () => {
+  const rule = [...eachRule(read('../public/styles/budget.css'))]
+    .find(({ selector, at }) => at.some((a) => /@container budget-page \(width < 960px\)/.test(a))
+      && selector.split(',').map((x) => x.trim()).includes('.budget-tab-panel .app-page'));
+  assert.ok(rule, 'die einspaltige Regel fehlt');
+  assert.ok(rule.selector.split(',').map((x) => x.trim()).includes('.budget-tab-panel'));
+  assert.match(rule.body, /--page-measure:\s*100%/);
 });

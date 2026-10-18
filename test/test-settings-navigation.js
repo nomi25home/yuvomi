@@ -487,7 +487,8 @@ test('two-factor card: every line and the button row keep a token gap, in every 
   assert.match(recovery, /class="form-hint settings-2fa__note" id="two-factor-copy-status" role="status"><\/p>/,
     'Statuszeile traegt ihre Klasse und bleibt leer im Markup');
   const ask = source.slice(source.indexOf('function askForCode'));
-  assert.match(ask, /<form id="two-factor-confirm-form" class="settings-form settings-2fa__form">/);
+  // `novalidate` (Re-Critique 2026-10-17): der fehlende Code steht am Feld, nicht in einer Browser-Blase.
+  assert.match(ask, /<form id="two-factor-confirm-form" class="settings-form settings-2fa__form" novalidate>/);
 
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];
@@ -3308,10 +3309,17 @@ test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mi
   assert.match(src, /content: addInviteFormHtml\(\)/);
   assert.match(src, /<ul class="settings-members row-divided" id="members-list">/, 'Haarlinien zwischen den Mitgliedern');
   // R19 (Critique 2026-10-16, "Einladen prominenter"): Einladen ist der
-  // EINE gefuellte Knopf unter der Liste - ein Knopf in seiner Breite neben
-  // "Mitglied hinzufuegen", kein Balken ueber die volle Breite (R14).
-  assert.match(src, /<div class="settings-member-actions">\s*<button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"><\/i>\$\{t\('settings\.invites\.add'\)\}<\/button>\s*<button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus"/,
-    'Einladen gefuellt vorn, Anlegen ruhig daneben, beide mit Icon');
+  // EINE gefuellte Knopf - ein Knopf in seiner Breite, kein Balken ueber die
+  // volle Breite (R14). R20 (Re-Critique 2026-10-17, A3 P3): er steht in der
+  // Karte "Einladungen", die vorher ohne Handlung war; "Mitglied hinzufuegen"
+  // bleibt ruhig unter der Mitgliederliste. Bewusst angepasst.
+  const membersCard = src.slice(src.indexOf('id="members-card"'), src.indexOf('id="invites-card"'));
+  const invitesCard = src.slice(src.indexOf('id="invites-card"'), src.indexOf('two-factor-household-card'));
+  assert.match(membersCard, /<div class="settings-member-actions">\s*<button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus"/,
+    'Anlegen ruhig unter der Mitgliederliste, mit Icon');
+  assert.doesNotMatch(membersCard, /add-invite-btn/, 'Einladen steht nicht in der Mitgliederkarte');
+  assert.match(invitesCard, /id="invites-list"><\/ul>\s*<div class="settings-member-actions">\s*<button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"><\/i>\$\{t\('settings\.invites\.add'\)\}<\/button>/,
+    'Einladen gefuellt unter den offenen Einladungen');
   assert.equal((src.match(/btn--primary settings-add-btn/g) ?? []).length, 1, 'genau ein gefuellter Knopf');
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.match(css, /\.settings-add-btn \{\s*align-self: flex-start;/, 'kein Balken ueber die volle Breite');
@@ -3469,13 +3477,20 @@ test('R16: die Sprungmarken sind Links im Blatt, eine scrollende Zeile, und spri
   const row = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && !r.at.length);
   assert.match(row?.body ?? '', /overflow-x:\s*auto/);
   assert.match(row?.body ?? '', /flex-wrap:\s*nowrap/, 'eine Zeile: umgebrochen kosteten fuenf Marken mobil drei Reihen vor dem ersten Schalter');
+  // R20: am Desktop schnitt die Zeile im Kalender-Blatt zwei Marken ab (999px in 660px).
+  const wide = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && r.at.some((a) => /min-width:\s*768px/.test(a)));
+  assert.match(wide?.body ?? '', /flex-wrap:\s*wrap/, 'ab 768px brechen die Marken um, statt an der Kante zu enden');
 });
 
-test('R16: mobil ist die Blattbeschreibung zwei Zeilen lang', async () => {
+test('R16/R20: mobil ist die Blattbeschreibung hoechstens drei Zeilen lang', async () => {
+  // R16 kappte auf zwei Zeilen (vier standen vor dem ersten Schalter). R20
+  // (Re-Critique 2026-10-17 a5 P3): zwei schnitten in "Dieses Geraet",
+  // Benachrichtigungen und Aufgaben die Aussage ab, alle drei ohne Sprungmarken.
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   const phone = [...eachRule(css)].find((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
     && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__description'));
-  assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*2/, 'vier Zeilen Vorspann standen vor dem ersten Schalter');
+  assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*3/, 'drei Zeilen: genug fuer jede Beschreibung ohne Marken, nie wieder vier');
+  assert.match(phone?.body ?? '', /(^|[^-])line-clamp:\s*3/);
 });
 
 test('R16: im Blatt mit Sprungmarken steht die Beschreibung mobil nur im Baum', async () => {
@@ -3975,7 +3990,7 @@ test('R19: Wand-Modus und Bildschirmschoner stehen im Blatt "Dieses Geraet"', as
     assert.ok(!SETTINGS_SECTIONS.find((s) => s.id === 'personal-appearance').options.includes(key), `${key} nicht mehr unter Darstellung`);
   }
   const src = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(container\.dataset\?\.part === 'device'\) \{\s*renderDeviceDisplay\(container\);\s*return;/);
+  assert.match(src, /if \(container\.dataset\?\.part === 'device'\) \{[\s\S]{0,400}?renderDeviceDisplay\(container, \{ screensaverOn, isAdmin[^}]*\}\);\s*return;/);
   const page = src.slice(src.indexOf('function renderPage('), src.indexOf('function deviceDisplayRowsHtml('));
   assert.doesNotMatch(page, /wall-mode-toggle|screensaver-idle-select/, 'Darstellung zeigt die Geraete-Zeilen nicht mehr');
 });

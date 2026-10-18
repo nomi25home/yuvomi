@@ -9,7 +9,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
-import { stagger, vibrate, scheduleUndoableDelete, growBars } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
@@ -34,7 +34,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
 import { rowMenuHtml } from '/utils/row-action.js';
-import { categoryColorIndex, categoryColor } from '/utils/budget-category-colors.js';
+import { categoryColorIndex, categoryColor, categoryTexture } from '/utils/budget-category-colors.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
@@ -42,6 +42,7 @@ import '/components/category-manager.js';
 import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { compareMembers, memberRanks, memberRankOf } from '/utils/member-order.js';
@@ -267,6 +268,7 @@ let state = {
   plannedExpandedMonth: null, // Monat, in dem "Geplant" ganz aufgeklappt ist (sonst die naechsten 3); gilt nur fuer DIESEN Monat
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
   loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
+  loanPaymentsExpanded: false, // Raten: alle statt der letzten sechs (renderLoanTransactions)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   metaError:   null,
   // Zeitachse der Berichte: dieselbe Kopfleiste wie der Monat, nur mit
@@ -413,7 +415,7 @@ function readOnly() {
 
 // Jede `data-action` dieser Seite, die NICHT schreibt. Eine Positivliste,
 // damit eine morgen ergaenzte Schreib-Aktion standardmaessig gesperrt ist.
-const READ_SAFE_ACTIONS = new Set(['loan-filter', 'toggle-planned']);
+const READ_SAFE_ACTIONS = new Set(['loan-filter', 'toggle-planned', 'toggle-loan-payments']);
 
 // Die schreibenden Bedienhaken OHNE `data-action` - Konten, Leerzustaende und
 // der Kategorie-Verwalter sind einzeln verdrahtet, nicht ueber einen Verteiler.
@@ -576,8 +578,10 @@ async function loadMonth(month) {
     try {
       const [entriesRes, summaryRes, prevSummaryRes, loansRes] = await Promise.all([
         api.get(`/budget?month=${month}${accountQuery}${scopeQuery}`),
-        api.get(`/budget/summary?month=${month}${scopeQuery}`),
-        api.get(`/budget/summary?month=${prevMonth}${scopeQuery}`),
+        // Die Bilanz folgt dem Kontofilter wie die Liste (Re-Critique
+        // 2026-10-17): sonst stand neben dem Kontoauszug der Saldo des Haushalts.
+        api.get(`/budget/summary?month=${month}${accountQuery}${scopeQuery}`),
+        api.get(`/budget/summary?month=${prevMonth}${accountQuery}${scopeQuery}`),
         api.get('/budget/loans'),
       ]);
       return {
@@ -1261,6 +1265,7 @@ function renderBody() {
       expenseCategories: expenseCategories(),
       // Identitaetsfarbe je Kategorie wie in Uebersicht und Statistik (D9).
       categoryColor: (category) => categoryColor(categoryColors(state.summary?.byCategory), category),
+      categoryTexture: (category) => categoryTexture(categoryColors(state.summary?.byCategory), category),
     }).catch((err) => console.error('[Budget] plans render error:', err));
     return;
   }
@@ -2072,7 +2077,7 @@ function renderCategoryBars(byCategory) {
               >
               <span class="budget-bar-row__label" title="${label}">${label}</span>
               <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}" data-bar-key="${kind}:${esc(String(r.category))}"></span>
+                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}"${kind === 'expenses' && categoryTexture(colors, r.category) ? ` data-texture="${categoryTexture(colors, r.category)}"` : ''} data-bar-key="${kind}:${esc(String(r.category))}"></span>
               </span>
               <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
             </button>`;
@@ -2122,7 +2127,9 @@ function subcategoryRows(category, entries) {
     0
   );
   // Die Unterkategorien tragen die Farbe ihrer Kategorie (D9).
-  const parentFill = kind === 'expenses' ? categoryColor(categoryColors(state.summary?.byCategory), category) : null;
+  const parentColors = categoryColors(state.summary?.byCategory);
+  const parentFill = kind === 'expenses' ? categoryColor(parentColors, category) : null;
+  const parentTexture = kind === 'expenses' ? categoryTexture(parentColors, category) : null;
   return rows.map((row) => {
     const selected = state.subcategoryFilter?.category === category
       && state.subcategoryFilter.key === row.key;
@@ -2136,7 +2143,7 @@ function subcategoryRows(category, entries) {
         <span class="budget-bar-row__label">${esc(row.label)}</span>
         <span class="budget-bar-row__track">
           <span class="budget-bar-row__fill budget-bar-row__fill--${kind}"
-                style="--bar-scale:${scale}${parentFill ? `;--bar-fill:${parentFill}` : ''}"></span>
+                style="--bar-scale:${scale}${parentFill ? `;--bar-fill:${parentFill}` : ''}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
         </span>
         <span class="budget-bar-row__amount">
           ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
@@ -2488,10 +2495,13 @@ function ledgerSectionsHtml(rows) {
   // zwei gleich grosse Ueberschriften uebereinander. `u-compact` ist die Stufe
   // darunter (typography.css, Kartentitel).
   if (isForecastMonth(state.month)) return entryRows(rows);
-  // Nach Betrag ist die Liste EINE Rangfolge: getrennt nach Geplant und Gebucht
-  // stuende der groesste Betrag nicht oben, sondern im zweiten Abschnitt.
-  if (ledgerSort() === 'amount') return entryRows(rows);
-  const { planned, booked } = splitLedger(rows);
+  // Auch nach Betrag bleiben Geplant und Gebucht getrennt (Re-Critique
+  // 2026-10-17): sortLedger() hat die Zeilen schon geordnet, und splitLedger()
+  // behaelt sie fuer "Gebucht"; "Geplant" ordnet es nach Datum und wird
+  // deshalb nach Betrag noch einmal sortiert.
+  const split = splitLedger(rows);
+  const booked = split.booked;
+  const planned = ledgerSort() === 'amount' ? sortLedger(split.planned, 'amount') : split.planned;
   if (!planned.length) return entryRows(rows);
   const expanded = state.plannedExpandedMonth === state.month;
   const more = planned.length - PLANNED_PREVIEW_ROWS;
@@ -2806,18 +2816,26 @@ function renderAccountsPage() {
       : '';
     return `
       <div class="budget-account ${a.archived ? 'budget-account--archived' : ''}" style="--account-accent:${accountAccent(a.color)}">
-        <button class="budget-account__main" type="button" data-drill="${a.id}"
-                aria-label="${t('budget.viewAccountTransactions', { name: a.name })} · ${t('budget.currentBalance')} ${formatAmount(a.current_balance)}">
+        ${/* NAME AUS DEM INHALT, DIE HANDLUNG ALS NACHSATZ (R20, WCAG 2.5.3):
+              das `aria-label` nannte Typ und Startsaldo nicht, die die Zeile
+              zeigt. Jetzt liest sie Name, Typ, Saldo und Start, dann
+              „Buchungen anzeigen". */ ''}
+        <button class="budget-account__main" type="button" data-drill="${a.id}">
           <span class="budget-account__icon"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
           <span class="budget-account__body">
             <span class="budget-account__name"><span class="budget-account__name-text">${esc(a.name)}</span>${archivedBadge}</span>
-            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}</span>
+            ${/* Am Telefon steht der Start in der Zeile der Kontoart (budget.css,
+                  unter 640px); dort ist `.budget-account__starting` ausgeblendet,
+                  hier `__type-start` daneben - genau eine Fassung ist sichtbar
+                  und im Barrierebaum. */ ''}
+            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}<span class="budget-account__type-start"> · ${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span></span>
             ${creditMeta}
           </span>
           <span class="budget-account__figures">
             <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance)}</span>
             <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span>
           </span>
+          <span class="sr-only">, ${esc(t('budget.showAccountTransactions'))}</span>
         </button>
         ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet den Kontoauszug; das
               Konto selbst bearbeitet der Eintrag im Mehr-Knopf statt eines
@@ -2902,7 +2920,7 @@ function openAccountModal(account = null) {
     <div class="form-group">
       <label class="form-label" for="am-name">${t('budget.accountNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="am-name" maxlength="100"
-             placeholder="${t('budget.accountNamePlaceholder')}" value="${esc(isEdit ? account.name : '')}">
+             placeholder="${t('budget.accountNamePlaceholder')}" value="${esc(isEdit ? account.name : '')}" required>
     </div>
     <div class="form-group">
       <label class="form-label" for="am-type">${t('budget.accountTypeLabel')}</label>
@@ -3066,6 +3084,41 @@ function openAccountModal(account = null) {
   });
 }
 
+/**
+ * Die Kennzahlen der Darlehenssumme, nach Richtung getrennt (Re-Critique
+ * 2026-10-17, P1). Aufgenommenes ist eine Schuld, Verliehenes ein Anspruch:
+ * EINE Summe über beide stand als "Restschuld" auf der Karte und machte die
+ * 800 EUR an Onkel Mike zu Schulden des Haushalts. Mit nur einer Richtung
+ * bleibt es bei drei Karten (offen, Raten offen, bezahlt bzw. zurückerhalten);
+ * mit beiden stehen Schuld und Anspruch nebeneinander, die Ratenzahl fällt weg,
+ * weil sie über beide addiert wieder mischte.
+ * @returns {{label: string, value: string}[]} erste Karte = Führungszahl
+ */
+function loanSummaryCards(summary) {
+  const money = (n) => amountByRole(n ?? 0, 'total').text;
+  const dirs = summary.by_direction;
+  // Ohne Aufteilung (alte Server-Antwort) bleibt die bisherige Gesamtsicht.
+  const borrowed = dirs ? (dirs.borrowed?.count ? dirs.borrowed : null) : summary;
+  const lent = dirs?.lent?.count ? dirs.lent : null;
+  const cards = [];
+  if (borrowed) {
+    cards.push({
+      label: t(borrowed.has_interest ? 'budget.loanRemainingPrincipal' : 'budget.loanRemainingAmount'),
+      value: money(borrowed.remaining_principal ?? borrowed.remaining_amount),
+    });
+  }
+  if (lent) cards.push({ label: t('budget.loanOwedToYou'), value: money(lent.remaining_principal ?? lent.remaining_amount) });
+  if (borrowed && lent) {
+    cards.push({ label: t('budget.loanPaidAmount'), value: money(borrowed.paid_amount) });
+    cards.push({ label: t('budget.loanReceivedAmount'), value: money(lent.paid_amount) });
+    return cards;
+  }
+  const only = borrowed || lent;
+  cards.push({ label: t('budget.loanRemainingInstallments'), value: String(only.remaining_installments ?? 0) });
+  cards.push({ label: t(borrowed ? 'budget.loanPaidAmount' : 'budget.loanReceivedAmount'), value: money(only.paid_amount) });
+  return cards;
+}
+
 function renderLoansDashboard() {
   const loans = state.loans?.loans ?? [];
   if (!loans.length) return '';
@@ -3073,20 +3126,18 @@ function renderLoansDashboard() {
   const summary = state.loans?.summary ?? {};
   const visibleLoans = filteredLoans();
 
-  const remainingLabel = t(summary.has_interest ? 'budget.loanRemainingPrincipal' : 'budget.loanRemainingAmount');
+  const cards = loanSummaryCards(summary);
+  const [leadCard, ...restCards] = cards;
   return `
     <section class="budget-loans">
       ${metricGlanceHtml({
     id: 'budget-loans-more',
     controls: 'budget-loans-details',
     expanded: state.loansExpanded,
-    label: remainingLabel,
-    value: amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text,
+    label: leadCard.label,
+    value: leadCard.value,
     lead: true,
-    flows: [
-      { label: t('budget.loanRemainingInstallments'), amount: String(summary.remaining_installments ?? 0) },
-      { label: t('budget.loanPaidAmount'), amount: amountByRole(summary.paid_amount ?? 0, 'total').text },
-    ],
+    flows: restCards.map((card) => ({ label: card.label, amount: card.value })),
   })}
       <div class="panel-head budget-loans__header">
         <div>
@@ -3121,19 +3172,12 @@ function renderLoansDashboard() {
            (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
            total: die Richtung steht im Label, nicht im Vorzeichen.
            Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
-      <div class="metric-grid metric-grid--led budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
-        <div class="metric-card ${leadCardClass(amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text)}">
-          <div class="metric-card__label">${remainingLabel}</div>
-          <div class="metric-card__value">${amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-card__label">${t('budget.loanRemainingInstallments')}</div>
-          <div class="metric-card__value">${summary.remaining_installments ?? 0}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-card__label">${t('budget.loanPaidAmount')}</div>
-          <div class="metric-card__value">${amountByRole(summary.paid_amount ?? 0, 'total').text}</div>
-        </div>
+      <div class="metric-grid metric-grid--led${cards.length === 4 ? ' metric-grid--quad' : ''} budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
+        ${cards.map((card, i) => `
+        <div class="metric-card${i === 0 ? ` ${leadCardClass(card.value)}` : ''}">
+          <div class="metric-card__label">${card.label}</div>
+          <div class="metric-card__value">${card.value}</div>
+        </div>`).join('')}
       </div>
       ${summary.has_foreign_currency ? `<p class="form-hint budget-loan-hint">${t('budget.loanSummaryConverted', {
         currency: esc(summary.currency || state.currency),
@@ -3263,18 +3307,51 @@ function loanPaymentsFor(loans) {
       || rank(a.loan) - rank(b.loan));
 }
 
+/**
+ * DIE RATEN ZEIGEN DIE LETZTEN SECHS (R20, Re-Critique 2026-10-17 A4 P3). Die
+ * Liste war unbegrenzt: mit einem Baukredit standen 16 Raten (mobil 1376px)
+ * zwischen den Darlehenskarten und dem Seitenende, alle mit demselben Titel.
+ * Die neuesten sechs stehen offen, der Rest hinter "Alle anzeigen (n)" -
+ * derselbe Knopf und dieselbe Mechanik wie "Geplant" im Hauptbuch (die
+ * uebrigen Zeilen sind gerendert und per `display` aus dem Fluss, also kein
+ * Tab-Stopp). Der Zustand gilt fuer die Sitzung der Seite.
+ */
+const LOAN_PAYMENTS_PREVIEW_ROWS = 6;
+
 function renderLoanTransactions(loans) {
   const payments = loanPaymentsFor(loans);
   if (!payments.length) return '';
+  const expanded = Boolean(state.loanPaymentsExpanded);
+  const more = payments.length - LOAN_PAYMENTS_PREVIEW_ROWS;
+  const row = ({ loan, ...payment }, i) => renderLoanPaymentEntry(loan, payment, { more: i >= LOAN_PAYMENTS_PREVIEW_ROWS });
+  const toggle = more > 0 ? `
+      <button type="button" class="budget-planned-toggle" data-action="toggle-loan-payments"
+              aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="budget-loan-transactions-list">
+        <i data-lucide="chevron-down" class="icon-sm budget-planned-toggle__icon" aria-hidden="true"></i>
+        <span class="budget-planned-toggle__label">${esc(plannedToggleLabel(expanded, payments.length))}</span>
+      </button>` : '';
 
-  return `<div class="budget-loan-transactions">
+  return `<div class="budget-loan-transactions${expanded ? ' is-expanded' : ''}">
     <h2 class="budget-loan-transactions__title u-section-title">${t('budget.loanTransactions')}</h2>
     ${/* Traeger wie das Hauptbuch (Re-Critique 2026-09-28 P1-1): vorher lagen
         * die Raten nackt auf der Buehne, der einzige Tab ohne Flaeche. */ ''}
-    <div class="row-carrier budget-loan-transactions__list">
-      ${payments.map(({ loan, ...payment }) => renderLoanPaymentEntry(loan, payment)).join('')}
+    <div class="row-carrier budget-loan-transactions__list" id="budget-loan-transactions-list">
+      ${payments.map(row).join('')}${toggle}
     </div>
   </div>`;
+}
+
+/* Wie togglePlanned(): ohne Neuaufbau, der Knopf behaelt Fokus und Platz. */
+function toggleLoanPayments(button) {
+  const section = button.closest('.budget-loan-transactions');
+  if (!section) return;
+  const expanded = !section.classList.contains('is-expanded');
+  state.loanPaymentsExpanded = expanded;
+  section.classList.toggle('is-expanded', expanded);
+  button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  const label = button.querySelector('.budget-planned-toggle__label');
+  const count = section.querySelectorAll('.budget-entry--loan').length;
+  if (label) label.textContent = plannedToggleLabel(expanded, count);
 }
 
 // Richtung (#638): Bei einem aufgenommenen Kredit geht die Rate raus. Vorzeichen,
@@ -3329,7 +3406,7 @@ function loanRowTitle(loan, loans = state.loans?.loans ?? []) {
   return shared ? (loan.title || partner) : partner;
 }
 
-function renderLoanPaymentEntry(loan, payment) {
+function renderLoanPaymentEntry(loan, payment, { more = false } = {}) {
   const entry = loanPaymentToEntry(loan, payment);
   const installment = t('budget.loanInstallmentNumber', {
     number: payment.installment_number,
@@ -3343,7 +3420,13 @@ function renderLoanPaymentEntry(loan, payment) {
   // denselben, der Name des Darlehens. Die Meta-Zeile sagt Datum und Rate,
   // das Darlehen steht schon im Titel. Der Eintrag im Hauptbuch behaelt seinen
   // Titel - dort braucht die Zeile die Gattung, hier steht sie im Abschnitt.
-  const meta = `${formatEntryDate(payment.paid_date)} · <span class="budget-entry__installment">${esc(installment)}</span>`;
+  // KEIN HAENGENDER PUNKT (R20, Re-Critique 2026-10-17): schmal brach die
+  // Meta-Zeile hinter "01.07.2026 ·" um, und der Trenner hing am Zeilenende.
+  // Datum und Rate sind zwei Stuecke einer umbrechenden Flex-Zeile, der Trenner
+  // gehoert zur Rate (budget.css `.budget-entry__sep`) und steht links neben
+  // ihr; faellt die Rate in die zweite Zeile, liegt er links ausserhalb der
+  // Zeile und ist abgeschnitten.
+  const meta = `<span class="budget-entry__date">${formatEntryDate(payment.paid_date)}</span><span class="budget-entry__installment"><span class="budget-entry__sep" aria-hidden="true">·</span>${esc(installment)}</span>`;
   const rowTitle = loanRowTitle(loan);
   // Alle Raten tragen denselben Titel - der Name des Loeschknopfs nennt die Rate mit.
   const deleteName = t('budget.deleteLabel', { title: `${rowTitle} · ${installment}` });
@@ -3359,7 +3442,7 @@ function renderLoanPaymentEntry(loan, payment) {
   ).text;
 
   return `
-    <div class="list-row budget-entry budget-entry--loan" data-loan-payment-id="${payment.id}" data-loan-id="${loan.id}" ${entry ? `data-entry-id="${entry.id}"` : ''}>
+    <div class="list-row budget-entry budget-entry--loan${more ? ' budget-entry--more' : ''}" data-loan-payment-id="${payment.id}" data-loan-id="${loan.id}" ${entry ? `data-entry-id="${entry.id}"` : ''}>
       <div class="budget-entry__indicator budget-entry__indicator--${flow}"></div>
       <div class="list-row__main">
         <div class="list-row__name budget-entry__title">${esc(rowTitle)}</div>
@@ -3434,6 +3517,7 @@ function wireLoanCards(root, open = openLoanReport) {
 }
 
 function wireLoansPage() {
+  _container.querySelector('[data-action="toggle-loan-payments"]')?.addEventListener('click', (e) => toggleLoanPayments(e.currentTarget));
   wireMetricGlance(_container, 'budget-loans-more', (on) => { state.loansExpanded = on; });
   _container.querySelector('#budget-empty-loan')?.addEventListener('click', () => openBudgetModal({ mode: 'create', initialType: 'loan' }));
   _container.querySelector('#budget-clear-loan-filter')?.addEventListener('click', () => {
@@ -3762,7 +3846,7 @@ function renderLoanCard(loan) {
         ${loan.interest ? `<div class="budget-loan-card__meta budget-loan-card__interest">${esc(loanInterestMeta(loan.interest, loan))}</div>` : ''}
       </div>
       <div class="budget-loan-card__amounts">
-        ${interest ? `<span class="budget-loan-card__amount-label">${t('budget.loanRemainingPrincipal')}</span>` : ''}
+        ${interest ? `<span class="budget-loan-card__amount-label">${t(isBorrowedLoan(loan) ? 'budget.loanRemainingPrincipal' : 'budget.loanOwedToYou')}</span>` : ''}
         <strong>${formatLoanAmount(leadAmount, loan)}</strong>
         <span>${t('budget.loanRemainingOf', { total: formatLoanAmount(leadTotal, loan) })}</span>
         ${loan.is_foreign_currency
@@ -3793,7 +3877,7 @@ function renderLoanCard(loan) {
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
               * war der Weg der Seite. Der steht im Kopf („+ Darlehen"). */ ''}
           <button class="btn btn--secondary" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
-            ${t('budget.markLoanPaid')}
+            ${t(isBorrowedLoan(loan) ? 'budget.loanBookInstallment' : 'budget.loanReceiveRepayment')}
           </button>
         </div>`}
       </div>
@@ -4002,7 +4086,6 @@ function entryReadSections(entry) {
 function openEntryReadView(entry) {
   return openDetailView({
     title: entry.title,
-    accentColor: 'var(--module-budget)',
     size: 'sm',
     sections: entryReadSections(entry),
   });
@@ -4125,13 +4208,13 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
       <input type="number" class="form-input budget-amount-input" id="bm-amount"
              placeholder="${amountPlaceholder(state.currency)}"
              step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
-             inputmode="decimal" value="${absAmount}">
+             inputmode="decimal" value="${absAmount}" required>
     </div>
 
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-title">${t('budget.titleLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="bm-title"
-             placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}">
+             placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}" required>
     </div>
 
     <div class="form-group js-entry-field">
@@ -4634,13 +4717,17 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
     `);
     panel.append(overlay);
     if (window.lucide) lucide.createIcons({ el: overlay });
-
     const input = overlay.querySelector('#budget-inline-name');
     // Der Auslöser bekommt den Fokus zurück, sonst fällt er beim Schließen auf
     // <body> — das Overlay liegt über einem offenen Modal.
     const opener = document.activeElement;
+    // Das Formular darunter ist gesperrt, solange die Abfrage offen ist
+    // (utils/background-inert.js) - erst NACH dem Merken des Ausloesers, sonst
+    // gaebe der Browser seinen Fokus ab; freigegeben VOR der Fokus-Rueckgabe.
+    const releaseBackground = inertOutside(overlay);
     const cleanup = (value = '') => {
       overlay.remove();
+      releaseBackground();
       if (opener?.isConnected) opener.focus();
       resolve(value);
     };
@@ -4661,7 +4748,7 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
     // tabbt man aus dem „Dialog" heraus in das darunterliegende Formular.
     overlay.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.stopPropagation(); cleanup(''); return; }
-      if (e.key === 'Enter' && e.target === input) { cleanup(input.value.trim()); return; }
+      if (e.key === 'Enter' && e.target === input && !isImeComposing(e)) { cleanup(input.value.trim()); return; }
       if (e.key !== 'Tab') return;
       const focusable = [...overlay.querySelectorAll('button, input')].filter((el) => !el.disabled);
       if (!focusable.length) return;
@@ -4808,7 +4895,7 @@ function loanIdentityFieldsHtml(loan) {
       }</span>${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="lm-borrower" maxlength="100"
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
-             value="${esc(loan?.borrower ?? '')}">
+             value="${esc(loan?.borrower ?? '')}" required>
     </div>
     <div class="form-group">
       <label class="form-label" for="lm-title">${t('budget.loanTitleLabel')}</label>
@@ -4875,7 +4962,7 @@ function loanInterestFieldsHtml(loan) {
         <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-principal"
                step="${amountStep(currency, it?.principal ?? '')}" min="${amountMin(currency, it?.principal ?? '')}"
-               placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}">
+               placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}" required>
       </div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -5092,18 +5179,18 @@ function loanFormFieldsHtml(loan, { startMonth }) {
                step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
                min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
                placeholder="${amountPlaceholder(loanCurrency)}" inputmode="decimal"
-               value="${loan ? String(loan.total_amount) : ''}">
+               value="${loan ? String(loan.total_amount) : ''}" required>
       </div>
       <div class="form-group">
         <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360"
-               inputmode="numeric" value="${loan?.installment_count ?? ''}">
+               inputmode="numeric" value="${loan?.installment_count ?? ''}" required>
       </div>
     </div>
     ${loanInterestFieldsHtml(loan)}
     <div class="form-group">
       <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
-      <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}">
+      <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}" required>
     </div>
     ${/* Faelligkeitstag (#1631): optional. Leer = kein Tag, die Rate wird wie
         * bisher auf den Tag des Abhakens gebucht. */ ''}
@@ -5778,15 +5865,6 @@ function summaryWith(summary, entries, sign) {
   return next;
 }
 
-/* Zeigt `state.entries` weniger Buchungen, als `state.summary` zaehlt? Nur der
- * Konto-Drilldown: `account_id` geht an `GET /budget`, nicht an
- * `/budget/summary` (loadMonth). Der Scope geht an beide Abfragen, und der
- * Zustaendigen-Filter greift erst beim Zeichnen (visibleEntries) -
- * `state.entries` bleibt dabei vollstaendig. */
-function listNarrowsSummary() {
-  return state.accountFilterId != null;
-}
-
 async function deleteEntry(id) {
   if (readOnly()) return;
   const entry = findEntry(id);
@@ -5815,7 +5893,7 @@ async function deleteEntry(id) {
   state.entries = state.entries.filter((e) => e.id !== id);
   if (state.ledgerResults) state.ledgerResults = state.ledgerResults.filter((e) => e.id !== id);
   // Auch im Konto-Drilldown genau: der Server loescht genau diese eine
-  // Buchung, und sie steht in der Liste - anders als die Serie (listNarrowsSummary).
+  // Buchung, und sie steht in der Liste; die Bilanz ist die des Kontos.
   if (entry && inMonth) state.summary = summaryWith(state.summary, [entry], -1);
   // Der Zustand ist schon geaendert: ein Neuzeichnen, das dem Ausklappen
   // zuvorkommt, zeigt dasselbe Ergebnis nur ohne die Bewegung.
@@ -6003,13 +6081,10 @@ async function deleteEntrySeries(id) {
   state.entries = state.entries.filter((e) => !inSeries(e));
   if (state.ledgerResults) state.ledgerResults = state.ledgerResults.filter((e) => !inSeries(e));
   // Das Undo laedt den Monat neu (restore unten) - herausrechnen genuegt hier.
-  // Aber nur, wenn die Liste alles zeigt, was die Bilanz zaehlt: im
-  // Konto-Drilldown fehlen ihr Vorkommen, die per Einzel-Bearbeitung auf ein
-  // anderes Konto gewandert sind, und `/budget/:id/series` loescht sie mit.
-  // Dann bleibt die Bilanz beim Serverstand, bis der Commit (bzw. das Undo)
-  // den Monat samt Summary neu laedt - ein halb herausgerechneter Saldo waere
-  // eine dritte Zahl, die weder vorher noch nachher stimmt.
-  if (!listNarrowsSummary()) state.summary = summaryWith(state.summary, removed, -1);
+  // Auch im Konto-Drilldown: die Bilanz folgt seit der Re-Critique 2026-10-17
+  // dem Kontofilter, die Vorkommen auf anderen Konten zaehlt sie also gar
+  // nicht erst (Codex #1485 fragte nach genau dieser Luecke).
+  state.summary = summaryWith(state.summary, removed, -1);
   renderBody();
   vibrate([30, 50, 30]);
 

@@ -304,6 +304,7 @@ test('R17 Z1: nur der markierte Zeitraum-Kopf loest seine Bar-Zeile in die Titel
 // eingeklappt dieselben 117px wie ausgeklappt - Titel und Siegel gingen, die
 // Zeile blieb. Eingeklappt steht der Stepper jetzt in Zeile 1 vor dem Menue;
 // Suche, Filter und "Heute" falten ins Menue (gemessen 390x844: 117 -> 65px).
+// R20 6c: seitdem falten die Pfeile, Filter und Wort der Ansicht bleiben.
 test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im Menue wieder', () => {
   const calendarCss = read('../public/styles/calendar.css');
   const collapsed = rules(calendarCss).filter((r) => /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/.test(r.selector));
@@ -316,13 +317,24 @@ test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im
   const center = collapsed.find((r) => /> \.page-toolbar__center$/.test(r.selector));
   assert.equal(center && decl(center.body, 'order'), '0', 'der Zeitraum rueckt in Zeile 1, vor die Werkzeuge');
   assert.match(center.body, /flex:\s*1 1 0/, 'und nimmt den Rest der Zeile statt einer eigenen');
-  const hidden = collapsed.find((r) => decl(r.body, 'display') === 'none');
-  assert.ok(hidden, 'die gefalteten Werkzeuge blenden eingeklappt aus');
-  for (const part of hidden.selector.split(',')) {
-    assert.match(part, /\[data-collapse-fold\]/, `"${part.trim()}" blendet nur aus, was als faltbar markiert ist`);
+  const hiddenRules = collapsed.filter((r) => decl(r.body, 'display') === 'none');
+  assert.ok(hiddenRules.length, 'die gefalteten Werkzeuge blenden eingeklappt aus');
+  const hiddenParts = hiddenRules.flatMap((r) => r.selector.split(',').map((p) => p.trim()));
+  for (const part of hiddenParts) {
+    assert.match(part, /\[data-collapse-fold\]/, `"${part}" blendet nur aus, was als faltbar markiert ist`);
   }
-  assert.match(hidden.selector, /\.cal-toolbar__filter-btn\[data-collapse-fold\]:not\(\.page-filter-btn--active\)/,
-    'ein aktiver Filter bleibt mit seiner Zahl stehen (Kopfregel 3)');
+  // R20 6c (Ulas 2026-10-17, Option b): eingeklappt weichen die PFEILE, nicht
+  // Filter und Wort der Ansicht - der kompakte Kopf von Apple Kalender zeigt
+  // Zeitraum, Ansicht mit Wort, Suche und Filter. Blaettern bleibt per Wisch,
+  // Taste und ueber die Stellvertreter im Ansichtsmenue; ein Tipp aufs Label
+  // springt zurueck (Heute deckt es ganz).
+  assert.ok(hiddenParts.some((p) => /\.period-stepper__prev\[data-collapse-fold\]/.test(p))
+    && hiddenParts.some((p) => /\.period-stepper__next\[data-collapse-fold\]/.test(p)), 'eingeklappt weichen beide Pfeile');
+  assert.ok(!hiddenParts.some((p) => /cal-toolbar__filter-btn/.test(p)), 'der Filter bleibt eingeklappt sichtbar');
+  assert.ok(!collapsed.some((r) => /cal-toolbar__view-menu-label/.test(r.selector) && decl(r.body, 'display') === 'none'),
+    'das Wort der Ansicht bleibt eingeklappt stehen');
+  const reset = collapsed.find((r) => /\.cal-toolbar__today\[data-collapse-fold\]/.test(r.selector));
+  assert.equal(reset && decl(reset.body, 'inset-inline'), '0', '"Heute" deckt eingeklappt das ganze Label - ein Tipp darauf springt zurueck');
 
   const calendarJs = read('../public/pages/calendar.js');
   assert.match(calendarJs, /id="cal-views-menu"[^>]*data-collapse-fold-menu/, 'das Ansichtsmenue nimmt die gefalteten Werkzeuge auf');
@@ -330,7 +342,9 @@ test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im
   // oeffnen. Sie faltet deshalb nicht, sie bleibt als Lupe stehen.
   assert.doesNotMatch(calendarJs, /id="cal-search"/, 'kein Suchknopf mehr, der falten koennte');
   assert.match(calendarJs, /id: 'cal-search-input'/, 'die Suche ist das Feld der Shell');
-  assert.match(calendarJs, /'#cal-filters'\)\.setAttribute\('data-collapse-fold'/, 'der Filter ist markiert');
+  assert.doesNotMatch(calendarJs, /'#cal-filters'\)\.setAttribute\('data-collapse-fold'/, 'der Filter faltet nicht mehr (R20 6c)');
+  assert.match(calendarJs, /id: 'cal-prev'[^\n]*'data-collapse-fold': true/, 'der Zurueck-Pfeil ist markiert');
+  assert.match(calendarJs, /id: 'cal-next'[^\n]*'data-collapse-fold': true/, 'der Vor-Pfeil ist markiert');
   assert.match(calendarJs, /id: 'cal-today'[\s\S]{0,200}'data-collapse-fold': true/, '"Heute" ist markiert');
 
   const ux = read('../public/utils/ux.js');
@@ -574,8 +588,10 @@ test('Re-Kritik: die FAB-Reserve der Kapsel steht immer - Kapselbreite und Tabs 
   const reserve = all.find((r) => !r.at.length && r.selector.trim() === '.nav-bottom__items' && decl(r.body, 'padding-inline-end'));
   assert.match(decl(reserve?.body ?? '', 'padding-inline-end') ?? '', /^calc\(var\(--fab-size\) \+ var\(--nav-fab-inset\)\)$/,
     'die Reserve ist der Knopf plus sein Abstand zur Kante');
-  assert.ok(!all.some((r) => r.selector.endsWith('.nav-bottom__items') && decl(r.body, 'inline-size')),
-    'keine eigene Breite der Kapsel ohne Knopf');
+  // Eine eigene Breite hat seit R20 nur die minimierte Pille (Test darunter);
+  // ohne Knopf bekommt die Kapsel keine.
+  assert.ok(!all.some((r) => r.selector.endsWith('.nav-bottom__items') && !r.selector.includes('nav-bottom--minimized')
+    && decl(r.body, 'inline-size')), 'keine eigene Breite der Kapsel ohne Knopf');
 });
 
 // R19 (Entscheidung Ulas 2026-10-16): DIE KAPSEL MINIMIERT BEIM LESEN.
@@ -608,6 +624,46 @@ test('R19: die Kapsel minimiert beim Abwaertsscrollen - flacher, ohne Labels, Zi
     'jeder Seitenwechsel beginnt mit ausgefahrener Kapsel');
 });
 
+// R20 (Entscheidung Ulas 2026-10-17, iOS 26): MINIMIERT IST DIE KAPSEL EINE PILLE.
+test('R20: minimiert schrumpft die Kapsel an ihrer Startkante auf das aktive Ziel, ohne Layout-Shift', () => {
+  const all = rules(layoutCss);
+  const compact = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a));
+  const find = (sel, prop = null) => all.find((r) => compact(r) && r.selector === sel && (!prop || decl(r.body, prop)));
+  const pill = find('.nav-bottom--minimized:not(:focus-within) .nav-bottom__items', 'inline-size');
+  assert.equal(decl(pill?.body ?? '', 'inline-size'), 'var(--nav-pill-width, 100%)', 'die Kapsel wird nicht zur Pille');
+  const start = all.find((r) => compact(r) && r.selector === '.nav-bottom__items' && decl(r.body, 'margin-inline'));
+  assert.match(decl(start?.body ?? '', 'margin-inline') ?? '', /^max\(0px, \(100% - var\(--nav-capsule-max\)\) \/ 2\) auto$/,
+    'die Startkante steht nicht fest - eine Pille mit auto-Raendern zentrierte sich');
+  const frozen = find(':is(.nav-bottom--minimized, .nav-bottom--settling) .nav-item');
+  assert.equal(decl(frozen?.body ?? '', 'flex'), 'none', 'die Tabs schrumpfen mit (und wandern) - auch auf dem Rueckweg');
+  const others = find('.nav-bottom--minimized:not(:focus-within) .nav-item:not(.nav-item--pill)');
+  assert.equal(decl(others?.body ?? '', 'visibility'), 'hidden', 'ausgeblendete Tabs nehmen noch Treffer');
+  const moved = find('.nav-bottom--minimized:not(:focus-within) .nav-item--pill');
+  assert.match(decl(moved?.body ?? '', 'translate') ?? '', /var\(--nav-pill-shift/, 'das aktive Ziel wandert per translate');
+  const tr = find('.nav-bottom .nav-bottom__items', 'transition');
+  assert.match(decl(tr?.body ?? '', 'transition') ?? '', /inline-size/, 'die Breite gleitet (und schlaegt glass.css per Spezifitaet)');
+  const calm = all.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && r.selector.includes('.nav-bottom .nav-item,'));
+  assert.ok(calm.some((r) => decl(r.body, 'transition') === 'none'), 'reduzierte Bewegung: die Pille entsteht ohne Gleiten');
+  assert.match(read('../public/utils/ux.js'), /if \(minimized\) measureNavPill\(nav\);/, 'gemessen wird nicht an der ausgefahrenen Kapsel');
+});
+
+// R20 (Re-Critique 2026-10-17): der Bereichskopf der Gesundheit blieb beim Lesen
+// 113px hoch. Eingeklappt steht er in EINER Zeile: Rueckweg als Zeichen,
+// Bereichsname inline, Personenwahl - 65px bei 390px.
+test('R20: der Gesundheits-Bereichskopf klappt beim Lesen auf eine Zeile ein', () => {
+  const all = rules(read('../public/styles/health.css'));
+  const compact = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a));
+  const collapsed = all.filter((r) => compact(r) && r.selector.includes('.health-toolbar.page-toolbar--capped.is-collapsed'));
+  const row = collapsed.find((r) => decl(r.body, 'flex-wrap') === 'nowrap');
+  assert.ok(row, 'eingeklappt bricht der Kopf weiter in zwei Zeilen um');
+  assert.ok(collapsed.some((r) => /health-toolbar__break/.test(r.selector) && /module-seal--head/.test(r.selector) && decl(r.body, 'display') === 'none'),
+    'Umbruch und Siegel bleiben eingeklappt stehen');
+  assert.ok(collapsed.some((r) => /\.health-toolbar__back > span/.test(r.selector) && /clip-path:\s*inset\(50%\)/.test(r.body)),
+    'der Name des Rueckwegs verlaesst nicht das Bild (er bleibt im Baum)');
+  const back = collapsed.find((r) => /\.health-toolbar__back:not\(\[hidden\]\)$/.test(r.selector.trim()));
+  assert.equal(decl(back?.body ?? '', 'min-inline-size'), 'var(--target-base)', 'der Rueckweg bleibt ein volles Ziel');
+});
+
 // R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE.
 // Schichtplan, Belohnungen und Haushaltshilfe massen 121/121/129px bei 390px
 // (Large Title ueber den Reitern), jetzt 65px; bei 834px 118-130 -> 69px.
@@ -628,4 +684,15 @@ test('R19: Schichtplan, Belohnungen und Haushaltshilfe fuehren ihre Reiter in de
   assert.ok(own.some((r) => at(r, 767) && r.selector.endsWith('> .module-seal--head') && decl(r.body, 'display') === 'none'),
     'das Siegel geht mit (die vier Reiter der Haushaltshilfe brauchen 351 von 358px)');
   assert.ok(read('../DESIGN.md').includes('page-toolbar--tabs-title'), 'DESIGN.md nennt die Variante');
+});
+
+// R20 (E1-Befund, gemessen 2026-10-17): der Nachlauf-Platzhalter hinter dem
+// Seiten-Root rutschte beim ersten Rendern von y=0 auf y=508 und trug auf dem
+// Schichtplan bei 390px CLS 0,114 bei. Er malt nichts; unsichtbar behaelt er
+// seinen Platz und zaehlt nicht als Layout-Shift.
+test('R20: der Shell-Nachlauf ist unsichtbar und damit kein Layout-Shift', () => {
+  const [tail] = topLevel(layoutCss, '.app-content:not(:has(.page-scrollport)) > .page-transition::after');
+  assert.ok(tail, 'Regel des Nachlaufs fehlt');
+  assert.equal(decl(tail.body, 'block-size'), 'var(--shell-tail)', 'der Platz bleibt');
+  assert.equal(decl(tail.body, 'visibility'), 'hidden');
 });

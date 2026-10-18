@@ -8,6 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken } from '/utils/ux.js';
@@ -389,8 +390,10 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
     </div>
   `);
 
+  let releaseBackground = () => {};
   function close() {
     overlay.remove();
+    releaseBackground();
     document.removeEventListener('keydown', onKeydown);
     onClose();
   }
@@ -424,6 +427,9 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
   // In den Termin-Dialog, aus dem die Wahl aufgeht: ausserhalb des modalen
   // <dialog> waere sie inert und laege darunter (D7, utils/overlay-host.js).
   overlayHost().appendChild(overlay);
+  // Das Termin-Formular darunter ist gesperrt, solange die Wahl offen ist
+  // (utils/background-inert.js); freigegeben, bevor onClose() den Fokus zurueckgibt.
+  releaseBackground = inertOutside(overlay);
   document.addEventListener('keydown', onKeydown);
   panel.querySelector('#event-icon-dialog-search')?.focus();
   if (window.lucide) lucide.createIcons({ el: panel });
@@ -965,8 +971,20 @@ function monthDayTapAction(date, cursor, { split = false } = {}) {
 }
 
 /**
+ * DIE MOBILE WOCHE BEGINNT AM CURSOR (R20, Re-Critique 2026-10-17 a3 P3).
+ * Das 3-Tage-Fenster stand um den Cursor (gestern, heute, morgen): wer den
+ * Kalender am Telefon oeffnete, sah als erste Spalte einen Tag, der vorbei
+ * ist. Apple Kalender und Fantastical beginnen ihre Mehrtagesansicht mit dem
+ * gewaehlten Tag - "Heute" steht damit links, und die Pfeile gehen in
+ * 3-Tage-Schritten weiter. EINE Stelle fuer Raster, Label und Ladefenster.
+ */
+function mobileWeekDays(cursor) {
+  return [cursor, addDays(cursor, 1), addDays(cursor, 2)];
+}
+
+/**
  * Ladefenster der Wochenansicht: das haushaltsweite 7-Tage-Raster, auf Mobile
- * erweitert um das 3-Tage-Fenster (cursor -1..+1), das renderWeekView() dort
+ * erweitert um das 3-Tage-Fenster (mobileWeekDays), das renderWeekView() dort
  * tatsächlich zeichnet. Ohne diese Erweiterung klammerte buildDayIndex() auf
  * das reine 7-Tage-Raster, und ein Cursor am Wochenrand liess auf Mobile den
  * hereinragenden Nachbartag ohne seine Termine stehen (#1006) - obwohl
@@ -980,8 +998,9 @@ function getWeekRange(dateStr, { weekStart = state.weekStart, mobile = false } =
   const desktopFrom = start;
   const desktopTo   = addDays(start, 6);
   if (!mobile) return { from: desktopFrom, to: desktopTo };
-  const mobileFrom = addDays(dateStr, -1);
-  const mobileTo   = addDays(dateStr, 1);
+  const window3 = mobileWeekDays(dateStr);
+  const mobileFrom = window3[0];
+  const mobileTo   = window3[window3.length - 1];
   return {
     from: mobileFrom < desktopFrom ? mobileFrom : desktopFrom,
     to:   mobileTo   > desktopTo   ? mobileTo   : desktopTo,
@@ -997,8 +1016,15 @@ function getAgendaRange(dateStr) {
  * Termin, nicht als Ladespanne. Deshalb nicht getRangeForView(): dessen
  * Monatsspanne ist das Wochenraster und begänne im Vormonat.
  */
-function visibleDayRange(view, cursor, weekStart = 1) {
+function visibleDayRange(view, cursor, weekStart = 1, { mobile = false } = {}) {
   if (view === 'month')  return monthPeriodKeys(cursor);
+  if (view === 'week' && mobile) {
+    // Am Telefon zeigt die Woche nur die drei Tage ab dem Cursor
+    // (mobileWeekDays): heute kann in derselben 7-Tage-Woche liegen und
+    // trotzdem nicht auf dem Schirm stehen (Codex-Review PR #2053).
+    const days = mobileWeekDays(cursor);
+    return { from: days[0], to: days[days.length - 1] };
+  }
   if (view === 'week')   {
     const from = startOfLocalWeekKey(cursor, weekStart);
     return { from, to: addLocalDays(from, 6) };
@@ -1012,9 +1038,9 @@ function visibleDayRange(view, cursor, weekStart = 1) {
  * hat: Toolbar-„+", FAB, Leerzustand der Agenda (#737). Die Entscheidung selbst
  * trifft defaultDateInPeriod() - sie gilt hausweit und nicht nur hier.
  */
-function newEventDefaultDate(view, cursor, today, weekStart = 1) {
+function newEventDefaultDate(view, cursor, today, weekStart = 1, { mobile = false } = {}) {
   if (!cursor) return today;
-  const { from, to } = visibleDayRange(view, cursor, weekStart);
+  const { from, to } = visibleDayRange(view, cursor, weekStart, { mobile });
   return defaultDateInPeriod(from, to, today);
 }
 
@@ -1024,7 +1050,9 @@ function newEventDate() {
   // „+" legt dann für diesen Tag an, nicht für den Monatsersten. Auf dem
   // Desktop ist der Cursor im Monat unsichtbar, dort gilt die Zeitraumregel.
   if (state.view === 'month' && isMonthSplit()) return state.cursor;
-  return newEventDefaultDate(state.view, state.cursor, state.today, state.weekStart);
+  // Dieselbe Telefonbreite entscheidet ueber das 3-Tage-Fenster der Woche
+  // (renderWeekView): der Vorschlag bleibt in dem, was zu sehen ist.
+  return newEventDefaultDate(state.view, state.cursor, state.today, state.weekStart, { mobile: isMonthSplit() });
 }
 
 /** Der geteilte Monat (Raster oben, Tagesliste unten) - die Telefonbreite. */
@@ -1915,7 +1943,7 @@ export async function render(container, { user, signal } = {}) {
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="calendar-page app-page app-page--full" id="calendar-page" data-composition="full">
+    <div class="calendar-page app-page app-page--full${sidebarWanted() ? ' has-cal-sidebar' : ''}" id="calendar-page" data-composition="full">
       ${/* DER KOPF STEHT SCHON VOR DEN DATEN, samt Aktions-Slot: die Shell
             dockt den FAB direkt nach dem synchronen Teil an (adoptPageFab in
             router.js) und findet ihn danach nur noch in der Shell-Ebene, nicht
@@ -1936,7 +1964,13 @@ export async function render(container, { user, signal } = {}) {
            Live-Region, die mit ihrem Inhalt zusammen entsteht, sagt nichts an. -->
       <span id="cal-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
       <div class="cal-frame">
-        <aside class="cal-sidebar" id="cal-sidebar" aria-label="${esc(t('calendar.sidebarLabel'))}" hidden></aside>
+        ${/* DIE SPALTE STEHT VOM ERSTEN BILD AN (R20, E1-Befund Kalender 1920:
+              CLS 0,136). Die Leiste kam erst mit renderSidebar() nach der
+              ersten Ansicht dazu, und #cal-body rutschte von x 220 auf 536.
+              Jetzt traegt die Seite `has-cal-sidebar` schon im Markup und die
+              leere Leiste reserviert ihre Breite (calendar.css, Container-
+              Regel); renderSidebar() fuellt sie nur noch. */ ''}
+        <aside class="cal-sidebar" id="cal-sidebar" aria-label="${esc(t('calendar.sidebarLabel'))}"${sidebarWanted() ? '' : ' hidden'}></aside>
         <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       </div>
       ${/* Die CSS-Regel html[data-module-readonly] .page-fab (layout.css) blendet
@@ -2084,11 +2118,13 @@ function periodNavHtml() {
   const labels = periodArrowLabels(currentPeriodStep());
   // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
   return periodStepperHtml({
-    prev: { id: 'cal-prev', label: labels.prev, title: true, keys: `${CAL_SHORTCUT_KEYS.prev} ${keys.prev}` },
+    // `data-collapse-fold`: eingeklappt (mobil) weichen die Pfeile ins
+    // Ansichtsmenue (R20 6c, calendar.css; die Stellvertreter baut utils/ux.js).
+    prev: { id: 'cal-prev', label: labels.prev, title: true, keys: `${CAL_SHORTCUT_KEYS.prev} ${keys.prev}`, attrs: { 'data-collapse-fold': true } },
     value: { id: 'cal-label', className: 'cal-toolbar__label' },
-    next: { id: 'cal-next', label: labels.next, title: true, keys: `${CAL_SHORTCUT_KEYS.next} ${keys.next}` },
-    // `data-collapse-fold`: eingeklappt (mobil) weicht "Heute" ins Menue, das
-    // Label braucht die Breite (calendar.css; die Stellvertreter baut utils/ux.js).
+    next: { id: 'cal-next', label: labels.next, title: true, keys: `${CAL_SHORTCUT_KEYS.next} ${keys.next}`, attrs: { 'data-collapse-fold': true } },
+    // "Heute" liegt mobil auf dem Wert und deckt eingeklappt das ganze Label;
+    // im laufenden Zeitraum ist er inert und kommt auch im Menue nicht vor.
     reset: {
       id: 'cal-today', className: 'cal-toolbar__today', label: t('calendar.today'), keys: CAL_SHORTCUT_KEYS.today,
       attrs: { 'data-collapse-fold': true, 'data-fold-icon': 'CalendarCheck' },
@@ -2331,10 +2367,8 @@ function renderToolbar() {
   bar.querySelector('#cal-calendars')?.addEventListener('click', openLocalCalendarsModal);
   bar.querySelector('#cal-today').addEventListener('click', goToday);
   wireCalendarSearch(bar, { focus: searchHadFocus });
+  // Der Filter faltet seit R20 (6c) nicht mehr: der kompakte Kopf zeigt ihn.
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
-  // Der Filterknopf kommt aus dem geteilten Baustein; die Marke fuer die
-  // Faltung im eingeklappten Kopf (calendar.css) setzt deshalb das Modul.
-  bar.querySelector('#cal-filters').setAttribute('data-collapse-fold', '');
   installPopoverMenus(bar);
   bar.querySelector('#cal-views-menu-panel')?.addEventListener('click', (e) => {
     const item = e.target.closest?.('[data-cal-view]');
@@ -2451,11 +2485,11 @@ function updateLabel() {
   // "${mon} ${year}" ergab im Koreanischen "10월 2026" statt "2026년 10월".
   if (state.view === 'month')  lbl.textContent = formatMonthYear(year, d.getMonth() + 1);
   if (state.view === 'week') {
-    // Mobil zeigt die "Woche" ein 3-Tage-Fenster um den Cursor (renderWeekView);
+    // Mobil zeigt die "Woche" ein 3-Tage-Fenster ab dem Cursor (mobileWeekDays);
     // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen
     // ist (Audit A1-19). Das Label nennt stattdessen den sichtbaren Bereich.
     lbl.textContent = window.matchMedia(MOBILE_MEDIA_QUERY).matches
-      ? t('calendar.dayRangeLabel', { from: formatDayMonth(addDays(state.cursor, -1)), to: formatPreferredDate(addDays(state.cursor, 1)) })
+      ? t('calendar.dayRangeLabel', { from: formatDayMonth(mobileWeekDays(state.cursor)[0]), to: formatPreferredDate(mobileWeekDays(state.cursor)[2]) })
       : t('calendar.weekNumberLabel', { week: getWeekNumber(state.cursor), month: mon, year });
   }
   // Mobil der kurze Wochentag: „Donnerstag, 24.09.2026" brauchte 186px und
@@ -3300,11 +3334,17 @@ function wireMonthGridKeys(grid, { split }) {
 
 /**
  * Nach dem Wechsel in die Tagesansicht per Tastatur: Fokus auf den ersten
- * Eintrag des Tages (Ganztags-Zeile, dann das Raster), sonst auf den Reiter.
+ * Eintrag des Tages (Ganztags-Zeile, dann das Raster). Ein LEERER Tag hat
+ * keinen - dann der Hinweis im Raster („Noch keine Termine …"), nicht mehr
+ * der Reiter „Tag" (R20, Re-Critique 2026-10-17 A3, Sam): Enter auf einen
+ * leeren Monatstag landete oben in der Ansichtswahl, und der Screenreader
+ * sagte „Tag, Registerkarte" statt, was an diesem Tag ist. Der Reiter bleibt
+ * der letzte Rueckfall (ein Tag mit Schicht, aber ohne Knopf darin).
  */
 function focusFirstDayEntry() {
   const body = _container?.querySelector('#cal-body');
-  const first = body?.querySelector('.day-view [role="button"][tabindex="0"]');
+  const first = body?.querySelector('.day-view [role="button"][tabindex="0"]')
+    ?? body?.querySelector('#day-empty-hint');
   (first ?? _container?.querySelector('#cal-view-tab-day'))?.focus();
 }
 
@@ -3707,18 +3747,29 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   // gridcell mit roving tabindex (wireMonthGridKeys): genau EINE Zelle ist
   // Tab-Stopp. `aria-selected` nur im geteilten Monat - dort gibt es eine
   // Auswahl, am Desktop oeffnet die Zelle den Tag.
+  //
+  // DER NAME KOMMT AUS DEM INHALT, NICHT AUS `aria-label` (R20, a11y-Baseline
+  // label-content-name-mismatch). Die Zusammenfassung (monthDayAriaLabel) ist
+  // dieselbe wie vorher; sie steht jetzt als `.month-day__label` (sr-only) in
+  // der Zelle, und das Sichtbare - Ziffer, Chips, „+N" - ist fuer Hilfstechnik
+  // ausgeblendet (`.month-day__visual`, `display: contents`, die Geometrie
+  // bleibt). Mit `aria-label` verlangte WCAG 2.5.3, dass jeder sichtbare
+  // Chip-Text in Reihenfolge im Namen steht - fuer eine Zelle, deren Chips
+  // Inhalt sind und kein Etikett, ist die Zusammenfassung der richtige Name.
   return `
     <div class="${classes}" data-date="${date}" data-total="${total}"
-         role="gridcell" tabindex="${focusable ? '0' : '-1'}"
-         aria-label="${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
+         role="gridcell" tabindex="${focusable ? '0' : '-1'}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
+      <span class="sr-only month-day__label">${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}</span>
+      <div class="month-day__visual" aria-hidden="true">
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
-      ${band?.depth ? `<div class="month-day__lanes" style="--lanes:${band.depth}" aria-hidden="true"></div>` : ''}
+      ${band?.depth ? `<div class="month-day__lanes" style="--lanes:${band.depth}"></div>` : ''}
       ${holHtml}
       ${scheduleHtml}
       ${wasteHtml}
       ${evHtml}
       ${taskHtml}
       <div class="month-day__more" hidden></div>
+      </div>
     </div>
   `;
 }
@@ -4098,9 +4149,9 @@ function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], 
 
 function renderWeekView(container) {
   const isMobile = window.matchMedia(MOBILE_MEDIA_QUERY).matches;
-  // Auf Mobile: 3-Tage-Fenster zentriert um state.cursor statt vollem Mo-So
+  // Auf Mobile: 3-Tage-Fenster ab state.cursor statt vollem Mo-So
   const days = isMobile
-    ? Array.from({ length: 3 }, (_, i) => addDays(state.cursor, i - 1))
+    ? mobileWeekDays(state.cursor)
     : (() => {
         const weekStart = startOfWeekOf(state.cursor);
         return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -4900,7 +4951,7 @@ function renderDayView(container) {
               ...scheduleBlocks.map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry)) })),
               ...timed.map((ev) => ({ range: timeRangeForEvent(ev, state.cursor), html: () => renderDayEvent(ev, layout.get(ev), state.cursor) })),
             ])}
-            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${dayEmptyHintText()}</div>` : ''}
+            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" id="day-empty-hint" tabindex="-1" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${dayEmptyHintText()}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
             <div class="day-view__now-line" aria-hidden="true" style="top:${hourOffset(nowMinutes())};"></div>
@@ -5029,7 +5080,17 @@ let _upNext = { events: null, loading: null, day: null, error: null };
 let _sidebarObserver = null;
 
 function sidebarWanted() {
-  return state.view !== 'agenda' && !searchActive;
+  return !searchActive;
+}
+
+/**
+ * „Als Naechstes" gehoert nicht in die Agenda (R20): die Liste daneben IST,
+ * was als Naechstes ansteht. Mini-Monat und Filter bleiben - und mit ihnen
+ * die Spalte: vorher fiel die Leiste in der Agenda ganz weg, und der Inhalt
+ * sprang beim Ansichtswechsel von x 536 auf 220 (1920px, Re-Critique 2026-10-17).
+ */
+function upNextWanted() {
+  return state.view !== 'agenda';
 }
 
 /** Steht die Spalte (Container-Abfrage) - oder ist sie unter der Schwelle verborgen? */
@@ -5187,7 +5248,7 @@ function renderSidebar() {
   page.classList.toggle('has-cal-sidebar', wanted);
   aside.hidden = !wanted;
   if (!sidebarShown(aside)) { aside.replaceChildren(); return; }
-  if (upNextNeedsLoad()) loadUpNext();
+  if (upNextWanted() && upNextNeedsLoad()) loadUpNext();
 
   const active = document.activeElement;
   let refocus = null;
@@ -5197,7 +5258,7 @@ function renderSidebar() {
     }
   }
   aside.replaceChildren();
-  aside.insertAdjacentHTML('beforeend', miniMonthHtml() + sidebarFiltersHtml() + upNextHtml());
+  aside.insertAdjacentHTML('beforeend', miniMonthHtml() + sidebarFiltersHtml() + (upNextWanted() ? upNextHtml() : ''));
   window.lucide?.createIcons({ el: aside });
   if (refocus) aside.querySelector(refocus)?.focus();
 }

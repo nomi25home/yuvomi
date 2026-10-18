@@ -42,6 +42,9 @@
         "errorOccurred": "Er is iets misgegaan.",
         "unexpectedError": "Er is een onverwachte fout opgetreden.",
         "errorDetails": "Technische details",
+        "pageFailedTitle": "De pagina {{page}} kan nu niet worden geopend",
+        "pageFailedHint": "Alle andere onderdelen blijven werken.",
+        "toOverview": "Naar het overzicht",
         "errorGeneric": "Er is een fout opgetreden.",
         "updateAvailable": "Update beschikbaar - herlaad de pagina voor de nieuwste versie.",
         "titleRequired": "Titel is verplicht",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "{{title}} op de boodschappenlijst zetten",
         "emailInUse": "Dit e-mailadres hoort al bij een ander account.",
+        "emailInvalid": "Voer een geldig e-mailadres in.",
         "sessionUnreachableTitle": "Verbinding onderbroken",
+        "serverNotReadyTitle": "Server is nu niet klaar",
+        "rateLimitedTitle": "Te veel verzoeken",
         "sessionRetryHint": "Je blijft ingelogd. Nieuwe poging over {{seconds}} s.",
         "sessionRetrying": "Opnieuw proberen…",
         "searchNoResultsTitle": "Geen resultaten",
         "searchNoResultsDescription": "Niets komt overeen met je zoekopdracht.",
         "searchNoResultsFilteredDescription": "Niets komt overeen met je zoekopdracht en filters.",
-        "searchReset": "Zoekopdracht wissen"
+        "searchReset": "Zoekopdracht wissen",
+        "passwordMinLength": "Minstens 8 tekens."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "Deze leningbetaling verwijderen?",
         "loanRemainingAmount": "Resterend",
         "loanRemainingPrincipal": "Restschuld",
+        "loanOwedToYou": "Nog te ontvangen",
         "loanStillToPay": "Nog te betalen",
         "loanPrincipalAmount": "Leenbedrag",
         "loanRemainingInstallments": "Resterende termijnen",
         "loanPaidAmount": "Betaald",
+        "loanReceivedAmount": "Terugontvangen",
         "loansEmpty": "Geen actieve leningen.",
         "loanInstallmentMeta": "{{paid}} van {{total}} termijnen betaald",
         "loanRemainingOf": "van {{total}}",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "Kleinste restschuld eerst",
         "loanSortActive": "Sortering: {{sort}}",
         "loanPaidStatus": "Betaald",
-        "markLoanPaid": "Als betaald markeren",
+        "loanBookInstallment": "Termijn boeken",
+        "loanReceiveRepayment": "Terugbetaling ontvangen",
         "loanBorrowerLabel": "Lener",
         "loanDirectionLabel": "Soort lening",
         "loanDirectionLent": "Uitgeleend (ik krijg het terug)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "Creditcard",
         "accountType_investment": "Belegging",
         "accountType_other": "Overig",
-        "viewAccountTransactions": "Boekingen van {{name}} tonen",
-        "currentBalance": "Huidig saldo",
         "clearAccountFilter": "Rekeningfilter wissen",
         "archivedBadge": "Gearchiveerd",
         "showArchivedAccounts": "Gearchiveerde tonen",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "Waarden van de trendlijn",
         "statsPointLabel": "{{period}}: inkomsten {{income}}, uitgaven {{expenses}}",
         "statsPointLabelCumulative": "Tot {{period}}: inkomsten {{income}}, uitgaven {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} gepland",
         "receiptsLabel": "Bonnen",
         "receiptsHint": "Kassabon of factuur bij deze boeking.",
         "receiptDocumentName": "Bon: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "Op datum",
         "ledgerSortAmount": "Op bedrag",
         "ledgerSortActive": "Sortering: {{sort}}",
-        "ledgerAccountsAll": "Alle rekeningen"
+        "ledgerAccountsAll": "Alle rekeningen",
+        "showAccountTransactions": "Boekingen tonen"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",
@@ -1987,6 +1997,8 @@
         "confirmPasswordLabel": "Nieuw wachtwoord bevestigen",
         "savePassword": "Wachtwoord opslaan",
         "passwordMismatch": "Wachtwoorden komen niet overeen.",
+        "currentPasswordWrong": "Het huidige wachtwoord klopt niet.",
+        "passwordTooShort": "Minstens 8 tekens.",
         "passwordSavedToast": "Wachtwoord succesvol gewijzigd.",
         "oidcLinkTitle": "Eenmalige aanmelding",
         "oidcLinkHint": "Koppel je SSO-account aan dit account, zodat aanmelden via de provider je hierheen brengt in plaats van een tweede account aan te maken.",
@@ -2096,6 +2108,7 @@
         "familyRoleGrandparent": "Grootouder",
         "familyRoleRelative": "Familie",
         "familyRoleOther": "Gezinslid",
+        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget en vasten en zien Huishoudhulp alleen-lezen, zonder lonen en betalingen. Je kunt dit daarna wijzigen onder “Rollen en rechten”.",
         "systemAdminLabel": "Systeembeheerder",
         "systemAdminHint": "Systeembeheerders kunnen applicatie-instellingen, integraties, API-tokens en gezinsaccounts beheren.",
         "systemAdminBadge": "Systeembeheerder",
@@ -2112,7 +2125,7 @@
         "removeMemberNamed": "{{name}} verwijderen",
         "memberDeactivatedToast": "{{name}} gedeactiveerd. De items blijven bewaard.",
         "memberFormerBadge": "Voormalig lid",
-        "memberOrderHint": "Deze volgorde geldt voor het hele huishouden: de agenda, het rooster en elke lijst met personen volgen haar. Wijzig de volgorde door een greep te slepen of er de focus op te zetten en de pijltjestoetsen te gebruiken. Nieuwe leden komen erna, gesorteerd op naam.",
+        "memberOrderHint": "Deze volgorde geldt in het hele huishouden. Sleep aan een greep of gebruik de pijltjestoetsen om haar te wijzigen.",
         "logout": "Uitloggen",
         "logoutConfirm": "Uitloggen op dit apparaat?",
         "synchronizing": "Synchroniseren…",
@@ -2141,7 +2154,7 @@
         "pwaInstallTitle": "Yuvomi op dit apparaat installeren",
         "pwaInstallChecking": "Installatiemogelijkheid controleren...",
         "pwaInstallReady": "Yuvomi kan als app op dit apparaat worden geïnstalleerd.",
-        "pwaInstallUnavailable": "Installatie is momenteel niet beschikbaar in deze browser.",
+        "pwaInstallUnavailable": "Deze browser biedt de installatie hier niet aan. In Chrome en Edge vind je die in het browsermenu, in Safari onder Deel > Voeg toe aan Dock of Zet op beginscherm. Zonder HTTPS-adres biedt geen enkele browser haar aan.",
         "pwaInstallInstalled": "Yuvomi is al geïnstalleerd op dit apparaat.",
         "pwaInstallIosHint": "Op iPhone of iPad: gebruik het Deelmenu en kies Zet op beginscherm.",
         "pwaInstallButton": "App installeren",
@@ -2502,7 +2515,7 @@
         "deleteCardDAVAccountConfirm": "Je gesynchroniseerde contacten blijven, maar verliezen hun CardDAV-koppeling.",
         "housekeepingPaymentsTitle": "Betalingstaken",
         "housekeepingPaymentTasksLabel": "Maak een betalingstaak aan bij elke inchecking van de schoonmaker",
-        "housekeepingPaymentTasksHint": "Indien ingeschakeld, maakt elke inchecking een taak aan voor het betalen van het personeelslid. Het voltooien van die taak markeert de bezoekbetaling als betaald.",
+        "housekeepingPaymentTasksHint": "Indien ingeschakeld, maakt elke inchecking een taak aan voor het betalen van het personeelslid. Het voltooien van die taak markeert de bezoekbetaling als betaald. Alleen wie incheckt en de beheerders zien die.",
         "housekeepingPaymentTasksSaved": "Instelling voor huishoudbetalingen opgeslagen.",
         "tasksSubtasksExpandedTitle": "Subtaken",
         "tasksSubtasksExpandedHint": "Kies of subtaken standaard open worden weergegeven.",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "Dit apparaat is nog gekoppeld. Trek het eerst in.",
         "feedExportIncludeBirthdays": "Verjaardagen opnemen",
         "feedExportIncludeBirthdaysHint": "Schakel dit uit bij een apart verjaardagsabonnement om dubbele verjaardagen en naamdagen te voorkomen.",
-        "birthdayFeedHint": "Iedereen met deze link kan alle opgeslagen verjaardagen en naamdagen van het huishouden zien, ook zonder herinnering. Gebruik de link alleen op je eigen apparaten."
+        "birthdayFeedHint": "Iedereen met deze link kan alle opgeslagen verjaardagen en naamdagen van het huishouden zien, ook zonder herinnering. Gebruik de link alleen op je eigen apparaten.",
+        "skipToSheet": "Naar de instelling",
+        "screensaverOffTitle": "Fotoschermbeveiliging",
+        "screensaverNeedsImmich": "De schermbeveiliging start zodra een beheerder Immich heeft gekoppeld. Daarna stel je hier wachttijd, klok en fotouitsnede voor dit apparaat in.",
+        "screensaverConnectImmich": "Immich koppelen",
+        "weatherPlaceLabel": "Plaats",
+        "weatherPlaceHint": "De zoekopdracht loopt via de weerdienst Open-Meteo. Alleen de plaatsnaam wordt verstuurd.",
+        "weatherPlacePlaceholder": "Stad of postcode",
+        "weatherPlaceSearch": "Zoeken",
+        "weatherPlaceCurrent": "Huidig: {{place}}",
+        "weatherPlaceNone": "Nog geen plaats gekozen.",
+        "weatherPlaceResultsLabel": "Gevonden plaatsen",
+        "weatherPlacePick": "Kies je plaats uit de lijst.",
+        "weatherPlaceChosen": "{{place}} gekozen. Sla op om het toe te passen.",
+        "weatherPlaceRequired": "Zoek een plaats en kies die uit de lijst.",
+        "weatherPlaceTooShort": "Voer minstens twee tekens in.",
+        "weatherPlaceNotFound": "Geen plaats met deze naam gevonden. Voeg het land toe, bijv. „Bergen, Nederland”.",
+        "weatherPlaceUnavailable": "Het zoeken naar plaatsen is nu niet bereikbaar. Probeer het zo opnieuw of vul de coördinaten met de hand in.",
+        "weatherManualTitle": "Coördinaten met de hand"
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",
@@ -3482,7 +3513,8 @@
         "resultCountMany": "{{count}} resultaten",
         "goTo": "Ga naar",
         "newSection": "Nieuw aanmaken",
-        "recentLabel": "Recent geopend"
+        "recentLabel": "Recent geopend",
+        "createTaskNamed": "„{{title}}” als taak aanmaken"
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - opnieuw verbinden…",
-        "staleData": "Offline - stand: {{time}}"
+        "staleData": "Offline - stand: {{time}}",
+        "pageTitle": "Je bent offline",
+        "pageDescription": "Deze pagina heeft een verbinding nodig. Zodra je apparaat weer online is, laadt ze vanzelf."
     },
     "shortcuts": {
         "search": "Zoeken openen",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "Voorbeeld: Badkamer",
         "taskFrequency": "Frequentie (dagen)",
         "taskCreatedToast": "Huishoudtaak aangemaakt.",
-        "dashboard": "Overzicht",
         "reports": "Rapporten",
         "visitsThisMonth": "Bezoeken deze maand",
         "lastVisit": "Laatste bezoek",
@@ -4007,7 +4040,12 @@
         "currentMonth": "Huidig",
         "noVisitReportsInMonth": "Geen personeelsbezoeken vastgelegd in {{month}}.",
         "settledAdminOnly": "Alleen een beheerder kan dit wijzigen of verwijderen",
-        "reportVisitsCount": "Bezoeken"
+        "reportVisitsCount": "Bezoeken",
+        "amountsPermissionLabel": "Lonen en betalingen zien",
+        "errorAmountsHidden": "Alleen wie de bedragen van de huishoudhulp mag zien, kan een betaling markeren.",
+        "notHereToday": "Vandaag nog niet aanwezig",
+        "tabVisits": "Bezoeken",
+        "tabChores": "Klussen"
     },
     "userMultiSelect": {
         "moreUsers": "meer",
@@ -4040,7 +4078,6 @@
         "noBalances": "Iedereen is vereffend.",
         "noExpenses": "Geen uitgaven komen overeen met deze weergave.",
         "noActivity": "Nog geen activiteit.",
-        "owes": "is schuldig aan",
         "system": "Systeem",
         "quickGroceries": "Supermarktuitgave toevoegen",
         "quickSchool": "Schoolkosten splitsen",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} aan {{payee}}, {{amount}}. Een tegenboeking heft de betaling op en de saldi staan weer zoals ervoor. De betaling blijft in de activiteit, gemarkeerd als tegengeboekt.",
         "loadMoreActivity": "Meer laden",
         "expenseDeleted": "Verwijderd",
-        "youAreOwedInGroup": "Je krijgt in {{group}}",
-        "youOweInGroup": "Je bent schuldig in {{group}}"
+        "youAreOwedInGroup": "{{group}}: Je krijgt",
+        "youOweInGroup": "{{group}}: Je bent schuldig",
+        "debtYouOwe": "Je bent {{name}} nog schuldig",
+        "debtOwesYou": "{{name}} is jou nog schuldig",
+        "debtOwes": "{{from}} is schuldig aan {{to}}"
     },
     "wmo": {
         "0": "Heldere lucht",
@@ -4256,7 +4296,8 @@
         "submit": "Link versturen",
         "sent": "Als er een bijbehorend account bestaat, is er een herstellink verstuurd.",
         "backToLogin": "Terug naar inloggen",
-        "unavailable": "Dit huishouden biedt geen wachtwoordherstel aan. Neem contact op met de beheerder van je huishouden."
+        "unavailable": "Dit huishouden biedt geen wachtwoordherstel aan. Neem contact op met de beheerder van je huishouden.",
+        "identifierRequired": "Vul je gebruikersnaam of e-mailadres in."
     },
     "resetPassword": {
         "title": "Nieuw wachtwoord instellen",
@@ -4286,6 +4327,15 @@
         "test": "Verbinding testen",
         "testSuccess": "Testmail succesvol verzonden.",
         "testFailed": "Test mislukt: {{error}}",
+        "portInvalid": "Voer een poort van {{min}} tot {{max}} in.",
+        "testFailedNotConfigured": "Vul eerst de SMTP-host en het afzenderadres in.",
+        "testFailedAuth": "De server heeft de gebruikersnaam of het wachtwoord geweigerd.",
+        "testFailedConnection": "De server is op deze host en poort niet bereikbaar.",
+        "testFailedTls": "De versleutelde verbinding is mislukt. Controleer versleuteling en poort.",
+        "testFailedRejected": "De server heeft de testmail niet geaccepteerd. Controleer het afzenderadres.",
+        "testFailedUnknown": "De testmail kon niet worden verzonden.",
+        "testNoRecipient": "De testmail gaat naar je eigen e-mailadres, en dat ontbreekt nog. Vul het in onder Account → E-mail.",
+        "testNoRecipientLink": "Account openen",
         "saveFailed": "Opslaan mislukt: {{error}}",
         "saved": "Instellingen opgeslagen."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Dagelijks",
                 "none": "Nog geen tijdstippen.",
                 "delete": "Tijdstip verwijderen",
-                "newHint": "Sla het medicijn op om tijdstippen te kunnen toevoegen.",
                 "timeRequired": "Tijd is verplicht."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Geen overeenkomende soort in dit huishouden",
         "mappingProfileStatusAmbiguousType": "Dubbelzinnig - meerdere types delen deze naam",
         "icsCalendarName": "Afvalophaling",
-        "icsPickupSummary": "Ophaling: {{name}}"
+        "icsPickupSummary": "Ophaling: {{name}}",
+        "intervalDecrease": "Interval verkleinen",
+        "intervalIncrease": "Interval vergroten"
     },
     "rewards": {
         "title": "Beloningen",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Selectie wissen",
         "continuesUntil": "…loopt door tot {{time}}",
         "overviewEmptyTitle": "Kies personen om te vergelijken",
-        "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien."
+        "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien.",
+        "presetCodes": {
+            "early": "V",
+            "late": "L",
+            "night": "N",
+            "day": "D",
+            "vacation": "VA",
+            "sick": "Z",
+            "exam": "EX",
+            "lecture": "HC",
+            "seminar": "WC",
+            "lab": "PR"
+        },
+        "typesWithTime": "Met tijden"
     },
     "pairDisplay": {
         "title": "Tablet koppelen",

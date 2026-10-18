@@ -558,6 +558,39 @@ test('swapPage R19: der Tipp, der die Blende abbricht, kommt nach ihrem Ende an 
   }
 });
 
+test('swapPage R20: was ausfaehrt, steht vor dem alten Bild am Ende - kein Mehr-Blatt im Standbild', async () => {
+  // Re-Critique 2026-10-17 P1: der Tipp auf ein Ziel im Mehr-Blatt startete
+  // den Wechsel mitten in dessen Ausfahrt; das alte Bild fror das Blatt mit
+  // Deckkraft 0,31-0,60 ueber der neuen Seite ein (100-400 ms Doppelbelichtung).
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  const env = stubDocument();
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    const { finished } = await swapPage(() => { env.log.push('update'); }, {
+      content: env.content,
+      from: '/',
+      animate: true,
+      settle: () => env.log.push('settle'),
+    });
+    assert.equal(env.log[0], 'settle', 'settle laeuft nicht VOR startViewTransition - das alte Bild faengt die Ausfahrt ein');
+    assert.match(env.log[1], /^start /);
+    env.finish();
+    await finished;
+    // Ohne Transition (Kaltstart, keine API) gibt es kein altes Bild und nichts zu beenden.
+    const log = [];
+    await swapPage(() => {}, { content: env.content, animate: false, settle: () => log.push('settle') });
+    assert.deepEqual(log, []);
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /await swapPage\(swap, \{[^}]*settle: settleClosingOverlays,/, 'der Router reicht das Beenden der Ausfahrt nicht an swapPage');
+  assert.match(router, /function settleClosingOverlays\(\) \{[\s\S]*?\.more-sheet, \.more-backdrop[\s\S]*?anim\.finish\(\)/,
+    'settleClosingOverlays beendet die Ausfahrt von Mehr-Blatt und Abdunklung nicht');
+});
+
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
   // Zwei Tipps innerhalb der Transition: der Browser verwirft die erste, ihr
   // `finished` loest auf, waehrend die zweite ihr altes Bild noch nicht
@@ -710,11 +743,22 @@ function reducedMotionRules() {
  *  Blende braucht trotzdem mindestens einen Opacity-Teil. */
 function opacityFade(value) {
   const parts = value.split(/,(?![^(]*\))/).map((p) => p.trim()).filter(Boolean);
-  if (!parts.length || !parts.every((p) => /^(opacity|visibility)\b/.test(p))) return false;
+  if (!parts.length || !parts.every((p) => /^(opacity|visibility|overlay|display)\b/.test(p))) return false;
   const fades = parts.filter((p) => /^opacity\b/.test(p));
   if (!fades.length) return false;
   return !fades.every((p) => /\b0?\.0\dms\b|\b0s\b/.test(p));
 }
+
+test('reduzierte Bewegung R20: Menue und Faltzeile blenden auch im Ausgang bzw. Rueckweg', () => {
+  const layout = css('layout.css');
+  const rm = [...eachRule(layout)].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+  const menu = rm.find((r) => r.selector.trim() === '.popover-menu');
+  assert.ok(menu, 'die Regel fuer das Menue unter reduzierter Bewegung fehlt');
+  assert.match(menu.body, /display var\(--duration-xs\) allow-discrete/, 'das Menue schliesst hart: ohne display im Uebergang faellt es sofort weg');
+  assert.match(menu.body, /overlay var\(--duration-xs\) allow-discrete/);
+  const fold = rm.find((r) => r.selector.trim() === '.page-toolbar--fold-row > *');
+  assert.match(fold?.body ?? '', /transition:\s*opacity/, 'der Inhalt der Faltzeile springt statt zu blenden');
+});
 
 test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nicht', () => {
   const reset = readFileSync(new URL('reset.css', stylesDir), 'utf8');
@@ -723,7 +767,20 @@ test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nic
   assert.ok(globalRule, 'die globale Regel fuer reduzierte Bewegung fehlt');
   assert.match(globalRule.body, /--motion-fade:\s*0s/, 'ohne Abmeldung bleibt jede Transition bei 0s');
   assert.match(globalRule.body, /transition-duration:\s*var\(--motion-fade\)\s*!important/);
-  assert.match(globalRule.body, /animation-duration:\s*0s\s*!important/, 'Animationen bleiben aus');
+  // Seit R20 meldet sich auch eine ANIMATION ab, die nur blendet (`--motion-blend`,
+  // der Large Title der gedeckelten Koepfe); alle anderen stehen bei 0s.
+  assert.match(globalRule.body, /--motion-blend:\s*0s/, 'ohne Abmeldung bleibt jede Animation bei 0s');
+  assert.match(globalRule.body, /animation-duration:\s*var\(--motion-blend\)\s*!important/, 'Animationen bleiben aus');
+  const blendRules = [...eachRule(reset)].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))
+    && /--motion-blend:\s*var\(/.test(r.body));
+  assert.deepEqual(blendRules.map((r) => r.selector.trim()), ['.page-toolbar--capped > .page-toolbar__title'],
+    'eine neue Abmeldung fuer Animationen: nur fuer Elemente, deren einzige Animation eine Blende ist (hier nachtragen und pruefen)');
+  for (const name of ['page-title-settle', 'page-title-settle-back']) {
+    const body = keyframesBody(name);
+    assert.ok(body, `@keyframes ${name} fehlt`);
+    const props = [...body.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]);
+    assert.deepEqual([...new Set(props)], ['opacity'], `${name} bewegt etwas - unter reduzierter Bewegung kaeme Bewegung zurueck`);
+  }
 
   const rules = reducedMotionRules();
   const fades = new Set();
@@ -1147,7 +1204,11 @@ test('redrawList/collapseRow: unter reduzierter Bewegung laeuft nur das Neuzeich
     let ran = 0;
     redrawList(host, () => { ran += 1; host.rows = [n, a2]; }, opts);
     assert.equal(ran, 1);
-    assert.equal(n.calls.length + a2.calls.length, 0, 'weder Aufklappen noch FLIP');
+    // Seit R20 blendet die neue Zeile ein (expandIn unter reduzierter Bewegung) -
+    // weiter ohne Aufklappen, ohne FLIP und ohne jede Bewegung.
+    assert.equal(a2.calls.length, 0, 'kein FLIP der bestehenden Zeile');
+    assert.ok(n.calls.every((c) => c.keyframes.every((k) => Object.keys(k).every((key) => key === 'opacity' || key === 'offset'))),
+      'weder Aufklappen noch FLIP - die neue Zeile blendet nur');
     await collapseRow(a2);
     // R19: blenden statt springen. Die Zeile geht per opacity, danach haelt
     // sie die geschlossene Form - nichts davon bewegt sich.
@@ -1364,7 +1425,9 @@ test('Large Title: der Titel blendet in seinen neuen Schnitt, Layout wird nicht 
   assert.equal(titleRules.length, 2);
   for (const r of titleRules) assert.match(r.selector, /\.is-collapsed|\.was-collapsed/, `${r.selector}: Blende ohne Zustand`);
   const ux = publicSource('utils/ux.js');
-  assert.match(ux, /if \(top > 24\) toolbar\.classList\.add\(\.\.\.states, 'was-collapsed'\);/, 'der Merker faellt beim ersten Einklappen');
+  // Seit R20 schaltet setCollapsed (Einklappen mit FLIP) - der Merker faellt dort.
+  assert.match(ux, /if \(top > 24\) setCollapsed\(true, states\);/, 'der Merker faellt beim ersten Einklappen');
+  assert.match(ux, /if \(on\) toolbar\.classList\.add\(\.\.\.states, 'was-collapsed'\);/, 'der Merker faellt beim ersten Einklappen');
   assert.match(ux, /classList\.remove\('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'was-collapsed',/, 'und geht mit dem Abbau');
   // Weiterhin keine font-size-Transition am Titel (R16).
   for (const file of ['layout.css', 'typography.css']) {

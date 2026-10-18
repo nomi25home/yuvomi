@@ -885,7 +885,7 @@ test('#1775: sind alle Abfallarten archiviert, traegt die Seite die Klasse, die 
   assert.equal(archived['waste-page--no-active-type'], true, 'aber auch keine aktive Abfallart');
   assert.equal(pageModeClasses(state([]))['waste-page--no-active-type'], true, 'im Onboarding ebenso');
   assert.deepEqual(pageModeClasses(state([{ id: 1, archived: true }, { id: 2, archived: false }])),
-    { 'waste-page--onboarding': false, 'waste-page--no-active-type': false },
+    { 'waste-page--loading': false, 'waste-page--onboarding': false, 'waste-page--no-active-type': false },
     'eine aktive genuegt: der Eintrag steht');
   // Dieselbe Regel wie der Primaerknopf - der Eintrag fehlt genau dann, wenn
   // sein Klick eine Abfallart anlegen wuerde.
@@ -956,7 +956,38 @@ test('R17/E2: eine Abfallart mit anstehender Abholung sagt nicht "Noch kein Term
   ];
   assert.match(__test.typeWithoutScheduleLine(2, occurrences), /^waste\.nextPickupLabel: Fr, 2099-01-02/, 'die naechste Abholung dieser Art');
   assert.equal(__test.typeWithoutScheduleLine(1, occurrences), 'waste.noSchedulesYet', 'wirklich nichts: der bisherige Satz');
-  assert.match(WASTE_SRC, /<p class="waste-schedule-list__empty">\$\{esc\(typeWithoutScheduleLine\(type\.id\)\)\}<\/p>/, 'die Karte liest die Zeile dort');
+  assert.match(WASTE_SRC, /const line = typeWithoutScheduleLine\(type\.id\);/, 'die Karte liest die Zeile dort (typeWithoutScheduleHtml)');
+});
+
+// R20 (Re-Critique 2026-10-17 a2 P2-5): "Noch kein Termin" ohne Inline-Aktion,
+// Schnellchips nach der ersten Art weg, Tageschips umbrechend bei 390.
+test('R20: ohne Termin steht der Weg daneben, die uebrigen Vorlagen bleiben, sieben Tage in einer Zeile', () => {
+  __test.setStateForTest({ occurrences: [], types: [{ id: 3, name: 'Restmüll' }] });
+  const html = __test.typeWithoutScheduleHtml({ id: 3, name: 'Restmüll', archived: false }, false);
+  assert.match(html, /waste\.noSchedulesYet[\s\S]*data-action="add-schedule" data-type-id="3"/, 'die Aktion steht an der Aussage');
+  assert.doesNotMatch(__test.typeWithoutScheduleHtml({ id: 3, archived: true }, false), /add-schedule/, 'archiviert: kein Angebot');
+  assert.doesNotMatch(__test.typeWithoutScheduleHtml({ id: 3, archived: false }, true), /add-schedule/, 'read: kein Angebot');
+  const first = __test.TYPE_PRESETS[0];
+  const label = `waste.preset${first.key.charAt(0).toUpperCase()}${first.key.slice(1)}`;
+  const left = __test.remainingTypePresets([{ name: ` ${label.toUpperCase()} ` }]).map((p) => p.key);
+  assert.ok(!left.includes(first.key), 'eine vorhandene Vorlage faellt aus der Zeile (Name, ohne Gross/klein)');
+  assert.equal(left.length, __test.TYPE_PRESETS.length - 1);
+  assert.equal(__test.remainingTypePresets([]).length, __test.TYPE_PRESETS.length);
+  // Codex-Review PR #2053: die Vorlage legt den Namen in der Sprache dessen
+  // an, der tippt. "Bioabfall" eines deutschen Mitglieds ist fuer ein
+  // englisches dieselbe Vorlage - Symbol und Farbe tragen sie ueber Sprachen.
+  const organic = __test.TYPE_PRESETS.find((p) => p.key === 'organic');
+  const foreign = __test.remainingTypePresets([{ name: 'Bioabfall', icon: organic.icon, color: organic.color.toLowerCase() }]).map((p) => p.key);
+  assert.ok(!foreign.includes('organic'), 'eine in einer anderen Sprache angelegte Vorlage wird erneut angeboten');
+  assert.equal(foreign.length, __test.TYPE_PRESETS.length - 1);
+  // Eine eigene Art mit Standardfarbe verdeckt keine Vorlage.
+  assert.equal(__test.remainingTypePresets([{ name: 'Gelber Sack', icon: 'trash-2', color: '#22C55E' }]).length, __test.TYPE_PRESETS.length);
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  assert.match(css, /\.waste-weekday-picker \{\s*display: grid;\s*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/, 'sieben gleiche Spalten');
+  const stepper = __test.intervalStepperHtml(1);
+  assert.match(stepper, /data-interval-step="-1"[^>]*disabled/, 'an der Untergrenze ist Weniger gesperrt');
+  assert.match(stepper, /<input type="number"[^>]*id="wsm-interval"[^>]*min="1" max="52"/, 'das native Feld bleibt');
+  assert.match(__test.intervalStepperHtml(52), /data-interval-step="1"[^>]*disabled/);
 });
 
 test('create-preset-type schreibt und steht deshalb NICHT in READ_SAFE_ACTIONS', () => {
@@ -1043,4 +1074,18 @@ test('D5: im Onboarding steht der Import nur im Leerzustand, nicht zusaetzlich i
   }
   assert.match(WASTE_SRC, /class="btn btn--ghost waste-onboarding__import" data-action="open-import"/,
     'der Leerzustand behaelt den Import als leisen Link');
+});
+
+// R20 (Re-Critique 2026-10-17 a2 P2-3): CLS 0,24 mobil (gemessen bis 0,42):
+// das Skelett der Seitenspalte stand unter dem der Abholungen und sprang nach
+// dem Laden. Waehrend des Ladens steht die Spalte nicht da.
+test('R20: waehrend des Ladens steht die Seitenspalte nicht da (kein Sprung nach dem Laden)', () => {
+  const { pageModeClasses } = __test;
+  assert.equal(pageModeClasses({ loading: true, error: null, types: [] })['waste-page--loading'], true);
+  assert.equal(pageModeClasses({ loading: false, error: null, types: [] })['waste-page--loading'], false);
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  assert.match(css, /\.waste-page--loading \.page-columns__rail \{\s*display: none;/);
+  const src = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
+  assert.match(src, /renderPage\(\);\s*_container\.querySelector\('\.waste-page'\)\?\.classList\.add\('waste-page--loading'\);/, 'die Klasse steht ab dem ersten Bild');
+  assert.match(src, /if \(state\.error\) \{\s*_container\.querySelector\('\.waste-page'\)\?\.classList\.remove\('waste-page--loading'\);/, 'ein Ladefehler gibt die Spalte frei');
 });

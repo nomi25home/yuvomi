@@ -525,6 +525,18 @@
  * mit - die Kennzahl-Zeile braucht darueber keine eigene mehr. Der Listenkopf
  * traegt nur noch den Titel und EINEN Menueknopf, also keine Umbruch-Reserve. */
 @container budget-page (width < 960px) {
+  /* EINSPALTIG ENDET JEDER REITER AN DER KANTE DES KOPFS (Re-Critique
+   * 2026-10-17, A4). Unter der Zweispalte stand der Inhalt von Uebersicht,
+   * Konten, Plan, Darlehen und Statistik auf dem Lesemass (bei 834 bis x 736),
+   * Kopf, Abonnements und Aufteilung liefen bis 818 - der Monats-Stepper endete
+   * 70px rechts der Liste, und jeder Reiterwechsel versetzte die rechte Kante.
+   * Am Telefon (unter 720px) aendert das nichts. Plan und Statistik sind
+   * eigene `.app-page`-Wurzeln mit Lesemass - sie bekommen es mit. */
+  .budget-tab-panel,
+  .budget-tab-panel .app-page {
+    --page-measure: 100%;
+  }
+
   .budget-overview .metric-grid {
     padding-block: 0 var(--space-2);
   }
@@ -814,37 +826,73 @@
  * Saldo allein. `display: contents` loest die Saldo-Spalte auf, ihre zwei
  * Kinder nehmen je eine Zelle des Rasters. Der Betrag bricht nie
  * (`__starting-amount`); bei 320px darf das Etikett zur Not vor ihm umbrechen. */
+/* EINE ZEILE FUER ART UND START (Re-Critique 2026-10-17, A4). Name, Art und
+ * Start standen untereinander in der 123px-Spalte neben dem Saldo: drei bis
+ * vier Zeilen, 110px je Konto. Jetzt: Name und Saldo in der ersten Zeile, Art
+ * und Start als EIN Satz darunter ueber die volle Breite bis unter den Saldo
+ * ("Girokonto · Start: 2.480,00 €") - der Start steht dafuer im Markup ein
+ * zweites Mal (`__type-start`), sichtbar ist je Breite genau eine Fassung.
+ * Der Betrag bricht nie; bei 320px darf der Satz vor ihm umbrechen. */
 @media (max-width: 639px) {
   .budget-account__main {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
+    column-gap: var(--space-3);
     row-gap: var(--space-0h);
   }
 
   .budget-account__icon {
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
+    align-self: center;
   }
 
-  .budget-account__body {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
+  .budget-account__body,
   .budget-account__figures {
     display: contents;
   }
 
-  .budget-account__balance {
-    grid-column: 3;
-    grid-row: 1 / span 2;
+  .budget-account__name {
+    grid-column: 2;
+    grid-row: 1;
     align-self: center;
   }
 
+  .budget-account__balance {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .budget-account__type,
+  .budget-account__meta {
+    grid-column: 2 / 4;
+  }
+
   .budget-account__starting {
-    grid-column: 2;
+    display: none;
+  }
+}
+
+/* Bei 320px blieben dem Namen neben dem Saldo 53px ("Gemei-nsa..."): dort
+ * steht alles in einer Spalte - Name, Saldo, Art und Start. Container statt
+ * Viewport (keine eigene Viewport-Schwelle, PAGE-005): unter 340px Inhalt,
+ * also bei 320er und 360er Telefonen, nicht mehr bei 390. */
+@container budget-page (width < 340px) {
+  .budget-account__name,
+  .budget-account__balance {
+    grid-column: 2 / 4;
+  }
+
+  .budget-account__balance {
     grid-row: 2;
-    text-align: start;
+    justify-self: start;
+  }
+}
+
+@media (min-width: 640px) {
+  .budget-account__type-start {
+    display: none;
   }
 }
 
@@ -1407,6 +1455,30 @@ button.budget-bar-row:focus-visible {
   .budget-bar-row__amount { grid-area: 1 / 3; }
 }
 
+/* EINE BAHN JE BLOCK (Re-Critique 2026-10-17, P1). Jede Zeile war ihr eigenes
+ * Raster mit `auto` als Betragsspalte; die Spalte wuchs mit der Differenz
+ * darunter ("von 1.700 €  +120,00 €", nowrap), und die Bahnen derselben
+ * Liste liefen gemessen 171 bis 191px - Balken und Zielmarken standen bis zu
+ * 12 % versetzt, ein Vergleich nach Laenge war keiner mehr. Mit subgrid teilen
+ * sich alle Zeilen eines Blocks die Spalten des Blocks: die breiteste
+ * Betragsspalte gilt fuer alle, jede Bahn beginnt und endet an derselben x.
+ * Ohne subgrid bleibt es beim Zeilenraster oben. Die Seitenleiste der
+ * Uebersicht stapelt ihre Zeilen (Name ueber Bahn) und bleibt aussen vor. */
+@container budget-page (min-width: 480px) {
+  @supports (grid-template-columns: subgrid) {
+    .budget-chart-block__rows:not(.budget-overview__aside .budget-chart-block__rows) {
+      display: grid;
+      grid-template-columns: 168px minmax(0, 1fr) auto;
+      column-gap: var(--space-2);
+    }
+
+    .budget-chart-block__rows:not(.budget-overview__aside .budget-chart-block__rows) > .budget-bar-row {
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+    }
+  }
+}
+
 .budget-bar-row__track {
   height: var(--space-2);
   /* Fill-Well statt Surface-2: der Track lag bei 1.02:1 auf der weißen Karte
@@ -1436,6 +1508,25 @@ button.budget-bar-row:focus-visible {
  * Richtung benennt der Blocktitel, nicht der Farbton. */
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
 .budget-bar-row__fill--expenses { background-color: var(--bar-fill, var(--module-accent)); }
+
+/* SCHRAFFUR STATT NUR FARBE (R20, Tritanopie): Serie 6 und 7 tragen im Balken
+ * dasselbe Muster wie ihr Donut-Segment (categoryTexture). Der Balken waechst
+ * per scaleX - die Kachel wird deshalb um 1/Skala breiter gezeichnet, damit sie
+ * nach dem Stauchen quadratisch steht und die Linien bei 45 Grad bleiben. Bei
+ * Skala 0 ist die Breite ungueltig, das Muster faellt weg; der Balken ist dann
+ * ohnehin nicht zu sehen. */
+.budget-bar-row__fill[data-texture="hatch"],
+.budget-plan-row[data-texture="hatch"] .budget-plan-row__fill {
+  background-image: linear-gradient(135deg,
+    var(--chart-texture-ink) 25%, transparent 25% 50%,
+    var(--chart-texture-ink) 50% 75%, transparent 75%);
+}
+.budget-bar-row__fill[data-texture="hatch"] {
+  background-size: calc(var(--chart-texture-tile) / var(--bar-scale)) var(--chart-texture-tile);
+}
+.budget-plan-row[data-texture="hatch"] .budget-plan-row__fill {
+  background-size: calc(var(--chart-texture-tile) / var(--plan-scale)) var(--chart-texture-tile);
+}
 
 /* Der Anteil einer Ausgabe steht hinter ihrem Betrag, in der Statistik und in
  * der Uebersicht gleich (R14 P8) - leiser, er erklaert den Betrag. */
@@ -2286,16 +2377,57 @@ button.budget-entry__title {
   text-overflow: ellipsis;
 }
 
+/* HOECHSTENS ZWEI ZEILEN STATT EINER (Re-Critique 2026-10-17, A4). Die eine
+ * Zeile kappte bei 390 fuenf Kategorien um 6-22px ("Freizeit und Unterhal…"),
+ * bei 320 sechzehn - also genau die Achse, nach der das Diagramm darueber
+ * aufteilt. Die Hoehe begrenzt jetzt die zweite Zeile, nicht die erste: was
+ * nicht in eine passt, bricht einmal um und wird erst danach gekappt. Die fuenf
+ * bis acht Zeilen von damals kommen nicht zurueck. */
+@supports (-webkit-line-clamp: 2) {
+  .budget-entry:not(.budget-entry--loan) .budget-entry__meta {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+}
+
 /* EINE RATENZEILE KAPPT IHRE RATE NICHT (R19): sie traegt nur Datum und
  * "Rate 10 von 312" - beides ist die Auskunft, nichts davon darf hinten
  * wegfallen. Die Zeile bricht zwischen den beiden Angaben um (die Rate ist
  * in sich unumbrechbar, budget.js renderLoanPaymentEntry). */
 .budget-entry--loan .budget-entry__meta {
   white-space: normal;
+  /* R20: Datum und Rate als zwei Stuecke einer umbrechenden Zeile. Der Abstand
+   * zwischen ihnen ist die Breite des Trenners, der links vor der Rate steht
+   * (`.budget-entry__sep`). Bricht die Rate um, steht er links ausserhalb der
+   * Zeile, und `overflow: hidden` oben schneidet ihn ab - kein "·" am Ende
+   * der ersten Zeile mehr (Re-Critique 2026-10-17). */
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-4);
 }
 
 .budget-entry__installment {
   white-space: nowrap;
+}
+
+.budget-entry--loan .budget-entry__installment {
+  position: relative;
+}
+
+.budget-entry__sep {
+  position: absolute;
+  inset-inline-end: 100%;
+  inline-size: var(--space-4);
+  text-align: center;
+}
+
+/* Raten jenseits der letzten sechs (renderLoanTransactions): gerendert, aber
+ * aus dem Fluss, bis "Alle anzeigen" sie holt - wie "Geplant" oben. */
+.budget-loan-transactions:not(.is-expanded) .budget-entry--more {
+  display: none;
 }
 
 /* DAS KONTO IST EINE FRAGE DER BREITE, NICHT DES GERÄTS - deshalb der
@@ -2601,6 +2733,9 @@ button.budget-entry__title {
  * Betrags - die geteilte Trend-Zeile ist sonst ein Block. */
 .budget-stats__legend .metric-card__trend { display:inline-flex; margin-inline-start:var(--space-1); }
 .budget-stats__legend { flex-wrap:wrap; row-gap:var(--space-1); }
+/* Was nach heute noch eingetragen ist (budget-stats.js trendLegendFigures):
+ * eine Stufe leiser als der Stand von heute, den der Punkt der Kurve zeigt. */
+.budget-stats__legend-planned { color:var(--color-text-tertiary); }
 
 /* Kategorievergleich (budget-stats.js renderCatBars): der Satz nennt den
  * Vorzeitraum EINMAL, die Zeilen tragen nur noch die Differenz. */
@@ -2656,6 +2791,7 @@ button.budget-entry__title {
  * 104px (Radius 60, Strich 16): "175.445 €" laeuft in 17px semibold 84px. */
 .budget-stats__donut-wrap { display:flex; justify-content:center; }
 .budget-stats__donut { width:160px; height:160px; flex:0 0 auto; }
+.budget-stats__hatch-line { fill: var(--chart-texture-ink); }
 
 .budget-stats__donut-total {
   fill: var(--color-text-primary);

@@ -42,6 +42,9 @@
         "errorOccurred": "May nangyaring mali.",
         "unexpectedError": "May naganap na hindi inaasahang error.",
         "errorDetails": "Mga teknikal na detalye",
+        "pageFailedTitle": "Hindi mabuksan ang {{page}} ngayon",
+        "pageFailedHint": "Gumagana pa rin ang lahat ng iba pang bahagi.",
+        "toOverview": "Pumunta sa Pangkalahatang-tanaw",
         "errorGeneric": "May naganap na error.",
         "updateAvailable": "May update - i-load muli ang pahina para makuha ang pinakabagong bersyon.",
         "titleRequired": "Kailangan ang pamagat",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "Idagdag ang {{title}} sa listahan ng pamimili",
         "emailInUse": "Ang email address na ito ay pag-aari na ng ibang account.",
+        "emailInvalid": "Maglagay ng wastong email address.",
         "sessionUnreachableTitle": "Naputol ang koneksyon",
+        "serverNotReadyTitle": "Hindi pa handa ang server",
+        "rateLimitedTitle": "Masyadong maraming request",
         "sessionRetryHint": "Naka-sign in ka pa rin. Susubukang muli sa loob ng {{seconds}} s.",
         "sessionRetrying": "Sinusubukang muli…",
         "searchNoResultsTitle": "Walang resulta",
         "searchNoResultsDescription": "Walang tumutugma sa iyong paghahanap.",
         "searchNoResultsFilteredDescription": "Walang tumutugma sa iyong paghahanap at mga filter.",
-        "searchReset": "I-reset ang paghahanap"
+        "searchReset": "I-reset ang paghahanap",
+        "passwordMinLength": "Hindi bababa sa 8 character."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -160,7 +167,8 @@
         "resultCountMany": "{{count}} na mga resulta",
         "goTo": "Pumunta sa",
         "newSection": "Gumawa ng bago",
-        "recentLabel": "Kamakailang binuksan"
+        "recentLabel": "Kamakailang binuksan",
+        "createTaskNamed": "Gawing gawain ang “{{title}}”"
     },
     "dashboard": {
         "title": "Pangkalahatang-tanaw",
@@ -1526,10 +1534,12 @@
         "deleteLoanPaymentConfirm": "Tanggalin ang bayad na ito sa utang?",
         "loanRemainingAmount": "Natitira",
         "loanRemainingPrincipal": "Natitirang balanse",
+        "loanOwedToYou": "Utang pa sa iyo",
         "loanStillToPay": "Babayaran pa",
         "loanPrincipalAmount": "Halaga ng utang",
         "loanRemainingInstallments": "Natitirang hulog",
         "loanPaidAmount": "Nabayaran",
+        "loanReceivedAmount": "Naibalik na",
         "loansEmpty": "Walang aktibong utang.",
         "loanInstallmentMeta": "{{paid}} sa {{total}} hulog ang nabayaran",
         "loanRemainingOf": "sa {{total}}",
@@ -1541,7 +1551,8 @@
         "loanSortBalance": "Pinakamaliit na balanse muna",
         "loanSortActive": "Pag-uuri: {{sort}}",
         "loanPaidStatus": "Bayad na",
-        "markLoanPaid": "Markahang bayad na",
+        "loanBookInstallment": "Itala ang hulog",
+        "loanReceiveRepayment": "Natanggap ang bayad",
         "loanBorrowerLabel": "Nangutang",
         "loanDirectionLabel": "Uri ng utang",
         "loanDirectionLent": "Ipinautang (binabayaran sa akin)",
@@ -1709,8 +1720,6 @@
         "accountType_credit": "Credit card",
         "accountType_investment": "Puhunan",
         "accountType_other": "Iba pa",
-        "viewAccountTransactions": "Ipakita ang mga transaksyon para sa {{name}}",
-        "currentBalance": "Kasalukuyang balanse",
         "clearAccountFilter": "I-clear ang filter ng account",
         "archivedBadge": "Naka-archive",
         "showArchivedAccounts": "Ipakita ang naka-archive",
@@ -1753,6 +1762,7 @@
         "statsPointsLabel": "Mga halaga ng linya ng takbo",
         "statsPointLabel": "{{period}}: kita {{income}}, gastos {{expenses}}",
         "statsPointLabelCumulative": "Hanggang {{period}}: kita {{income}}, gastos {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} nakaplano",
         "receiptsLabel": "Mga resibo",
         "receiptsHint": "Resibo o invoice para sa transaksyong ito.",
         "receiptDocumentName": "Resibo: {{title}} ({{date}})",
@@ -1800,7 +1810,8 @@
         "ledgerSortDate": "Ayon sa petsa",
         "ledgerSortAmount": "Ayon sa halaga",
         "ledgerSortActive": "Pagkakasunod: {{sort}}",
-        "ledgerAccountsAll": "Lahat ng account"
+        "ledgerAccountsAll": "Lahat ng account",
+        "showAccountTransactions": "Ipakita ang mga transaksyon"
     },
     "settings": {
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",
@@ -2029,6 +2040,8 @@
         "confirmPasswordLabel": "Kumpirmahin ang bagong password",
         "savePassword": "I-save ang password",
         "passwordMismatch": "Hindi magkatugma ang mga password.",
+        "currentPasswordWrong": "Hindi tama ang kasalukuyang password.",
+        "passwordTooShort": "Hindi bababa sa 8 character.",
         "passwordSavedToast": "Matagumpay na napalitan ang password.",
         "oidcLinkTitle": "Single sign-on",
         "oidcLinkHint": "Iugnay ang iyong SSO account sa account na ito para dalhin ka rito ng pag-sign in sa provider sa halip na gumawa ng pangalawang account.",
@@ -2138,6 +2151,7 @@
         "familyRoleGrandparent": "Lolo/Lola",
         "familyRoleRelative": "Kamag-anak",
         "familyRoleOther": "Miyembro ng pamilya",
+        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "Napapamahalaan ng mga system admin ang mga setting ng aplikasyon, integrasyon, API token at account ng pamilya.",
         "systemAdminBadge": "System admin",
@@ -2154,7 +2168,7 @@
         "removeMemberNamed": "Alisin si {{name}}",
         "memberDeactivatedToast": "Na-deactivate si {{name}}. Nananatili ang mga entry.",
         "memberFormerBadge": "Dating miyembro",
-        "memberOrderHint": "Ang pagkakasunod-sunod na ito ay para sa buong sambahayan: sinusunod ito ng kalendaryo, ng iskedyul, at ng bawat listahan ng mga tao. Para baguhin, i-drag ang hawakan o i-focus ito at pindutin ang mga arrow key. Ang mga bagong miyembro ay kasunod nito, nakaayos ayon sa pangalan.",
+        "memberOrderHint": "Ang ayos na ito ay para sa buong sambahayan. I-drag ang hawakan o gamitin ang arrow keys para baguhin ito.",
         "logout": "Mag-log out",
         "logoutConfirm": "Mag-log out sa device na ito?",
         "synchronizing": "Nagsi-sync…",
@@ -2206,7 +2220,7 @@
         "pwaInstallTitle": "I-install ang Yuvomi sa device na ito",
         "pwaInstallChecking": "Sinusuri ang pagkakaroon ng pag-install...",
         "pwaInstallReady": "Maaaring i-install ang Yuvomi bilang app sa device na ito.",
-        "pwaInstallUnavailable": "Hindi available ang pag-install sa browser na ito sa ngayon.",
+        "pwaInstallUnavailable": "Hindi nag-aalok ng pag-install ang browser na ito rito. Sa Chrome at Edge, nasa menu ng browser ito; sa Safari, nasa Share > Add to Dock o Add to Home Screen. Kung walang HTTPS na address, walang browser na mag-aalok nito.",
         "pwaInstallInstalled": "Naka-install na ang Yuvomi sa device na ito.",
         "pwaInstallIosHint": "Sa iPhone o iPad, gamitin ang Share menu at piliin ang Add to Home Screen.",
         "pwaInstallButton": "I-install ang app",
@@ -2574,7 +2588,7 @@
         "emptyStateNoAccounts": "Wala pang nakakonektang account",
         "housekeepingPaymentsTitle": "Mga gawain sa pagbabayad",
         "housekeepingPaymentTasksLabel": "Gumawa ng gawain sa pagbabayad sa bawat check-in ng katulong",
-        "housekeepingPaymentTasksHint": "Kapag naka-enable, gumagawa ang bawat check-in ng gawain para bayaran ang tauhan. Ang pagtapos sa gawaing iyon ang magmamarka sa bayad ng pagbisita bilang bayad na.",
+        "housekeepingPaymentTasksHint": "Kapag naka-enable, gumagawa ang bawat check-in ng gawain para bayaran ang tauhan. Ang pagtapos sa gawaing iyon ang magmamarka sa bayad ng pagbisita bilang bayad na. Ang nagche-check-in at ang mga admin lang ang makakakita nito.",
         "housekeepingPaymentTasksSaved": "Na-save ang setting ng bayad sa gawaing-bahay.",
         "tabModules": "Mga Modyul",
         "thirdPartyModulesTitle": "Mga Modyul",
@@ -3199,7 +3213,25 @@
         "displayRemoveDeviceActive": "Nakapares pa ang device na ito. Bawiin muna ito.",
         "feedExportIncludeBirthdays": "Isama ang mga kaarawan",
         "feedExportIncludeBirthdaysHint": "I-off kapag naka-subscribe sa hiwalay na feed ng kaarawan upang hindi madoble ang mga kaarawan at araw ng pangalan.",
-        "birthdayFeedHint": "Makikita ng sinumang may link na ito ang lahat ng kaarawan at araw ng pangalan na naka-save sa sambahayan, kahit walang paalala. Gamitin lamang sa sarili mong mga device."
+        "birthdayFeedHint": "Makikita ng sinumang may link na ito ang lahat ng kaarawan at araw ng pangalan na naka-save sa sambahayan, kahit walang paalala. Gamitin lamang sa sarili mong mga device.",
+        "skipToSheet": "Lumaktaw sa setting",
+        "screensaverOffTitle": "Screensaver ng mga larawan",
+        "screensaverNeedsImmich": "Magsisimula ang screensaver kapag naikonekta na ng admin ang Immich. Pagkatapos, dito mo itatakda ang paghihintay, orasan at pagkakasya ng larawan para sa device na ito.",
+        "screensaverConnectImmich": "Ikonekta ang Immich",
+        "weatherPlaceLabel": "Lugar",
+        "weatherPlaceHint": "Sa weather service na Open-Meteo hinahanap ito. Ang pangalan lang ng lugar ang ipinapadala.",
+        "weatherPlacePlaceholder": "Lungsod o postal code",
+        "weatherPlaceSearch": "Hanapin",
+        "weatherPlaceCurrent": "Kasalukuyan: {{place}}",
+        "weatherPlaceNone": "Wala pang napiling lugar.",
+        "weatherPlaceResultsLabel": "Mga nahanap na lugar",
+        "weatherPlacePick": "Piliin ang lugar mo sa listahan.",
+        "weatherPlaceChosen": "Napili ang {{place}}. I-save para magamit.",
+        "weatherPlaceRequired": "Maghanap ng lugar at piliin ito sa listahan.",
+        "weatherPlaceTooShort": "Maglagay ng hindi bababa sa dalawang character.",
+        "weatherPlaceNotFound": "Walang nahanap na lugar sa pangalang ito. Idagdag ang bansa, hal. “San Jose, Philippines”.",
+        "weatherPlaceUnavailable": "Hindi maabot ang paghahanap ng lugar ngayon. Subukan ulit mamaya o ilagay nang mano-mano ang mga coordinate.",
+        "weatherManualTitle": "Mano-manong coordinate"
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - muling kumokonekta…",
-        "staleData": "Offline - noong: {{time}}"
+        "staleData": "Offline - noong: {{time}}",
+        "pageTitle": "Offline ka",
+        "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load."
     },
     "emptyHint": {
         "tasks": "I-tap ang + para gawin ang iyong unang gawain. I-swipe pakaliwa ang isang card para tapusin, pakanan para tingnan.",
@@ -3882,7 +3916,6 @@
         "taskAreaPlaceholder": "Halimbawa: Banyo",
         "taskFrequency": "Dalas (araw)",
         "taskCreatedToast": "Nagawa ang gawaing-bahay.",
-        "dashboard": "Pangkalahatang-tanaw",
         "reports": "Mga Ulat",
         "visitsThisMonth": "Mga pagbisita ngayong buwan",
         "lastVisit": "Huling pagbisita",
@@ -4011,7 +4044,12 @@
         "currentMonth": "Kasalukuyan",
         "noVisitReportsInMonth": "Walang naitalang pagbisita ng tauhan sa {{month}}.",
         "settledAdminOnly": "Tanging admin ang maaaring baguhin o burahin ito",
-        "reportVisitsCount": "Mga pagbisita"
+        "reportVisitsCount": "Mga pagbisita",
+        "amountsPermissionLabel": "Makita ang sahod at mga bayad",
+        "errorAmountsHidden": "Ang may pahintulot lang na makita ang halaga para sa kasambahay ang makakapagmarka ng bayad.",
+        "notHereToday": "Wala pa ngayong araw",
+        "tabVisits": "Mga pagbisita",
+        "tabChores": "Gawaing-bahay"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",
@@ -4040,7 +4078,6 @@
         "noBalances": "Ayos na ang lahat.",
         "noExpenses": "Walang gastos na tumutugma sa view na ito.",
         "noActivity": "Wala pang aktibidad.",
-        "owes": "may utang kay",
         "system": "Sistema",
         "quickGroceries": "Magdagdag ng gastos sa supermarket",
         "quickSchool": "Hatiin ang gastos sa paaralan",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} kay {{payee}}, {{amount}}. Kinakansela ng kabaligtarang entry ang bayad at babalik ang mga balanse sa dati. Mananatili ang bayad sa aktibidad na may markang binawi.",
         "loadMoreActivity": "Mag-load pa",
         "expenseDeleted": "Natanggal",
-        "youAreOwedInGroup": "May utang sa iyo sa {{group}}",
-        "youOweInGroup": "May utang ka sa {{group}}"
+        "youAreOwedInGroup": "{{group}}: May utang sa iyo",
+        "youOweInGroup": "{{group}}: May utang ka",
+        "debtYouOwe": "May utang ka kay {{name}}",
+        "debtOwesYou": "May utang sa iyo si {{name}}",
+        "debtOwes": "{{from}} may utang kay {{to}}"
     },
     "wmo": {
         "0": "Maaliwalas na langit",
@@ -4256,7 +4296,8 @@
         "submit": "Ipadala ang link",
         "sent": "Kung may tugmang account, naipadala na ang link para sa pag-reset.",
         "backToLogin": "Bumalik sa pag-log in",
-        "unavailable": "Hindi nag-aalok ang sambahayang ito ng pag-reset ng password. Makipag-ugnayan sa administrador ng iyong sambahayan."
+        "unavailable": "Hindi nag-aalok ang sambahayang ito ng pag-reset ng password. Makipag-ugnayan sa administrador ng iyong sambahayan.",
+        "identifierRequired": "Ilagay ang iyong username o email address."
     },
     "resetPassword": {
         "title": "Maglagay ng bagong password",
@@ -4286,6 +4327,15 @@
         "test": "Subukan ang koneksyon",
         "testSuccess": "Matagumpay na naipadala ang test email.",
         "testFailed": "Nabigo ang pagsubok: {{error}}",
+        "portInvalid": "Maglagay ng port mula {{min}} hanggang {{max}}.",
+        "testFailedNotConfigured": "Ilagay muna ang SMTP host at sender address.",
+        "testFailedAuth": "Tinanggihan ng server ang username o password.",
+        "testFailedConnection": "Hindi maabot ang server sa host at port na ito.",
+        "testFailedTls": "Nabigo ang naka-encrypt na koneksyon. Suriin ang encryption at port.",
+        "testFailedRejected": "Hindi tinanggap ng server ang test email. Suriin ang sender address.",
+        "testFailedUnknown": "Hindi maipadala ang test email.",
+        "testNoRecipient": "Ipinapadala ang test email sa sarili mong email address, na wala pa. Idagdag ito sa Account → Email.",
+        "testNoRecipientLink": "Buksan ang account",
         "saveFailed": "Nabigo ang pag-save: {{error}}",
         "saved": "Na-save ang mga setting."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Araw-araw",
                 "none": "Wala pang oras na nakatakda.",
                 "delete": "Tanggalin ang oras",
-                "newHint": "I-save muna ang gamot, saka ka makakapagdagdag ng oras.",
                 "timeRequired": "Kailangan ang oras."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Walang tumutugmang uri sa sambahayang ito",
         "mappingProfileStatusAmbiguousType": "Malabo - maraming uri ang may parehong pangalan",
         "icsCalendarName": "Kolekta ng basura",
-        "icsPickupSummary": "Kolekta: {{name}}"
+        "icsPickupSummary": "Kolekta: {{name}}",
+        "intervalDecrease": "Bawasan ang pagitan",
+        "intervalIncrease": "Dagdagan ang pagitan"
     },
     "rewards": {
         "title": "Mga Gantimpala",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "I-clear ang pinili",
         "continuesUntil": "…magpapatuloy hanggang {{time}}",
         "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
-        "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi."
+        "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi.",
+        "presetCodes": {
+            "early": "U",
+            "late": "H",
+            "night": "G",
+            "day": "A",
+            "vacation": "BK",
+            "sick": "MS",
+            "exam": "PS",
+            "lecture": "LK",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "May oras"
     },
     "pairDisplay": {
         "title": "Ipares ang tablet",

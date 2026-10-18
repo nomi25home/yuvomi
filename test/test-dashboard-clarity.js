@@ -555,7 +555,9 @@ test('#1821 Fokus: der Neuaufbau der Seite ruft Erfassen und Wiederfokus, um das
   const paint = body.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead');
   // R19: mobil steht der Anpassen-Einstieg im Menue (`.dashboard-tools-btn`) -
   // der Knopf ist dort nicht gerendert, das Menue ist der Rueckweg.
-  const restore = body.search(/^ {4}restoreFocusAfterRebuild\(container, \[\n {6}keepFocus,\n {6}\.\.\.\(focusAfterRebuild \?\? \[\]\),\n {6}\.\.\.\(hadFocus && modeChanged \? \['#dashboard-customize-btn', '\.dashboard-tools-btn'\] : \[\]\),\n {4}\]\);$/m);
+  // R20 (D, Wand-Modus): nach dem Verlassen der Wand steht danach der
+  // Einstieg in die Wand als letzter Kandidat - nach den drei oben.
+  const restore = body.search(/^ {4}restoreFocusAfterRebuild\(container, \[\n {6}keepFocus,\n {6}\.\.\.\(focusAfterRebuild \?\? \[\]\),\n {6}\.\.\.\(hadFocus && modeChanged \? \['#dashboard-customize-btn', '\.dashboard-tools-btn'\] : \[\]\),\n(?: {6}\.\.\.\(takeWallFocusIntent\('leave'\) \? \[[^\n]*\] : \[\]\),\n)? {4}\]\);$/m);
   assert.ok(capture > 0, 'erfasst wird vor dem Aufbau');
   assert.ok(paint > capture, 'dann wird gebaut');
   assert.ok(restore > paint, 'und danach wieder fokussiert: eigener Schluessel, Nachfolger der Geste, Anpassen-Knopf');
@@ -1333,6 +1335,54 @@ test('Onboarding Schritt 3 nennt am Desktop den Knopf oben rechts, nicht unten (
     if (bottom[loc]) assert.doesNotMatch(text, bottom[loc], `${loc}: ${text}`);
     if (top[loc]) assert.match(text, top[loc], `${loc}: ${text}`);
   }
+});
+
+// Re-Critique 2026-10-17 (A1, Shell): der Rundgang war austauschbar - ein
+// Lucide-Haus statt der Bildmarke, und Leiste und Plus-Knopf nur beschrieben.
+// Schritt 1 traegt die Marke aus utils/brand-mark.js, Schritt 2 und 3 zeigen
+// per Lichtring auf das echte Bedienelement, das ihr Text nennt. Der Ring ist
+// Anzeige: das Overlay faengt weiter die Klicks, und die Tafel liegt ueber
+// seinem Abdunkler (positioniert), sonst stuende sie selbst im Grau.
+test('Onboarding: Bildmarke im ersten Schritt, Lichtring auf Leiste und Plus-Knopf (Re-Critique 2026-10-17)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const dashboard = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const steps = dashboard.slice(dashboard.indexOf('function getOnboardingSteps'), dashboard.indexOf('function showOnboarding'));
+  const show = dashboard.slice(dashboard.indexOf('function showOnboarding'), dashboard.indexOf('function maybeHintCustomize'));
+  assert.doesNotMatch(steps, /icon:\s*'home'/, 'kein generisches Haus als Zeichen des Produkts');
+  assert.match(dashboard, /import \{ brandMarkSvg \} from '\/utils\/brand-mark\.js'/);
+  assert.match(steps, /\{ mark: true,[^\n]*step1Title/, 'Schritt 1 traegt die Bildmarke');
+  assert.match(show, /brandMarkSvg\(\)/);
+  assert.match(steps, /step2Title[^\n]*\n\s*target: \(\) => document\.querySelector\(desktop \? '\.nav-sidebar' : '\.nav-bottom__items'\)/,
+    'Schritt 2 zeigt auf die Seitenleiste bzw. die Kapsel');
+  assert.match(steps, /step3Title[^\n]*\n\s*target: \(\) => \[\.\.\.document\.querySelectorAll\('\.page-fab'\)\]/,
+    'Schritt 3 zeigt auf den sichtbaren Plus-Knopf');
+  assert.match(show, /function placeSpotlight\(\)/);
+  assert.match(show, /classList\.toggle\('onboarding-overlay--spot', shown\)/, 'ohne sichtbares Ziel bleibt die Unschaerfe');
+  assert.match(show, /spot\.setAttribute\('aria-hidden', 'true'\)/);
+  assert.match(show, /removeEventListener\('resize', onResize\)/, 'der Ring haengt nach dem Rundgang an keinem Resize mehr');
+  const rule = (sel) => (css.match(new RegExp(`(?:^|\\n)${sel.replace(/[.]/g, '\\.')} \\{([^}]*)\\}`)) || [])[1] || '';
+  assert.match(rule('.onboarding-overlay--spot'), /backdrop-filter:\s*none/);
+  assert.match(rule('.onboarding-spotlight'), /pointer-events:\s*none/);
+  assert.match(rule('.onboarding-spotlight'), /box-shadow:[^;]*100vmax/);
+  assert.match(rule('.onboarding-card'), /position:\s*relative/, 'die Tafel liegt ueber dem Abdunkler');
+});
+
+// Re-Critique 2026-10-17 (A1): "Widgets anpassen" am Telefon trug je Zeile vier
+// umrandete 48px-Kreise. Hoch/Runter liegen jetzt in EINER Kapsel auf der
+// Mulde, Groesse und Ausblenden ohne Ring daneben; die Ziele bleiben 48px.
+test('Anpassen am Telefon: eine Kapsel fuer Hoch/Runter, keine Ringe je Knopf (Re-Critique 2026-10-17)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const phone = css.slice(css.indexOf('ANPASSEN AUF DEM TELEFON IST EINE LISTE'));
+  const block = phone.slice(0, phone.indexOf('@media (max-width: 767px)'));
+  assert.match(block, /\.widget-edit-controls__hide,\s*\.widget-edit-controls__options,\s*\.widget-edit-controls__size-trigger\s*\) \{\s*border-color: transparent;\s*background: transparent;/,
+    'Groesse, Optionen und Ausblenden ohne Ring');
+  assert.match(block, /\.widget-edit-controls__move \{\s*gap: 0;\s*border-radius: var\(--radius-full\);\s*background: var\(--color-fill-well\);/,
+    'Hoch und Runter in einer Kapsel');
+  assert.match(block, /\.widget-edit-controls__move-btn \{\s*border: none;/);
+  // Die Zielgroesse kommt weiter aus der Fingerregel (48px).
+  assert.match(css, /@media \(pointer: coarse\)[\s\S]*?\.widget-edit-controls__move-btn \{\s*min-width: var\(--target-base\);\s*min-height: var\(--target-base\);/);
 });
 
 // --------------------------------------------------------

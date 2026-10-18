@@ -1108,6 +1108,25 @@ test('Wochenansicht: der Wochenstart des angezeigten Zeitraums, im gewählten Wo
     'liegt heute in der angezeigten Woche, gewinnt heute');
 });
 
+// Codex-Review PR #2053, zweite Runde (P2): am Telefon zeigt die Woche nur
+// die drei Tage ab dem Cursor. Stand der Cursor auf morgen, lag heute in
+// derselben 7-Tage-Woche, aber nicht mehr auf dem Schirm - der Vorschlag war
+// trotzdem heute.
+test('Wochenansicht am Telefon: der Vorschlag bleibt im 3-Tage-Fenster', () => {
+  assert(newEventDate('week', '2026-08-15', TODAY, 1) === TODAY,
+    'Reichweite: am Desktop liegt heute in derselben Woche und gewinnt');
+  assert(newEventDate('week', '2026-08-15', TODAY, 1, { mobile: true }) === '2026-08-15',
+    'am Telefon steht heute nicht im Fenster 15.-17.08., also der erste sichtbare Tag');
+  assert(newEventDate('week', TODAY, TODAY, 1, { mobile: true }) === TODAY,
+    'steht heute im Fenster, gewinnt heute');
+  assert(newEventDate('week', '2026-08-13', TODAY, 1, { mobile: true }) === TODAY,
+    'auch als zweiter Tag des Fensters');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('function newEventDate()'), src.indexOf('function isMonthSplit()'));
+  assert(/newEventDefaultDate\([^)]*\{ mobile: isMonthSplit\(\) \}\)/.test(body),
+    'der Aufrufer reicht die Telefonbreite durch');
+});
+
 test('Agenda: der Listenanfang, sobald heute außerhalb der 30 Tage liegt', () => {
   assert(newEventDate('agenda', '2026-10-01', TODAY) === '2026-10-01',
     'vorgeblätterte Agenda schlägt ihren eigenen Anfang vor');
@@ -1817,7 +1836,7 @@ test('getWeekRange: Desktop bleibt beim reinen 7-Tage-Raster (#1006)', () => {
 });
 
 test('getWeekRange: Mobile mitten in der Woche erweitert das Ladefenster nicht unnötig (#1006)', () => {
-  // Mittwoch: das 3-Tage-Fenster (Di-Do) liegt vollständig innerhalb der
+  // Mittwoch: das 3-Tage-Fenster (Mi-Fr, seit R20 ab dem Cursor) liegt vollständig innerhalb der
   // Montag-Woche - die Vereinigung darf hier gleich dem Desktop-Raster bleiben.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-11', { weekStart: 1, mobile: true });
   assert(from === '2026-03-09' && to === '2026-03-15',
@@ -1825,28 +1844,30 @@ test('getWeekRange: Mobile mitten in der Woche erweitert das Ladefenster nicht u
 });
 
 test('getWeekRange: Montag-Woche + Sonntags-Cursor schliesst den folgenden Montag ein (#1006)', () => {
-  // Sonntag ist der letzte Tag der Montag-Woche; das Mobile-Fenster (Sa-Mo)
-  // ragt einen Tag darüber hinaus - genau der Tag, den buildDayIndex() vorher
-  // stillschweigend wegklammerte.
+  // Sonntag ist der letzte Tag der Montag-Woche; das Mobile-Fenster (So-Di,
+  // seit R20 ab dem Cursor) ragt zwei Tage darüber hinaus - genau die Tage,
+  // die buildDayIndex() vorher stillschweigend wegklammerte.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-15', { weekStart: 1, mobile: true });
-  assert(from === '2026-03-09' && to === '2026-03-16',
-    `Der folgende Montag muss mitgeladen werden: ${from}..${to}`);
+  assert(from === '2026-03-09' && to === '2026-03-17',
+    `Montag und Dienstag danach muessen mitgeladen werden: ${from}..${to}`);
 });
 
 test('getWeekRange: Sonntag-Woche + Samstags-Cursor schliesst den folgenden Sonntag ein (#1006)', () => {
   // Dieselbe Randsituation am anderen Wochenstart: Samstag ist hier der
   // letzte Tag, das Mobile-Fenster ragt in den folgenden Sonntag hinein.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-14', { weekStart: 0, mobile: true });
-  assert(from === '2026-03-08' && to === '2026-03-15',
-    `Der folgende Sonntag muss mitgeladen werden: ${from}..${to}`);
+  assert(from === '2026-03-08' && to === '2026-03-16',
+    `Sonntag und Montag danach muessen mitgeladen werden: ${from}..${to}`);
 });
 
-test('getWeekRange: Montag-Woche + Montags-Cursor schliesst den vorherigen Sonntag ein (#1006)', () => {
-  // Symmetrischer Fall am linken Rand: Montag ist der erste Tag der Woche,
-  // das Mobile-Fenster ragt einen Tag in die vorherige Woche hinein.
+test('getWeekRange: das Mobile-Fenster beginnt am Cursor, nie am Vortag (R20)', () => {
+  // Bis R20 stand das Fenster um den Cursor (gestern, heute, morgen), und
+  // ein Montags-Cursor zog den Sonntag davor mit. Seit R20 beginnt es AM
+  // Cursor - "Heute" steht links wie in Apple Kalender, links vom Wochenstart
+  // gibt es nichts mehr zu laden.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-09', { weekStart: 1, mobile: true });
-  assert(from === '2026-03-08' && to === '2026-03-15',
-    `Der vorherige Sonntag muss mitgeladen werden: ${from}..${to}`);
+  assert(from === '2026-03-09' && to === '2026-03-15',
+    `Ein Montags-Cursor laedt keinen Sonntag davor: ${from}..${to}`);
 });
 
 test('getRangeForView: Der echte Week-Aufrufer liest matchMedia und reicht mobile weiter (#1030)', () => {
@@ -1859,7 +1880,7 @@ test('getRangeForView: Der echte Week-Aufrufer liest matchMedia und reicht mobil
   try {
     globalThis.window = { matchMedia: () => ({ matches: true }) };
     const mobile = calendarHelpers.getRangeForView('week', '2026-03-15');
-    assert(mobile.from === '2026-03-09' && mobile.to === '2026-03-16',
+    assert(mobile.from === '2026-03-09' && mobile.to === '2026-03-17',
       `Mobile-Aufrufer muss das erweiterte Fenster laden: ${mobile.from}..${mobile.to}`);
 
     globalThis.window = { matchMedia: () => ({ matches: false }) };
@@ -6117,7 +6138,7 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
   assert(/display:\s*none/.test(base?.body ?? ''), 'unter der Schwelle steht keine Leiste');
   const wide = rules.filter((r) => r.at.some((a) => /@container cal-page \(min-width: 86\.25rem\)/.test(a)));
   assert(wide.length >= 3 && wide.every((r) => r.selector.includes('.calendar-page.has-cal-sidebar')),
-    'jede Regel der Leiste haengt an has-cal-sidebar - Agenda und Suche bleiben auf der Inhaltsspalte');
+    'jede Regel der Leiste haengt an has-cal-sidebar - die Suche bleibt auf der Inhaltsspalte');
   assert(rules.some((r) => r.selector.trim() === '.calendar-page' && /container:\s*cal-page\s*\/\s*inline-size/.test(r.body)), 'die Seite ist der Container');
   const leiste = wide.find((r) => /\.cal-sidebar:not\(\[hidden\]\)/.test(r.selector));
   assert(/overflow-y:\s*auto/.test(leiste?.body ?? '') && /scrollbar-gutter:\s*stable/.test(leiste?.body ?? ''),
@@ -6128,7 +6149,13 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
   assert(/font-weight:\s*var\(--font-weight-bold\)/.test(label?.body ?? '') && /font-size:\s*var\(--text-lg\)/.test(label?.body ?? ''),
     'der Desktop-Zeitraum steht fett in 18px, nicht mehr leiser als Fliesstext-Gewicht');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert(/function sidebarWanted\(\) \{\s*return state\.view !== 'agenda' && !searchActive;/.test(src), 'Agenda und Suche zeigen keine Leiste');
+  // R20: nur die Suche steht ohne Leiste. Die Agenda behaelt sie - ohne „Als
+  // Naechstes" (das IST die Agenda); vorher sprang der Inhalt beim
+  // Ansichtswechsel von x 536 auf 220 (1920px, Re-Critique 2026-10-17).
+  assert(/function sidebarWanted\(\) \{\s*return !searchActive;/.test(src), 'die Agenda verliert die Leiste - der Inhalt springt beim Ansichtswechsel');
+  assert(/function upNextWanted\(\) \{\s*return state\.view !== 'agenda';/.test(src), 'in der Agenda steht „Als Naechstes" doppelt');
+  assert(/\(upNextWanted\(\) \? upNextHtml\(\) : ''\)/.test(src) && /if \(upNextWanted\(\) && upNextNeedsLoad\(\)\) loadUpNext\(\);/.test(src),
+    'die Leiste zeichnet bzw. laedt „Als Naechstes" auch in der Agenda');
   assert(/syncHeadToScrollport\(body\);\s*renderSidebar\(\);\s*\}/.test(src), 'jede Ansicht zeichnet die Leiste mit');
 });
 
@@ -6199,6 +6226,15 @@ test('R19 Popover und Tageskopf: Spanne bricht nicht, Ort nicht im Wort, ein Kop
   assert(/flex-wrap:\s*wrap/.test(wrap?.body ?? ''), 'die Aktion einer Zeile rueckt bei Platzmangel darunter');
   const text = rules.find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action) > .detail-row__text');
   assert(/flex:\s*1 1 10rem/.test(text?.body ?? ''), 'der Wert beansprucht seine Mindestbreite');
+});
+
+// R20 (E1-Befund, Kalender 1920 CLS 0,136): die Spalte der Seitenleiste steht
+// vom ersten Bild an. Vorher kam `has-cal-sidebar` erst mit renderSidebar()
+// nach der ersten Ansicht, und #cal-body rutschte von x 220 auf 536.
+test('R20: die Seitenleiste reserviert ihre Spalte schon im ersten Markup', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/class="calendar-page app-page app-page--full\$\{sidebarWanted\(\) \? ' has-cal-sidebar' : ''\}" id="calendar-page"/.test(src), 'die Seite traegt has-cal-sidebar schon im Markup');
+  assert(/<aside class="cal-sidebar" id="cal-sidebar" aria-label="[^"]*"\$\{sidebarWanted\(\) \? '' : ' hidden'\}><\/aside>/.test(src), 'die leere Leiste ist nicht verborgen');
 });
 
 // --------------------------------------------------------

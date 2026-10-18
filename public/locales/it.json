@@ -42,6 +42,9 @@
         "errorOccurred": "Si è verificato un errore.",
         "unexpectedError": "Si è verificato un errore imprevisto.",
         "errorDetails": "Dettagli tecnici",
+        "pageFailedTitle": "La pagina {{page}} non si apre in questo momento",
+        "pageFailedHint": "Tutte le altre sezioni continuano a funzionare.",
+        "toOverview": "Vai alla panoramica",
         "errorGeneric": "Si è verificato un errore.",
         "updateAvailable": "Aggiornamento disponibile - ricarica la pagina per ottenere l'ultima versione.",
         "titleRequired": "Il titolo è obbligatorio",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "Aggiungi {{title}} alla lista della spesa",
         "emailInUse": "Questo indirizzo email appartiene già a un altro account.",
+        "emailInvalid": "Inserisci un indirizzo email valido.",
         "sessionUnreachableTitle": "Connessione interrotta",
+        "serverNotReadyTitle": "Il server non è pronto al momento",
+        "rateLimitedTitle": "Troppe richieste",
         "sessionRetryHint": "La sessione resta attiva. Nuovo tentativo tra {{seconds}} s.",
         "sessionRetrying": "Nuovo tentativo in corso…",
         "searchNoResultsTitle": "Nessun risultato",
         "searchNoResultsDescription": "Nulla corrisponde alla tua ricerca.",
         "searchNoResultsFilteredDescription": "Nulla corrisponde alla tua ricerca e ai filtri.",
-        "searchReset": "Reimposta ricerca"
+        "searchReset": "Reimposta ricerca",
+        "passwordMinLength": "Almeno 8 caratteri."
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "Eliminare questo pagamento del prestito?",
         "loanRemainingAmount": "Rimanente",
         "loanRemainingPrincipal": "Capitale residuo",
+        "loanOwedToYou": "Ti spetta ancora",
         "loanStillToPay": "Ancora da pagare",
         "loanPrincipalAmount": "Importo del prestito",
         "loanRemainingInstallments": "Rate rimanenti",
         "loanPaidAmount": "Pagato",
+        "loanReceivedAmount": "Rimborsato",
         "loansEmpty": "Nessun prestito attivo.",
         "loanInstallmentMeta": "{{paid}} di {{total}} rate pagate",
         "loanRemainingOf": "di {{total}}",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "Capitale residuo più basso prima",
         "loanSortActive": "Ordinamento: {{sort}}",
         "loanPaidStatus": "Pagato",
-        "markLoanPaid": "Segna pagato",
+        "loanBookInstallment": "Registra rata",
+        "loanReceiveRepayment": "Rimborso ricevuto",
         "loanBorrowerLabel": "Persona",
         "loanDirectionLabel": "Tipo di prestito",
         "loanDirectionLent": "Prestato (mi viene restituito)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "Carta di credito",
         "accountType_investment": "Investimento",
         "accountType_other": "Altro",
-        "viewAccountTransactions": "Mostra i movimenti di {{name}}",
-        "currentBalance": "Saldo attuale",
         "clearAccountFilter": "Rimuovi filtro conto",
         "archivedBadge": "Archiviato",
         "showArchivedAccounts": "Mostra archiviati",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "Valori della curva",
         "statsPointLabel": "{{period}}: entrate {{income}}, uscite {{expenses}}",
         "statsPointLabelCumulative": "Fino al {{period}}: entrate {{income}}, uscite {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} previsto",
         "receiptsLabel": "Ricevute",
         "receiptsHint": "Scontrino o fattura di questo movimento.",
         "receiptDocumentName": "Ricevuta: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "Per data",
         "ledgerSortAmount": "Per importo",
         "ledgerSortActive": "Ordinamento: {{sort}}",
-        "ledgerAccountsAll": "Tutti i conti"
+        "ledgerAccountsAll": "Tutti i conti",
+        "showAccountTransactions": "Mostra i movimenti"
     },
     "settings": {
         "healthCycleEnableLabel": "Offri il ciclo alla famiglia",
@@ -1876,6 +1886,8 @@
         "confirmPasswordLabel": "Conferma nuova password",
         "savePassword": "Salva password",
         "passwordMismatch": "Le password non corrispondono.",
+        "currentPasswordWrong": "La password attuale non è corretta.",
+        "passwordTooShort": "Almeno 8 caratteri.",
         "passwordSavedToast": "Password modificata con successo.",
         "oidcLinkTitle": "Single sign-on",
         "oidcLinkHint": "Collega il tuo account SSO a questo, così l'accesso tramite il provider ti porta qui invece di creare un secondo account.",
@@ -1985,6 +1997,7 @@
         "familyRoleGrandparent": "Nonno/a",
         "familyRoleRelative": "Parente",
         "familyRoleOther": "Membro della famiglia",
+        "childStartHint": "I nuovi account bambino partono senza Budget e digiuno e vedono l’Aiuto domestico in sola lettura, senza compensi e pagamenti. Puoi cambiarlo dopo in «Ruoli e autorizzazioni».",
         "systemAdminLabel": "Amministratore di sistema",
         "systemAdminHint": "Gli amministratori di sistema possono gestire impostazioni, integrazioni, token API e account familiari.",
         "systemAdminBadge": "Admin sistema",
@@ -2001,7 +2014,7 @@
         "removeMemberNamed": "Rimuovi {{name}}",
         "memberDeactivatedToast": "Account di {{name}} disattivato. Le voci restano.",
         "memberFormerBadge": "Ex membro",
-        "memberOrderHint": "Questo ordine vale per tutta la famiglia: il calendario, l'orario e ogni elenco di persone lo seguono. Per cambiarlo trascina una maniglia oppure selezionala e premi i tasti freccia. I nuovi membri vengono dopo, ordinati per nome.",
+        "memberOrderHint": "Questo ordine vale in tutta la famiglia. Trascina la maniglia o usa le frecce per cambiarlo.",
         "logout": "Esci",
         "logoutConfirm": "Disconnettersi da questo dispositivo?",
         "synchronizing": "Sincronizzazione…",
@@ -2030,7 +2043,7 @@
         "pwaInstallTitle": "Installa Yuvomi su questo dispositivo",
         "pwaInstallChecking": "Verifica della disponibilità di installazione...",
         "pwaInstallReady": "Yuvomi può essere installato come app su questo dispositivo.",
-        "pwaInstallUnavailable": "L’installazione non è disponibile in questo browser al momento.",
+        "pwaInstallUnavailable": "Questo browser qui non offre l'installazione. In Chrome ed Edge la trovi nel menu del browser, in Safari in Condividi > Aggiungi al Dock o Aggiungi alla schermata Home. Senza un indirizzo HTTPS nessun browser la offre.",
         "pwaInstallInstalled": "Yuvomi è già installato su questo dispositivo.",
         "pwaInstallIosHint": "Su iPhone o iPad, usa il menu Condividi e scegli Aggiungi alla schermata Home.",
         "pwaInstallButton": "Installa app",
@@ -2218,7 +2231,7 @@
         "deleteCardDAVAccountConfirm": "I contatti sincronizzati restano, ma perdono il collegamento CardDAV.",
         "housekeepingPaymentsTitle": "Attività di pagamento",
         "housekeepingPaymentTasksLabel": "Crea un'attività di pagamento a ogni check-in del personale delle pulizie",
-        "housekeepingPaymentTasksHint": "Se abilitato, ogni check-in crea un'attività per il pagamento del membro dello staff. Il completamento di tale attività contrassegna il pagamento della visita come pagato.",
+        "housekeepingPaymentTasksHint": "Se abilitato, ogni check-in crea un'attività per il pagamento del membro dello staff. Il completamento di tale attività contrassegna il pagamento della visita come pagato. La vedono solo chi registra l'arrivo e gli amministratori.",
         "housekeepingPaymentTasksSaved": "Impostazione del pagamento delle pulizie salvata.",
         "backupSchedulerDisabled": "Disattivato",
         "backupSchedulerEnabled": "Attivato",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "Questo dispositivo è ancora associato. Revocalo prima.",
         "feedExportIncludeBirthdays": "Includi compleanni",
         "feedExportIncludeBirthdaysHint": "Disattiva questa opzione con un abbonamento separato ai compleanni per evitare compleanni e onomastici duplicati.",
-        "birthdayFeedHint": "Chiunque abbia questo link può vedere tutti i compleanni e gli onomastici salvati nella famiglia, anche senza promemoria. Usalo solo sui tuoi dispositivi."
+        "birthdayFeedHint": "Chiunque abbia questo link può vedere tutti i compleanni e gli onomastici salvati nella famiglia, anche senza promemoria. Usalo solo sui tuoi dispositivi.",
+        "skipToSheet": "Vai all’impostazione",
+        "screensaverOffTitle": "Salvaschermo con foto",
+        "screensaverNeedsImmich": "Il salvaschermo parte quando un amministratore ha collegato Immich. Poi qui imposti attesa, ora e inquadratura per questo dispositivo.",
+        "screensaverConnectImmich": "Collega Immich",
+        "weatherPlaceLabel": "Luogo",
+        "weatherPlaceHint": "La ricerca avviene presso il servizio meteo Open-Meteo. Viene inviato solo il nome del luogo.",
+        "weatherPlacePlaceholder": "Città o CAP",
+        "weatherPlaceSearch": "Cerca",
+        "weatherPlaceCurrent": "Attuale: {{place}}",
+        "weatherPlaceNone": "Nessun luogo scelto per ora.",
+        "weatherPlaceResultsLabel": "Luoghi trovati",
+        "weatherPlacePick": "Scegli il tuo luogo dall’elenco.",
+        "weatherPlaceChosen": "{{place}} scelto. Salva per applicarlo.",
+        "weatherPlaceRequired": "Cerca un luogo e sceglilo dall’elenco.",
+        "weatherPlaceTooShort": "Inserisci almeno due caratteri.",
+        "weatherPlaceNotFound": "Nessun luogo trovato con questo nome. Aggiungi il paese, ad es. «Bari, Italia».",
+        "weatherPlaceUnavailable": "La ricerca dei luoghi non è raggiungibile ora. Riprova tra poco o inserisci le coordinate a mano.",
+        "weatherManualTitle": "Coordinate a mano"
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",
@@ -3380,7 +3411,8 @@
         "resultCountMany": "{{count}} risultati",
         "goTo": "Vai a",
         "newSection": "Crea nuovo",
-        "recentLabel": "Aperti di recente"
+        "recentLabel": "Aperti di recente",
+        "createTaskNamed": "Crea «{{title}}» come attività"
     },
     "birthdays": {
         "inDays_one": "tra {{count}} giorno",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - riconnessione in corso…",
-        "staleData": "Offline - aggiornato al: {{time}}"
+        "staleData": "Offline - aggiornato al: {{time}}",
+        "pageTitle": "Sei offline",
+        "pageDescription": "Questa pagina ha bisogno di una connessione. Appena il dispositivo torna online, si carica da sola."
     },
     "emptyHint": {
         "recipes": "Una ricetta va direttamente nel piano dei pasti o nella lista della spesa.",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "Esempio: bagno",
         "taskFrequency": "Frequenza (giorni)",
         "taskCreatedToast": "Attività di pulizia creata.",
-        "dashboard": "Panoramica",
         "reports": "Resoconti",
         "visitsThisMonth": "Visite del mese",
         "lastVisit": "Ultima visita",
@@ -4007,7 +4040,12 @@
         "currentMonth": "Corrente",
         "noVisitReportsInMonth": "Nessuna visita del personale registrata per {{month}}.",
         "settledAdminOnly": "Solo un admin può modificarla o eliminarla",
-        "reportVisitsCount": "Visite"
+        "reportVisitsCount": "Visite",
+        "amountsPermissionLabel": "Vedere compensi e pagamenti",
+        "errorAmountsHidden": "Solo chi può vedere gli importi dell’aiuto domestico può segnare un pagamento.",
+        "notHereToday": "Oggi non è ancora arrivata",
+        "tabVisits": "Visite",
+        "tabChores": "Faccende"
     },
     "userMultiSelect": {
         "moreUsers": "altri",
@@ -4040,7 +4078,6 @@
         "noBalances": "Tutto saldato.",
         "noExpenses": "Nessuna spesa in questa vista.",
         "noActivity": "Ancora nessuna attività.",
-        "owes": "deve a",
         "system": "Sistema",
         "quickGroceries": "Spesa supermercato",
         "quickSchool": "Dividi spese scolastiche",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Una scrittura di storno annulla il pagamento e i saldi tornano come prima. Il pagamento resta nell’attività, segnato come stornato.",
         "loadMoreActivity": "Carica altri",
         "expenseDeleted": "Eliminata",
-        "youAreOwedInGroup": "Ti devono in {{group}}",
-        "youOweInGroup": "Devi in {{group}}"
+        "youAreOwedInGroup": "{{group}}: Ti devono",
+        "youOweInGroup": "{{group}}: Devi",
+        "debtYouOwe": "Devi a {{name}}",
+        "debtOwesYou": "{{name}} ti deve",
+        "debtOwes": "{{from}} deve a {{to}}"
     },
     "wmo": {
         "0": "Cielo sereno",
@@ -4256,7 +4296,8 @@
         "submit": "Invia link",
         "sent": "Se esiste un account corrispondente, è stato inviato un link di ripristino.",
         "backToLogin": "Torna al login",
-        "unavailable": "Questa famiglia non offre il ripristino della password. Contatta l'amministratore della tua famiglia."
+        "unavailable": "Questa famiglia non offre il ripristino della password. Contatta l'amministratore della tua famiglia.",
+        "identifierRequired": "Inserisci il tuo nome utente o indirizzo email."
     },
     "resetPassword": {
         "title": "Imposta una nuova password",
@@ -4286,6 +4327,15 @@
         "test": "Testa connessione",
         "testSuccess": "Email di prova inviata con successo.",
         "testFailed": "Test fallito: {{error}}",
+        "portInvalid": "Inserisci una porta da {{min}} a {{max}}.",
+        "testFailedNotConfigured": "Inserisci prima l’host SMTP e l’indirizzo del mittente.",
+        "testFailedAuth": "Il server ha rifiutato nome utente o password.",
+        "testFailedConnection": "Il server non è raggiungibile a questo host e porta.",
+        "testFailedTls": "La connessione cifrata non è riuscita. Controlla cifratura e porta.",
+        "testFailedRejected": "Il server non ha accettato l’email di prova. Controlla l’indirizzo del mittente.",
+        "testFailedUnknown": "Impossibile inviare l’email di prova.",
+        "testNoRecipient": "L’email di prova va al tuo indirizzo, che manca ancora. Aggiungilo in Account → Email.",
+        "testNoRecipientLink": "Apri account",
         "saveFailed": "Salvataggio non riuscito: {{error}}",
         "saved": "Impostazioni salvate."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Ogni giorno",
                 "none": "Ancora nessuna fascia oraria.",
                 "delete": "Elimina fascia oraria",
-                "newHint": "Salva il farmaco per poter aggiungere le fasce orarie.",
                 "timeRequired": "L'ora è obbligatoria."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Nessun tipo corrispondente in questa famiglia",
         "mappingProfileStatusAmbiguousType": "Ambiguo - più tipi condividono questo nome",
         "icsCalendarName": "Raccolta rifiuti",
-        "icsPickupSummary": "Raccolta: {{name}}"
+        "icsPickupSummary": "Raccolta: {{name}}",
+        "intervalDecrease": "Riduci intervallo",
+        "intervalIncrease": "Aumenta intervallo"
     },
     "rewards": {
         "title": "Ricompense",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Cancella selezione",
         "continuesUntil": "…continua fino alle {{time}}",
         "overviewEmptyTitle": "Scegli le persone da confrontare",
-        "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati."
+        "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati.",
+        "presetCodes": {
+            "early": "M",
+            "late": "S",
+            "night": "N",
+            "day": "G",
+            "vacation": "F",
+            "sick": "ML",
+            "exam": "ES",
+            "lecture": "LZ",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Con orario"
     },
     "pairDisplay": {
         "title": "Associa tablet",

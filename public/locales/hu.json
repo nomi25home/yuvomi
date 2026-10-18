@@ -42,6 +42,9 @@
         "errorOccurred": "Hiba történt.",
         "unexpectedError": "Váratlan hiba történt.",
         "errorDetails": "Technikai részletek",
+        "pageFailedTitle": "A(z) {{page}} oldal most nem nyitható meg",
+        "pageFailedHint": "Minden más rész tovább működik.",
+        "toOverview": "Az áttekintéshez",
         "errorGeneric": "Hiba történt.",
         "updateAvailable": "Frissítés elérhető - frissítse az oldalt a legújabb verzióhoz.",
         "titleRequired": "A cím megadása kötelező",
@@ -84,13 +87,17 @@
         },
         "toShoppingListNamed": "{{title}} hozzáadása a bevásárlólistához",
         "emailInUse": "Ez az e-mail-cím már egy másik fiókhoz tartozik.",
+        "emailInvalid": "Adj meg egy érvényes e-mail-címet.",
         "sessionUnreachableTitle": "Megszakadt a kapcsolat",
+        "serverNotReadyTitle": "A kiszolgáló most nem áll készen",
+        "rateLimitedTitle": "Túl sok kérés",
         "sessionRetryHint": "Bejelentkezve maradsz. Új próbálkozás {{seconds}} mp múlva.",
         "sessionRetrying": "Újrapróbálkozás…",
         "searchNoResultsTitle": "Nincs találat",
         "searchNoResultsDescription": "Semmi sem felel meg a keresésnek.",
         "searchNoResultsFilteredDescription": "Semmi sem felel meg a keresésnek és a szűrőknek.",
-        "searchReset": "Keresés visszaállítása"
+        "searchReset": "Keresés visszaállítása",
+        "passwordMinLength": "Legalább 8 karakter."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -1511,10 +1518,12 @@
         "deleteLoanPaymentConfirm": "Törli ezt a hitelfizetést?",
         "loanRemainingAmount": "Fennmaradó",
         "loanRemainingPrincipal": "Fennálló tőketartozás",
+        "loanOwedToYou": "Még jár neked",
         "loanStillToPay": "Még fizetendő",
         "loanPrincipalAmount": "Hitelösszeg",
         "loanRemainingInstallments": "Hátralévő részletek",
         "loanPaidAmount": "Fizetett",
+        "loanReceivedAmount": "Visszakapott",
         "loansEmpty": "Nincsenek aktív hitelek.",
         "loanInstallmentMeta": "{{paid}} a {{total}} részletből fizetve",
         "loanRemainingOf": "{{total}}-ból",
@@ -1526,7 +1535,8 @@
         "loanSortBalance": "Legkisebb tőketartozás elöl",
         "loanSortActive": "Rendezés: {{sort}}",
         "loanPaidStatus": "Fizetve",
-        "markLoanPaid": "Jelölés fizetettként",
+        "loanBookInstallment": "Részlet könyvelése",
+        "loanReceiveRepayment": "Visszafizetés megérkezett",
         "loanBorrowerLabel": "Kölcsönkérő",
         "loanDirectionLabel": "Kölcsön típusa",
         "loanDirectionLent": "Kiadott (visszakapom)",
@@ -1694,8 +1704,6 @@
         "accountType_credit": "Hitelkártya",
         "accountType_investment": "Befektetés",
         "accountType_other": "Egyéb",
-        "viewAccountTransactions": "{{name}} tételeinek megjelenítése",
-        "currentBalance": "Aktuális egyenleg",
         "clearAccountFilter": "Számlaszűrő törlése",
         "archivedBadge": "Archivált",
         "showArchivedAccounts": "Archiváltak megjelenítése",
@@ -1738,6 +1746,7 @@
         "statsPointsLabel": "A trendgörbe értékei",
         "statsPointLabel": "{{period}}: bevétel {{income}}, kiadás {{expenses}}",
         "statsPointLabelCumulative": "{{period}}-ig: bevétel {{income}}, kiadás {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} tervezett",
         "receiptsLabel": "Bizonylatok",
         "receiptsHint": "Nyugta vagy számla ehhez a tételhez.",
         "receiptDocumentName": "Bizonylat: {{title}} ({{date}})",
@@ -1785,7 +1794,8 @@
         "ledgerSortDate": "Dátum szerint",
         "ledgerSortAmount": "Összeg szerint",
         "ledgerSortActive": "Rendezés: {{sort}}",
-        "ledgerAccountsAll": "Minden számla"
+        "ledgerAccountsAll": "Minden számla",
+        "showAccountTransactions": "Tételek megjelenítése"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",
@@ -1987,6 +1997,8 @@
         "confirmPasswordLabel": "Új jelszó megerősítése",
         "savePassword": "Jelszó mentése",
         "passwordMismatch": "A jelszavak nem egyeznek.",
+        "currentPasswordWrong": "A jelenlegi jelszó nem helyes.",
+        "passwordTooShort": "Legalább 8 karakter.",
         "passwordSavedToast": "Jelszó sikeresen megváltoztatva.",
         "oidcLinkTitle": "Egyszeri bejelentkezés",
         "oidcLinkHint": "Kösd össze az SSO-fiókodat ezzel a fiókkal, hogy a szolgáltatón keresztüli belépés ide vezessen, ahelyett hogy második fiókot hozna létre.",
@@ -2096,6 +2108,7 @@
         "familyRoleGrandparent": "Nagyszülő",
         "familyRoleRelative": "Rokon",
         "familyRoleOther": "Családtag",
+        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod.",
         "systemAdminLabel": "Rendszergazda",
         "systemAdminHint": "A rendszergazdák kezelhetik az alkalmazás beállításait, integrációit, API tokenjeit és családi fiókjait.",
         "systemAdminBadge": "Rendszergazda",
@@ -2112,7 +2125,7 @@
         "removeMemberNamed": "Eltávolítás: {{name}}",
         "memberDeactivatedToast": "{{name}} fiókja inaktiválva. A bejegyzések megmaradnak.",
         "memberFormerBadge": "Korábbi tag",
-        "memberOrderHint": "Ez a sorrend az egész háztartásra érvényes: a naptár, az órarend és minden személylista ezt követi. A módosításhoz húzd a fogantyút, vagy állítsd rá a fókuszt, és nyomd meg a nyílbillentyűket. Az új tagok utána következnek, név szerint rendezve.",
+        "memberOrderHint": "Ez a sorrend az egész háztartásban érvényes. Módosításhoz húzd a fogantyút, vagy használd a nyílbillentyűket.",
         "logout": "Kijelentkezés",
         "logoutConfirm": "Kijelentkezik erről az eszközről?",
         "synchronizing": "Szinkronizálás…",
@@ -2141,7 +2154,7 @@
         "pwaInstallTitle": "Yuvomi telepítése erre az eszközre",
         "pwaInstallChecking": "Telepítési lehetőség ellenőrzése...",
         "pwaInstallReady": "A Yuvomi telepíthető alkalmazásként erre az eszközre.",
-        "pwaInstallUnavailable": "A telepítés jelenleg nem elérhető ebben a böngészőben.",
+        "pwaInstallUnavailable": "Ez a böngésző itt nem kínálja fel a telepítést. Chrome-ban és Edge-ben a böngésző menüjében találod, Safariban a Megosztás > Hozzáadás a Dockhoz vagy a Főképernyőhöz alatt. HTTPS-cím nélkül egyik böngésző sem kínálja fel.",
         "pwaInstallInstalled": "A Yuvomi már telepítve van erre az eszközre.",
         "pwaInstallIosHint": "iPhone vagy iPad esetén használja a Megosztás menüt, majd válassza a Hozzáadás a Főképernyőhöz lehetőséget.",
         "pwaInstallButton": "Alkalmazás telepítése",
@@ -2502,7 +2515,7 @@
         "deleteCardDAVAccountConfirm": "A szinkronizált névjegyek megmaradnak, de elveszítik a CardDAV-kapcsolatot.",
         "housekeepingPaymentsTitle": "Fizetési feladatok",
         "housekeepingPaymentTasksLabel": "Hozzon létre fizetési feladatot minden háztartási ellenőrzésnél",
-        "housekeepingPaymentTasksHint": "Ha engedélyezve van, minden ellenőrzés létrehoz egy feladatot a személyzet tagjának fizetésére. A feladat teljesítése a látogatás fizetését fizetettként jelöli.",
+        "housekeepingPaymentTasksHint": "Ha engedélyezve van, minden ellenőrzés létrehoz egy feladatot a személyzet tagjának fizetésére. A feladat teljesítése a látogatás fizetését fizetettként jelöli. Csak az látja, aki a belépést rögzíti, és az adminisztrátorok.",
         "housekeepingPaymentTasksSaved": "Háztartási fizetési beállítások mentve.",
         "tasksSubtasksExpandedTitle": "Részfeladatok",
         "tasksSubtasksExpandedHint": "Válassza ki, hogy a részfeladatok alapértelmezés szerint nyitva jelenjenek-e meg.",
@@ -3184,7 +3197,25 @@
         "displayRemoveDeviceActive": "Ez az eszköz még párosítva van. Előbb vond vissza.",
         "feedExportIncludeBirthdays": "Születésnapok felvétele",
         "feedExportIncludeBirthdaysHint": "Külön születésnapi naptárra feliratkozva kapcsolja ki, hogy a születésnapok és névnapok ne jelenjenek meg kétszer.",
-        "birthdayFeedHint": "A hivatkozás birtokában bárki láthatja a háztartás összes mentett születésnapját és névnapját, emlékeztető nélkül is. Csak saját eszközein használja."
+        "birthdayFeedHint": "A hivatkozás birtokában bárki láthatja a háztartás összes mentett születésnapját és névnapját, emlékeztető nélkül is. Csak saját eszközein használja.",
+        "skipToSheet": "Ugrás a beállításhoz",
+        "screensaverOffTitle": "Fotós képernyővédő",
+        "screensaverNeedsImmich": "A képernyővédő akkor indul, amikor egy adminisztrátor csatlakoztatta az Immichet. Utána itt állítod be ennek az eszköznek a várakozást, az órát és a képkivágást.",
+        "screensaverConnectImmich": "Immich csatlakoztatása",
+        "weatherPlaceLabel": "Hely",
+        "weatherPlaceHint": "A keresés az Open-Meteo időjárás-szolgáltatásnál fut. Csak a hely neve kerül elküldésre.",
+        "weatherPlacePlaceholder": "Város vagy irányítószám",
+        "weatherPlaceSearch": "Keresés",
+        "weatherPlaceCurrent": "Jelenleg: {{place}}",
+        "weatherPlaceNone": "Még nincs kiválasztott hely.",
+        "weatherPlaceResultsLabel": "Talált helyek",
+        "weatherPlacePick": "Válaszd ki a helyed a listából.",
+        "weatherPlaceChosen": "Kiválasztva: {{place}}. Mentsd az alkalmazáshoz.",
+        "weatherPlaceRequired": "Keress egy helyet, és válaszd ki a listából.",
+        "weatherPlaceTooShort": "Adj meg legalább két karaktert.",
+        "weatherPlaceNotFound": "Nincs ilyen nevű hely. Írd hozzá az országot, pl. „Szeged, Magyarország”.",
+        "weatherPlaceUnavailable": "A helykeresés most nem érhető el. Próbáld újra kicsit később, vagy add meg kézzel a koordinátákat.",
+        "weatherManualTitle": "Koordináták kézzel"
     },
     "login": {
         "tagline": "Üdv újra a családi tervezőben.",
@@ -3482,7 +3513,8 @@
         "resultCountMany": "{{count}} találat",
         "goTo": "Ugrás ide",
         "newSection": "Új létrehozása",
-        "recentLabel": "Legutóbb megnyitott"
+        "recentLabel": "Legutóbb megnyitott",
+        "createTaskNamed": "„{{title}}” létrehozása feladatként"
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",
@@ -3500,7 +3532,9 @@
     },
     "offline": {
         "banner": "Offline - újracsatlakozás…",
-        "staleData": "Offline - állapot: {{time}}"
+        "staleData": "Offline - állapot: {{time}}",
+        "pageTitle": "Offline vagy",
+        "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik."
     },
     "shortcuts": {
         "search": "Keresés megnyitása",
@@ -3878,7 +3912,6 @@
         "taskAreaPlaceholder": "Példa: Fürdőszoba",
         "taskFrequency": "Gyakoriság (nap)",
         "taskCreatedToast": "Háztartási feladat létrehozva.",
-        "dashboard": "Áttekintés",
         "reports": "Jelentések",
         "visitsThisMonth": "Látogatások ebben a hónapban",
         "lastVisit": "Utolsó látogatás",
@@ -4007,7 +4040,12 @@
         "currentMonth": "Aktuális hónap",
         "noVisitReportsInMonth": "{{month}} időszakban nem volt személyzeti látogatás.",
         "settledAdminOnly": "Csak egy admin módosíthatja vagy törölheti",
-        "reportVisitsCount": "Látogatások"
+        "reportVisitsCount": "Látogatások",
+        "amountsPermissionLabel": "Bérek és kifizetések megtekintése",
+        "errorAmountsHidden": "Fizetést csak az jelölhet, aki láthatja a háztartási segítő összegeit.",
+        "notHereToday": "Ma még nincs itt",
+        "tabVisits": "Látogatások",
+        "tabChores": "Házimunkák"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",
@@ -4040,7 +4078,6 @@
         "noBalances": "Mindenki rendezte az egyenlegét.",
         "noExpenses": "Nincs költség ebben a nézetben.",
         "noActivity": "Még nincs tevékenység.",
-        "owes": "tartozik",
         "system": "Rendszer",
         "quickGroceries": "Szupermarket költség hozzáadása",
         "quickSchool": "Iskolai költségek megosztása",
@@ -4190,8 +4227,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Egy ellentételes könyvelés érvényteleníti a fizetést, az egyenlegek visszaállnak. A fizetés sztornózottként a tevékenységben marad.",
         "loadMoreActivity": "Továbbiak betöltése",
         "expenseDeleted": "Törölve",
-        "youAreOwedInGroup": "Neked jár itt: {{group}}",
-        "youOweInGroup": "Tartozásod itt: {{group}}"
+        "youAreOwedInGroup": "{{group}}: Neked jár",
+        "youOweInGroup": "{{group}}: Tartozásod",
+        "debtYouOwe": "Ön tartozik neki: {{name}}",
+        "debtOwesYou": "{{name}} tartozik Önnek",
+        "debtOwes": "{{from}} tartozik neki: {{to}}"
     },
     "wmo": {
         "0": "Tiszta égbolt",
@@ -4256,7 +4296,8 @@
         "submit": "Link küldése",
         "sent": "Ha létezik megfelelő fiók, egy visszaállító linket küldtünk.",
         "backToLogin": "Vissza a bejelentkezéshez",
-        "unavailable": "Ez a háztartás nem kínál jelszó-visszaállítást. Kérjük, forduljon a háztartás rendszergazdájához."
+        "unavailable": "Ez a háztartás nem kínál jelszó-visszaállítást. Kérjük, forduljon a háztartás rendszergazdájához.",
+        "identifierRequired": "Add meg a felhasználóneved vagy az e-mail-címed."
     },
     "resetPassword": {
         "title": "Új jelszó beállítása",
@@ -4286,6 +4327,15 @@
         "test": "Kapcsolat tesztelése",
         "testSuccess": "Teszt email sikeresen elküldve.",
         "testFailed": "Teszt sikertelen: {{error}}",
+        "portInvalid": "Adj meg egy portot {{min}} és {{max}} között.",
+        "testFailedNotConfigured": "Először add meg az SMTP-kiszolgálót és a feladó címét.",
+        "testFailedAuth": "A kiszolgáló elutasította a felhasználónevet vagy a jelszót.",
+        "testFailedConnection": "A kiszolgáló nem érhető el ezen a címen és porton.",
+        "testFailedTls": "A titkosított kapcsolat nem jött létre. Ellenőrizd a titkosítást és a portot.",
+        "testFailedRejected": "A kiszolgáló nem fogadta el a tesztlevelet. Ellenőrizd a feladó címét.",
+        "testFailedUnknown": "A tesztlevelet nem sikerült elküldeni.",
+        "testNoRecipient": "A tesztlevél a saját e-mail-címedre megy, ami még hiányzik. Add meg a Fiók → E-mail alatt.",
+        "testNoRecipientLink": "Fiók megnyitása",
         "saveFailed": "A mentés sikertelen: {{error}}",
         "saved": "Beállítások mentve."
     },
@@ -4821,7 +4871,6 @@
                 "daily": "Naponta",
                 "none": "Még nincsenek időpontok.",
                 "delete": "Időpont törlése",
-                "newHint": "Mentsd el a gyógyszert, hogy időpontokat adhass hozzá.",
                 "timeRequired": "Az időpont kötelező."
             },
             "weekday": {
@@ -5720,7 +5769,9 @@
         "mappingProfileStatusUnmatchedType": "Nincs egyező típus ebben a háztartásban",
         "mappingProfileStatusAmbiguousType": "Nem egyértelmű - több típus is ezt a nevet viseli",
         "icsCalendarName": "Hulladékszállítás",
-        "icsPickupSummary": "Elszállítás: {{name}}"
+        "icsPickupSummary": "Elszállítás: {{name}}",
+        "intervalDecrease": "Időköz csökkentése",
+        "intervalIncrease": "Időköz növelése"
     },
     "rewards": {
         "title": "Jutalmak",
@@ -6348,7 +6399,20 @@
         "overviewClearSelection": "Kijelölés törlése",
         "continuesUntil": "…eddig tart: {{time}}",
         "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",
-        "overviewEmptyDescription": "Válassz fent legalább egy háztartástagot, hogy a heti beosztásokat egymás mellett lásd."
+        "overviewEmptyDescription": "Válassz fent legalább egy háztartástagot, hogy a heti beosztásokat egymás mellett lásd.",
+        "presetCodes": {
+            "early": "DE",
+            "late": "DU",
+            "night": "É",
+            "day": "N",
+            "vacation": "SZ",
+            "sick": "B",
+            "exam": "V",
+            "lecture": "EA",
+            "seminar": "SZE",
+            "lab": "L"
+        },
+        "typesWithTime": "Időponttal"
     },
     "pairDisplay": {
         "title": "Táblagép párosítása",

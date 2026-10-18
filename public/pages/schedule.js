@@ -192,6 +192,41 @@ const ALL_PRESETS = Object.freeze([...new Map(
 ).values()]);
 const SHIFT_COLOR_FALLBACK = USER_COLOR_DEFAULT;
 
+// DER KURZCODE SPRICHT DIE SPRACHE DES HAUSHALTS (R20, Re-Critique 2026-10-17
+// a3 P2-3). `shortCode` oben ist der englische Stand ("E", "L", "S"), und er
+// stand so in jeder Sprache: "S · Krank" neben "L · Spätschicht". Der Code
+// kommt jetzt aus `schedule.presetCodes.<key>` (in jeder Vorlage eindeutig,
+// test:schedule prueft das je Locale); Stunden heissen ueberall 1-4 und die
+// 24-Stunden-Schicht "24" - Ziffern brauchen keine Uebersetzung. Gespeichert
+// wird der Code beim Anlegen; bestehende Schichtarten behalten ihren.
+const NUMERIC_PRESET_CODES = Object.freeze({ period1: '1', period2: '2', period3: '3', period4: '4', fullDay: '24' });
+function presetShortCode(preset) {
+  if (NUMERIC_PRESET_CODES[preset.key]) return NUMERIC_PRESET_CODES[preset.key];
+  const key = `schedule.presetCodes.${preset.key}`;
+  const code = t(key);
+  return code && code !== key ? code : preset.shortCode;
+}
+
+/**
+ * Hat der Haushalt diese Vorlage schon? Ja bei ihrem Code von heute, dem
+ * englischen von frueher (vor R20 angelegt), ihrem Namen in der eigenen
+ * Sprache - ODER Symbol und Farbe der Vorlage. Code und Name allein reichen
+ * nicht, weil die Vorlage beide in der Sprache dessen anlegt, der getippt hat:
+ * eine deutsche "Frühschicht" mit Code F traf weder das englische E noch
+ * "Early shift", und "Arbeit" legte sie ein zweites Mal an (Codex-Review
+ * PR #2053, dasselbe Muster wie die Abfallvorlagen in pages/waste.js). Symbol
+ * und Farbe schreibt die Vorlage in jeder Sprache gleich, und kein Paar steht
+ * in zwei Vorlagen (test:schedule).
+ */
+function presetAlreadyThere(preset, types = state.types) {
+  const codes = new Set(types.map((type) => type.short_code));
+  const names = new Set(types.map((type) => String(type.name ?? '').trim().toLowerCase()));
+  const looks = new Set(types.map((type) => `${type.icon ?? ''}|${String(type.color ?? '').toUpperCase()}`));
+  return codes.has(presetShortCode(preset)) || codes.has(preset.shortCode)
+    || names.has(shiftPresetLabel(preset.key).trim().toLowerCase())
+    || looks.has(`${preset.icon}|${preset.color.toUpperCase()}`);
+}
+
 // Welche Vorlagen ueberhaupt als Knopf angeboten werden, ist selbst haushalt-
 // weit konfigurierbar (server/routes/preferences.js#schedule_hidden_templates,
 // Settings > Module > Optionen) - ein Haushalt, der nur Arbeit braucht, muss
@@ -859,7 +894,7 @@ function applyShiftPreset(form) {
   const selected = ALL_PRESETS.find((preset) => preset.key === form.elements.shift_preset?.value);
   if (!selected) return;
   form.elements.name.value = shiftPresetLabel(selected.key);
-  form.elements.short_code.value = selected.shortCode;
+  form.elements.short_code.value = presetShortCode(selected);
   form.elements.start_time.value = selected.startTime;
   form.elements.end_time.value = selected.endTime;
   form.elements.color.value = selected.color;
@@ -999,6 +1034,34 @@ function editDeleteMenu({ key, name, edit, remove }) {
       { ...remove, icon: 'trash-2', label: t('schedule.delete'), danger: true },
     ],
   }) + '</span>';
+}
+
+/**
+ * SCHICHTARTEN NACH TAGESZEIT, GANZTAEGIGES FUER SICH (R20, Re-Critique
+ * 2026-10-17 a3 P3). Die Liste kam lexikalisch vom Server: "24 · 24-Stunden",
+ * "E · Fruehschicht", "S · Krank", "N · Nachtschicht", "LAB · Praktikum" -
+ * Urlaub zwischen Vorlesung und Tagschicht. Jetzt zwei Gruppen: mit Uhrzeit,
+ * nach Beginn sortiert (dann Name), und ganztaegig (Urlaub, Krank) nach Name.
+ * Pure, damit test:schedule die Ordnung ohne DOM prueft.
+ */
+function shiftTypeGroups(types = state.types) {
+  const byName = (a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''));
+  const timed = types.filter((type) => type.start_time && type.end_time)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time) || byName(a, b));
+  const allDay = types.filter((type) => !(type.start_time && type.end_time)).sort(byName);
+  return [
+    { key: 'timed', label: t('schedule.typesWithTime'), types: timed },
+    { key: 'allDay', label: t('schedule.allDay'), types: allDay },
+  ].filter((group) => group.types.length);
+}
+
+function shiftTypeListHtml(types = state.types) {
+  const groups = shiftTypeGroups(types);
+  // Eine Gruppe allein braucht keinen Titel - die Liste heisst schon "Schichtarten".
+  if (groups.length === 1) return '<div class="row-carrier">' + groups[0].types.map(shiftTypeRow).join('') + '</div>';
+  return groups.map((group) => '<div class="schedule-type-group" data-type-group="' + group.key + '">'
+    + '<h3 class="schedule-type-group__title u-meta">' + esc(group.label) + '</h3>'
+    + '<div class="row-carrier">' + group.types.map(shiftTypeRow).join('') + '</div></div>').join('');
 }
 
 function shiftTypeRow(type) {
@@ -1464,6 +1527,7 @@ function renderStatistics() {
   // (laengst verschwundenen) Fehler-Toast bliebe der Nutzer bei einer stillen
   // Falschaussage. Eigener Zweig, denselben Fehlerzustand wie andere Module
   // (mountLoadError/emptyStateHTML variant:'error') statt erfundener Zahlen.
+  const printable = !statistics.loading && !statistics.error && Boolean(bounds) && statistics.entries.length > 0;
   const results = statistics.loading
     ? scheduleLoadingHtml({ rows: 3, lines: 2 })
     : statistics.error
@@ -1518,8 +1582,10 @@ function renderStatistics() {
     + '<select class="form-input schedule-stat-range__select" name="statistics_range" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + STATISTICS_RANGES.map(([value, label]) => '<option value="' + value + '"' + (range === value ? ' selected' : '') + '>' + esc(t(label)) + '</option>').join('')
     + '</select></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
-    + '<div class="schedule-stat-filter-actions">'
-    + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
+    // DRUCKEN NUR, WO ES ETWAS ZU DRUCKEN GIBT (R20, Re-Critique 2026-10-17 a3):
+    // ueber dem Leerzustand druckte der Knopf eine leere Seite.
+    + (printable ? '<div class="schedule-stat-filter-actions">'
+    + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div>' : '') + '</form>'
     + results + '</section>';
 }
 /**
@@ -2199,10 +2265,19 @@ function renderPage() {
       // Buttons wie in emptyShiftTypesState() (derselbe Sparkles-Weg im
       // Leerzustand) statt des Umschalter-Aussehens; die Haushalts-Vorlagen-
       // Filterung (visibleQuickstartTemplates()) bleibt unveraendert.
-      + (locked ? '' : (state.types.length && visibleQuickstartTemplates().length ? '<div class="schedule-quickstart-actions" role="group" aria-label="' + esc(t('schedule.quickStartShiftTypes')) + '">'
-        + visibleQuickstartTemplates().map(([template, key]) => '<button type="button" class="btn btn--secondary btn--sm" data-action="quick-start-shifts" data-template="' + template + '"><i data-lucide="sparkles" aria-hidden="true"></i>' + esc(t(key)) + '</button>').join('')
-        + '</div>' : '')) + '</div>'
-      + (state.types.length ? '<div class="row-carrier">' + state.types.map(shiftTypeRow).join('') + '</div>' : emptyShiftTypesState()) + '</section>'
+      //
+      // R20 (Re-Critique 2026-10-17 a3 P3): DER SCHNELLSTART STEHT UNTER DER
+      // LISTE, NICHT IM KOPF. Neben dem Titel waren die drei Knoepfe das
+      // Lauteste der Seite, auch wenn der Haushalt laengst seine Schichtarten
+      // hat. Im Leerzustand bleiben sie die Hauptaktion; danach stehen sie als
+      // leise Zeile "Schnellstart: Arbeit · Schule · Universitaet" am Ende -
+      // erreichbar fuer die zweite Vorlage, ohne den Blick zu ziehen.
+      + '</div>'
+      + (state.types.length ? shiftTypeListHtml() : emptyShiftTypesState())
+      + (locked ? '' : (state.types.length && visibleQuickstartTemplates().length ? '<div class="schedule-quickstart-actions schedule-quickstart-actions--more" role="group" aria-labelledby="schedule-quickstart-label">'
+        + '<span class="u-meta" id="schedule-quickstart-label">' + esc(t('schedule.quickStartShiftTypes')) + '</span>'
+        + visibleQuickstartTemplates().map(([template, key]) => '<button type="button" class="btn btn--ghost btn--sm" data-action="quick-start-shifts" data-template="' + template + '"><i data-lucide="sparkles" aria-hidden="true"></i>' + esc(t(key)) + '</button>').join('')
+        + '</div>' : '')) + '</section>'
       + customFieldsSection()
     : activeView === 'patterns'
       ? planningPanel()
@@ -3152,14 +3227,16 @@ async function action(event) {
     if (button.dataset.action === 'quick-start-shifts') {
       button.disabled = true;
       const template = PRESET_TEMPLATES[button.dataset.template] ?? [];
-      const existingCodes = new Set(state.types.map((type) => type.short_code));
+      const existing = [...state.types];
       let createdCount = 0;
       try {
         for (const preset of template) {
-          if (existingCodes.has(preset.shortCode)) continue;
+          // Schon da: presetAlreadyThere() - Code, Name oder Symbol und Farbe.
+          if (presetAlreadyThere(preset, existing)) continue;
+          const code = presetShortCode(preset);
           await api.post('/schedule/shift-types', {
             name: shiftPresetLabel(preset.key),
-            short_code: preset.shortCode,
+            short_code: code,
             start_time: preset.startTime,
             end_time: preset.endTime,
             color: preset.color,
@@ -3173,7 +3250,7 @@ async function action(event) {
       }
       // Zaehlend statt "Gespeichert." fuer beide Faelle (S-11): ein erneuter
       // Klick auf dieselbe Vorlage legt nichts mehr an (siehe Kommentar oben,
-      // existingCodes ueberspringt jeden schon vorhandenen Kurzcode) - das war
+      // presetAlreadyThere() ueberspringt jede schon vorhandene Vorlage) - das war
       // vorher nicht vom Erfolgsfall zu unterscheiden.
       window.yuvomi?.showToast(
         createdCount > 0 ? t('schedule.quickStartCreated', { count: createdCount }) : t('schedule.quickStartNothingNew'),
@@ -3505,4 +3582,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

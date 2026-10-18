@@ -5,9 +5,9 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -15,6 +15,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { previewKind } from '/utils/document-preview.js';
 import { fileShareSupport } from '/utils/web-share.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { findPageFab } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 // Im Solo-Haushalt hat „Wer darf das sehen" genau eine Antwort - gefragt wird
@@ -2644,7 +2645,7 @@ function openDocumentModal(doc = null) {
   // kein <label>: er liegt ausserhalb der Drop-Zone, ist selbst fokussierbar
   // und oeffnet den Picker im selben Klick - die Nutzeraktivierung bleibt.
   const fileFieldHtml = `
-        <div class="form-group">
+        <div class="form-group form-field">
           <label class="label" for="document-file">${t('documents.fileLabel')}</label>
           <label class="document-dropzone" id="document-dropzone" for="document-file">
             <input class="sr-only" id="document-file" type="file" multiple
@@ -2679,7 +2680,7 @@ function openDocumentModal(doc = null) {
         ${isEdit ? '' : fileFieldHtml}
         <div class="modal-grid modal-grid--2">
           <div class="form-group">
-            <label class="label" for="document-name">${t('documents.nameLabel')}</label>
+            <label class="label" for="document-name">${t('documents.nameLabel')}${isEdit ? REQUIRED_MARK : ''}</label>
             <input class="input" id="document-name" name="name" maxlength="200" value="${esc(doc?.name || '')}"
                    ${isEdit ? 'required' : `placeholder="${esc(t('documents.namePlaceholder'))}"`}>
             ${isEdit ? '' : `<p class="document-form__hint" id="document-name-hint">${t('documents.nameHint')}</p>`}
@@ -2779,6 +2780,47 @@ function bindDropzone(panel) {
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
+}
+
+/**
+ * Der Fehler der Dateiwahl steht AN DER ABLAGE (Re-Critique 2026-10-17, P1).
+ *
+ * "Bitte waehle eine Datei aus." stand als Formularfehler am Fuss des Dialogs,
+ * mobil bei y=1086 von 844 - unsichtbar, und der Fokus blieb auf "Hochladen".
+ * Jetzt wie jedes Feld (reportFieldError): Meldung direkt unter der Ablage,
+ * rote Kante, Ablage in den Blick, Fokus in die Dateiwahl.
+ *
+ * Die Meldung haengt am Datei-Input, nicht am Label: er bekommt den Fokus, und
+ * der Screenreader liest sie dort ueber aria-describedby (Guide
+ * accessible-error-announcement: Zustand am fokussierten Feld, keine zweite
+ * Ansage per Alarm-Rolle). Platziert wird sie hinter der Ablage, weil der
+ * Input sr-only IN ihr liegt. Die naechste Dateiwahl raeumt den Fehler weg.
+ */
+function reportDropzoneError(form, message) {
+  const dropzone = form.querySelector('#document-dropzone');
+  const input = form.querySelector('#document-file');
+  if (!dropzone || !input) return false;
+  reportFieldError(dropzone, message, { focus: false, live: false });
+  // reportFieldError markiert, was es bekommt - hier das Label. Zustand und
+  // Beschreibung gehoeren an das Feld, das den Fokus bekommt.
+  dropzone.removeAttribute('aria-invalid');
+  const errorEl = dropzone.parentElement?.querySelector('.form-field__error');
+  const errorId = dropzone.getAttribute('aria-describedby');
+  dropzone.removeAttribute('aria-describedby');
+  if (errorEl && errorId) {
+    const ids = (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+    if (!ids.includes(errorId)) input.setAttribute('aria-describedby', [...ids, errorId].join(' '));
+  }
+  input.setAttribute('aria-invalid', 'true');
+  input.addEventListener('change', () => {
+    input.setAttribute('aria-invalid', 'false');
+    const rest = (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((id) => id && id !== errorId);
+    if (rest.length) input.setAttribute('aria-describedby', rest.join(' '));
+    else input.removeAttribute('aria-describedby');
+  }, { once: true });
+  input.focus({ preventScroll: true });
+  dropzone.scrollIntoView({ block: 'center' });
+  return false;
 }
 
 const FOLDER_UPLOAD_REASON_KEYS = {
@@ -3280,10 +3322,16 @@ async function saveDocument(event, doc, panel) {
         return;
       }
       const files = Array.from(form.querySelector('#document-file').files || []);
-      if (!files.length) throw new PageProblem(t('documents.fileRequired'));
+      if (!files.length) {
+        reportDropzoneError(form, t('documents.fileRequired'));
+        return;
+      }
       const maxSize = state.maxFileSize || maxUploadBytes();
       const tooBig = files.find((file) => file.size > maxSize);
-      if (tooBig) throw new PageProblem(t('documents.fileTooLargeNamed', { name: tooBig.name }));
+      if (tooBig) {
+        reportDropzoneError(form, t('documents.fileTooLargeNamed', { name: tooBig.name }));
+        return;
+      }
 
       // Fortschritt sichtbar machen: das Einlesen einer mehrere MB großen Datei
       // als Data-URL dauert spürbar, und bei Mehrfachauswahl erst recht. Ein
@@ -3364,7 +3412,7 @@ function openFolderModal({ parentId = null } = {}) {
     content: `
       <form id="document-folder-form" class="document-form">
         <div class="form-group">
-          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}</label>
+          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}${REQUIRED_MARK}</label>
           <input class="input" id="document-folder-name" required maxlength="200" autocomplete="off">
         </div>
         <div class="form-group">
@@ -3765,9 +3813,11 @@ function openDmsPreview({ item, src, canOpen, onLink }) {
   box.append(header, figure, actions);
   layer.appendChild(box);
 
+  let releaseBackground = () => {};
   const dismiss = () => {
     document.removeEventListener('keydown', onKey, true);
     layer.remove();
+    releaseBackground();
     opener?.focus?.();
   };
   // Wie bei Escape gilt fuer die Zurueck-Geste: sie schliesst zuerst die
@@ -3786,6 +3836,9 @@ function openDmsPreview({ item, src, canOpen, onLink }) {
   layer.addEventListener('click', (e) => { if (e.target === layer) dismiss(); });
 
   panel.appendChild(layer);
+  // Die Auswahl darunter ist gesperrt, solange die Vorschau offen ist
+  // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+  releaseBackground = inertOutside(layer);
   if (window.lucide) lucide.createIcons({ el: layer });
   close.focus();
 }

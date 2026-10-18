@@ -43,6 +43,9 @@
         "errorOccurred": "Něco se nepovedlo.",
         "unexpectedError": "Došlo k neočekávané chybě.",
         "errorDetails": "Technické podrobnosti",
+        "pageFailedTitle": "Stránku {{page}} teď nelze otevřít",
+        "pageFailedHint": "Všechny ostatní části fungují dál.",
+        "toOverview": "Na přehled",
         "errorGeneric": "Nastala chyba.",
         "updateAvailable": "Je k dispozici aktualizace - obnovte stránku pro získání nejnovější verze.",
         "titleRequired": "Název je povinný",
@@ -85,13 +88,17 @@
         },
         "toShoppingListNamed": "Přidat {{title}} na nákupní seznam",
         "emailInUse": "Tato e-mailová adresa již patří jinému účtu.",
+        "emailInvalid": "Zadej platnou e-mailovou adresu.",
         "sessionUnreachableTitle": "Spojení přerušeno",
+        "serverNotReadyTitle": "Server teď není připraven",
+        "rateLimitedTitle": "Příliš mnoho požadavků",
         "sessionRetryHint": "Přihlášení zůstává zachováno. Další pokus za {{seconds}} s.",
         "sessionRetrying": "Zkouším to znovu…",
         "searchNoResultsTitle": "Žádné výsledky",
         "searchNoResultsDescription": "Vašemu hledání nic neodpovídá.",
         "searchNoResultsFilteredDescription": "Vašemu hledání a filtrům nic neodpovídá.",
-        "searchReset": "Zrušit hledání"
+        "searchReset": "Zrušit hledání",
+        "passwordMinLength": "Alespoň 8 znaků."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -1588,10 +1595,12 @@
         "deleteLoanPaymentConfirm": "Smazat tuto splátku půjčky?",
         "loanRemainingAmount": "Zbývá",
         "loanRemainingPrincipal": "Zbývající jistina",
+        "loanOwedToYou": "Ještě ti dluží",
         "loanStillToPay": "Zbývá zaplatit",
         "loanPrincipalAmount": "Výše úvěru",
         "loanRemainingInstallments": "Zbývající splátky",
         "loanPaidAmount": "Zaplaceno",
+        "loanReceivedAmount": "Vráceno",
         "loansEmpty": "Žádné aktivní půjčky.",
         "loanInstallmentMeta": "{{paid}} z {{total}} splátek zaplaceno",
         "loanRemainingOf": "z {{total}}",
@@ -1603,7 +1612,8 @@
         "loanSortBalance": "Nejnižší zbývající jistina první",
         "loanSortActive": "Řazení: {{sort}}",
         "loanPaidStatus": "Zaplaceno",
-        "markLoanPaid": "Označit jako zaplacené",
+        "loanBookInstallment": "Zaúčtovat splátku",
+        "loanReceiveRepayment": "Splátka přijata",
         "loanBorrowerLabel": "Osoba",
         "loanDirectionLabel": "Typ půjčky",
         "loanDirectionLent": "Půjčeno (vrací se mi)",
@@ -1771,8 +1781,6 @@
         "accountType_credit": "Kreditní karta",
         "accountType_investment": "Investice",
         "accountType_other": "Jiné",
-        "viewAccountTransactions": "Zobrazit pohyby účtu {{name}}",
-        "currentBalance": "Aktuální zůstatek",
         "clearAccountFilter": "Zrušit filtr účtu",
         "archivedBadge": "Archivováno",
         "showArchivedAccounts": "Zobrazit archivované",
@@ -1815,6 +1823,7 @@
         "statsPointsLabel": "Hodnoty křivky vývoje",
         "statsPointLabel": "{{period}}: příjmy {{income}}, výdaje {{expenses}}",
         "statsPointLabelCumulative": "Do {{period}}: příjmy {{income}}, výdaje {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} plánováno",
         "receiptsLabel": "Doklady",
         "receiptsHint": "Účtenka nebo faktura k této transakci.",
         "receiptDocumentName": "Doklad: {{title}} ({{date}})",
@@ -1863,7 +1872,8 @@
         "ledgerSortDate": "Podle data",
         "ledgerSortAmount": "Podle částky",
         "ledgerSortActive": "Řazení: {{sort}}",
-        "ledgerAccountsAll": "Všechny účty"
+        "ledgerAccountsAll": "Všechny účty",
+        "showAccountTransactions": "Zobrazit pohyby účtu"
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",
@@ -2095,6 +2105,8 @@
         "confirmPasswordLabel": "Potvrdit nové heslo",
         "savePassword": "Uložit heslo",
         "passwordMismatch": "Hesla se neshodují.",
+        "currentPasswordWrong": "Současné heslo není správné.",
+        "passwordTooShort": "Alespoň 8 znaků.",
         "passwordSavedToast": "Heslo úspěšně změněno.",
         "oidcLinkTitle": "Jednotné přihlášení",
         "oidcLinkHint": "Propoj svůj účet SSO s tímto účtem, aby tě přihlášení přes poskytovatele přivedlo sem místo vytvoření druhého účtu.",
@@ -2204,6 +2216,7 @@
         "familyRoleGrandparent": "Prarodič",
         "familyRoleRelative": "Příbuzný/á",
         "familyRoleOther": "Člen rodiny",
+        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“.",
         "systemAdminLabel": "Správce systému",
         "systemAdminHint": "Správci systému mohou spravovat nastavení aplikace, integrace, API tokeny a rodinné účty.",
         "systemAdminBadge": "Správce systému",
@@ -2220,7 +2233,7 @@
         "removeMemberNamed": "Odebrat účet {{name}}",
         "memberDeactivatedToast": "Účet {{name}} byl deaktivován. Záznamy zůstávají.",
         "memberFormerBadge": "Bývalý člen",
-        "memberOrderHint": "Toto pořadí platí pro celou domácnost: řídí se jím kalendář, rozvrh i každý seznam osob. Změníte ho přetažením úchytu, nebo na něj přesuňte fokus a stiskněte klávesy se šipkami. Noví členové jsou zařazeni za něj, seřazení podle jména.",
+        "memberOrderHint": "Toto pořadí platí v celé domácnosti. Změníš ho tažením za úchyt nebo šipkami.",
         "logout": "Odhlásit se",
         "logoutConfirm": "Odhlásit se z tohoto zařízení?",
         "synchronizing": "Synchronizuji…",
@@ -2249,7 +2262,7 @@
         "pwaInstallTitle": "Instalovat Yuvomi na toto zařízení",
         "pwaInstallChecking": "Kontrola dostupnosti instalace...",
         "pwaInstallReady": "Yuvomi lze na toto zařízení nainstalovat jako aplikaci.",
-        "pwaInstallUnavailable": "Instalace v tomto prohlížeči momentálně není dostupná.",
+        "pwaInstallUnavailable": "Tento prohlížeč zde instalaci nenabízí. V Chromu a Edge ji najdeš v nabídce prohlížeče, v Safari pod Sdílet > Přidat do Docku nebo Přidat na plochu. Bez adresy HTTPS ji nenabízí žádný prohlížeč.",
         "pwaInstallInstalled": "Yuvomi je na tomto zařízení již nainstalován.",
         "pwaInstallIosHint": "Na iPhone nebo iPad otevřete nabídku Sdílet a vyberte Přidat na plochu.",
         "pwaInstallButton": "Instalovat aplikaci",
@@ -2627,7 +2640,7 @@
         "emptyStateNoAccounts": "Zatím nejsou připojeny žádné účty",
         "housekeepingPaymentsTitle": "Platební úkoly",
         "housekeepingPaymentTasksLabel": "Vytvořit platební úkol při každém příchodu",
-        "housekeepingPaymentTasksHint": "Pokud je aktivní, vytvoří se při každém příchodu úkol pro zaplacení pomoci v domácnosti. Splnění tohoto úkolu označí návštěvu jako zaplacenou.",
+        "housekeepingPaymentTasksHint": "Pokud je aktivní, vytvoří se při každém příchodu úkol pro zaplacení pomoci v domácnosti. Splnění tohoto úkolu označí návštěvu jako zaplacenou. Vidí ho jen osoba, která příchod zaznamená, a správci.",
         "housekeepingPaymentTasksSaved": "Nastavení plateb pomoci v domácnosti uloženo.",
         "tabModules": "Moduly",
         "thirdPartyModulesTitle": "Moduly",
@@ -3285,7 +3298,25 @@
         "displayRemoveDeviceActive": "Toto zařízení je stále spárované. Nejprve ho odvolejte.",
         "feedExportIncludeBirthdays": "Zahrnout narozeniny",
         "feedExportIncludeBirthdaysHint": "Při samostatném odběru narozenin vypněte tuto možnost, aby se narozeniny a svátky nezobrazovaly dvakrát.",
-        "birthdayFeedHint": "Kdokoli s tímto odkazem uvidí všechny narozeniny a svátky uložené v domácnosti, i bez připomínek. Používejte jej pouze na vlastních zařízeních."
+        "birthdayFeedHint": "Kdokoli s tímto odkazem uvidí všechny narozeniny a svátky uložené v domácnosti, i bez připomínek. Používejte jej pouze na vlastních zařízeních.",
+        "skipToSheet": "Přejít k nastavení",
+        "screensaverOffTitle": "Fotografický spořič obrazovky",
+        "screensaverNeedsImmich": "Spořič se spustí, až správce připojí Immich. Potom zde nastavíš pro toto zařízení prodlevu, hodiny a ořez fotek.",
+        "screensaverConnectImmich": "Připojit Immich",
+        "weatherPlaceLabel": "Místo",
+        "weatherPlaceHint": "Hledá se u meteorologické služby Open-Meteo. Odesílá se jen název místa.",
+        "weatherPlacePlaceholder": "Město nebo PSČ",
+        "weatherPlaceSearch": "Hledat",
+        "weatherPlaceCurrent": "Aktuálně: {{place}}",
+        "weatherPlaceNone": "Zatím není vybráno žádné místo.",
+        "weatherPlaceResultsLabel": "Nalezená místa",
+        "weatherPlacePick": "Vyber své místo ze seznamu.",
+        "weatherPlaceChosen": "Vybráno: {{place}}. Pro použití ulož.",
+        "weatherPlaceRequired": "Vyhledej místo a vyber ho ze seznamu.",
+        "weatherPlaceTooShort": "Zadej alespoň dva znaky.",
+        "weatherPlaceNotFound": "Místo s tímto názvem nebylo nalezeno. Připoj zemi, např. „Most, Česko“.",
+        "weatherPlaceUnavailable": "Vyhledávání míst teď není dostupné. Zkus to za chvíli znovu nebo zadej souřadnice ručně.",
+        "weatherManualTitle": "Souřadnice ručně"
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
@@ -3373,7 +3404,8 @@
         "resultCountMany": "{{count}} výsledků",
         "goTo": "Přejít na",
         "newSection": "Vytvořit nové",
-        "recentLabel": "Nedávno otevřené"
+        "recentLabel": "Nedávno otevřené",
+        "createTaskNamed": "Vytvořit „{{title}}“ jako úkol"
     },
     "shortcuts": {
         "search": "Otevřít vyhledávání",
@@ -3448,7 +3480,9 @@
     },
     "offline": {
         "banner": "Offline - obnovování připojení…",
-        "staleData": "Offline - stav: {{time}}"
+        "staleData": "Offline - stav: {{time}}",
+        "pageTitle": "Jsi offline",
+        "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama."
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",
@@ -3514,7 +3548,6 @@
         "taskAreaPlaceholder": "Příklad: Koupelna",
         "taskFrequency": "Četnost (dny)",
         "taskCreatedToast": "Úkol domácí péče vytvořen.",
-        "dashboard": "Přehled",
         "reports": "Hlášení",
         "visitsThisMonth": "Návštěvy v měsíci",
         "lastVisit": "Poslední návštěva",
@@ -3643,7 +3676,12 @@
         "currentMonth": "Aktuální měsíc",
         "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
         "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
-        "reportVisitsCount": "Návštěvy"
+        "reportVisitsCount": "Návštěvy",
+        "amountsPermissionLabel": "Zobrazit mzdy a platby",
+        "errorAmountsHidden": "Platbu může označit jen ten, kdo smí vidět částky za pomoc v domácnosti.",
+        "notHereToday": "Dnes ještě nedorazila",
+        "tabVisits": "Návštěvy",
+        "tabChores": "Práce"
     },
     "splitExpenses": {
         "title": "Společné výdaje",
@@ -3672,7 +3710,6 @@
         "noBalances": "Vše je vyrovnáno.",
         "noExpenses": "Žádné odpovídající výdaje.",
         "noActivity": "Zatím žádná aktivita.",
-        "owes": "dluží",
         "system": "Systém",
         "quickGroceries": "Výdaj v supermarketu",
         "quickSchool": "Sdílet školní náklady",
@@ -3825,8 +3862,11 @@
         "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná.",
         "loadMoreActivity": "Načíst další",
         "expenseDeleted": "Smazáno",
-        "youAreOwedInGroup": "Dostaneš v {{group}}",
-        "youOweInGroup": "Dlužíš v {{group}}"
+        "youAreOwedInGroup": "{{group}}: dostaneš",
+        "youOweInGroup": "{{group}}: dlužíš",
+        "debtYouOwe": "Dlužíte osobě {{name}}",
+        "debtOwesYou": "{{name}} vám dluží",
+        "debtOwes": "{{from}} dluží {{to}}"
     },
     "documents": {
         "title": "Dokumenty",
@@ -4375,7 +4415,8 @@
         "submit": "Odeslat odkaz",
         "sent": "Pokud odpovídající účet existuje, byl odeslán odkaz pro obnovení.",
         "backToLogin": "Zpět na přihlášení",
-        "unavailable": "Tato domácnost nenabízí obnovu hesla. Obraťte se na správce vaší domácnosti."
+        "unavailable": "Tato domácnost nenabízí obnovu hesla. Obraťte se na správce vaší domácnosti.",
+        "identifierRequired": "Zadejte své uživatelské jméno nebo e-mailovou adresu."
     },
     "resetPassword": {
         "title": "Nastavit nové heslo",
@@ -4405,6 +4446,15 @@
         "test": "Testovat připojení",
         "testSuccess": "Testovací e-mail byl úspěšně odeslán.",
         "testFailed": "Test selhal: {{error}}",
+        "portInvalid": "Zadej port od {{min}} do {{max}}.",
+        "testFailedNotConfigured": "Nejprve zadej SMTP server a adresu odesílatele.",
+        "testFailedAuth": "Server odmítl uživatelské jméno nebo heslo.",
+        "testFailedConnection": "Server není na tomto hostiteli a portu dostupný.",
+        "testFailedTls": "Šifrované spojení se nepodařilo. Zkontroluj šifrování a port.",
+        "testFailedRejected": "Server testovací e-mail nepřijal. Zkontroluj adresu odesílatele.",
+        "testFailedUnknown": "Testovací e-mail se nepodařilo odeslat.",
+        "testNoRecipient": "Testovací e-mail jde na tvou vlastní adresu, která zatím chybí. Doplň ji v Účet → E-mail.",
+        "testNoRecipientLink": "Otevřít účet",
         "saveFailed": "Uložení se nezdařilo: {{error}}",
         "saved": "Nastavení uloženo."
     },
@@ -4945,7 +4995,6 @@
                 "daily": "Denně",
                 "none": "Zatím žádné časy.",
                 "delete": "Smazat čas",
-                "newHint": "Uložte lék, poté můžete přidat časy.",
                 "timeRequired": "Čas je povinný."
             },
             "weekday": {
@@ -5856,7 +5905,9 @@
         "mappingProfileStatusUnmatchedType": "V této domácnosti není odpovídající druh",
         "mappingProfileStatusAmbiguousType": "Nejednoznačné - více typů má stejný název",
         "icsCalendarName": "Svoz odpadu",
-        "icsPickupSummary": "Svoz: {{name}}"
+        "icsPickupSummary": "Svoz: {{name}}",
+        "intervalDecrease": "Zkrátit interval",
+        "intervalIncrease": "Prodloužit interval"
     },
     "rewards": {
         "title": "Odměny",
@@ -6510,7 +6561,20 @@
         "overviewClearSelection": "Zrušit výběr",
         "continuesUntil": "…pokračuje do {{time}}",
         "overviewEmptyTitle": "Vyberte osoby k porovnání",
-        "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe."
+        "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe.",
+        "presetCodes": {
+            "early": "R",
+            "late": "O",
+            "night": "N",
+            "day": "D",
+            "vacation": "DV",
+            "sick": "NE",
+            "exam": "ZK",
+            "lecture": "PŘ",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "S časem"
     },
     "pairDisplay": {
         "title": "Spárovat tablet",

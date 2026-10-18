@@ -1285,3 +1285,49 @@ test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', as
   const recipePane = recipes.slice(recipes.indexOf('function renderRecipePane('), recipes.indexOf('function openRecipeNarrow('));
   assert.match(recipePane, /withPrimaryEdit\(/, 'die Rezeptspalte folgt derselben Regel');
 });
+
+// Re-Critique 2026-10-17 (A4 P3): im Inventar stand der 2px-Streifen im
+// Modulton 16px unter der Haarlinie der Kopfzeile - eine Doppellinie, die
+// nichts sagte (das Modul nennt der Kopf der Seite). Ein Streifen traegt eine
+// Aussage (Marken-, Kalenderfarbe), nie nur den Modulton - wie seit R18 bei
+// Geburtstagen und Terminen.
+test('R20: keine Leseansicht zieht einen Farbstreifen im blossen Modulton', async () => {
+  const { readdirSync } = await import('node:fs');
+  const dir = new URL('../public/pages/', import.meta.url);
+  const hits = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    for (const m of src.matchAll(/accentColor:\s*'var\(--module-[a-z-]+\)'/g)) hits.push(`${file}: ${m[0]}`);
+  }
+  assert.deepEqual(hits, []);
+});
+
+/* Fremde Adressen als Link: nur http(s) wird zum href. Die Website eines
+ * Kontakts kommt ungeprueft aus dem vCard-Feld URL (CardDAV), die Rezept-URL
+ * aus Formular, API und Rezept-Anbietern. Stand dort `javascript:...`, wurde es
+ * ein klickbarer Link - heute bremst das nur die CSP (script-src ohne
+ * unsafe-inline), eine zweite Schicht gab es nicht.
+ */
+test('externalHref laesst nur http(s) als Linkziel durch', async () => {
+  const { externalHref } = await import('../public/utils/html.js');
+  assert.equal(typeof externalHref, 'function', 'utils/html.js exportiert externalHref');
+  assert.equal(externalHref('https://example.org/a?b=1'), 'https://example.org/a?b=1');
+  assert.equal(externalHref('  HTTP://example.org  '), 'HTTP://example.org');
+  assert.equal(externalHref('javascript:alert(1)'), '');
+  assert.equal(externalHref(' JavaScript:alert(1)'), '');
+  assert.equal(externalHref('data:text/html,<b>x</b>'), '');
+  assert.equal(externalHref('www.example.org'), '', 'ohne Schema kein relativer Link in die App');
+  assert.equal(externalHref(null), '');
+});
+
+test('Kontakt-Website und Rezept-URL laufen durch externalHref', async () => {
+  const contacts = await read('public/pages/contacts.js');
+  assert.match(contacts, /externalHref\(contact\.website\)/, 'contacts.js: Website');
+  assert.doesNotMatch(contacts, /href: contact\.website\b/, 'contacts.js: roher Wert als href');
+  const recipes = await read('public/pages/recipes.js');
+  assert.match(recipes, /externalHref\(recipe\.recipe_url\)/, 'recipes.js: Rezept-Link');
+  assert.doesNotMatch(recipes, /link\.href = recipe\.recipe_url/, 'recipes.js: roher Wert als href');
+  const meals = await read('public/pages/meals.js');
+  assert.match(meals, /externalHref\(meal\.recipe_url\)/, 'meals.js: Rezept-Knopf der Mahlzeitkarte');
+  assert.doesNotMatch(meals, /href="\$\{esc\(meal\.recipe_url\)\}"/, 'meals.js: roher Wert als href');
+});

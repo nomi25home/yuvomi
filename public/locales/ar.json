@@ -45,6 +45,9 @@
         "errorOccurred": "حدث خطأ ما.",
         "unexpectedError": "حدث خطأ غير متوقع.",
         "errorDetails": "التفاصيل التقنية",
+        "pageFailedTitle": "تعذّر فتح {{page}} الآن",
+        "pageFailedHint": "كل الأقسام الأخرى تعمل كالمعتاد.",
+        "toOverview": "إلى لوحة التحكم",
         "errorGeneric": "حدث خطأ.",
         "updateAvailable": "يوجد تحديث - أعد تحميل الصفحة للحصول على أحدث إصدار.",
         "titleRequired": "العنوان مطلوب",
@@ -87,13 +90,17 @@
         },
         "toShoppingListNamed": "إضافة {{title}} إلى قائمة التسوق",
         "emailInUse": "عنوان البريد الإلكتروني هذا مرتبط بالفعل بحساب آخر.",
+        "emailInvalid": "أدخل عنوان بريد إلكتروني صالحًا.",
         "sessionUnreachableTitle": "انقطع الاتصال",
+        "serverNotReadyTitle": "الخادم غير جاهز حاليًا",
+        "rateLimitedTitle": "طلبات كثيرة جدًا",
         "sessionRetryHint": "ستبقى مسجلاً للدخول. محاولة جديدة خلال {{seconds}} ث.",
         "sessionRetrying": "جارٍ إعادة المحاولة…",
         "searchNoResultsTitle": "لا توجد نتائج",
         "searchNoResultsDescription": "لا شيء يطابق بحثك.",
         "searchNoResultsFilteredDescription": "لا شيء يطابق بحثك وعوامل التصفية.",
-        "searchReset": "إعادة تعيين البحث"
+        "searchReset": "إعادة تعيين البحث",
+        "passwordMinLength": "8 أحرف على الأقل."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -1743,10 +1750,12 @@
         "deleteLoanPaymentConfirm": "هل تريد حذف دفعة القرض هذه؟",
         "loanRemainingAmount": "المتبقي",
         "loanRemainingPrincipal": "الرصيد المتبقي من أصل الدين",
+        "loanOwedToYou": "المستحق لك",
         "loanStillToPay": "المتبقي للدفع",
         "loanPrincipalAmount": "مبلغ القرض",
         "loanRemainingInstallments": "الأقساط المتبقية",
         "loanPaidAmount": "المدفوع",
+        "loanReceivedAmount": "المسترد",
         "loansEmpty": "لا توجد قروض نشطة.",
         "loanInstallmentMeta": "تم دفع {{paid}} من {{total}} أقساط",
         "loanRemainingOf": "من {{total}}",
@@ -1758,7 +1767,8 @@
         "loanSortBalance": "أصغر رصيد متبقٍ أولاً",
         "loanSortActive": "الترتيب: {{sort}}",
         "loanPaidStatus": "مدفوع",
-        "markLoanPaid": "تسجيل الدفع",
+        "loanBookInstallment": "تسجيل قسط",
+        "loanReceiveRepayment": "تم استلام السداد",
         "loanBorrowerLabel": "الشخص",
         "loanDirectionLabel": "نوع القرض",
         "loanDirectionLent": "قرض مُقدَّم (يُسدَّد لي)",
@@ -1926,8 +1936,6 @@
         "accountType_credit": "بطاقة ائتمان",
         "accountType_investment": "استثمار",
         "accountType_other": "أخرى",
-        "viewAccountTransactions": "عرض حركات {{name}}",
-        "currentBalance": "الرصيد الحالي",
         "clearAccountFilter": "إزالة تصفية الحساب",
         "archivedBadge": "مؤرشف",
         "showArchivedAccounts": "عرض المؤرشفة",
@@ -1970,6 +1978,7 @@
         "statsPointsLabel": "قيم منحنى التطور",
         "statsPointLabel": "{{period}}: الدخل {{income}}، المصروفات {{expenses}}",
         "statsPointLabelCumulative": "حتى {{period}}: الدخل {{income}}، المصروفات {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} مخطط",
         "receiptsLabel": "الإيصالات",
         "receiptsHint": "إيصال أو فاتورة لهذه الحركة.",
         "receiptDocumentName": "إيصال: {{title}} ({{date}})",
@@ -2020,7 +2029,8 @@
         "ledgerSortDate": "حسب التاريخ",
         "ledgerSortAmount": "حسب المبلغ",
         "ledgerSortActive": "الترتيب: {{sort}}",
-        "ledgerAccountsAll": "كل الحسابات"
+        "ledgerAccountsAll": "كل الحسابات",
+        "showAccountTransactions": "عرض الحركات"
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",
@@ -2117,6 +2127,8 @@
         "confirmPasswordLabel": "تأكيد كلمة المرور الجديدة",
         "savePassword": "حفظ كلمة المرور",
         "passwordMismatch": "كلمتا المرور غير متطابقتين.",
+        "currentPasswordWrong": "كلمة المرور الحالية غير صحيحة.",
+        "passwordTooShort": "8 أحرف على الأقل.",
         "passwordSavedToast": "تم تغيير كلمة المرور بنجاح.",
         "oidcLinkTitle": "الدخول الموحد",
         "oidcLinkHint": "اربط حساب الدخول الموحد بهذا الحساب حتى يقودك تسجيل الدخول عبر المزوّد إلى هنا بدلاً من إنشاء حساب ثانٍ.",
@@ -2226,6 +2238,7 @@
         "familyRoleGrandparent": "جد/جدة",
         "familyRoleRelative": "قريب",
         "familyRoleOther": "فرد من العائلة",
+        "childStartHint": "تبدأ حسابات الأطفال الجديدة بدون الميزانية والصيام، وترى المساعدة المنزلية للقراءة فقط دون الأجور والمدفوعات. يمكنك تغيير ذلك لاحقًا ضمن «الأدوار والأذونات».",
         "systemAdminLabel": "مسؤول النظام",
         "systemAdminHint": "يمكن لمسؤولي النظام إدارة الإعدادات والتكاملات ورموز API وحسابات العائلة.",
         "systemAdminBadge": "مسؤول النظام",
@@ -2242,7 +2255,7 @@
         "removeMemberNamed": "إزالة {{name}}",
         "memberDeactivatedToast": "تم تعطيل حساب {{name}}. الإدخالات محفوظة.",
         "memberFormerBadge": "عضو سابق",
-        "memberOrderHint": "هذا الترتيب يسري على المنزل كله: التقويم والجدول وكل قائمة أشخاص تتبعه. لتغييره اسحب المقبض، أو ركّز عليه واضغط مفاتيح الأسهم. الأعضاء الجدد يأتون بعده مرتبين حسب الاسم.",
+        "memberOrderHint": "ينطبق هذا الترتيب على المنزل كله. اسحب المقبض أو استخدم مفاتيح الأسهم لتغييره.",
         "logout": "تسجيل الخروج",
         "logoutConfirm": "تسجيل الخروج من هذا الجهاز؟",
         "synchronizing": "جارٍ المزامنة…",
@@ -2271,7 +2284,7 @@
         "pwaInstallTitle": "تثبيت Yuvomi على هذا الجهاز",
         "pwaInstallChecking": "جارٍ التحقق من إمكانية التثبيت...",
         "pwaInstallReady": "يمكن تثبيت Yuvomi كتطبيق على هذا الجهاز.",
-        "pwaInstallUnavailable": "التثبيت غير متاح في هذا المتصفح الآن.",
+        "pwaInstallUnavailable": "لا يعرض هذا المتصفح التثبيت هنا. في Chrome وEdge تجده في قائمة المتصفح، وفي Safari ضمن مشاركة > إضافة إلى Dock أو إلى الشاشة الرئيسية. بدون عنوان HTTPS لا يعرضه أي متصفح.",
         "pwaInstallInstalled": "Yuvomi مثبت بالفعل على هذا الجهاز.",
         "pwaInstallIosHint": "على iPhone أو iPad، استخدم قائمة المشاركة واختر إضافة إلى الشاشة الرئيسية.",
         "pwaInstallButton": "تثبيت التطبيق",
@@ -2468,7 +2481,7 @@
         "deleteCardDAVAccountConfirm": "تبقى جهات الاتصال المتزامنة، لكنها تفقد ارتباطها بـ CardDAV.",
         "housekeepingPaymentsTitle": "مهام الدفع",
         "housekeepingPaymentTasksLabel": "إنشاء مهمة دفع عند كل تسجيل دخول",
-        "housekeepingPaymentTasksHint": "عند التفعيل، تُنشأ مهمة لدفع أجر العاملة المنزلية عند كل تسجيل دخول. إنجاز هذه المهمة يضع علامة مدفوع على الزيارة.",
+        "housekeepingPaymentTasksHint": "عند التفعيل، تُنشأ مهمة لدفع أجر العاملة المنزلية عند كل تسجيل دخول. إنجاز هذه المهمة يضع علامة مدفوع على الزيارة. لا يراها إلا من يسجّل الدخول والمشرفون.",
         "housekeepingPaymentTasksSaved": "تم حفظ إعداد مدفوعات التدبير المنزلي.",
         "backupSchedulerDisabled": "معطّل",
         "backupSchedulerEnabled": "مفعّل",
@@ -3488,7 +3501,25 @@
         "displayRemoveDeviceActive": "هذا الجهاز ما زال مقترنًا. أبطِله أولًا.",
         "feedExportIncludeBirthdays": "تضمين أعياد الميلاد",
         "feedExportIncludeBirthdaysHint": "عطّل هذا الخيار عند الاشتراك في موجز أعياد الميلاد المنفصل لتجنب تكرار أعياد الميلاد وأيام الأسماء.",
-        "birthdayFeedHint": "يمكن لأي شخص لديه هذا الرابط رؤية جميع أعياد الميلاد وأيام الأسماء المحفوظة في المنزل، حتى دون تذكيرات. استخدمه على أجهزتك الخاصة فقط."
+        "birthdayFeedHint": "يمكن لأي شخص لديه هذا الرابط رؤية جميع أعياد الميلاد وأيام الأسماء المحفوظة في المنزل، حتى دون تذكيرات. استخدمه على أجهزتك الخاصة فقط.",
+        "skipToSheet": "انتقل إلى الإعداد",
+        "screensaverOffTitle": "شاشة توقف الصور",
+        "screensaverNeedsImmich": "تبدأ شاشة التوقف عندما يربط مشرف Immich. بعدها تضبط هنا مدة الانتظار والساعة وقصّ الصورة لهذا الجهاز.",
+        "screensaverConnectImmich": "ربط Immich",
+        "weatherPlaceLabel": "المكان",
+        "weatherPlaceHint": "يتم البحث لدى خدمة الطقس Open-Meteo. يُرسل اسم المكان فقط.",
+        "weatherPlacePlaceholder": "المدينة أو الرمز البريدي",
+        "weatherPlaceSearch": "بحث",
+        "weatherPlaceCurrent": "الحالي: {{place}}",
+        "weatherPlaceNone": "لم يتم اختيار مكان بعد.",
+        "weatherPlaceResultsLabel": "الأماكن التي تم العثور عليها",
+        "weatherPlacePick": "اختر مكانك من القائمة.",
+        "weatherPlaceChosen": "تم اختيار {{place}}. احفظ لتطبيقه.",
+        "weatherPlaceRequired": "ابحث عن مكان واختره من القائمة.",
+        "weatherPlaceTooShort": "أدخل حرفين على الأقل.",
+        "weatherPlaceNotFound": "لم يُعثر على مكان بهذا الاسم. أضف البلد، مثل «الإسكندرية، مصر».",
+        "weatherPlaceUnavailable": "البحث عن الأماكن غير متاح حاليًا. حاول مجددًا بعد قليل أو أدخل الإحداثيات يدويًا.",
+        "weatherManualTitle": "الإحداثيات يدويًا"
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",
@@ -3693,7 +3724,8 @@
         "resultCountMany": "{{count}} نتائج",
         "goTo": "انتقل إلى",
         "newSection": "إنشاء جديد",
-        "recentLabel": "فُتح مؤخرًا"
+        "recentLabel": "فُتح مؤخرًا",
+        "createTaskNamed": "إنشاء „{{title}}“ كمهمة"
     },
     "birthdays": {
         "inDays_one": "خلال {{count}} يوم",
@@ -3816,7 +3848,9 @@
     },
     "offline": {
         "banner": "غير متصل - تتم إعادة الاتصال…",
-        "staleData": "غير متصل - آخر تحديث: {{time}}"
+        "staleData": "غير متصل - آخر تحديث: {{time}}",
+        "pageTitle": "أنت غير متصل",
+        "pageDescription": "تحتاج هذه الصفحة إلى اتصال. ستُحمَّل تلقائيًا فور عودة جهازك إلى الاتصال."
     },
     "emptyHint": {
         "recipes": "تنتقل الوصفة مباشرة إلى خطة الوجبات أو إلى قائمة المشتريات.",
@@ -4221,7 +4255,6 @@
         "taskAreaPlaceholder": "مثال: الحمام",
         "taskFrequency": "التكرار (بالأيام)",
         "taskCreatedToast": "تم إنشاء مهمة التدبير المنزلي.",
-        "dashboard": "نظرة عامة",
         "reports": "التقارير",
         "visitsThisMonth": "زيارات هذا الشهر",
         "lastVisit": "آخر زيارة",
@@ -4350,7 +4383,12 @@
         "currentMonth": "الشهر الحالي",
         "noVisitReportsInMonth": "لم تُسجل أي زيارة في {{month}}.",
         "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول",
-        "reportVisitsCount": "الزيارات"
+        "reportVisitsCount": "الزيارات",
+        "amountsPermissionLabel": "عرض الأجور والمدفوعات",
+        "errorAmountsHidden": "لا يمكن تسجيل الدفع إلا لمن يُسمح له برؤية مبالغ المساعدة المنزلية.",
+        "notHereToday": "لم تصل اليوم بعد",
+        "tabVisits": "الزيارات",
+        "tabChores": "الأعمال المنزلية"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
@@ -4383,7 +4421,6 @@
         "noBalances": "تمت تسوية الجميع.",
         "noExpenses": "لا توجد مصاريف لهذه العرض.",
         "noActivity": "لا يوجد نشاط بعد.",
-        "owes": "يدين لـ",
         "system": "النظام",
         "quickGroceries": "إضافة مصروف سوبرماركت",
         "quickSchool": "تقسيم مصاريف المدرسة",
@@ -4542,8 +4579,11 @@
         "reversePaymentConfirmDetail": "{{payer}} إلى {{payee}}، {{amount}}. قيد معاكس يلغي الدفعة وتعود الأرصدة كما كانت. تبقى الدفعة في النشاط مع علامة معكوسة.",
         "loadMoreActivity": "تحميل المزيد",
         "expenseDeleted": "محذوف",
-        "youAreOwedInGroup": "مستحق لك في {{group}}",
-        "youOweInGroup": "عليك في {{group}}"
+        "youAreOwedInGroup": "{{group}}: مستحق لك",
+        "youOweInGroup": "{{group}}: عليك",
+        "debtYouOwe": "أنت مدين لـ {{name}}",
+        "debtOwesYou": "{{name}} مدين لك",
+        "debtOwes": "{{from}} مدين لـ {{to}}"
     },
     "wmo": {
         "0": "سماء صافية",
@@ -4611,7 +4651,8 @@
         "submit": "إرسال الرابط",
         "sent": "إذا كان هناك حساب مطابق، فقد أُرسل رابط لإعادة التعيين.",
         "backToLogin": "العودة إلى تسجيل الدخول",
-        "unavailable": "لا يوفّر هذا المنزل إعادة تعيين كلمة المرور. يرجى التواصل مع مسؤول منزلك."
+        "unavailable": "لا يوفّر هذا المنزل إعادة تعيين كلمة المرور. يرجى التواصل مع مسؤول منزلك.",
+        "identifierRequired": "أدخل اسم المستخدم أو عنوان بريدك الإلكتروني."
     },
     "resetPassword": {
         "title": "تعيين كلمة مرور جديدة",
@@ -4641,6 +4682,15 @@
         "test": "اختبار الاتصال",
         "testSuccess": "تم إرسال رسالة الاختبار بنجاح.",
         "testFailed": "فشل الاختبار: {{error}}",
+        "portInvalid": "أدخل منفذًا من {{min}} إلى {{max}}.",
+        "testFailedNotConfigured": "أدخل أولًا مضيف SMTP وعنوان المرسل.",
+        "testFailedAuth": "رفض الخادم اسم المستخدم أو كلمة المرور.",
+        "testFailedConnection": "لا يمكن الوصول إلى الخادم على هذا المضيف والمنفذ.",
+        "testFailedTls": "تعذّر إنشاء الاتصال المشفّر. تحقّق من التشفير والمنفذ.",
+        "testFailedRejected": "لم يقبل الخادم رسالة الاختبار. تحقّق من عنوان المرسل.",
+        "testFailedUnknown": "تعذّر إرسال رسالة الاختبار.",
+        "testNoRecipient": "تُرسل رسالة الاختبار إلى بريدك الإلكتروني، وهو غير مضاف بعد. أضفه في الحساب ← البريد الإلكتروني.",
+        "testNoRecipientLink": "فتح الحساب",
         "saveFailed": "فشل الحفظ: {{error}}",
         "saved": "تم حفظ الإعدادات."
     },
@@ -5191,7 +5241,6 @@
                 "daily": "يوميًا",
                 "none": "لا توجد أوقات بعد.",
                 "delete": "حذف الوقت",
-                "newHint": "احفظ الدواء لتتمكن من إضافة الأوقات.",
                 "timeRequired": "الوقت مطلوب."
             },
             "weekday": {
@@ -6126,7 +6175,9 @@
         "mappingProfileStatusUnmatchedType": "لا يوجد نوع مطابق في هذه الأسرة",
         "mappingProfileStatusAmbiguousType": "غامض - عدة أنواع تشترك في هذا الاسم",
         "icsCalendarName": "مواعيد جمع النفايات",
-        "icsPickupSummary": "جمع {{name}}"
+        "icsPickupSummary": "جمع {{name}}",
+        "intervalDecrease": "تقليل الفاصل",
+        "intervalIncrease": "زيادة الفاصل"
     },
     "rewards": {
         "title": "المكافآت",
@@ -6820,7 +6871,20 @@
         "overviewClearSelection": "مسح التحديد",
         "continuesUntil": "…يستمر حتى {{time}}",
         "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
-        "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب."
+        "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب.",
+        "presetCodes": {
+            "early": "ص",
+            "late": "م",
+            "night": "ل",
+            "day": "ن",
+            "vacation": "إج",
+            "sick": "مر",
+            "exam": "امت",
+            "lecture": "مح",
+            "seminar": "ند",
+            "lab": "مع"
+        },
+        "typesWithTime": "بمواعيد"
     },
     "pairDisplay": {
         "title": "اقتران الجهاز اللوحي",

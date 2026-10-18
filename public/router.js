@@ -16,9 +16,10 @@ import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
-import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted } from '/utils/router-navigate.js';
+import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
@@ -38,21 +39,21 @@ import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import {
-  SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands,
+  SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands, paletteStatusText,
   readRecent, rememberRecent, visibleRecent, forgetAllRecent,
 } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { wirePaletteCombobox } from '/utils/palette-combobox.js';
-import { triggerPageFab } from '/utils/fab.js';
+import { triggerPageFab, syncFabName, fabActionLabel } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
 import { createStartHandoff } from '/utils/start-handoff.js';
-import { showSessionUnreachable } from '/utils/session-unreachable.js';
+import { showSessionUnreachable, showPageUnreachable, isUnreachableFailure } from '/utils/session-unreachable.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
-  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled, hasOpenOverlay,
+  pushOverlay, dropOverlay, whenHistorySettled, hasOpenOverlay,
 } from '/utils/overlay-history.js';
 import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
@@ -282,6 +283,31 @@ function updateThemeColorForRoute(route) {
 // --------------------------------------------------------
 let activePageStyle = null;
 
+// DIE @import-ZEILEN DER SEITENBLAETTER, damit der Browser sie gleich mitlaedt
+// (Modern-Web-Guidance-Audit, Befund 12). Ein `@import` sieht er erst, wenn
+// das Blatt darueber geladen und gelesen ist - eine zweite Rundreise vor dem
+// ersten Bild der Seite. `preloadStyleImports()` legt sie als `preload` daneben,
+// das `@import` findet die Antwort dann schon vor. Die Tabelle haelt ein Guard
+// in test:frontend-audit gleich mit den @import-Zeilen in public/styles/.
+const PAGE_STYLE_IMPORTS = Object.freeze({
+  '/styles/budget.css': ['/styles/split-expenses.css', '/styles/subscriptions.css'],
+  '/styles/dashboard.css': ['/styles/fasting-controls.css'],
+  '/styles/health.css': ['/styles/fasting-controls.css'],
+});
+const _preloadedStyleImports = new Set();
+
+function preloadStyleImports(href) {
+  for (const imported of PAGE_STYLE_IMPORTS[href] ?? []) {
+    if (_preloadedStyleImports.has(imported)) continue;
+    _preloadedStyleImports.add(imported);
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'style';
+    link.href = imported;
+    document.head.appendChild(link);
+  }
+}
+
 function loadPageStyle(moduleName, routeStyle = null) {
   if (!moduleName && !routeStyle) return { ready: Promise.resolve(), cleanup: () => {}, abandon: () => {} };
   const href = routeStyle || `/styles/${moduleName}.css`;
@@ -289,6 +315,7 @@ function loadPageStyle(moduleName, routeStyle = null) {
     return { ready: Promise.resolve(), cleanup: () => {}, abandon: () => {} };
   }
 
+  preloadStyleImports(href);
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
@@ -324,6 +351,57 @@ function navigationIdle() {
   return new Promise((resolve) => {
     const check = () => (!routerState.isNavigating || Date.now() > until ? resolve() : setTimeout(check, 16));
     check();
+  });
+}
+
+/**
+ * Der zuletzt senkrecht gescrollte Port im Inhalt - in den gedeckelten Modulen
+ * (Kalender, Budget) scrollt nicht `#main-content`, sondern ihr eigener Port.
+ * Als WeakRef: ein abgehaengter Port der Vorseite bleibt nicht im Speicher.
+ */
+let _lastContentPort = null;
+document.addEventListener('scroll', (e) => {
+  const port = e.target;
+  if (port instanceof Element && port.scrollTop > 0 && port.closest('#main-content')) {
+    _lastContentPort = typeof WeakRef === 'function' ? new WeakRef(port) : null;
+  }
+}, { capture: true, passive: true });
+
+/**
+ * Tipp auf den aktiven Tab: die Seite gleitet nach oben (reduzierte Bewegung:
+ * springt). Der Inhalt bleibt, wie er ist - Filter, Auswahl, Aufklapper.
+ */
+function scrollPageToTop() {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  const port = _lastContentPort?.deref?.();
+  for (const el of new Set([main, port])) {
+    if (el?.isConnected && main.contains(el) && el.scrollTop > 0) el.scrollTo({ top: 0, behavior });
+  }
+}
+
+/**
+ * DER GRUND, MIT DEM EINE SEITE ABGEBROCHEN WIRD - EINMAL ERZEUGT (R20).
+ * `abort()` ohne Grund baut bei jedem Aufruf eine neue `AbortError`-Ausnahme,
+ * und deren Stapel haelt die Funktionen fest, die gerade liefen - den
+ * Seitentausch samt `oldToolbar` und damit den ganzen alten Baum. Weil Module
+ * ihr letztes Signal in einer Variablen tragen (`pageSignal`), blieb so die
+ * Aufgabenliste mit 200 Zeilen nach dem Verlassen im Speicher (Heap-Snapshot,
+ * Re-Critique 2026-10-17 a6 P3). Derselbe Name `AbortError`: wer `err.name`
+ * prueft oder ein `fetch` damit abbricht, sieht keinen Unterschied.
+ */
+const PAGE_LEFT = new DOMException('The page was left.', 'AbortError');
+
+/**
+ * Bringt das ausfahrende Mehr-Blatt samt Abdunklung an sein Ende - vor dem
+ * alten Bild eines Seitenwechsels (utils/view-transition.js, `settle`). Die
+ * Ausfahrt ist eine CSS-Transition; `finish()` setzt sie auf ihren Endwert,
+ * und `getAnimations()` holt eine noch nicht gestartete vorher in den Stil.
+ */
+function settleClosingOverlays() {
+  document.querySelectorAll('.more-sheet, .more-backdrop').forEach((el) => {
+    el.getAnimations?.().forEach((anim) => anim.finish());
   });
 }
 
@@ -414,7 +492,7 @@ async function importPage(pagePath) {
 const _prefetchedPages = new Set();
 const _prefetchedStyles = new Set();
 
-function prefetchRoute(path, { now = false } = {}) {
+function prefetchRoute(path, { now = false, priority = null } = {}) {
   if (!path) return;
   // Nach angekündigtem Update nichts mehr vorwärmen: ein modulepreload zieht den
   // kompletten Modulgraph in die Modul-Map und würde neue Seitenmodule gegen die
@@ -428,6 +506,14 @@ function prefetchRoute(path, { now = false } = {}) {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
     link.href = route.page;
+    // modulepreload laedt mit hoher Prioritaet. Das Vorwaermen im Leerlauf
+    // (warmPrimaryRoutes, rund 19 Module) gibt `low` mit, damit es nichts
+    // verdraengt, was die offene Seite gerade braucht; ohne Unterstuetzung
+    // bleibt es beim Standard (Modern-Web-Guidance-Audit, Befund 11). Die
+    // statischen Importe der Seite holt Chrome dabei nicht mit (gemessen:
+    // 15 Seitenmodule, alle `Low`, keine Abhaengigkeit); die kommen erst
+    // beim Aufruf.
+    if (priority) link.fetchPriority = priority;
     document.head.appendChild(link);
   }
 
@@ -444,6 +530,9 @@ function prefetchRoute(path, { now = false } = {}) {
     link.as = 'style';
     link.href = cssHref;
     document.head.appendChild(link);
+    // Die Startroute laedt ihre Importe gleich mit; beim Vorwaermen im
+    // Leerlauf genuegt das, was loadPageStyle() beim Aufruf nachholt.
+    if (now) preloadStyleImports(cssHref);
   }
 }
 
@@ -456,7 +545,7 @@ function warmPrimaryRoutes() {
   const run = () => {
     try {
       navItems().forEach((item) => {
-        if (item.path && item.path !== routerState.currentPath) prefetchRoute(item.path);
+        if (item.path && item.path !== routerState.currentPath) prefetchRoute(item.path, { priority: 'low' });
       });
     } catch { /* Prefetch ist rein spekulativ — Fehler nie eskalieren. */ }
   };
@@ -799,7 +888,7 @@ function applyStartPreferences(res) {
   }
 }
 
-async function syncThirdPartyModules() {
+async function syncThirdPartyModules({ forceLocales = false } = {}) {
   try {
     const res = await api.get('/modules');
     _thirdPartyModules = selectThirdPartyModuleList(_thirdPartyModules, { ok: true, data: res?.data });
@@ -809,7 +898,7 @@ async function syncThirdPartyModules() {
   setExtensionModules(_thirdPartyModules);
   setExtensionSettingsModules(_thirdPartyModules);
   setExtensionNavMap(_thirdPartyModules);
-  await reloadExtensionLocales(_thirdPartyModules);
+  await reloadExtensionLocales(_thirdPartyModules, { force: forceLocales });
 }
 
 function moduleSnapshot() {
@@ -825,6 +914,9 @@ function moduleSnapshot() {
 function startThirdPartyModulePolling() {
   if (_moduleRefreshTimer || ['split_guest', 'display'].includes(routerState.currentUser?.access_scope)) return;
   _moduleRefreshTimer = setInterval(async () => {
+    // Ein verborgener Tab fragt nicht ab: niemand sieht die Navigation, und
+    // der naechste Takt nach der Rueckkehr holt den Stand nach.
+    if (document.hidden) return;
     const before = moduleSnapshot();
     await syncThirdPartyModules();
     if (before !== moduleSnapshot()) rebuildNavigation();
@@ -1073,13 +1165,20 @@ function syncSidebarAccount(root = document.querySelector('.nav-sidebar__account
   const ink = Boolean(color) && prefersInkText(color);
   avatar.classList.toggle('nav-sidebar__avatar--ink', ink);
   avatar.classList.toggle('nav-sidebar__avatar--on-color', Boolean(color) && !ink);
+  // DIE INITIALEN SIND BILD, NICHT TEXT (R20, axe label-content-name-mismatch
+  // auf allen 60 Ansichten). Als Textknoten zaehlten „LI" zum sichtbaren
+  // Etikett des Knopfs, und sein Name „Konto-Menue, Linda Johnson" enthielt
+  // sie nicht. Sie stehen jetzt als `data-initials` und zeichnen sich per
+  // `::before` (layout.css) - wie ein Bild, das sie vertreten.
+  avatar.replaceChildren();
   if (routerState.currentUser?.avatar_data) {
     const img = document.createElement('img');
     img.src = routerState.currentUser.avatar_data;
     img.alt = '';
-    avatar.replaceChildren(img);
+    avatar.appendChild(img);
+    delete avatar.dataset.initials;
   } else {
-    avatar.textContent = initials(displayName);
+    avatar.dataset.initials = initials(displayName);
   }
   const label = displayName ? t('nav.accountMenu', { name: displayName }) : t('nav.accountMenuAnonymous');
   trigger.dataset.baseLabel = label;
@@ -1631,6 +1730,15 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // diesem Callback aufgenommen und darf nicht bei 0 stehen. Die Blende
       // des Rueckfalls ist eine Animation und schlaegt den Inline-Wert.
       pageWrapper.style.opacity = '1';
+      // DIE ALTE SEITE GEHT GANZ (R20, Re-Critique 2026-10-17 a6 P3). Jedes
+      // Modul haelt seine Wurzel in einer Modulvariablen (`_container`) - und
+      // mit ihr den ganzen letzten Baum: nach Aufgaben mit 200 Eintraegen hielt
+      // die Uebersicht 37.356 statt 2.054 Knoten, der Heap wuchs von 4,6 auf
+      // 9,7 MB. Das alte Bild hat die View Transition schon; die Kinder der
+      // alten Huelle werden hier geleert, gehalten bleibt nur die leere Huelle.
+      // Was ein Modul ueber den Wechsel retten will (die Kuechen-Leiste), haelt
+      // es selbst und setzt es im neuen render() wieder ein.
+      const oldPages = [...content.children];
       content.replaceChildren(pageWrapper);
       // Scrollport auf Anfang, solange er leer ist. `content` IST der Scrollport
       // (#main-content == .app-content) und überlebt die Navigation; ohne diese
@@ -1642,6 +1750,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // Wiederherstellung bei popstate darf und soll das dagegen überschreiben,
       // sie steht deshalb unten hinter dem await.
       content.scrollTop = 0;
+      for (const old of oldPages) old.replaceChildren();
       // Der FAB der alten Seite lebt in der Shell und fiele sonst nicht mit ihrem
       // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
       // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
@@ -1665,7 +1774,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // Uhr, stiller Refresh, Wetter- und Wandtimer liefen gegen einen
       // abgehaengten Container weiter und starteten Anfragen hinter der
       // naechsten Seite.
-      _pageController?.abort();
+      _pageController?.abort(PAGE_LEFT);
       _pageController = new AbortController();
 
       // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
@@ -1702,7 +1811,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
 
     // Wird die Navigation erst NACH dem Tausch ueberholt, verliert die neue
     // Seite ihr Signal: sie bricht ihr Laden ab, statt die naechste aufzuhalten.
-    signal?.addEventListener('abort', () => _pageController?.abort(), { once: true });
+    signal?.addEventListener('abort', () => _pageController?.abort(PAGE_LEFT), { once: true });
     const { transition, finished } = await swapPage(swap, {
       content,
       from: previousPath,
@@ -1711,6 +1820,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // wenn diese Navigation durch ist: navigate() verwirft jeden Aufruf,
       // solange `isNavigating` steht.
       whenSettled: navigationIdle,
+      settle: settleClosingOverlays,
     });
 
     // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch
@@ -1798,7 +1908,20 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
     // gesamte Navigation und die Fehlerkarte dehnt sich über die Nav-Spalte -
     // die Seite ist dann nur noch per Reload verlassbar. Erst wenn noch keine
     // Shell steht (Auth-Seiten, früher Fehler), ist #app der richtige Ort.
-    renderError(document.getElementById('main-content') ?? app, err);
+    const errorHost = document.getElementById('main-content') ?? app;
+    // OHNE NETZ KEIN ABSTURZ (Re-Critique 2026-10-17): ein Seitenwechsel
+    // offline zeigte "Etwas ist schiefgelaufen" samt Stack. Ein Netzfehler
+    // bekommt den Zustand der Sitzungsseite und zeichnet sich bei `online`
+    // selbst neu; nur ein Fehler im Code der Seite bleibt der Fehlerbildschirm.
+    if (!route.thirdPartyModule && isUnreachableFailure(err)) {
+      const retryPath = `${location.pathname}${location.search}${location.hash}`;
+      showPageUnreachable(errorHost, err, () => navigate(retryPath, false));
+    } else {
+      renderError(errorHost, err, {
+        page: navCatalog().find((n) => n.path === route.path)?.label ?? null,
+        home: route.path !== '/',
+      });
+    }
   } finally {
     // Die Uebergabe gilt der Seite, die DIESER Start zeichnet (utils/start-handoff.js).
     startHandoff.expirePage();
@@ -2209,11 +2332,18 @@ function renderAppShell(container) {
   applySidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
   updateBranding(routerState.currentPath || '/');
 
-  // Klick-Handler für alle Nav-Links
+  // Klick-Handler für alle Nav-Links. Der aktive Tab fuehrt nur nach oben,
+  // wie in einer iOS-Leiste (R20): kein Neuaufbau, kein zweiter Eintrag.
   container.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      navigate(el.dataset.navHref ?? el.dataset.route);
+      const target = el.dataset.navHref ?? el.dataset.route;
+      if (isCurrentAddress(target, location)) {
+        window._closeMoreSheet?.({ restoreFocus: false });
+        scrollPageToTop();
+        return;
+      }
+      navigate(target);
     });
   });
 
@@ -2341,6 +2471,7 @@ function dockFabIntoToolbar(fab) {
     span.textContent = label;
     fab.appendChild(span);
   }
+  syncFabName(fab);
   slot.appendChild(fab);
   /* DAS TASTENKUERZEL WIRD HIER MITGESETZT, nicht nur beim schwebenden Knopf.
    * `adoptPageFab()` gibt beim Andocken `null` zurueck, damit die
@@ -2356,7 +2487,7 @@ function dockFabIntoToolbar(fab) {
 /** Macht den 'n'-Chord am FAB sichtbar bzw. vorlesbar - schwebend wie angedockt. */
 function markFabShortcut(fab) {
   fab.setAttribute('aria-keyshortcuts', 'n');
-  const fabLabel = fab.getAttribute('aria-label');
+  const fabLabel = fabActionLabel(fab);
   if (fabLabel && !/\(n\)$/.test(fab.getAttribute('title') || '')) {
     fab.setAttribute('title', `${fabLabel} (n)`);
   }
@@ -2376,6 +2507,7 @@ function undockFabFromToolbar(fab) {
   if (!layer) return false;
   fab.classList.remove('btn', 'btn--primary', 'page-fab--docked');
   fab.querySelector('.toolbar-new-btn__label')?.remove();
+  syncFabName(fab);
   layer.replaceChildren(fab.closest('.page-fab-group') ?? fab);
   return true;
 }
@@ -2719,16 +2851,6 @@ function showHelpModal() {
   // Klartext-Fassung am Finger.
   const helpTitle = coarsePointer ? t('help.title') : t('shortcuts.help');
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-
-  const panel = document.createElement('div');
-  panel.className = 'modal-panel modal-panel--sm';
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', helpTitle);
-
   const rows = helpRows.map((r) => r.key
     ? `<div class="help-row">
          <kbd class="shortcut-kbd">${esc(r.key)}</kbd>
@@ -2740,15 +2862,24 @@ function showHelpModal() {
        </div>`
   ).join('');
 
-  panel.insertAdjacentHTML('beforeend', `
-    <div class="modal-panel__header">
-      <span class="modal-panel__title">${esc(helpTitle)}</span>
-      <button class="modal-panel__close btn--ghost" aria-label="${esc(t('common.close'))}">
-        <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="modal-panel__body">
-      <div class="shortcuts-list">${rows}</div>
+  // DER GETEILTE DIALOG (R20, Re-Critique 2026-10-17 A1 P1-2). Hier stand ein
+  // eigenes Overlay mit `aria-modal` am Grund statt am Dialog, einem `span`
+  // als Titel und einem Esc-Listener am Dokument: der Fokus blieb auf der
+  // Seite, Tab lief hinaus, und nach dem Schliessen fand niemand zurueck.
+  // openModal() bringt Top-Layer, Fokusfalle, Esc, Zurueck-Geste und die
+  // Rueckgabe an den Ausloeser mit - wie jeder andere Dialog der App. Nichts
+  // darin ist ungespeichert, also ohne Verwerfen-Rueckfrage.
+  //
+  // Am Zeiger stehen die Kuerzel in ZWEI SPALTEN (`--columns`): zwanzig
+  // Zeilen untereinander ergaben bei 1440x900 852px Einzelspalte.
+  // `--help-rows` haelt die Spalten gleich lang, gelesen wird spaltenweise.
+  const columns = !coarsePointer;
+  openModal({
+    title: helpTitle,
+    size: columns ? 'lg' : 'sm',
+    dirtyGuard: false,
+    content: `
+      <div class="shortcuts-list${columns ? ' shortcuts-list--columns' : ''}"${columns ? ` style="--help-rows:${Math.ceil(helpRows.length / 2)}"` : ''}>${rows}</div>
       <!-- Nutzerhandbuch aus der Community (#799). Es lebt in einem fremden
            Repository und in fremder Regie - deshalb steht die Herkunft im
            Linktext und nicht nur im Hinweis darunter: wer hier klickt,
@@ -2758,21 +2889,8 @@ function showHelpModal() {
           ${esc(t('help.guideLink'))}
         </a>
         <span class="help-guide__hint">${esc(t('help.guideHint'))}</span>
-      </p>
-    </div>
-  `);
-
-  panel.querySelector('.modal-panel__close').addEventListener('click', () => overlay.remove());
-  document.addEventListener('keydown', function onEsc(e) {
-    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onEsc); }
+      </p>`,
   });
-
-  overlay.appendChild(panel);
-  document.body.appendChild(overlay);
-  // Die Zurueck-Geste schliesst auch diesen Dialog (#871). `attachOverlay`
-  // statt `pushOverlay`, weil er auf drei Wegen per `remove()` verschwindet.
-  attachOverlay(overlay, () => overlay.remove());
-  if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
 // --------------------------------------------------------
@@ -3210,11 +3328,17 @@ function initMoreSheet(container, openSearch) {
 
   // Der Marker der Zurueck-Geste, solange das Blatt offen ist (#871).
   let sheetOverlayToken = null;
+  // Die Seite hinter dem Blatt ist gesperrt, solange es offen ist
+  // (utils/background-inert.js). Abdunklung und Mehr-Knopf bleiben bedienbar:
+  // beide schliessen das Blatt.
+  let releaseSheetBackground = null;
 
   function openSheet() {
     lastFocusedBeforeSheet = document.activeElement;
     sheetOverlayToken = pushOverlay(() => closeSheet());
     setOverlayInteractive(sheet, true);
+    releaseSheetBackground?.();
+    releaseSheetBackground = inertOutside(sheet, { keep: [backdrop, currentMoreBtn()] });
     sheet.addEventListener('keydown', moreSheetTrap);
     backdrop.classList.add('more-backdrop--visible');
     currentMoreBtn().setAttribute('aria-expanded', 'true');
@@ -3247,6 +3371,8 @@ function initMoreSheet(container, openSearch) {
       dropOverlay(token);
     }
     setOverlayInteractive(sheet, false);
+    releaseSheetBackground?.();
+    releaseSheetBackground = null;
     sheet.removeEventListener('keydown', moreSheetTrap);
     backdrop.classList.remove('more-backdrop--visible');
     currentMoreBtn().setAttribute('aria-expanded', 'false');
@@ -3446,6 +3572,7 @@ function initSearch(container) {
 
   // Der Marker der Zurueck-Geste, solange die Suche offen ist (#871).
   let searchOverlayToken = null;
+  let releaseSearchBackground = null;
 
   function openSearch() {
     // SCHON OFFEN: nur zurueck ins Feld. ⌘K gilt auch aus Eingabefeldern,
@@ -3461,6 +3588,10 @@ function initSearch(container) {
     lastFocusedBeforeSearch = document.activeElement;
     if (searchOverlayToken === null) searchOverlayToken = pushOverlay(() => closeSearch());
     setOverlayInteractive(overlay, true);
+    // Die Seite hinter der Suche ist gesperrt, solange sie offen ist
+    // (utils/background-inert.js).
+    releaseSearchBackground?.();
+    releaseSearchBackground = inertOutside(overlay);
     overlay.classList.add('search-overlay--visible');
     if (!input.value.trim()) renderSearchHint();
     setTimeout(() => input.focus(), 50);
@@ -3480,6 +3611,8 @@ function initSearch(container) {
     // Schließen ins versteckte Overlay und macht eine Phantom-Live-Ansage.
     clearTimeout(searchTimer);
     setOverlayInteractive(overlay, false);
+    releaseSearchBackground?.();
+    releaseSearchBackground = null;
     overlay.classList.remove('search-overlay--visible');
     if (_searchTrapHandler) {
       overlay.removeEventListener('keydown', _searchTrapHandler);
@@ -3505,11 +3638,7 @@ function initSearch(container) {
   // Pfeile schoben frueher den Fokus in die Treffer, und Enter im Feld tat
   // nichts (A1 P1-1).
 
-  const announceCount = (count) => setStatus(
-    count === 0 ? t('search.noResults')
-      : count === 1 ? t('search.resultCountOne', { count })
-      : t('search.resultCountMany', { count }),
-  );
+  const announceCount = (count, opts) => setStatus(paletteStatusText(count, opts, t));
 
   let searchTimer = null;
   input.addEventListener('input', () => {
@@ -3549,12 +3678,12 @@ function initSearch(container) {
       setStatus(t('search.loading'));
       try {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
-        const count = renderSearchResults(results, data, onClose, { local, query: q });
+        const { count, createLabel } = renderSearchResults(results, data, onClose, { local, query: q });
         // Die Daten kommen UNTER die Orte: eine schon bewegte Markierung
         // bleibt, wo sie ist; war noch keine gesetzt, steht sie jetzt oben.
         combo.refresh({ keep: true });
         results.setAttribute('aria-busy', 'false');
-        announceCount(count);
+        announceCount(count, { createLabel });
       } catch {
         // Fehler nicht verschlucken: sichtbare Meldung statt „wirkt wie 0 Treffer".
         // Die Ansage besitzt #search-status; der sichtbare Text bleibt rein
@@ -3635,6 +3764,42 @@ function paletteRowsSection(label, items, { title, meta, go }, onClose) {
   return section;
 }
 
+/**
+ * Der Befehl fuer „kein Treffer": die Eingabe als neue Aufgabe - oder null,
+ * wo Aufgaben fehlen (abgeschaltet, ausgeblendet) oder nur zu lesen sind.
+ */
+function createTaskFromQuery(query) {
+  const title = String(query ?? '').trim();
+  if (!title) return null;
+  if (!navItems().some((item) => item.module === 'tasks') || navModuleAccess('tasks') !== 'write') return null;
+  return {
+    label: t('search.createTaskNamed', { title }), route: '/tasks', module: 'tasks',
+    context: t('nav.tasks'), create: true, prefillTitle: title,
+  };
+}
+
+/**
+ * Traegt den gesuchten Titel ins Formular „Neue Aufgabe", das triggerPageFab
+ * gerade oeffnet. Das Formular entsteht asynchron (Seitenaufbau, Modal);
+ * gewartet wird hoechstens eine Sekunde, und ein Feld, in das schon jemand
+ * tippt, bleibt, wie es ist.
+ */
+function prefillNewTaskTitle(title, { frames = 60 } = {}) {
+  let left = frames;
+  const step = () => {
+    const input = document.querySelector('#shared-modal-overlay #task-title');
+    if (input) {
+      if (!input.value) {
+        input.value = title;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return;
+    }
+    if (--left > 0) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 /** Text mit markierten Fundstellen als Knoten (`<mark>`), ohne innerHTML. */
 function appendMarked(el, text, query) {
   for (const seg of markSegments(text, query)) {
@@ -3653,16 +3818,24 @@ function appendMarked(el, text, query) {
  * Rendert die Palette: Orte und Aktionen (lokal) vor den Datentreffern.
  * `data` ist null, solange der Server nicht geantwortet hat (oder unter zwei
  * Zeichen gar nicht gefragt wird).
- * @returns {number} Zahl aller Zeilen - fuer die Ansage
+ * @returns {{ count: number, createLabel: string|null }} Zahl aller waehlbaren
+ *   Zeilen fuer die Ansage - die Zeile „als Aufgabe anlegen" zaehlt mit, und
+ *   ihr Text steht in `createLabel`, damit die Ansage sie nennt.
  */
 function renderSearchResults(container, data, onClose, { local = { places: [], actions: [] }, query = '', silent = false } = {}) {
   container.replaceChildren();
   const localCount = local.places.length + local.actions.length;
   const total = localCount + (data ? searchResultCount(data) : 0);
 
-  if (total === 0) {
+  // KEIN TREFFER IST EIN ANFANG (R20, Re-Critique 2026-10-17 A1 P2-4): wer
+  // etwas sucht, das es nicht gibt, will es oft gerade anlegen. Unter dem
+  // Leerzustand steht dann EIN Befehl, „<Eingabe>" als Aufgabe anzulegen -
+  // nur, wo der Betrachter Aufgaben schreiben darf, und erst, wenn der Server
+  // geantwortet hat (vorher waere „nichts gefunden" eine Vermutung).
+  const createTask = total === 0 && data && !silent ? createTaskFromQuery(query) : null;
+  if (total === 0 && !createTask) {
     if (data && !silent) container.appendChild(emptyHintEl(t('search.noResults')));
-    return 0;
+    return { count: 0, createLabel: null };
   }
 
   // Aktivitätstyp lokalisieren (Preset via labelKey, Freitext unverändert).
@@ -3676,7 +3849,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // der Sektion ist die Herkunft damit selbstverstaendlich, die Zeilen
   // bleiben siegelfrei. Die Zeilen selbst liegen in GENAU EINEM Traeger
   // (Zeilenlisten-Regel) statt als Karte pro Treffer.
-  function makeSection(label, sealModule, items, { route, title, meta, go, remember = false }) {
+  function makeSection(label, sealModule, items, { route, title, meta, go, remember = false, rowSeals = false }) {
     if (!items.length) return;
     const section = document.createElement('div');
     section.className = 'search-section';
@@ -3698,6 +3871,19 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'search-result';
+      // DAS SIEGEL AN DER ZEILE, WO DIE SEKTION GEMISCHT IST (R20): unter
+      // „Gehe zu" und „Neu anlegen" stehen Ziele aus vielen Modulen, und ohne
+      // Siegel sah „Neuer Termin" aus wie „Neue Aufgabe". Datensektionen
+      // tragen es weiter im Kopf - dort ist die Herkunft eine.
+      if (rowSeals && item.module && MODULE_ICON[item.module]) {
+        btn.classList.add('search-result--sealed');
+        const sealEl = document.createElement('span');
+        sealEl.className = 'module-seal module-seal--sm search-result__seal';
+        sealEl.setAttribute('aria-hidden', 'true');
+        sealEl.style.setProperty('--seal-accent', moduleAccentVar(item.module));
+        sealEl.appendChild(moduleIconEl(MODULE_ICON[item.module]));
+        btn.appendChild(sealEl);
+      }
       const titleEl = document.createElement('span');
       titleEl.className = 'search-result__title';
       appendMarked(titleEl, title(item), query);
@@ -3731,27 +3917,22 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
     container.appendChild(section);
   }
 
+  if (createTask) container.appendChild(emptyHintEl(t('search.noResults')));
+
   // 1. GEHE ZU - Navigationsziele und Einstellungsblaetter.
   makeSection(t('search.goTo'), null, local.places, {
     remember: true,
+    rowSeals: true,
     title: (item) => item.label,
     meta: (item) => item.context || '',
     go: (item) => (item.run ? item.run() : navigate(item.route)),
   });
-  // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
-  //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
-  makeSection(t('search.newSection'), null, local.actions, {
-    title: (item) => item.label,
-    meta: (item) => item.context || '',
-    go: async (item) => {
-      await navigate(item.route);
-      triggerPageFab();
-    },
-  });
 
-  // 3. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
+  // 2. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
   // utils/search-sections.js (test:search-permissions prueft sie gegen die
-  // Antwort des Servers).
+  // Antwort des Servers). SIE STEHEN VOR DEN ANLEGE-BEFEHLEN (R20, Re-Critique
+  // 2026-10-17, Alex): wer „Zahnarzt" tippt, sucht den Termin, nicht „Neuer
+  // Termin" - bei 1280x800 lagen die Treffer unter sechs Befehlen und der Falz.
   // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
   // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
   // als Instant in der Zeile - sein UTC-Tag waere der falsche.
@@ -3767,11 +3948,25 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
     });
   }
 
+  // 3. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
+  //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
+  //    Ohne jeden Treffer steht hier allein „als Aufgabe anlegen".
+  makeSection(t('search.newSection'), null, createTask ? [createTask] : local.actions, {
+    rowSeals: true,
+    title: (item) => item.label,
+    meta: (item) => item.context || '',
+    go: async (item) => {
+      await navigate(item.route);
+      triggerPageFab();
+      if (item.prefillTitle) prefillNewTaskTitle(item.prefillTitle);
+    },
+  });
+
   // Die Siegel-Icons kommen als data-lucide-Platzhalter; der Treffer-Pfad
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).
   window.lucide?.createIcons({ el: container });
 
-  return total;
+  return createTask ? { count: 1, createLabel: createTask.label } : { count: total, createLabel: null };
 }
 
 // Read-only-Modus für ein Modul anwenden (#467): FAB via <html data-module-readonly>
@@ -4139,7 +4334,9 @@ function setMobileNavOrder(order) {
 }
 
 async function refreshThirdPartyModules() {
-  await syncThirdPartyModules();
+  // Nach Installation oder Update: Sprachdateien koennen sich bei gleicher
+  // Version geaendert haben, deshalb ohne Fingerabdruck-Vergleich neu laden.
+  await syncThirdPartyModules({ forceLocales: true });
   rebuildNavigation();
 }
 
@@ -4643,7 +4840,7 @@ function updateNav(rawPath) {
   });
 }
 
-function renderError(container, err) {
+function renderError(container, err, { page = null, home = false } = {}) {
   // Der globale Fehlerbildschirm laeuft ueber dieselbe Grammatik wie jeder
   // Leerzustand im Modul. Er hatte `role="alert"` und einen Ausweg schon
   // richtig, aber seinen Titel als <div> - auf einem Bildschirm, der nichts
@@ -4653,16 +4850,29 @@ function renderError(container, err) {
   // die einzige verwertbare Information (Name, Meldung, Stack) lag frueher nur
   // in der Browserkonsole. Zugeklappt beigelegt stoert sie das Layout nicht,
   // ist aber ohne DevTools erreichbar und kopierbar.
+  //
+  // WAS KAPUTT IST, UND WAS NICHT (Re-Critique 2026-10-17, A1: "Fehlerseite
+  // generisch"). Steht die Shell, ist nur EINE Seite gescheitert: der Titel
+  // nennt sie mit ihrem Namen aus der Navigation, der Hinweis sagt, dass der
+  // Rest weiterlaeuft, und neben "Neu laden" fuehrt ein zweiter Weg zur
+  // Uebersicht - ein Neuladen derselben kaputten Seite ist nicht der einzige
+  // Ausweg. Ohne Shell (Start gescheitert) bleibt der allgemeine Titel.
+  const cause = friendlyError(err);
+  const reload = {
+    label: t('common.reload'),
+    attrs: { id: 'error-reload-btn' },
+    onClick: () => location.reload(),
+  };
   const state = emptyStateEl({
     variant: 'error',
-    title: t('common.errorOccurred'),
-    description: friendlyError(err),
+    title: page ? t('common.pageFailedTitle', { page }) : t('common.errorOccurred'),
+    // Ein Absatz, nicht der Hinweis-Kasten: der Satz gehoert zur Ursache.
+    description: page ? `${cause} ${t('common.pageFailedHint')}` : cause,
+    className: 'page-crash',
     details: { summary: t('common.errorDetails'), text: errorDetails(err) },
-    action: {
-      label: t('common.reload'),
-      attrs: { id: 'error-reload-btn' },
-      onClick: () => location.reload(),
-    },
+    actions: home
+      ? [reload, { label: t('common.toOverview'), tone: 'secondary', attrs: { id: 'error-home-btn' }, onClick: () => navigate('/') }]
+      : [reload],
   });
   // Fokusziel: nach einem Absturz soll die Ansage beim Screenreader ankommen
   // und die Tastatur nicht im abgeraeumten Baum haengen.

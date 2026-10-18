@@ -23,7 +23,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
-import { isNavModuleReadOnly } from '/permissions.js';
+import { isNavModuleReadOnly, canSeeHousekeepingAmounts } from '/permissions.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { todayKey } from '/utils/date.js';
 import { displayTimeZone, zonedDateKey } from '/utils/timezone.js';
@@ -199,8 +199,40 @@ function readOnlyLatch(event) {
   event.stopPropagation();
 }
 
+/**
+ * Sieht dieser Nutzer Loehne, Zahlungen und Betraege (R20)? Ohne das Recht
+ * schickt der Server die Felder als `null` (server/routes/housekeeping.js,
+ * `housekeeping_view_amounts`). Die Seite fragt BEIDES: das Recht aus
+ * /auth/me und die Antwort selbst - eine `null` darf nie als „0,00 €" stehen.
+ */
+function amountsHidden(value) {
+  return !canSeeHousekeepingAmounts() || value === null;
+}
+
+/** Von-bis eines Besuchs - die Auskunft, die ohne Betraege bleibt. */
+function visitTimeText(visit) {
+  if (!visit?.check_in) return '';
+  const from = formatTime(visit.check_in);
+  return visit.check_out && visit.check_out !== visit.check_in ? `${from}-${formatTime(visit.check_out)}` : from;
+}
+
 function money(value) {
   return getNumberFormat({ style: 'currency', currency: state.currency }).format(Number(value || 0));
+}
+
+/**
+ * Der Betrag ueber einer Diagrammsaeule: ganze Betraege ohne Nachkommastellen
+ * (R20, Re-Critique 2026-10-17 a5 P2-5). "380,00 €" lief bei 390px in seiner
+ * Spalte ueber die Kante; "380 €" traegt dieselbe Auskunft. Krumme Betraege
+ * behalten ihre Stellen - gerundet wuerde aus 57,50 € eine Zahl, die nie
+ * gezahlt wurde.
+ */
+function chartMoney(value) {
+  const amount = Number(value || 0);
+  const whole = Number.isInteger(amount);
+  return getNumberFormat({
+    style: 'currency', currency: state.currency, ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+  }).format(amount);
 }
 
 function urgencyLabel(status) {
@@ -406,8 +438,10 @@ function renderShell(container) {
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="housekeeping-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('housekeeping.bottomNav'))}">
-          ${renderTabButton('dashboard', t('housekeeping.dashboard'))}
-          ${renderTabButton('tasks', t('housekeeping.tasks'))}
+          ${/* R20: die Reiter heissen nach ihrem Inhalt, nicht wie die Kapsel-
+                Tabs "Uebersicht" und "Aufgaben" darunter (Re-Critique a5). */ ''}
+          ${renderTabButton('dashboard', t('housekeeping.tabVisits'))}
+          ${renderTabButton('tasks', t('housekeeping.tabChores'))}
           ${renderTabButton('reports', t('housekeeping.reports'))}
           ${renderTabButton('staff', t('housekeeping.staffTitle'))}
         </nav>
@@ -566,7 +600,7 @@ function renderWorkerSummary() {
       </div>
       <div class="housekeeping-worker-strip__identity">
         <strong>${esc(worker.display_name)}</strong>
-        <span>${esc(session ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
+        <span>${esc(session ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : amountsHidden(worker.daily_rate) ? t('housekeeping.notHereToday') : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
       </div>
       ${readOnly() ? presenceSignHtml(checkedIn) : `
       <button class="btn ${checkedIn ? 'btn--secondary' : 'btn--primary'} housekeeping-check-small" type="button"
@@ -625,15 +659,26 @@ function renderDashboard(content) {
     // Zahlung bleibt leer (R19): seit der Server alle sechs Monate liefert,
     // stuende sonst ueber jeder Null ein Stummel, als waere etwas gezahlt.
     const scale = row.total > 0 ? Math.max(0.06, row.total / maxPayment) : 0;
+    // BEZAHLT UNTEN, OFFEN DARUEBER (R20, Re-Critique 2026-10-17 a5 P2-5).
+    // Die Saeule ist die Summe der Besuche eines Monats; ihr bezahlter Teil
+    // steht voll, der offene als Tint derselben Serie - die Legende darunter
+    // nennt beide, und "Offene Zahlungen" im Abschnittskopf findet sich in
+    // der Saeule wieder. Vorher war die Saeule eine Kapsel in einer vollen
+    // Bahn (las sich als Fortschritt), und ueber jedem leeren Monat stand
+    // "0,00 €". Ein Monat ohne Besuch traegt jetzt nur die Grundlinie.
+    const paidShare = row.total > 0 ? Math.max(0, Math.min(1, (row.total - (row.pending || 0)) / row.total)) : 0;
+    const name = row.total > 0
+      ? `${formatMonthLabel(row.month)}: ${money(row.total)}${row.pending > 0 ? ` (${t('housekeeping.paymentPending')} ${money(row.pending)})` : ''}`
+      : `${formatMonthLabel(row.month)}: ${money(0)}`;
     // Wert sichtbar am Balken statt nur im Hover-title: das Chart trug sonst
     // keine ablesbare Achse oder Zahl (Audit A2-23).
     return `
-      <div class="housekeeping-chart__bar-wrap">
-        <span class="housekeeping-chart__value">${esc(money(row.total))}</span>
-        <div class="housekeeping-chart__track" title="${esc(formatMonthLabel(row.month))} ${esc(money(row.total))}">
-          <div class="housekeeping-chart__bar" style="--bar-scale:${scale.toFixed(4)}"></div>
+      <div class="housekeeping-chart__bar-wrap" role="listitem" aria-label="${esc(name)}">
+        <span class="housekeeping-chart__value" aria-hidden="true">${row.total > 0 ? esc(chartMoney(row.total)) : ''}</span>
+        <div class="housekeeping-chart__track" title="${esc(name)}" aria-hidden="true">
+          ${row.total > 0 ? `<div class="housekeeping-chart__bar" style="--bar-scale:${scale.toFixed(4)};--paid-share:${(paidShare * 100).toFixed(1)}%"></div>` : ''}
         </div>
-        <span>${esc(formatMonthLabel(row.month, { month: 'short' }))}</span>
+        <span aria-hidden="true">${esc(formatMonthLabel(row.month, { month: 'short' }))}</span>
       </div>
     `;
   }).join('');
@@ -694,7 +739,7 @@ function renderDashboard(content) {
          "Ueberschrift ueber Inhalt"): der Titel stand IN der Karte, als
          einziges Modul neben dem Budget. Der Abschnitt (.housekeeping-section)
          traegt keine Flaeche, die Karte darunter nur noch den Inhalt. -->
-    <div class="housekeeping-dashboard-columns">
+    <div class="housekeeping-dashboard-columns${amountsHidden(data.monthly_payments) ? ' housekeeping-dashboard-columns--single' : ''}">
     <section class="housekeeping-section">
       <div class="housekeeping-section-heading">
         <h2 class="u-section-title">${esc(t('housekeeping.recentVisits'))}</h2>
@@ -705,17 +750,21 @@ function renderDashboard(content) {
       </div>
       </div>
     </section>
-    <section class="housekeeping-section">
+    ${amountsHidden(data.monthly_payments) ? '' : `<section class="housekeeping-section">
       <div class="housekeeping-section-heading">
         <h2 class="u-section-title">${esc(t('housekeeping.payments'))}</h2>
         <span>${esc(t('housekeeping.pendingPayments'))}: ${esc(money(data.pending_payments || 0))}</span>
       </div>
       <div class="housekeeping-card">
-      <div class="housekeeping-chart" aria-label="${esc(t('housekeeping.monthlyPayments'))}">
+      <div class="housekeeping-chart"${bars ? ' role="list"' : ''} aria-label="${esc(t('housekeeping.monthlyPayments'))}">
         ${bars || `<p class="housekeeping-muted">${esc(t('housekeeping.noPaymentData'))}</p>`}
       </div>
+      ${bars ? `<ul class="housekeeping-chart__legend" aria-hidden="true">
+        <li><span class="housekeeping-chart__swatch"></span>${esc(t('housekeeping.paymentPaid'))}</li>
+        <li><span class="housekeeping-chart__swatch housekeeping-chart__swatch--pending"></span>${esc(t('housekeeping.paymentPending'))}</li>
+      </ul>` : ''}
       </div>
-    </section>
+    </section>`}
     </div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
@@ -1008,7 +1057,9 @@ function taskSummaryHtml() {
   const pending = data.pending_tasks ?? 0;
   const finished = data.finished_tasks_this_month ?? 0;
   return `
-    <section class="metric-grid budget-glance-details housekeeping-task-summary" aria-label="${esc(t('housekeeping.tasks'))}">
+    ${/* EINE GRUPPE, KEINE ZWEITE REGION „Aufgaben" (R20, axe landmark-unique):
+         die Liste daneben ist schon die Region dieses Namens. */ ''}
+    <div class="metric-grid budget-glance-details housekeeping-task-summary" role="group" aria-label="${esc(t('housekeeping.tasks'))}">
       <article class="metric-card${pending > 0 ? '' : ' metric-card--empty'}">
         <div class="metric-card__label">${esc(t('housekeeping.pendingChores'))}</div>
         <div class="metric-card__value">${esc(pending)}</div>
@@ -1017,7 +1068,7 @@ function taskSummaryHtml() {
         <div class="metric-card__label">${esc(t('housekeeping.finishedChores'))}</div>
         <div class="metric-card__value">${esc(finished)}</div>
       </article>
-    </section>`;
+    </div>`;
 }
 
 function drawTasks(content) {
@@ -1259,10 +1310,12 @@ async function unpayVisit(visit, onUnpaid) {
  *           paymentText?: string, className?: string }} opts
  */
 function visitRowHtml(visit, { dateText, visitDate = dateText, showWorker = true, paymentText, className = '' } = {}) {
+  // Ohne Betragsrecht (R20) nennt die Zeile die Zeit statt Betrag und Zahlstatus.
+  const hidden = amountsHidden(visit.total_amount);
   const meta = [
     showWorker ? (visit.worker_name || t('housekeeping.unnamedWorker')) : null,
-    money(visit.total_amount),
-    paymentText ?? visitPaymentMeta(visit),
+    hidden ? visitTimeText(visit) : money(visit.total_amount),
+    hidden ? null : (paymentText ?? visitPaymentMeta(visit)),
   ].filter(Boolean).join(' · ');
   return `
     <article class="list-row housekeeping-visit-row${className ? ` ${className}` : ''}">
@@ -1590,13 +1643,15 @@ function renderReports(content) {
   // Kennzahlen | Besuche: mobil stehen die Kennzahlen ueber der Liste (DOM-
   // Reihenfolge), ab der Split-Schwelle ruecken sie als Zusammenfassung in die
   // Seitenspalte neben die Liste (`railFirst`).
+  // Ohne Betragsrecht (R20) bleibt nur die Zahl der Besuche.
+  const noAmounts = amountsHidden(state.visitReport?.totals ?? null);
   content.insertAdjacentHTML('beforeend', renderPageColumns({
     railFirst: true,
     rail: `
     ${metricGlanceHtml({
     label: t('housekeeping.reportVisitsCount'),
     value: String(visits.length),
-    flows: [
+    flows: noAmounts ? [] : [
       { label: t('housekeeping.pendingPayments'), amount: money(totals.pending || 0) },
       { label: t('housekeeping.paymentPaid'), amount: money(totals.paid || 0) },
     ],
@@ -1606,14 +1661,14 @@ function renderReports(content) {
         <div class="metric-card__label">${esc(t('housekeeping.reportVisitsCount'))}</div>
         <div class="metric-card__value">${esc(visits.length)}</div>
       </article>
-      <article class="metric-card">
+      ${noAmounts ? '' : `<article class="metric-card">
         <div class="metric-card__label">${esc(t('housekeeping.pendingPayments'))}</div>
         <div class="metric-card__value">${esc(money(totals.pending || 0))}</div>
       </article>
       <article class="metric-card">
         <div class="metric-card__label">${esc(t('housekeeping.paymentPaid'))}</div>
         <div class="metric-card__value">${esc(money(totals.paid || 0))}</div>
-      </article>
+      </article>`}
     </section>`,
     main: `
     <section class="housekeeping-reports${rows ? ' row-carrier' : ''}" aria-label="${esc(t('housekeeping.recentReports'))}">
@@ -1641,6 +1696,12 @@ function renderReports(content) {
  * Dialog ihm gibt: nach Stunden die Minuten und der daraus berechnete Betrag,
  * sonst der Tagessatz. */
 function visitWorkDetailsHtml(visit) {
+  if (amountsHidden(visit.daily_rate)) {
+    return visit.rate_type === 'hourly' && visit.minutes_worked != null
+      ? `
+          <div><dt>${esc(t('housekeeping.minutesWorked'))}</dt><dd>${esc(visit.minutes_worked)}</dd></div>`
+      : '';
+  }
   if (visit.rate_type === 'hourly') {
     return `
           <div><dt>${esc(t('housekeeping.minutesWorked'))}</dt><dd>${esc(visit.minutes_worked ?? 0)}</dd></div>
@@ -1709,15 +1770,16 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
           </div>
           <div>
             <strong>${esc(visit.worker_name || t('housekeeping.unnamedWorker'))}</strong>
-            <span>${esc(scheduleLabel(visit.payment_schedule))}</span>
+            ${amountsHidden(visit.total_amount) ? '' : `<span>${esc(scheduleLabel(visit.payment_schedule))}</span>`}
           </div>
         </div>
         <dl class="housekeeping-report-details">
-          <div><dt>${esc(t('housekeeping.lastVisit'))}</dt><dd>${esc(formatDate(visit.check_in))} · ${esc(formatTime(visit.check_in))}</dd></div>
+          <div><dt>${esc(t('housekeeping.lastVisit'))}</dt><dd>${esc(formatDate(visit.check_in))} · ${esc(amountsHidden(visit.total_amount) ? visitTimeText(visit) : formatTime(visit.check_in))}</dd></div>
           ${visitWorkDetailsHtml(visit)}
+          ${amountsHidden(visit.total_amount) ? '' : `
           <div><dt>${esc(t('housekeeping.extras'))}</dt><dd>${esc(money(visit.extras))}</dd></div>
           <div><dt>${esc(t('housekeeping.totalPayment'))}</dt><dd>${esc(money(visit.total_amount))}</dd></div>
-          <div><dt>${esc(t('housekeeping.paymentStatus'))}</dt><dd>${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</dd></div>
+          <div><dt>${esc(t('housekeeping.paymentStatus'))}</dt><dd>${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</dd></div>`}
           ${visit.payment_task_id ? `<div><dt>${esc(t('housekeeping.paymentTask'))}</dt><dd>#${esc(visit.payment_task_id)}</dd></div>` : ''}
           ${visit.calendar_event_id ? `<div><dt>${esc(t('housekeeping.calendarEvent'))}</dt><dd>#${esc(visit.calendar_event_id)}</dd></div>` : ''}
           ${visitReceiptDetailHtml(visit)}
@@ -2029,7 +2091,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           <span>${esc(t('housekeeping.visitDate'))}</span>
           <yuvomi-datepicker name="date" type="date" value="${esc(visitDay)}"></yuvomi-datepicker>
         </label>
-        <div class="housekeeping-form-grid">
+        <div class="housekeeping-form-grid"${amountsHidden(visit.daily_rate) ? ' hidden' : ''}>
           ${visit.rate_type === 'hourly' ? `
             <label class="housekeeping-field">
               <span>${esc(t('housekeeping.minutesWorked'))}</span>
@@ -2212,11 +2274,11 @@ function openStaffReadModal(worker) {
           ${worker.phone ? row('housekeeping.workerPhone', esc(worker.phone)) : ''}
           ${worker.email ? row('housekeeping.workerEmail', esc(worker.email)) : ''}
           ${worker.birth_date ? row('housekeeping.workerBirthDate', esc(formatDate(worker.birth_date))) : ''}
-          ${row('housekeeping.rateType', esc(t(hourly ? 'housekeeping.rateHourly' : 'housekeeping.rateDaily')))}
+          ${amountsHidden(worker.daily_rate) ? '' : `${row('housekeeping.rateType', esc(t(hourly ? 'housekeeping.rateHourly' : 'housekeeping.rateDaily')))}
           ${hourly
     ? row('housekeeping.hourlyRate', esc(money(worker.hourly_rate)))
     : row('housekeeping.dailyRate', esc(money(worker.daily_rate)))}
-          ${row('housekeeping.paymentSchedule', esc(scheduleLabel(worker.payment_schedule)))}
+          ${row('housekeeping.paymentSchedule', esc(scheduleLabel(worker.payment_schedule)))}`}
           ${worker.calendar_color ? row('housekeeping.calendarColor', swatch(worker.calendar_color)) : ''}
           ${worker.avatar_color ? row('housekeeping.profileColor', swatch(worker.avatar_color)) : ''}
           ${worker.notes ? `
@@ -2542,6 +2604,7 @@ export async function render(container, { signal } = {}) {
 // Nur fuer die Tests (test-housekeeping-ui.js, test-housekeeping-editvisit.js):
 // die Seite laeuft dort ohne DOM.
 export const __test = {
+  amountsHidden, visitTimeText, visitRowHtml, visitWorkDetailsHtml,
   describeDeepLinkError,
   openVisitFromDeepLink,
   loadData,
