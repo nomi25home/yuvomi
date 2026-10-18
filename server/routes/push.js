@@ -90,16 +90,20 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
       const userId = req.authUserId || req.session.userId;
       const title = typeof req.body?.title === 'string' ? req.body.title : 'Yuvomi';
       const body  = typeof req.body?.body === 'string' ? req.body.body : '';
+      const testEndpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : null;
       // Vor dem Senden zählen: Wird das Abo beim Senden als "gone" entfernt,
       // bleibt devices > 0 bei sent === 0 und der Client kann "abgelaufen"
       // von "nie registriert" unterscheiden.
       const devices = getDb()
         .prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?')
         .get(userId)?.n ?? 0;
-      // Wand-Pause aufheben, damit der Test-Push auf jedem Abo ankommt: ein
-      // pausiertes Geraet wuerde `sent: 0, devices: 1` zurueckgeben und den
-      // Client zur Reparatur animieren, obwohl das Abo gesund ist (#1904).
-      getDb().prepare("UPDATE push_subscriptions SET wall_paused_at = NULL WHERE user_id = ?").run(userId);
+      // Wand-Pause nur am anfragenden Geraet aufheben, damit ein Test vom Telefon
+      // die Pause des Wandtablets nicht loescht (#1904).
+      if (testEndpoint) {
+        getDb().prepare("UPDATE push_subscriptions SET wall_paused_at = NULL WHERE user_id = ? AND endpoint = ?").run(userId, testEndpoint);
+      } else {
+        getDb().prepare("UPDATE push_subscriptions SET wall_paused_at = NULL WHERE user_id = ?").run(userId);
+      }
       const sent = await pushService.sendPushToUser(userId, { title, body, url: '/reminders', tag: 'push-test' });
       res.json({ data: { sent, devices } });
     } catch (err) {

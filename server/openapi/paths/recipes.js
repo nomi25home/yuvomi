@@ -1,7 +1,13 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
+// Dieselbe Form wie in paths/family.js.
+const apiError = (description) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+});
+
 export function recipesPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/recipes': {
       get: op({ summary: 'List recipes', tag: 'Recipes', description: 'Every ingredient carries `pantry_item_id` and `pantry_item_name`, the household\'s own confirmed match to one row of its pantry, both `null` when there is none. They name a row of the `pantry` module although this path belongs to `meals`, so they are also `null` for a member whose pantry access is `none` and for a token that carries no pantry scope - the ingredient itself stays, simply unmatched.' }),
       post: op({ summary: 'Create recipe', tag: 'Recipes', stateChanging: true, requestBody: jsonBody(null) }),
@@ -55,7 +61,64 @@ export function recipesPaths() {
       get: op({ summary: "Fetch a recipe's own uploaded image", tag: 'Recipes', params: [idParam()], description: "Returns the image stored on the recipe itself, for recipes typed into Yuvomi rather than mirrored from a provider. It is a route and not a field on the recipe: the column holds a data URL of up to 5 MB, and shipping that with every row of a recipe list or a week of meals would dwarf the rest of the response for a 32-pixel preview. The lists carry a `has_own_image` flag instead. 404 when the recipe has no image of its own." }),
     },
     '/api/v1/recipes/{id}/provider-thumbnail': {
-      get: op({ summary: 'Fetch the image of an imported recipe', tag: 'Recipes', params: [idParam()], description: 'Proxies the bytes from the recipe provider. A direct <img src> to the provider is not possible: its media route wants the same bearer token as every other endpoint, and that token must never reach the client. Same arrangement as the DMS preview proxy.' }),
+      get: op({
+        summary: 'Fetch the image of an imported recipe',
+        tag: 'Recipes',
+        params: [
+          idParam(),
+          {
+            name: 'v',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'The image version: `provider_updated_at` of the recipe (meal rows carry it as `recipe_image_version`). Keeps the address unique per version; the response is the same with or without it.',
+          },
+        ],
+        description: 'Proxies the bytes from the recipe provider. A direct <img src> to the provider is not possible: its media route wants the same bearer token as every other endpoint, and that token must never reach the client. Same arrangement as the DMS preview proxy. '
+          + 'The response carries `Cache-Control: private, no-cache` and an `ETag` derived from the image version, so a client revalidates on every use (through authentication and the module gate) and `If-None-Match` answers `304` without a request to the provider. Errors stay `no-store`.',
+        responses: {
+          200: {
+            description: 'The image',
+            content: {
+              'image/png': { schema: { type: 'string', format: 'binary' } },
+              'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+              'image/webp': { schema: { type: 'string', format: 'binary' } },
+            },
+          },
+          304: { description: 'Unchanged since the given ETag; no request to the provider' },
+          400: apiError('Invalid recipe ID'),
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: apiError('Not an imported recipe, or no image at the provider'),
+          415: apiError('The provider returned no image or a type outside PNG, JPEG and WebP'),
+          502: apiError('The provider could not be reached'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const RECIPE_GONE = '`recipes_recipe_not_found` (404, the recipe does not exist - deleted, or removed by the sync with its recipe provider)';
+const CASE_REASONS = {
+  '/api/v1/recipes/{id}': { put: RECIPE_GONE, delete: RECIPE_GONE },
+  '/api/v1/recipes/{id}/to-shopping-list': {
+    post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist)`,
+  },
+  '/api/v1/recipes/{id}/ingredient-match': {
+    put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist)`,
+  },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi recipes: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

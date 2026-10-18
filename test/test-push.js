@@ -6,6 +6,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import { buildRouter } from '../server/routes/push.js';
 import { processDuePushes } from '../server/services/push-scheduler.js';
@@ -571,4 +572,36 @@ test('wall-mode: syncWallMode ruft den Hook nur bei Uebergaengen, isWallActive m
   delete global.document;
   delete global.localStorage;
   delete global.window;
+});
+
+// ---------------------------------------------------------------------------
+// Boot-time report: initPushAndReport in router.js muss reportWallPauseState
+// mit dem aktuellen Wandzustand aufrufen, damit Kaltstart und stale-Pausen
+// ohne Sitzungsuebergang geheilt werden (#1904).
+// ---------------------------------------------------------------------------
+test('router.js: initPushAndReport ruft reportWallPauseState(isWallActive()) nach initPush() auf (#1904)', () => {
+  const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const fnStart = src.indexOf('async function initPushAndReport()');
+  assert.ok(fnStart >= 0, 'initPushAndReport ist in router.js definiert');
+  const fnEnd = src.indexOf('\n}', fnStart);
+  const fn = src.slice(fnStart, fnEnd + 2);
+  assert.match(fn, /reportWallPauseState\s*\(\s*isWallActive\s*\(\s*\)\s*\)/,
+    'initPushAndReport ruft reportWallPauseState(isWallActive()) auf - Boot-Report fuer Kaltstart und stale-Pausen');
+});
+
+test('POST /test hebt die Wand-Pause nur am anfragenden Geraet auf, nicht bei anderen Abos desselben Nutzers (#1904)', async () => {
+  const db = makeDb();
+  const webpush = makeWebpushMock();
+  // Zwei Abos: das Telefon fragt den Test an, das Wandtablett ist pausiert.
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/phone','p','a')").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth,wall_paused_at) VALUES (1,'https://push/wall','p','a',datetime('now'))").run();
+  const app = await startApp(db, webpush);
+  const res = await fetchRetry(`${app.baseUrl}/test`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://push/phone' }),
+  });
+  assert.equal(res.status, 200);
+  const wall = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/wall'").get();
+  assert.ok(wall.wall_paused_at !== null, 'die Pause des Wandtablets bleibt - nur das Telefon wurde entsperrt');
 });

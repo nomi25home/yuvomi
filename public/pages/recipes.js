@@ -5,28 +5,38 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
-import { scheduleUndoableDelete, expandIn, collapseOut } from '/utils/ux.js';
+import { scheduleUndoableDelete } from '/utils/ux.js';
 import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
 import { todayKey } from '/utils/date.js';
 import '/components/datepicker.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
+import { mountEmptyState, mountLoadError, mountSearchEmpty } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
-import { recipeThumbEl, recipeHeroEl, recipeBandEl } from '/utils/recipe-thumb.js';
+import { recipeThumbEl, recipeHeroEl } from '/utils/recipe-thumb.js';
 import { navModuleAccess } from '/permissions.js';
 import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
+import { openDetailView, closeDetailView, detailFooterEl, withPrimaryEdit } from '/components/detail-view.js';
 import { mayWritePath } from '/utils/module-access.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
 
 let _container = null;
+/**
+ * Rezepte, deren Loeschen gerade im Ruecknahme-Fenster steht: sie stehen noch
+ * in `state.recipes` (Rueckgaengig stellt sie zurueck), aber nicht mehr in der
+ * Liste. Ein Neuzeichnen in diesem Fenster - etwa nach "gibt es nicht mehr"
+ * an einem ANDEREN Rezept - baut die Liste ohne sie (Codex an #2001).
+ */
+const _pendingDeleteIds = new Set();
 /** Handle des geteilten Suchfelds (setValue/clear), gesetzt in render(). */
 let _search = null;
 /** Handle von Liste + Detail (utils/master-detail.js), gesetzt in render(). */
@@ -87,13 +97,132 @@ function mayPlanRecipe() {
  * `read` zu, bis sie hier ausdruecklich steht. `to-shopping` schreibt in den
  * Einkauf und traegt seinen eigenen Riegel (`transferRecipe`).
  */
-const READ_SAFE_ACTIONS = new Set(['toggle-detail', 'to-shopping']);
+const READ_SAFE_ACTIONS = new Set(['open-detail', 'to-shopping']);
+
+/**
+ * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909). Der Toast sagt den Satz der
+ * App (`errorSentence`): den Fall, den der Server mit `reason` nennt, sonst den
+ * allgemeinen Satz der Stelle - nie den Text des Servers.
+ *
+ * Sagt der Grund, dass es das Ziel der Handlung nicht mehr gibt (`isGone`: ein
+ * anderes Haushaltsmitglied hat das Rezept oder die Einkaufsliste geloescht,
+ * der Abgleich mit einer Rezeptquelle hat das Rezept entfernt oder seine
+ * Zutaten ersetzt), nimmt die Seite genau dieses Ding aus ihrem Stand
+ * (`dropGone`) und zeichnet neu. KEIN NACHLADEN der ganzen Liste: eine
+ * verspaetete Antwort ersetzte sonst, was der Nutzer inzwischen getan hat,
+ * und die Objekte, die ein offener Dialog haelt (Zuschnitt nach Codex an
+ * #2001). Die Aufrufstelle nennt, worum es ging (`recipeId`, `ingredientName`,
+ * `listId`). `dialog` ist der Modal-Kontext der Handlung
+ * (`captureModalContext()` vor der Anfrage): geschlossen wird nur, wenn genau
+ * dieser Dialog noch offen ist - einen inzwischen geoeffneten anderen laesst
+ * die Antwort stehen (Codex an #1994).
+ *
+ * `owner` ist der Container der Seite, VOR der Anfrage gemerkt (wie
+ * `dialog`). Erst nach der Antwort gelesen, waere es nach "Seite verlassen
+ * und zurueck" der NEUE Container - und eine spaete Antwort nahme etwas aus
+ * dem frisch geladenen Stand, das der Nutzer dort inzwischen wieder angelegt
+ * hat (Codex an #2001). Zeigt die Seite nicht mehr diesen Container, bleibt
+ * es beim Satz: kein Entfernen, kein Zeichnen.
+ *
+ * @param {unknown} err
+ * @param {{ owner?: object|null, fallbackKey?: string, dialog?: object|null, recipeId?: number|null,
+ *   recipeRef?: object|null, ingredientName?: string|null, listId?: number|null }} [options]
+ */
+async function reportError(err, {
+  owner = null, fallbackKey = 'common.errorGeneric', dialog = null, recipeId = null, recipeRef = null,
+  ingredientName = null, listId = null,
+} = {}) {
+  window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
+  if (!isGone(err)) return;
+  if (dialog && isModalContextCurrent(dialog)) await closeSharedModal({ force: true });
+  // Wer die Seite inzwischen verlassen hat (oder neu betreten), bekommt weder
+  // seinen Stand angefasst noch etwas gezeichnet.
+  if (!stillShown(owner)) return;
+  if (!dropGone(err.data.reason, { recipeId, recipeRef, ingredientName, listId })) return;
+  // War das das letzte Rezept der gewaehlten Quelle, gibt es die Quelle im
+  // Filter nicht mehr: sonst stuende eine leere Liste unter einem leeren Label.
+  if (state.sourceFilter !== 'all' && !state.recipes.some((r) => r.source === state.sourceFilter)) {
+    state.sourceFilter = 'all';
+  }
+  renderSourceFilter();
+  renderRecipeList({ repaint: true });
+  // Der Ausloeser ist mit der Liste neu gebaut: den Fokus auf seinen
+  // Nachfolger tragen.
+  refocusAfterRender();
+}
+
+/**
+ * Nimmt aus dem Stand der Seite, was der Server als "gibt es nicht mehr"
+ * gemeldet hat. Nur per ID bzw. Name, und `filter` statt Neuaufbau: die
+ * uebrigen Rezept- und Zutatenobjekte bleiben dieselben, ein offener
+ * Zuordnungsdialog schreibt also weiter in den aktuellen Stand.
+ *
+ * - Rezept weg (`recipes_recipe_not_found`, beim Einplanen
+ *   `meals_selected_recipe_not_found`): das Rezept faellt aus der Liste.
+ * - Zutat weg (`recipes_ingredient_not_found`): jede Zutat mit demselben
+ *   Schluessel faellt aus dem Rezept - der Server sucht mit
+ *   `ingredientMatchKey()` (getrimmt, Leerraum gefaltet, klein), "gibt es
+ *   nicht mehr" gilt also fuer "Salz" und "salz" zugleich. Hat der Abgleich die Zutaten ERSETZT, kennt die Seite die neuen
+ *   nicht - die zeigt erst das naechste Laden der Seite.
+ * - Einkaufsliste weg (`shopping_list_not_found`): die Liste faellt aus der
+ *   Auswahl.
+ *
+ * @returns {boolean} ob sich der Stand geaendert hat
+ */
+function dropGone(reason, { recipeId, recipeRef, ingredientName, listId }) {
+  if (reason === 'recipes_recipe_not_found' || reason === 'meals_selected_recipe_not_found') {
+    if (recipeId == null) return false;
+    const before = state.recipes.length;
+    state.recipes = state.recipes.filter((r) => r.id !== recipeId);
+    return state.recipes.length !== before;
+  }
+  if (reason === 'recipes_ingredient_not_found') {
+    // NUR an dem Rezept-Objekt, an dem die Anfrage hing (`recipeRef`, vor
+    // der Anfrage gemerkt). Hat der Nutzer das Rezept inzwischen gespeichert,
+    // steht dort ein neues Objekt mit dem Stand des Servers - eine spaete
+    // Antwort nimmt ihm keine Zutat, die das Speichern wieder angelegt hat
+    // (Codex an #2001). Rezepte und Listen brauchen das nicht: eine ID, die
+    // es einmal nicht mehr gab, kommt nicht zurueck.
+    const recipe = state.recipes.find((r) => r.id === recipeId);
+    if (!recipe || recipe !== recipeRef || ingredientName == null) return false;
+    const before = (recipe.ingredients ?? []).length;
+    const key = ingredientMatchKey(ingredientName);
+    recipe.ingredients = (recipe.ingredients ?? []).filter((i) => ingredientMatchKey(i.name) !== key);
+    return recipe.ingredients.length !== before;
+  }
+  if (reason === 'shopping_list_not_found') {
+    if (listId == null) return false;
+    const before = state.lists.length;
+    state.lists = state.lists.filter((l) => l.id !== listId);
+    return state.lists.length !== before;
+  }
+  return false;
+}
+
+/**
+ * Zeigt die Seite noch diesen Container? Die Navigation in ein anderes Modul
+ * leert `_container` nicht, die Variable zeigt dann weiter auf den
+ * abgehaengten Container. "Derselbe Container" allein haelt deshalb nicht: er muss
+ * auch noch im DOM haengen (Codex an #2001). Sonst zeichnete ein spaetes
+ * Nachladen in eine Seite, die niemand mehr sieht, und zoege den Fokus auf
+ * der neuen Seite weg.
+ */
+function stillShown(owner) {
+  return Boolean(owner) && _container === owner && owner.isConnected === true;
+}
+
+const isSelectedPantryItemGone = (err) => isGone(err) && err.data.reason === 'recipes_selected_pantry_item_not_found';
+
+/** Die Rezepte der Liste: ohne die, deren Loeschen gerade laeuft. */
+function listedRecipes() {
+  return state.recipes.filter((r) => !_pendingDeleteIds.has(r.id));
+}
 
 // Client-seitige Suche über Titel, Notizen und Zutaten (Audit A1-21):
 // die Rezeptliste ist vollständig geladen, ein Server-Roundtrip wäre Umweg.
 function filteredRecipes() {
   const q = state.query.toLowerCase();
-  return state.recipes.filter((r) => {
+  return listedRecipes().filter((r) => {
     if (state.sourceFilter !== 'all' && r.source !== state.sourceFilter) return false;
     if (!q) return true;
     return r.title?.toLowerCase().includes(q)
@@ -126,6 +255,7 @@ function recipeThumb(recipe) {
     recipeId: recipe.id,
     hasImage: recipe.provider_has_image,
     hasOwnImage: recipe.has_own_image,
+    imageVersion: recipe.provider_updated_at,
     className: 'recipe-row__thumb',
   });
 }
@@ -214,12 +344,14 @@ async function loadPlannedRecipes() {
 /**
  * Oeffnet das per ?open=<id> benannte Rezept, wenn es in der geladenen Liste steht.
  *
- * Aufklappen statt Bearbeiten: wer aus dem Essensplan kommt, will kochen, nicht
- * aendern - dieselbe Entscheidung wie beim Antippen einer Zeile.
+ * Lesen statt Bearbeiten: wer aus dem Essensplan kommt, will kochen, nicht
+ * aendern - dieselbe Entscheidung wie beim Antippen einer Zeile. Unter der
+ * Schwelle oeffnet das Rezept seit R19 als Leseblatt (wie Kontakte, Inventar,
+ * Aufgaben), nicht mehr als Aufklapper in der Liste.
  *
  * Ein Rezept ohne Detailinhalt (keine Zutaten, keine Notiz, keine Quelle) hat
- * gar kein Aufklapp-Panel. Dann bleibt das Scrollen als das, was zu holen ist:
- * die Zeile zeigen, statt still nichts zu tun.
+ * kein Leseblatt. Dann bleibt das Scrollen als das, was zu holen ist: die
+ * Zeile zeigen, statt still nichts zu tun.
  */
 function openRecipeFromQuery() {
   const raw = new URLSearchParams(window.location.search).get('open');
@@ -228,23 +360,15 @@ function openRecipeFromQuery() {
 
   const row = _container?.querySelector(`.recipe-row-item[data-id="${id}"]`);
   if (!row) return;
+  row.scrollIntoView({ block: 'nearest' });
 
   // In der Detailspalte hat der Baustein das Rezept beim Einhaengen schon
   // ausgewaehlt - er liest denselben Parameter (`param: 'open'` in
-  // mountRecipeDetail). Aufzuklappen gibt es dort nichts: die Liste zeigt
-  // keine Aufklapper, das Detail steht rechts.
-  if (_md?.isSplit()) {
-    row.scrollIntoView({ block: 'nearest' });
-    return;
-  }
+  // mountRecipeDetail).
+  if (_md?.isSplit()) return;
 
-  const toggle = row.querySelector('[data-action="toggle-detail"]');
-  const panel = _container.querySelector(`#recipe-detail-${id}`);
-  if (toggle && panel) {
-    toggle.setAttribute('aria-expanded', 'true');
-    panel.hidden = false;
-  }
-  row.scrollIntoView({ block: 'nearest' });
+  const recipe = state.recipes.find((r) => r.id === id);
+  if (recipe && row.querySelector('[data-action="open-detail"]')) openRecipeSheet(recipe);
 }
 
 /**
@@ -324,7 +448,8 @@ export async function render(container, { signal } = {}) {
     placeholder: t('recipes.searchPlaceholder'),
     value: state.query,
     clearLabel: t('common.searchClear'),
-    className: 'recipes-search page-toolbar__center',
+    // Feld statt Lupe auch mobil (R19): die Zeile traegt nur die Suche.
+    className: 'recipes-search page-toolbar__center page-search--field',
   }));
 
   // Trigger im __actions-Slot statt einer eigenen Pillen-Zeile darunter -
@@ -435,9 +560,9 @@ export async function render(container, { signal } = {}) {
 }
 
 async function onSplitClick(e, list) {
-  // Der Hauptknopf der Zeile: in der Spalte waehlt er aus, darunter klappt
-  // er auf oder oeffnet das Formular - der Baustein entscheidet ueber open().
-  // Auswaehlen und Aufklappen sind Lesen; den Weg ins Formular schliesst
+  // Der Hauptknopf der Zeile: in der Spalte waehlt er aus, darunter oeffnet
+  // er das Leseblatt oder das Formular - der Baustein entscheidet ueber open().
+  // Auswaehlen und Oeffnen sind Lesen; den Weg ins Formular schliesst
   // openRecipeModal() selbst.
   const main = e.target.closest('.recipe-row__toggle');
   if (main && list.contains(main)) {
@@ -468,7 +593,7 @@ async function onSplitClick(e, list) {
  * Was eine `data-action` der Seite TUT - eine Tabelle statt einer Kette aus
  * `if`, damit der Riegel davor (`READ_SAFE_ACTIONS` in onSplitClick) an EINER
  * Stelle ueber alle Eintraege urteilt, auch ueber einen, der morgen dazukommt
- * und noch keinen eigenen Riegel traegt. `toggle-detail` fehlt hier: der
+ * und noch keinen eigenen Riegel traegt. `open-detail` fehlt hier: der
  * Hauptknopf der Zeile ist vorher abgezweigt.
  */
 const SPLIT_ACTIONS = {
@@ -578,14 +703,14 @@ function mountRecipeDetail(root, signal) {
     renderDetail: (id, body) => renderRecipePane(id, body),
     openNarrow: (id, trigger) => openRecipeNarrow(id, trigger),
     // Unter der Schwelle loest openRecipeFromQuery() den Link ein, NACH dem
-    // Listenbau - beim Einhaengen gibt es noch keine Zeile zum Aufklappen.
+    // Listenbau - beim Einhaengen sind die Rezepte noch nicht geladen.
     deepLinkNarrow: false,
-    // Darunter ist die Zeile ein Aufklapper, kein Blatt: mehrere Rezepte
-    // stehen offen, und Aufklappen schreibt keine Adresse.
-    narrow: 'accordion',
+    // Darunter oeffnet die Zeile ein LESEBLATT (R19, "Zeilentipp oeffnet"):
+    // vorher klappte sie in der Liste auf, als einziges Modul neben Aufgaben,
+    // Kontakten und Inventar, die ihr Element oeffnen.
+    narrow: 'sheet',
     // Und bei Zurueck/Vor auf `?open=` (Eintraege aus der Spalte, Fenster
-    // inzwischen schmal) dieselbe Einloesung: die Zeilen stehen, der
-    // Aufklapper geht auf (Codex an #1477).
+    // inzwischen schmal) dieselbe Einloesung (Codex an #1477).
     onNarrowSync: () => openRecipeFromQuery(),
   });
   // Der Moduswechsel (Fenster, Seitenleiste) aendert, was der Hauptknopf der
@@ -615,83 +740,95 @@ function renderRecipePane(id, body) {
   // Dieselbe Regel wie die Zeilenaktionen: gespiegelte Rezepte sind
   // schreibgeschuetzt, Duplizieren legt eine eigene Kopie an.
   const isMirrored = recipe.source !== 'native';
-  // Bei `read` traegt der Kopf nur den Titel: alle drei Knoepfe schreiben.
-  const actions = readOnly() ? [] : [
-    !isMirrored && {
-      label: t('common.edit'), icon: 'pencil', id: 'recipes-detail-edit',
-      onClick: () => openRecipeModal('edit', recipe),
-    },
-    {
-      label: t('recipes.duplicate'), icon: 'copy', variant: 'ghost', iconOnly: true,
-      onClick: () => duplicateRecipe(recipe),
-    },
-    !isMirrored && {
-      label: t('common.delete'), icon: 'trash-2', variant: 'ghost', iconOnly: true,
-      onClick: () => removeRecipe(recipe),
-    },
-  ].filter(Boolean);
+  // Bei `read` gibt es keinen Fuss: alle drei Knoepfe schreiben.
+  // BEARBEITEN IST DER PRIMAERKNOPF AM ENDE DES FUSSES (R19, withPrimaryEdit) -
+  // wie in jeder anderen Detailspalte; vorher stand es umrandet im Kopf.
+  const footer = readOnly() ? null : detailFooterEl(recipeActions(recipe, {
+    // In der Spalte bearbeiten, nicht in einem Fenster darueber (R19).
+    edit: { id: 'recipes-detail-edit', dock: true, onClick: () => openRecipeModal('edit', recipe) },
+    duplicate: () => duplicateRecipe(recipe),
+    remove: () => removeRecipe(recipe),
+  }));
+  if (footer) footer.className = 'detail-view__footer split-view__detail-footer';
 
   const detail = document.createElement('div');
   detail.className = 'recipe-detail recipe-detail--pane';
   fillRecipeDetail(detail, recipe);
-  body.replaceChildren(detailPaneHeaderEl({ title: recipe.title, actions }), detail);
+  body.replaceChildren(...[detailPaneHeaderEl({ title: recipe.title }), detail, footer].filter(Boolean));
   return undefined;
 }
 
 /**
- * Unter der Schwelle: der bisherige Weg der Zeile. Aufklappen, wenn es ein
- * Detail gibt, sonst das Formular - ein gespiegeltes Rezept ohne Detail tut
- * nichts (siehe buildRecipeList).
+ * Die Aktionen eines Rezepts im Fuss von Leseblatt und Detailspalte: Loeschen
+ * zurueckgenommen am Anfang, Duplizieren leise, Bearbeiten als Primaerknopf
+ * am Ende (withPrimaryEdit). Ein gespiegeltes Rezept ist schreibgeschuetzt:
+ * nur Duplizieren (legt eine eigene Kopie an).
+ */
+function recipeActions(recipe, { edit, duplicate, remove }) {
+  const isMirrored = recipe.source !== 'native';
+  return withPrimaryEdit([
+    !isMirrored && {
+      id: 'recipe-detail-delete', label: t('common.delete'), icon: 'trash-2',
+      variant: 'danger-ghost', align: 'start', onClick: remove,
+    },
+    { id: 'recipe-detail-duplicate', label: t('recipes.duplicate'), icon: 'copy', variant: 'ghost', onClick: duplicate },
+  ], isMirrored ? null : { label: t('common.edit'), ...edit });
+}
+
+/**
+ * Das Rezept als LESEBLATT unter der Schwelle (R19, Critique 2026-10-16:
+ * "Zeilentipp hat vier Bedeutungen"). Derselbe Inhalt wie die Detailspalte
+ * (fillRecipeDetail), dasselbe Blatt wie Kontakte und Inventar
+ * (openDetailView), Bearbeiten unten als Hauptaktion. Die Knoepfe IM Detail
+ * (Einplanen, Einkauf, Vorrat zuordnen) laufen ueber dieselbe Tabelle wie in
+ * der Liste (SPLIT_ACTIONS) samt Nur-lesen-Riegel.
+ */
+function openRecipeSheet(recipe) {
+  const detail = document.createElement('div');
+  detail.className = 'recipe-detail recipe-detail--sheet';
+  fillRecipeDetail(detail, recipe);
+  detail.addEventListener('click', (e) => onSplitClick(e, detail));
+  // Erst das Blatt schliessen, dann das naechste Fenster: das geteilte Modal
+  // kennt kein Stapeln (closeDetailView).
+  const leave = (next) => async ({ close } = {}) => {
+    await (close ?? closeDetailView)({ force: true });
+    next();
+  };
+  openDetailView({
+    title: recipe.title,
+    key: `recipe:${recipe.id}`,
+    sections: [{ node: detail }],
+    actions: readOnly() ? [] : recipeActions(recipe, {
+      edit: { id: 'recipe-sheet-edit', onClick: leave(() => openRecipeModal('edit', recipe)) },
+      duplicate: leave(() => duplicateRecipe(recipe)),
+      remove: leave(() => removeRecipe(recipe)),
+    }),
+  });
+}
+
+/**
+ * Unter der Schwelle: das Leseblatt, wenn es ein Detail gibt, sonst das
+ * Formular - ein gespiegeltes Rezept ohne Detail tut nichts (siehe
+ * buildRecipeList).
  */
 function openRecipeNarrow(id, trigger) {
   const btn = trigger
     ?? _container?.querySelector(`.recipe-row__toggle[data-id="${CSS.escape(String(id))}"]`);
   if (!btn) return;
-
-  // Aufklappen: der Zustand lebt am Button (aria-expanded) und am Panel
-  // (hidden). `hidden` statt max-height-Transition, weil ein per Transition
-  // versteckter Inhalt in headless-Renderern und auf inaktiven Tabs nie
-  // erscheint - der Reveal muss einen sichtbaren Default verbessern, nicht
-  // Sichtbarkeit an eine Animation binden.
-  // BEWEGUNG OBENDRAUF (Re-Critique 2026-09-28, A4 P2-8): der Aufklapper
-  // oeffnete hart. Der Zustand bleibt `hidden` (siehe oben), die Bewegung kommt
-  // aus dem geteilten Paar expandIn/collapseOut (utils/ux.js, reduzierte
-  // Bewegung springt): Oeffnen macht sichtbar und zieht auf, Schliessen klappt
-  // erst ein und versteckt dann.
-  if (btn.dataset.action === 'toggle-detail') {
-    const panel = _container?.querySelector(`#recipe-detail-${btn.dataset.id}`);
-    if (!panel) return;
-    const open = btn.getAttribute('aria-expanded') === 'true';
-    btn.setAttribute('aria-expanded', String(!open));
-    if (!open) {
-      panel.getAnimations?.().forEach((a) => a.cancel());
-      panel.hidden = false;
-      expandIn(panel);
-      return;
-    }
-    collapseOut(panel).then(() => {
-      // Nur verstecken, wenn inzwischen niemand wieder aufgeklappt hat.
-      if (btn.getAttribute('aria-expanded') !== 'true') panel.hidden = true;
-      // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen, sonst
-      // oeffnete das Panel beim naechsten Mal auf Hoehe 0.
-      panel.getAnimations?.().forEach((a) => a.cancel());
-      panel.style.overflow = '';
-    });
+  const recipe = state.recipes.find((r) => String(r.id) === String(id));
+  if (!recipe) return;
+  if (btn.dataset.action === 'open-detail') {
+    openRecipeSheet(recipe);
     return;
   }
-
-  if (btn.dataset.action === 'edit') {
-    const recipe = state.recipes.find((r) => String(r.id) === String(id));
-    if (recipe) openRecipeModal('edit', recipe);
-  }
+  if (btn.dataset.action === 'edit') openRecipeModal('edit', recipe);
 }
 
 /**
- * ARIA des Hauptknopfs je Darstellung. Unter der Schwelle ist er ein
- * Aufklapper (`aria-expanded` + `aria-controls` aufs Panel); in der Spalte
- * waehlt er aus - ein „eingeklappt", das nie aufklappt, waere eine falsche
- * Ansage. Dort zeigt `aria-controls` auf die Detailspalte, und die Auswahl
- * traegt der Baustein als `aria-current`.
+ * ARIA des Hauptknopfs je Darstellung. Unter der Schwelle oeffnet er ein
+ * Leseblatt (`aria-haspopup="dialog"`, seit R19 statt eines Aufklappers); in
+ * der Spalte waehlt er aus - dort zeigt `aria-controls` auf die Detailspalte,
+ * und die Auswahl traegt der Baustein als `aria-current`.
  */
 function syncRowMode() {
   const list = _container?.querySelector('#recipes-list');
@@ -703,16 +840,14 @@ function syncRowMode() {
   // layout.css davon, und PAGE-019 bewacht nur die eine.
   list.classList.toggle('recipes-list--split', split);
   for (const btn of list.querySelectorAll('.recipe-row__toggle')) {
+    // In der Spalte steuert der Knopf die Detailspalte; darunter oeffnet er
+    // ein Blatt (aria-haspopup) oder das Formular.
     if (split) {
-      btn.removeAttribute('aria-expanded');
       btn.setAttribute('aria-controls', 'recipes-detail');
-    } else if (btn.dataset.action === 'toggle-detail') {
-      const panelId = `recipe-detail-${btn.dataset.id}`;
-      const panel = list.querySelector(`#${CSS.escape(panelId)}`);
-      btn.setAttribute('aria-expanded', String(Boolean(panel && !panel.hidden)));
-      btn.setAttribute('aria-controls', panelId);
+      btn.removeAttribute('aria-haspopup');
     } else {
       btn.removeAttribute('aria-controls');
+      if (btn.dataset.action === 'open-detail') btn.setAttribute('aria-haspopup', 'dialog');
     }
     if ('narrowInert' in btn.dataset) {
       btn.tabIndex = split ? 0 : -1;
@@ -766,7 +901,7 @@ function buildRecipeList() {
     return;
   }
 
-  if (!state.recipes.length) {
+  if (!listedRecipes().length) {
     // Geteilter Renderer (utils/empty-state.js): erzwingt Reihenfolge und
     // ARIA-Rolle. Vorher fehlte hier als einzigem Küchen-Leerzustand das Icon.
     mountEmptyState(list, emptyListOptions());
@@ -780,25 +915,16 @@ function buildRecipeList() {
     // Stelle im Modul, die den erzwingenden Baustein umging, während die
     // Schwester im Vorrat im identischen Zustand Icon, Überschrift, den
     // Suchbegriff und einen Zurücksetzen-Pfad lieferte (Critique 2026-07-30).
-    mountEmptyState(list, {
-      variant: 'no-results',
-      title: t('recipes.noResultsTitle'),
-      description: t('recipes.searchNoResults'),
-      hint: state.query ? `„${state.query}"` : undefined,
-      action: {
-        // Geteilter Key: „Suche leeren" existiert in allen 23 Locales. Der
-        // Vorrat sagt „Suche und Filter zurücksetzen", weil er beides hat -
-        // Rezepte haben nur die Suche, und das Label soll nicht mehr versprechen
-        // als es tut.
-        label: t('common.searchClear'),
-        onClick: () => {
-          state.query = '';
-          // clear() versteckt zugleich den Leeren-Knopf; ein blankes
-          // `value = ''` ließe ihn über dem leeren Feld stehen.
-          _search?.clear();
-          renderRecipeList();
-          _search?.input.focus();
-        },
+    // Seit R19 der EINE Leerzustand einer leeren Suche (mountSearchEmpty).
+    mountSearchEmpty(list, {
+      query: state.query,
+      onReset: () => {
+        state.query = '';
+        // clear() versteckt zugleich den Leeren-Knopf; ein blankes
+        // `value = ''` ließe ihn über dem leeren Feld stehen.
+        _search?.clear();
+        renderRecipeList();
+        _search?.input.focus();
       },
     });
     return;
@@ -817,7 +943,6 @@ function buildRecipeList() {
     const isMirrored = recipe.source !== 'native';
     const ro = readOnly();
     const ingredients = recipe.ingredients ?? [];
-    const detailId = `recipe-detail-${recipe.id}`;
     // Bei `read` hat JEDE Zeile ein Detail: dort stehen dann immer die
     // Mahlzeiten (fillRecipeDetail), und der Weg „ohne Detail direkt ins
     // Formular" ist zu - die Zeile waere sonst ein Knopf, der nichts tut.
@@ -843,7 +968,7 @@ function buildRecipeList() {
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'list-row__main--interactive recipe-row__toggle';
-    toggle.dataset.action = 'toggle-detail';
+    toggle.dataset.action = 'open-detail';
     toggle.dataset.id = String(recipe.id);
     toggle.dataset.mdFocus = "";
 
@@ -906,10 +1031,10 @@ function buildRecipeList() {
     toggle.appendChild(sub);
 
     if (hasDetail) {
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.setAttribute('aria-controls', detailId);
+      // Ein Wegweiser, kein Aufklapp-Winkel: die Zeile oeffnet das Rezept.
+      toggle.setAttribute('aria-haspopup', 'dialog');
       toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-down" class="icon-sm recipe-row__chevron" aria-hidden="true"></i>');
+        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron" aria-hidden="true"></i>');
     } else if (!isMirrored) {
       // Ohne Detail kein Versprechen: kein Chevron, kein aria-expanded. Der
       // Button öffnet dann direkt das Bearbeiten-Formular.
@@ -934,7 +1059,7 @@ function buildRecipeList() {
       // vor ihm rutscht gegenüber jeder anderen gespiegelten Zeile nach
       // rechts - derselbe Mechanismus wie bei der Zutatenzahl oben.
       toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-down" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
+        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
     }
 
     heading.appendChild(toggle);
@@ -996,16 +1121,6 @@ function buildRecipeList() {
     if (ROW_ACTIONS.length) row.appendChild(actions);
     li.appendChild(row);
 
-    if (hasDetail) {
-      const detail = document.createElement('div');
-      detail.className = 'recipe-detail';
-      detail.id = detailId;
-      detail.hidden = true;
-
-      fillRecipeDetail(detail, recipe);
-      li.appendChild(detail);
-    }
-
     rows.appendChild(li);
   }
 
@@ -1024,16 +1139,13 @@ function fillRecipeDetail(detail, recipe) {
   const ingredients = recipe.ingredients ?? [];
   const mealTypes = normalizeRecipeMealTypes(recipe.meal_types);
   // Das eigene Bild als Kopf des Details (R16) - ohne Bild kein Platzhalterblock
-  // (utils/recipe-thumb.js). Seit R18 tritt an seine Stelle ein flaches Band im
-  // Kuechenton mit dem Zeichen der ersten Mahlzeit, zu der das Rezept passt -
-  // auch dann, wenn das Bild beim Laden scheitert. Die Liste bleibt ohne.
-  // Das Zeichen der Mahlzeit nur, wo sie unterscheidet: gilt das Rezept fuer
-  // alle vier (oder fuer keine), waere "Fruehstueck" ueber einem Curry eine
-  // Falschaussage - dann steht das Besteck der Kueche.
-  const slots = mealTypeList();
-  const distinct = mealTypes.length > 0 && mealTypes.length < slots.length;
-  const band = () => recipeBandEl({ icon: distinct ? slots.find((option) => mealTypes.includes(option.key))?.icon : undefined });
-  detail.appendChild(recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image, fallback: band }) ?? band());
+  // (utils/recipe-thumb.js). OHNE BILD BEGINNT DAS DETAIL MIT SEINEM INHALT
+  // (R20, Entscheidung Ulas 2026-10-17): das flache Band im Kuechenton aus R18
+  // ist weg - am Desktop stand es als 480px breiter Stummel ueber den Zutaten,
+  // und den Titel traegt der Kopf des Rahmens ohnehin. Scheitert ein Bild beim
+  // Laden, nimmt es seinen Rahmen mit (keine Luecke, kein Ersatz).
+  const hero = recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image });
+  if (hero) detail.appendChild(hero);
 
   // Chips nur, wenn sie unterscheiden: gilt ein Rezept für alle Mahlzeiten,
   // ist die volle Chip-Reihe reine Ornamentik (Audit A1-21). Das
@@ -1096,9 +1208,12 @@ function fillRecipeDetail(detail, recipe) {
 
   // „In den Essensplan" legt eine Mahlzeit an - ohne Schreibrecht entfaellt
   // der Knopf (Regel 2), der Riegel dazu steht in planRecipe().
+  // SEKUNDAER (R19): der Fuss von Leseblatt und Detailspalte traegt
+  // Bearbeiten als den EINEN Primaerknopf (withPrimaryEdit); zwei gefuellte
+  // Knoepfe in einer Ansicht stritten um die Hauptaktion.
   if (mayPlanRecipe()) {
     const addToMeals = document.createElement('button');
-    addToMeals.className = 'btn btn--primary';
+    addToMeals.className = 'btn btn--secondary';
     addToMeals.type = 'button';
     addToMeals.dataset.action = 'add-to-meals';
     addToMeals.dataset.id = String(recipe.id);
@@ -1109,10 +1224,11 @@ function fillRecipeDetail(detail, recipe) {
   const addToShopping = shoppingTransferButton(recipe, ingredients);
   if (addToShopping) detailActions.appendChild(addToShopping);
 
-  if (recipe.recipe_url) {
+  const recipeHref = externalHref(recipe.recipe_url);
+  if (recipeHref) {
     const link = document.createElement('a');
     link.className = 'btn btn--ghost';
-    link.href = recipe.recipe_url;
+    link.href = recipeHref;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.insertAdjacentHTML('beforeend',
@@ -1313,6 +1429,49 @@ function pantryOptionLabel(item) {
   return teile.join(' · ');
 }
 
+/**
+ * Die Optionen EINER Vorrats-Auswahl: "nicht zugeordnet" und je Zeile ihr
+ * Name samt Ort und MHD. Ein Helfer fuer jede Auswahl - Einzel- und
+ * Sammeldialog und den Neuaufbau nach "die gewaehlte Zeile gibt es nicht
+ * mehr", damit sie nicht auseinanderlaufen.
+ */
+function pantrySelectOptionsHtml(items, selectedId = null) {
+  return `<option value="">${esc(t('recipes.ingredientMatchNone'))}</option>${items.map((item) => `<option value="${esc(String(item.id))}"${
+    item.id === selectedId ? ' selected' : ''
+  }>${esc(pantryOptionLabel(item))}</option>`).join('')}`;
+}
+
+/**
+ * Die im Dialog GEWAEHLTE Vorratszeile ist weg (#1909): der Dialog bleibt mit
+ * seiner Auswahl offen, jede Auswahl bekommt den aktuellen Vorrat. Eine Wahl,
+ * die es noch gibt, bleibt stehen; eine weggefallene steht danach auf "nicht
+ * zugeordnet", und die erste davon traegt den Fokus. Scheitert das Nachladen,
+ * bleibt die Auswahl, wie sie war - der Satz steht schon da.
+ *
+ * @param {HTMLSelectElement[]} selects
+ */
+async function offerCurrentPantryItems(selects) {
+  let items;
+  try {
+    const res = await api.get('/pantry');
+    items = res.data ?? [];
+  } catch (err) {
+    console.warn('[Recipes] pantry reload failed:', err);
+    return;
+  }
+  const present = new Set(items.map((item) => String(item.id)));
+  let focusTarget = null;
+  for (const select of selects) {
+    const chosen = String(select.value ?? '');
+    select.replaceChildren();
+    select.insertAdjacentHTML('beforeend', pantrySelectOptionsHtml(items));
+    const keep = chosen !== '' && present.has(chosen);
+    select.value = keep ? chosen : '';
+    if (!keep && chosen !== '' && !focusTarget) focusTarget = select;
+  }
+  focusTarget?.focus();
+}
+
 async function openPantryMatchModal(recipe, ingredientName) {
   // Zweite Linie hinter dem Markup, VOR dem Laden des Vorrats.
   if (!mayMatchIngredient(recipe.id)) return;
@@ -1320,17 +1479,14 @@ async function openPantryMatchModal(recipe, ingredientName) {
   if (!ing) return;
 
   let items = [];
+  const owner = _container;
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('recipes.ingredientMatchLoadError'), 'danger');
+    reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
   }
-
-  const options = items.map((item) => `<option value="${esc(String(item.id))}"${
-    item.id === ing.pantry_item_id ? ' selected' : ''
-  }>${esc(pantryOptionLabel(item))}</option>`).join('');
 
   openSharedModal({
     title: t('recipes.ingredientMatchTitle', { name: ingredientName }),
@@ -1341,8 +1497,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
         <div class="form-group">
           <label class="form-label" for="pantry-match-select">${t('recipes.ingredientMatchLabel')}</label>
           <select id="pantry-match-select" class="form-input">
-            <option value="">${t('recipes.ingredientMatchNone')}</option>
-            ${options}
+            ${pantrySelectOptionsHtml(items, ing.pantry_item_id)}
           </select>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -1363,6 +1518,8 @@ async function openPantryMatchModal(recipe, ingredientName) {
         const pantryItemId = raw === '' ? null : Number(raw);
         // Die Rechte koennen sich aendern, waehrend der Dialog offen steht.
         if (!mayMatchIngredient(recipe.id)) return;
+        const dialog = captureModalContext();
+        const owner = _container;
         try {
           const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, {
             name: ingredientName,
@@ -1373,8 +1530,18 @@ async function openPantryMatchModal(recipe, ingredientName) {
           ing.pantry_item_id = res.data.pantry_item_id;
           ing.pantry_item_name = res.data.pantry_item_name;
           // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
-          // eine Frage nach etwas, das schon gespeichert ist.
-          closeSharedModal({ force: true });
+          // eine Frage nach etwas, das schon gespeichert ist. `context`: nur
+          // DIESEN Dialog - einen inzwischen geoeffneten anderen laesst die
+          // spaete Antwort stehen, samt allem, was darin getippt ist (#1997).
+          const ownDialog = isOwnModalOpen(dialog);
+          closeSharedModal({ force: true, context: dialog });
+          window.yuvomi?.showToast(
+            pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
+            'success',
+          );
+          // Seite verlassen (oder neu betreten): nichts zeichnen, keinen Fokus
+          // ziehen - wie reportError.
+          if (!stillShown(owner)) return;
           // NUR DEN ZUTATEN-ABSCHNITT NEU BAUEN, kein renderRecipeList(): das
           // Zutaten-Detail ist gerade aufgeklappt, und ein Neuaufbau der Liste
           // klappte es zu - der Nutzer stuende nach dem Speichern vor der
@@ -1386,14 +1553,19 @@ async function openPantryMatchModal(recipe, ingredientName) {
           // Abschnitt, weil der Sammelknopf darunter seine Zahl mitaendert.
           renderIngredientSections(recipe);
           // Der Ausloeser ist mit dem Abschnitt ersetzt: den Fokus auf seinen
-          // Nachfolger tragen (gleiches data-action/data-id).
-          refocusAfterRender();
-          window.yuvomi?.showToast(
-            pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
-            'success',
-          );
+          // Nachfolger tragen (gleiches data-action/data-id) - nur, wenn es
+          // dieser Dialog war, der eben zuging. Sonst gehoert der Fokus dem,
+          // was der Nutzer inzwischen tut.
+          if (ownDialog) refocusAfterRender();
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          if (isSelectedPantryItemGone(err)) {
+            window.yuvomi?.showToast(errorSentence(err), 'danger');
+            // Wie reportError: nur, solange Seite und Dialog noch dieselben sind.
+            if (!stillShown(owner) || !isModalContextCurrent(dialog)) return;
+            await offerCurrentPantryItems([panel.querySelector('#pantry-match-select')].filter(Boolean));
+            return;
+          }
+          reportError(err, { owner, dialog, recipeId: recipe.id, recipeRef: recipe, ingredientName });
         }
       });
     },
@@ -1413,21 +1585,19 @@ async function openPantryBulkMatchModal(recipe) {
   if (!open.length) return;
 
   let items = [];
+  const owner = _container;
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('recipes.ingredientMatchLoadError'), 'danger');
+    reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
   }
-
-  const options = items.map((item) => `<option value="${esc(String(item.id))}">${esc(pantryOptionLabel(item))}</option>`).join('');
   const fields = open.map((ing, i) => `
         <div class="form-group">
           <label class="form-label" for="pantry-bulk-match-${i}">${esc(ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name)}</label>
           <select id="pantry-bulk-match-${i}" class="form-input" data-ingredient-index="${i}">
-            <option value="">${esc(t('recipes.ingredientMatchNone'))}</option>
-            ${options}
+            ${pantrySelectOptionsHtml(items)}
           </select>
         </div>`).join('');
 
@@ -1459,23 +1629,40 @@ async function openPantryBulkMatchModal(recipe) {
         if (!mayMatchIngredient(recipe.id)) return;
         save.disabled = true;
         let saved = 0;
+        // Die Zutat, an der ein Fehler haengt: "gibt es nicht mehr" nimmt sie
+        // aus dem Stand (reportError).
+        let current = null;
+        const dialog = captureModalContext();
+        const owner = _container;
         try {
           for (const { ing, pantryItemId } of chosen) {
+            current = ing;
             const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, { name: ing.name, pantryItemId });
             ing.pantry_item_id = res.data.pantry_item_id;
             ing.pantry_item_name = res.data.pantry_item_name;
             saved += 1;
           }
-          closeSharedModal({ force: true });
-          renderIngredientSections(recipe);
-          refocusAfterRender();
+          // Wie im Einzeldialog: nur diesen Dialog schliessen, nur auf dieser
+          // Seite zeichnen und den Fokus nur zurueckgeben, wenn er es war (#1997).
+          const ownDialog = isOwnModalOpen(dialog);
+          closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(t('recipes.ingredientMatchSaved'), 'success');
+          if (!stillShown(owner)) return;
+          renderIngredientSections(recipe);
+          if (ownDialog) refocusAfterRender();
         } catch (err) {
           // Was bis zum Fehler gespeichert ist, bleibt gespeichert und steht
           // gleich in der Liste; der Dialog bleibt fuer den Rest offen.
-          if (saved) renderIngredientSections(recipe);
+          if (saved && stillShown(owner)) renderIngredientSections(recipe);
           save.disabled = false;
-          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          if (isSelectedPantryItemGone(err)) {
+            window.yuvomi?.showToast(errorSentence(err), 'danger');
+            // Wie reportError: nur, solange Seite und Dialog noch dieselben sind.
+            if (!stillShown(owner) || !isModalContextCurrent(dialog)) return;
+            await offerCurrentPantryItems([...panel.querySelectorAll('select[data-ingredient-index]')]);
+            return;
+          }
+          reportError(err, { owner, dialog, recipeId: recipe.id, recipeRef: recipe, ingredientName: current?.name ?? null });
         }
       });
     },
@@ -1616,8 +1803,10 @@ function openRecipeModal(mode, recipe = null) {
         // Sofort zuruecksetzen: sonst feuert dieselbe Datei nach einem
         // abgebrochenen Zuschnitt kein zweites `change`.
         e.target.value = '';
+        let ImageProblemType = null;
         try {
-          const { pickCroppedImage } = await import('/utils/avatar-crop.js');
+          const { pickCroppedImage, ImageProblem } = await import('/utils/avatar-crop.js');
+          ImageProblemType = ImageProblem;
           const zugeschnitten = await pickCroppedImage(datei, {
             messageKeys: { dataTooLarge: 'recipes.imageTooLarge' },
           });
@@ -1625,7 +1814,13 @@ function openRecipeModal(mode, recipe = null) {
           bildStand = zugeschnitten;
           zeigeBild();
         } catch (err) {
-          window.yuvomi?.showToast(err.message, 'danger');
+          // Die Pruefung des Bildes sagt ihren Satz; jeder andere Wurf (ein
+          // Ladefehler, ein Programmfehler) den allgemeinen, nie seinen
+          // eigenen, unuebersetzten Text (#1909).
+          window.yuvomi?.showToast(
+            ImageProblemType && err instanceof ImageProblemType ? err.sentence : t('common.errorGeneric'),
+            'danger',
+          );
         }
       });
       panel.querySelector('#recipe-image-remove')?.addEventListener('click', () => {
@@ -1691,8 +1886,10 @@ function openRecipeModal(mode, recipe = null) {
   });
 }
 
-function closeModal({ force = false } = {}) {
-  closeSharedModal({ force });
+// Reicht `context` durch (#1997): ein Wrapper, der nur `force` weitergibt,
+// schloesse nach einer spaeten Antwort wieder den Dialog, der gerade offen ist.
+function closeModal({ force = false, context = null } = {}) {
+  return closeSharedModal({ force, context });
 }
 
 async function saveRecipe(panel, mode, recipe) {
@@ -1724,6 +1921,8 @@ async function saveRecipe(panel, mode, recipe) {
   const bildFeld = bildStand === undefined ? {} : { image_data: bildStand };
 
   saveBtn.disabled = true;
+  const dialog = captureModalContext();
+  const owner = _container;
 
   try {
     let createdId = null;
@@ -1737,7 +1936,9 @@ async function saveRecipe(panel, mode, recipe) {
       if (idx >= 0) state.recipes[idx] = res.data;
     }
 
-    closeModal({ force: true });
+    // Nur diesen Dialog: einen inzwischen geoeffneten anderen laesst die
+    // spaete Antwort stehen (#1997).
+    closeModal({ force: true, context: dialog });
     renderRecipeList({ repaint: true });
     // In der Spalte steht das neue Rezept gleich rechts - wie eine neue Notiz
     // in Notizen. Darunter bleibt die Liste, wie sie war.
@@ -1745,7 +1946,7 @@ async function saveRecipe(panel, mode, recipe) {
     window.yuvomi?.showToast(mode === 'create' ? t('recipes.created') : t('recipes.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    reportError(err, { owner, dialog, recipeId: mode === 'create' ? null : recipe.id });
   }
 }
 
@@ -1831,16 +2032,18 @@ async function planRecipe(recipe, btn) {
 
         if (!mayPlanRecipe()) return;
         confirmBtn.disabled = true;
+        const dialog = captureModalContext();
+        const owner = _container;
         try {
           await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
-          closeSharedModal({ force: true });
+          closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(
             t('recipes.planSuccess', { name: recipe.title, date: formatDate(date) }),
             'success',
           );
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
           confirmBtn.disabled = false;
+          reportError(err, { owner, dialog, recipeId: recipe.id });
         }
       });
     },
@@ -1879,6 +2082,7 @@ async function transferRecipe(recipe, btn) {
   if (!target) return;
 
   if (btn) btn.disabled = true;
+  const owner = _container;
   try {
     const res = await api.post(`/recipes/${recipe.id}/to-shopping-list`, { listId: target.id });
     const added = res.data?.transferred ?? 0;
@@ -1902,7 +2106,7 @@ async function transferRecipe(recipe, btn) {
       window.yuvomi?.showToast(t('recipes.toShoppingNoIngredients'), 'info');
     }
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    reportError(err, { owner, recipeId: recipe.id, listId: target.id });
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -1914,6 +2118,8 @@ async function removeRecipe(recipe) {
   if (readOnly()) return;
   const itemEl = _container.querySelector(`.recipe-row-item[data-id="${recipe.id}"]`);
   if (itemEl) itemEl.style.display = 'none';
+  // Auch jedes Neuzeichnen im Ruecknahme-Fenster laesst das Rezept weg.
+  _pendingDeleteIds.add(recipe.id);
   // Steht das Rezept rechts in der Detailspalte, geht es dort mit: sonst
   // zeigte die Spalte ein Rezept, das die Liste schon nicht mehr fuehrt.
   // Rueckgaengig waehlt es wieder aus.
@@ -1926,15 +2132,30 @@ async function removeRecipe(recipe) {
   scheduleUndoableDelete({
     message: t('recipes.deleted'),
     commit: async ({ keepalive }) => {
-      await api.delete(`/recipes/${recipe.id}`, { keepalive });
+      try {
+        await api.delete(`/recipes/${recipe.id}`, { keepalive });
+      } catch (err) {
+        _pendingDeleteIds.delete(recipe.id);
+        // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
+        // war schneller. Rezepte haben keine Sichtbarkeit, und ein
+        // gespiegeltes Rezept weist DELETE vorher mit 403 ab - die 404 heisst
+        // hier also nur "gibt es nicht mehr". Kein Toast, die Zeile kommt
+        // nicht zurueck. Alles andere bleibt ein Fehler.
+        if (!isAlreadyDeleted(err, 'recipes_recipe_not_found')) throw err;
+      }
+      _pendingDeleteIds.delete(recipe.id);
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       state.recipes = state.recipes.filter((r) => r.id !== recipe.id);
       renderRecipeList();
     },
     restore: (err) => {
+      _pendingDeleteIds.delete(recipe.id);
       if (itemEl) itemEl.style.display = '';
+      // Wurde die Liste im Fenster neu gebaut, haengt die alte Zeile nicht
+      // mehr: dann steht das Rezept erst mit dem naechsten Bau wieder da.
+      if (itemEl?.isConnected === false && stillShown(_container)) renderRecipeList();
       if (wasSelected && _md?.isSplit()) _md.select(recipe.id, { history: 'replace' });
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err, 'common.unknownError'), 'danger');
     },
   });
 }
@@ -1975,6 +2196,7 @@ async function duplicateRecipe(recipe) {
     category: ing.category || DEFAULT_CATEGORY_NAME,
   }));
 
+  const owner = _container;
   try {
     const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
     state.recipes.push(res.data);
@@ -1984,7 +2206,7 @@ async function duplicateRecipe(recipe) {
     if (res.data?.id != null) selectOwnRecipe(res.data.id);
     window.yuvomi?.showToast(t('recipes.duplicated'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    reportError(err, { owner });
   }
 }
 

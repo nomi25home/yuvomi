@@ -34,6 +34,7 @@ const MIGRATIONS_SQL = {
       password_hash TEXT    NOT NULL,
       avatar_color  TEXT    NOT NULL DEFAULT '#007AFF',
       avatar_data   TEXT,
+      avatar_key    TEXT,
       role          TEXT    NOT NULL DEFAULT 'member'
                             CHECK(role IN ('admin', 'member')),
       family_role   TEXT    NOT NULL DEFAULT 'other'
@@ -241,6 +242,20 @@ const MIGRATIONS_SQL = {
     CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
       AFTER UPDATE ON users FOR EACH ROW
       BEGIN UPDATE users SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+    -- avatar_key + Trigger stammen aus v251 (Profilbild-Adressen in Listen).
+    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_key_update
+      AFTER UPDATE OF avatar_data ON users FOR EACH ROW
+      WHEN NEW.avatar_data IS NOT OLD.avatar_data
+      BEGIN
+        UPDATE users SET avatar_key = CASE
+          WHEN NEW.avatar_data IS NULL OR NEW.avatar_data = '' THEN NULL
+          ELSE lower(hex(randomblob(16))) END
+        WHERE id = OLD.id;
+      END;
+    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_key_insert
+      AFTER INSERT ON users FOR EACH ROW
+      WHEN NEW.avatar_data IS NOT NULL AND NEW.avatar_data <> ''
+      BEGIN UPDATE users SET avatar_key = lower(hex(randomblob(16))) WHERE id = NEW.id; END;
     CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
       AFTER UPDATE ON tasks FOR EACH ROW
       BEGIN UPDATE tasks SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
@@ -1539,6 +1554,12 @@ const MIGRATIONS_SQL = {
     WHEN NEW.local_calendar_id IS NOT NULL AND (NEW.external_source IS NOT 'local'
       OR NEW.target_google_calendar_id IS NOT NULL OR NEW.target_caldav_account_id IS NOT NULL)
     BEGIN SELECT RAISE(ABORT, 'Local and sync calendars are mutually exclusive'); END;
+  `,
+  249: `
+    ALTER TABLE users ADD COLUMN birthday_feed_token TEXT;
+    ALTER TABLE users ADD COLUMN calendar_feed_include_birthdays INTEGER NOT NULL DEFAULT 1 CHECK(calendar_feed_include_birthdays IN (0, 1));
+    CREATE UNIQUE INDEX idx_users_birthday_feed_token ON users(birthday_feed_token)
+      WHERE birthday_feed_token IS NOT NULL;
   `,
 };
 

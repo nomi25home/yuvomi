@@ -1,4 +1,5 @@
 import express from 'express';
+import birthdayFeedRouter from './birthday-feed.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
@@ -15,6 +16,7 @@ import {
 
 const log = createLogger('Birthdays');
 const router = express.Router();
+router.use('/feed', birthdayFeedRouter);
 const MAX_PHOTO_LENGTH = 6_990_507; // ~5 MB raw image in base64
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 

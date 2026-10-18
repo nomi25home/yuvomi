@@ -157,7 +157,7 @@ test('errorSentence: ein bekannter Fall bekommt seinen Satz, an jedem Status', a
 
 test('errorSentence: unbekannter oder fehlender Grund ergibt den allgemeinen Satz, nie den des Servers', async () => {
   const { errorSentence } = await load();
-  for (const status of [400, 404, 409, 422, 429, 500, 502]) {
+  for (const status of [400, 404, 409, 422, 500, 502]) {
     for (const reason of [undefined, 'some_future_reason', '__proto__', 'constructor', 'toString', '', 7, null, {}]) {
       const err = answer(status, SERVER_TEXT, reason);
       assert.equal(errorSentence(err), 'common.errorGeneric', `${status} ${String(reason)}`);
@@ -189,6 +189,25 @@ test('errorSentence: Absage, Offline und Restore sagen dasselbe wie friendlyErro
   }
 });
 
+// 429 HAT EINEN EIGENEN SATZ (Critique 2026-10-16, Schritt 6). Vorher reichte
+// friendlyError den Text der Bremse durch - "Too many requests. Please wait a
+// moment." mitten in der deutschen Oberflaeche -, und errorSentence sagte den
+// allgemeinen Satz, der verschweigt, dass Warten hilft. Ein Grund mit eigenem
+// Satz (etwa install_rate_limited) bleibt bei diesem.
+test('429: friendlyError und errorSentence sagen common.errorRateLimited, nie den Text des Servers', async () => {
+  const { friendlyError, errorSentence, CASE_MESSAGES } = await load();
+  for (const reason of [undefined, 'some_future_reason', '__proto__', 'constructor', '', 7, null, {}]) {
+    const err = answer(429, 'Too many requests. Please wait a moment.', reason);
+    assert.equal(friendlyError(err), 'common.errorRateLimited', String(reason));
+    assert.equal(errorSentence(err), 'common.errorRateLimited', String(reason));
+    assert.equal(errorSentence(err, 'shopping.sendListError'), 'common.errorRateLimited', String(reason));
+  }
+  for (const [reason, key] of CASE_MESSAGES) {
+    if (reason !== 'install_rate_limited' && reason !== 'gravatar_rate_limited') continue;
+    assert.equal(errorSentence(answer(429, SERVER_TEXT, reason)), key, reason);
+  }
+});
+
 // UEBERGANG: #1916 hatte den letzten Rueckfall von friendlyError fuer ALLE
 // Aufrufer auf den allgemeinen Satz verengt - auch fuer die, die noch nicht
 // umgestellt sind (Kontakt-Import, Essensplan, Fehlerbildschirm, unbehandelte
@@ -197,7 +216,7 @@ test('errorSentence: Absage, Offline und Restore sagen dasselbe wie friendlyErro
 // Weg ist errorSentence, friendlyError behaelt den Text des Servers.
 test('friendlyError: ein Status ohne eigenen Satz behaelt den Text des Servers, errorSentence nie', async () => {
   const { friendlyError, errorSentence } = await load();
-  for (const status of [400, 401, 409, 422, 429]) {
+  for (const status of [400, 401, 409, 422]) {
     for (const reason of [undefined, 'some_future_reason', '__proto__']) {
       const err = answer(status, SERVER_TEXT, reason);
       assert.equal(friendlyError(err), SERVER_TEXT, `friendlyError ${status} ${String(reason)}`);
@@ -265,7 +284,13 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
   // Die Dokumente ebenso, dazu Verknuepfen und Senden an ein DMS; dass eine
   // ECHTE Antwort sie traegt, misst test:documents-errors.
   const documentsServer = ['../server/routes/documents.js', '../server/routes/dms.js'].map(read).join('\n');
-  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  // Die Rezepte ebenso, dazu das Einplanen eines Rezepts in den Essensplan;
+  // dass eine ECHTE Antwort sie traegt, misst test:recipes-errors.
+  const recipesServer = ['../server/routes/recipes.js', '../server/routes/meals.js'].map(read).join('\n');
+  // Die Abos ebenso; dass eine ECHTE Antwort sie traegt, misst
+  // test:subscriptions-errors.
+  const subscriptionsServer = read('../server/routes/subscriptions.js');
+  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -294,6 +319,10 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'health_nutrition_entry_not_found', 'health_cycle_period_not_found', 'health_cycle_log_not_found',
     'documents_folder_not_found', 'documents_selected_folder_not_found', 'documents_document_not_found',
     'dms_account_not_found', 'dms_document_not_found',
+    'recipes_recipe_not_found', 'recipes_ingredient_not_found', 'recipes_selected_pantry_item_not_found',
+    'meals_selected_recipe_not_found',
+    'subscriptions_subscription_not_found', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
+    'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);

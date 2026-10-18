@@ -12,11 +12,14 @@ import {
   createDisclosure,
   createInlineError,
   createRetryState,
+  createSettingRow,
   createStatusSummary,
-  createToggleRow,
+  settingRowHtml,
+  settingSwitchRowHtml,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
-import { esc } from '/utils/html.js';
+import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 
 // Seit R10 ein Abschnitt im Blatt Kalender (registry.js). Neu laden heisst,
@@ -683,6 +686,8 @@ async function loadCalDAVAccounts(container, user) {
   window.lucide?.createIcons({ el: listEl });
 }
 
+/** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
+
 function bindCalDAVAddButton(container, user) {
   const addBtn = container.querySelector('#caldav-add-account-btn');
   if (!addBtn) return;
@@ -692,26 +697,31 @@ function bindCalDAVAddButton(container, user) {
       size: 'sm',
       content: `
         <form id="caldav-add-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="caldav-name">${t('settings.caldavNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="text" id="caldav-name" required
-                   placeholder="${t('settings.caldavNamePlaceholder')}" maxlength="100" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="caldav-url">${t('settings.caldavUrlLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="url" id="caldav-url" required
-                   placeholder="${t('settings.caldavUrlPlaceholder')}" />
-            <small class="form-hint">${t('settings.caldavUrlHint')}</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="caldav-username">${t('settings.caldavUsernameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="text" id="caldav-username" required autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="caldav-password">${t('settings.caldavPasswordLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="password" id="caldav-password" required autocomplete="current-password" />
-            <small class="form-hint">${t('settings.caldavPasswordHint')}</small>
-          </div>
+          ${/* DER DIALOG SPRICHT DENSELBEN DIALEKT (R19, B7): Zeilen im Traeger,
+               Etikett links, Feld rechts, Hinweis unter der Zeile - die Form
+               der iOS-Kontoanlage. Jede Zeile ist die Fehlergruppe ihres Felds. */ ''}
+          ${formRowsHtml([
+            formRowHtml({
+              label: t('settings.caldavNameLabel'), labelFor: 'caldav-name', labelExtra: REQUIRED_MARK, field: true,
+              control: `<input class="form-input" type="text" id="caldav-name" required
+                   placeholder="${t('settings.caldavNamePlaceholder')}" maxlength="100" />`,
+            }),
+            formRowHtml({
+              label: t('settings.caldavUrlLabel'), labelFor: 'caldav-url', labelExtra: REQUIRED_MARK, field: true,
+              description: t('settings.caldavUrlHint'), descriptionId: 'caldav-url-hint',
+              control: `<input class="form-input" type="url" id="caldav-url" required aria-describedby="caldav-url-hint"
+                   placeholder="${t('settings.caldavUrlPlaceholder')}" />`,
+            }),
+            formRowHtml({
+              label: t('settings.caldavUsernameLabel'), labelFor: 'caldav-username', labelExtra: REQUIRED_MARK, field: true,
+              control: '<input class="form-input" type="text" id="caldav-username" required autocomplete="off" />',
+            }),
+            formRowHtml({
+              label: t('settings.caldavPasswordLabel'), labelFor: 'caldav-password', labelExtra: REQUIRED_MARK, field: true,
+              description: t('settings.caldavPasswordHint'), descriptionId: 'caldav-password-hint',
+              control: '<input class="form-input" type="password" id="caldav-password" required autocomplete="new-password" aria-describedby="caldav-password-hint" />',
+            }),
+          ])}
           <div id="caldav-add-error" class="form-error" role="alert" hidden></div>
           <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="caldav-add-cancel">${t('common.cancel')}</button>
@@ -782,7 +792,36 @@ function buildGoogleProvider(googleStatus, user) {
 
   const status = document.createElement('p');
   status.className = 'settings-sync-info__status';
-  status.textContent = providerConnectionStatus(googleStatus);
+  // Google hat das Token abgelehnt (#2019): derselbe Text wie bei Outlook statt
+  // "Verbunden", denn ohne neues OAuth synchronisiert hier nichts mehr.
+  const reauth = Boolean(googleStatus?.connected && googleStatus.needsReauth);
+
+  // EINE Stelle für jede Google-Antwort, die das abgelehnte Token meldet: der
+  // Status oben ist dann veraltet, also neu holen und die Karte im neuen Zustand
+  // aufbauen. Jeder Aufruf der Karte läuft über `googleCall` und damit hier
+  // vorbei (Kalenderauswahl, Kalender an/aus, Jetzt synchronisieren,
+  // Schreibschutz). Status und Trennen fragen Google nicht. Der Fehler geht danach mit `reauthHandled` weiter:
+  // der Aufrufer nimmt seinen Zustand zurück, zeigt aber keinen Toast mehr.
+  const handleReauth = async (err) => {
+    if (err?.data?.reason !== GOOGLE_REAUTH_REASON) return false;
+    const fresh = await api.get('/calendar/google/status').catch(() => null);
+    // Nur wenn die Karte wirklich neu steht: sonst zeigt der Aufrufer den
+    // ursprünglichen Fehler, statt still auf einer veralteten Karte zu bleiben.
+    if (!fresh?.needsReauth) return false;
+    section.replaceWith(buildGoogleProvider(fresh, user));
+    return true;
+  };
+  const googleCall = async (request) => {
+    try {
+      return await request();
+    } catch (err) {
+      if (await handleReauth(err)) err.reauthHandled = true;
+      throw err;
+    }
+  };
+  status.textContent = reauth
+    ? t('settings.outlookReauthRequired')
+    : providerConnectionStatus(googleStatus);
   section.appendChild(status);
   appendSyncError(status, googleStatus?.lastError);
 
@@ -805,14 +844,29 @@ function buildGoogleProvider(googleStatus, user) {
     return section;
   }
 
-  if (googleStatus.connected && user?.role === 'admin') {
-    section.appendChild(buildGoogleCalendarPicker());
-    section.appendChild(buildGoogleReadonlyToggle(googleStatus));
+  // Auswahl und Schreibschutz brauchen ein gültiges Token - bis zum neuen
+  // Verbinden bleiben sie weg, statt mit einem Fehler zu laden.
+  if (googleStatus.connected && !reauth && user?.role === 'admin') {
+    // Stellt erst der Kalenderabruf fest, dass Google das Token ablehnt, ist der
+    // Status oben veraltet: neu holen und die Karte im neuen Zustand aufbauen.
+    section.appendChild(buildGoogleCalendarPicker(googleCall));
+    section.appendChild(buildGoogleReadonlyToggle(googleStatus, googleCall));
   }
 
   const actions = document.createElement('div');
   actions.className = 'settings-sync-actions';
-  if (googleStatus.connected) {
+  if (googleStatus.connected && reauth) {
+    if (user?.role === 'admin') {
+      const reconnect = document.createElement('a');
+      reconnect.href = '/api/v1/calendar/google/auth';
+      reconnect.className = 'btn btn--primary';
+      reconnect.textContent = t('settings.outlookReconnect');
+      actions.appendChild(reconnect);
+      actions.appendChild(buildGoogleDisconnectButton(googleStatus));
+    } else {
+      section.appendChild(buildProviderHint(t('settings.googleOnlyAdmin')));
+    }
+  } else if (googleStatus.connected) {
     const syncBtn = document.createElement('button');
     syncBtn.type = 'button';
     syncBtn.className = 'btn btn--secondary';
@@ -821,9 +875,10 @@ function buildGoogleProvider(googleStatus, user) {
       syncBtn.disabled = true;
       syncBtn.textContent = t('settings.synchronizing');
       try {
-        await api.post('/calendar/google/sync', {});
+        await googleCall(() => api.post('/calendar/google/sync', {}));
         showToast(t('settings.syncSuccess', { provider: 'Google Calendar' }), 'success');
       } catch (err) {
+        if (err.reauthHandled) return;
         showToast(err.message || t('common.errorGeneric'), 'danger');
       } finally {
         syncBtn.disabled = false;
@@ -833,31 +888,7 @@ function buildGoogleProvider(googleStatus, user) {
     actions.appendChild(syncBtn);
 
     if (user?.role === 'admin') {
-      const disconnectBtn = document.createElement('button');
-      disconnectBtn.type = 'button';
-      disconnectBtn.className = 'btn btn--danger-outline';
-      disconnectBtn.textContent = t('settings.disconnect');
-      disconnectBtn.addEventListener('click', async () => {
-        if (!await confirmModal(t('settings.googleDisconnectConfirm'),
-          { danger: true, detail: t('settings.googleDisconnectConfirmDetail') })) return;
-        const deleteEvents = await askDeleteMirrored(googleStatus.mirroredEvents);
-        try {
-          // Die Zahl statt der blossen Trennmeldung, wenn geraeumt wurde: sonst
-          // bliebe der zweite Teil der Aktion unbestaetigt (#820). Wie bei CalDAV.
-          const res = await api.delete(`/calendar/google/disconnect?deleteEvents=${deleteEvents ? 'true' : 'false'}`);
-          const removed = res?.removed ?? 0;
-          showToast(
-            removed
-              ? t('settings.syncCleanup.removed', { count: removed })
-              : t('settings.disconnectedToast', { provider: 'Google Calendar' }),
-            'default',
-          );
-          window.yuvomi?.navigate(SYNC_CALENDAR_HREF);
-        } catch (err) {
-          showToast(err.message || t('common.errorGeneric'), 'danger');
-        }
-      });
-      actions.appendChild(disconnectBtn);
+      actions.appendChild(buildGoogleDisconnectButton(googleStatus));
     }
   } else if (user?.role === 'admin') {
     const connect = document.createElement('a');
@@ -872,6 +903,35 @@ function buildGoogleProvider(googleStatus, user) {
   if (cleanup) section.appendChild(cleanup);
 
   return section;
+}
+
+/** Trennen-Knopf der Google-Karte: im verbundenen wie im abgelehnten Zustand. */
+function buildGoogleDisconnectButton(googleStatus) {
+  const disconnectBtn = document.createElement('button');
+  disconnectBtn.type = 'button';
+  disconnectBtn.className = 'btn btn--danger-outline';
+  disconnectBtn.textContent = t('settings.disconnect');
+  disconnectBtn.addEventListener('click', async () => {
+    if (!await confirmModal(t('settings.googleDisconnectConfirm'),
+      { danger: true, detail: t('settings.googleDisconnectConfirmDetail') })) return;
+    const deleteEvents = await askDeleteMirrored(googleStatus.mirroredEvents);
+    try {
+      // Die Zahl statt der blossen Trennmeldung, wenn geraeumt wurde: sonst
+      // bliebe der zweite Teil der Aktion unbestaetigt (#820). Wie bei CalDAV.
+      const res = await api.delete(`/calendar/google/disconnect?deleteEvents=${deleteEvents ? 'true' : 'false'}`);
+      const removed = res?.removed ?? 0;
+      showToast(
+        removed
+          ? t('settings.syncCleanup.removed', { count: removed })
+          : t('settings.disconnectedToast', { provider: 'Google Calendar' }),
+        'default',
+      );
+      window.yuvomi?.navigate(SYNC_CALENDAR_HREF);
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  return disconnectBtn;
 }
 
 /**
@@ -984,11 +1044,16 @@ function buildProviderHint(text) {
   return hint;
 }
 
-function buildGoogleCalendarPicker() {
-  const group = document.createElement('div');
-  group.className = 'form-group settings-google-calendars';
+/** Grund, mit dem /calendar/google/calendars ein abgelehntes Token meldet (#2019). */
+const GOOGLE_REAUTH_REASON = 'google_reauth_required';
 
-  const label = document.createElement('label');
+function buildGoogleCalendarPicker(googleCall) {
+  // Eine Liste, kein Feld (R19): ihr Name ist keine `<label>` ohne
+  // Bedienelement, und sie steht nicht im Feld-Dialekt `.form-group`.
+  const group = document.createElement('div');
+  group.className = 'settings-google-calendars';
+
+  const label = document.createElement('p');
   label.className = 'form-label';
   label.textContent = t('settings.googleCalendarsSelect');
   group.appendChild(label);
@@ -1015,7 +1080,7 @@ function buildGoogleCalendarPicker() {
 
   (async () => {
     try {
-      const { data } = await api.get('/calendar/google/calendars');
+      const { data } = await googleCall(() => api.get('/calendar/google/calendars'));
       const calendars = data || [];
       list.replaceChildren();
       for (const cal of calendars) {
@@ -1050,19 +1115,20 @@ function buildGoogleCalendarPicker() {
           const enabled = checkbox.checked;
           await withBusy(checkbox, async () => {
             try {
-              await api.patch('/calendar/google/calendars', { calendarId: cal.id, enabled });
+              await googleCall(() => api.patch('/calendar/google/calendars', { calendarId: cal.id, enabled }));
               showToast(
                 enabled ? t('settings.calendarEnabled') : t('settings.calendarDisabled'),
                 'success',
               );
             } catch (err) {
               checkbox.checked = !enabled;
-              showToast(err.message || t('common.errorGeneric'), 'danger');
+              if (!err.reauthHandled) showToast(err.message || t('common.errorGeneric'), 'danger');
             }
           });
         });
       }
     } catch (err) {
+      if (err.reauthHandled) return;
       const p = document.createElement('p');
       p.className = 'form-hint';
       p.textContent = err.message || t('common.errorGeneric');
@@ -1073,31 +1139,26 @@ function buildGoogleCalendarPicker() {
   return group;
 }
 
-function buildGoogleReadonlyToggle(googleStatus) {
+function buildGoogleReadonlyToggle(googleStatus, googleCall) {
+  // Eine Schalterzeile der Gruppe samt Hinweis darunter (R19, ein Dialekt).
   const group = document.createElement('div');
-  group.className = 'form-group';
-
-  const row = createToggleRow({
-    control: 'switch',
+  group.className = 'row-carrier settings-group';
+  group.insertAdjacentHTML('beforeend', settingSwitchRowHtml({
     label: t('settings.googleReadonly'),
     checked: Boolean(googleStatus.readonly),
-  });
-  const checkbox = row.querySelector('input');
-  group.appendChild(row);
-
-  const hint = document.createElement('p');
-  hint.className = 'form-hint';
-  hint.textContent = t('settings.googleReadonlyHint');
-  group.appendChild(hint);
+    description: t('settings.googleReadonlyHint'),
+    descriptionId: 'google-readonly-hint',
+  }));
+  const checkbox = group.querySelector('input');
 
   checkbox.addEventListener('change', async () => {
     const enabled = checkbox.checked;
     await withBusy(checkbox, async () => {
       try {
-        await api.put('/calendar/google/readonly', { readonly: enabled });
+        await googleCall(() => api.put('/calendar/google/readonly', { readonly: enabled }));
       } catch (err) {
         checkbox.checked = !enabled;
-        showToast(err.message || t('common.errorGeneric'), 'danger');
+        if (!err.reauthHandled) showToast(err.message || t('common.errorGeneric'), 'danger');
       }
     });
   });
@@ -1172,13 +1233,15 @@ function buildOutlookCalendarList(account, calendars, user) {
  * PUT /calendar/outlook/accounts/:id.
  */
 function buildOutlookAutoSyncControls(account, calendars) {
+  // Zielkalender und Besitzer als Zeilen der Gruppe, der Hinweis als ihr Fuss
+  // (R19, ein Dialekt) - vorher zwei Auswahlen unter ihren Etiketten.
   const wrap = document.createElement('div');
-  wrap.className = 'form-group';
-
+  const group = document.createElement('div');
+  group.className = 'row-carrier settings-group';
+  wrap.appendChild(group);
   const hint = document.createElement('p');
-  hint.className = 'form-hint';
+  hint.className = 'form-hint settings-group__footer';
   hint.textContent = t('settings.outlookAutoSyncHint');
-  wrap.appendChild(hint);
 
   const saveField = async (payload, selectEl, revertValue) => {
     selectEl.disabled = true;
@@ -1194,11 +1257,6 @@ function buildOutlookAutoSyncControls(account, calendars) {
   };
 
   // Zielkalender (nur beschreibbare)
-  const calLabel = document.createElement('label');
-  calLabel.className = 'form-label';
-  calLabel.textContent = t('settings.outlookAutoSyncCalendar');
-  wrap.appendChild(calLabel);
-
   const calSelect = document.createElement('select');
   calSelect.className = 'form-input';
   const offOpt = document.createElement('option');
@@ -1218,14 +1276,9 @@ function buildOutlookAutoSyncControls(account, calendars) {
     await saveField({ autoSyncCalendarId: value || null }, calSelect, lastCal);
     lastCal = calSelect.value;
   });
-  wrap.appendChild(calSelect);
+  group.appendChild(createSettingRow({ label: t('settings.outlookAutoSyncCalendar'), control: calSelect }));
 
   // Owner (bestimmt „für mich sichtbare Termine")
-  const ownerLabel = document.createElement('label');
-  ownerLabel.className = 'form-label';
-  ownerLabel.textContent = t('settings.outlookOwner');
-  wrap.appendChild(ownerLabel);
-
   const ownerSelect = document.createElement('select');
   ownerSelect.className = 'form-input';
   const noneOpt = document.createElement('option');
@@ -1247,7 +1300,8 @@ function buildOutlookAutoSyncControls(account, calendars) {
     await saveField({ ownerUserId: value ? Number(value) : null }, ownerSelect, lastOwner);
     lastOwner = ownerSelect.value;
   });
-  wrap.appendChild(ownerSelect);
+  group.appendChild(createSettingRow({ label: t('settings.outlookOwner'), control: ownerSelect }));
+  wrap.appendChild(hint);
 
   return wrap;
 }
@@ -1509,19 +1563,23 @@ function buildAppleProvider(appleStatus, user) {
 function buildAppleConnectForm() {
   const form = document.createElement('form');
   form.className = 'settings-form settings-form--compact';
+  // EIN FORMULAR-DIALEKT (R19, Einstellungen B7): die drei Felder als Zeilen
+  // der Gruppe, der Passwort-Hinweis unter seiner Zeile.
   form.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="apple-caldav-url">${t('settings.caldavUrlLabel')}</label>
-      <input class="form-input" type="url" id="apple-caldav-url" placeholder="${t('settings.caldavUrlPlaceholder')}" required />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="apple-username">${t('settings.appleIdLabel')}</label>
-      <input class="form-input" type="email" id="apple-username" autocomplete="username" required />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="apple-password">${t('settings.applePasswordLabel')}</label>
-      <input class="form-input" type="password" id="apple-password" autocomplete="current-password" required />
-      <span class="form-hint">${t('settings.applePasswordHint')}</span>
+    <div class="row-carrier settings-group">
+      ${settingRowHtml({
+        label: t('settings.caldavUrlLabel'), labelFor: 'apple-caldav-url', labelExtra: REQUIRED_MARK,
+        control: `<input class="form-input" type="url" id="apple-caldav-url" placeholder="${t('settings.caldavUrlPlaceholder')}" required />`,
+      })}
+      ${settingRowHtml({
+        label: t('settings.appleIdLabel'), labelFor: 'apple-username', labelExtra: REQUIRED_MARK,
+        control: '<input class="form-input" type="email" id="apple-username" autocomplete="off" required />',
+      })}
+      ${settingRowHtml({
+        label: t('settings.applePasswordLabel'), labelFor: 'apple-password', labelExtra: REQUIRED_MARK,
+        description: t('settings.applePasswordHint'), descriptionId: 'apple-password-hint',
+        control: '<input class="form-input" type="password" id="apple-password" autocomplete="new-password" aria-describedby="apple-password-hint" required />',
+      })}
     </div>
     <div id="apple-connect-error" class="form-error" role="alert" hidden></div>
     <button type="submit" class="btn btn--primary" id="apple-connect-btn">${t('settings.appleConnectBtn')}</button>
@@ -1665,3 +1723,6 @@ export async function render(container, { user, query } = {}) {
 
   window.lucide?.createIcons({ el: container });
 }
+
+// Für die Suite: die Google-Karte für sich, ohne die ganze Seite (#2019).
+export const __test = { buildGoogleProvider };

@@ -52,6 +52,11 @@
  *            Schalters: ein frischer Import je Wert (ungesetzt, yes, "TRUE ",
  *            leer, false, 0 → aus; true, 1, " 1 " → an) haelt fest, dass die
  *            Umgebung gelesen wird und nicht eine Konstante.
+ *          - Nach dem Merge: GitHubs sekundaeres Limit (429, 403 mit retry-after)
+ *            ist rate_limited, ein nacktes 403 bleibt github_failed. Ein Ersetzen,
+ *            das ein Neustart abgeschnitten hat, holt der Start zurueck
+ *            (recoverInterruptedInstalls: Sperre, schreibgeschuetzt, zweimal).
+ *            Eine id mit Pfadteilen wird abgewiesen, ohne dass etwas entsteht.
  *
  *        Kein Netz: der GitHub-Transport ist ein Fake (__setGithubRequestForTests /
  *        createGithubInstaller({ request })). MODULES_DIR zeigt auf einen
@@ -394,6 +399,20 @@ test('kaputtes Manifest → 400 bad_manifest (entry fehlt, id ungueltig, manifes
   assert.match(future.body.error, /manifestVersion 2/, 'die Meldung des Loaders kommt durch');
   assert.ok(!fs.existsSync(path.join(MODULES_DIR, 'future-mod')));
   assert.deepEqual(stagingLeftovers(), []);
+});
+
+test('eine id mit Pfadteilen → 400 bad_manifest, nichts entsteht in modules/ oder darueber', async () => {
+  const listing = (dir) => fs.readdirSync(dir).sort();
+  const modulesBefore = listing(MODULES_DIR);
+  const parentBefore = listing(TMP_ROOT);
+  for (const id of ['../evil', 'a/b', 'a\\b', '..', '../../evil-two']) {
+    const r = await postZip(makeZip(moduleFiles(id)));
+    assert.equal(r.status, 400, `${JSON.stringify(id)} → ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.reason, 'bad_manifest', JSON.stringify(id));
+  }
+  assert.deepEqual(listing(MODULES_DIR), modulesBefore, 'kein Ordner in modules/, auch kein Staging');
+  assert.deepEqual(listing(TMP_ROOT), parentBefore, 'nichts neben modules/');
+  assert.ok(!fs.existsSync(path.join(path.dirname(TMP_ROOT), 'evil-two')), 'nichts zwei Ebenen darueber');
 });
 
 test('nicht erlaubte Dateien werden uebersprungen und gemeldet', async () => {
@@ -814,18 +833,232 @@ test('Rate-Limit: die elfte Installation in zehn Minuten → 429', async () => {
   assert.equal((await call('POST', '/install/zip', { raw: 'x', contentType: 'text/plain' })).status, 400);
 });
 
-test('veraltete Staging-Ordner werden aufgeraeumt, Sicherungen nicht', async () => {
-  const stale = path.join(MODULES_DIR, '.install-stale');
-  const backup = path.join(MODULES_DIR, '.backup-x-1');
-  fs.mkdirSync(stale);
-  fs.mkdirSync(backup);
-  const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
-  fs.utimesSync(stale, old, old);
-  fs.utimesSync(backup, old, old);
-  await install.cleanupStaleStaging();
-  assert.ok(!fs.existsSync(stale));
-  assert.ok(fs.existsSync(backup), 'eine Sicherung kann die letzte Kopie sein');
-  fs.rmSync(backup, { recursive: true });
+// Namen, wie die Installation sie macht: `.install-` + 16 Hex-Zeichen
+// (randomBytes(8)), `.backup-<id>-` + 13 Ziffern (Date.now()).
+const STAGE = '.install-0123456789abcdef';
+const T = (n) => String(1760000000000 + n);
+
+test('veraltete Staging-Ordner werden aufgeraeumt, Sicherungen und fremde Namen nicht', async () => {
+  const at = (name) => path.join(MODULES_DIR, name);
+  const names = [STAGE, '.install-notes', '.install-0123', '.install-ABCDEF0123456789', '.backup-x-1'];
+  try {
+    for (const name of names) fs.mkdirSync(at(name));
+    const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    for (const name of names) fs.utimesSync(at(name), old, old);
+    await install.cleanupStaleStaging();
+    assert.ok(!fs.existsSync(at(STAGE)), 'ein Staging-Ordner der Installation geht');
+    assert.ok(fs.existsSync(at('.backup-x-1')), 'eine Sicherung kann die letzte Kopie sein');
+    for (const name of ['.install-notes', '.install-0123', '.install-ABCDEF0123456789']) {
+      assert.ok(fs.existsSync(at(name)), `${name} hat die Installation nicht angelegt`);
+    }
+  } finally {
+    for (const name of names) fs.rmSync(at(name), { recursive: true, force: true });
+  }
+});
+
+// Ein Modulordner, wie ihn ein Ersetzen beiseitestellt: mit Installationsdatei
+// (record: true) - oder ohne, wie ein von Hand angelegter Ordner gleichen Namens.
+function seedModuleDir(dir, id, version, { approved = true, record = true } = {}) {
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [name, content] of Object.entries(moduleFiles(id, { version }))) fs.writeFileSync(path.join(dir, name), content);
+  if (!record) return;
+  fs.writeFileSync(path.join(dir, '.yuvomi-install.json'),
+    JSON.stringify({ source: 'zip', installedAt: '2026-10-01T00:00:00.000Z', installedBy: 1, approved }));
+}
+const NOTHING_DONE = { removedStaging: [], restored: [], removedBackups: [] };
+
+test('Neustart mitten im Ersetzen: der Start holt die alte Fassung AUSGESCHALTET zurueck und raeumt auf', async () => {
+  const at = (name) => path.join(MODULES_DIR, name);
+  const versionOf = (id) => JSON.parse(fs.readFileSync(path.join(MODULES_DIR, id, 'module.json'), 'utf8')).version;
+  const seeded = ['lost-mod', 'kept-mod', 'hand-two', 'flat-mod', 'web-mod'];
+  try {
+    // Abgebrochen zwischen den Umbenennungen: modules/lost-mod fehlt, zwei Sicherungen.
+    seedModuleDir(at(`.backup-lost-mod-${T(1000)}`), 'lost-mod', '1.0.0');
+    seedModuleDir(at(`.backup-lost-mod-${T(2000)}`), 'lost-mod', '2.0.0');
+    // Abgebrochen nach dem Tausch, vor dem Aufraeumen: modules/kept-mod ist die neue Fassung.
+    seedModuleDir(at('kept-mod'), 'kept-mod', '5.0.0', { approved: false });
+    seedModuleDir(at(`.backup-kept-mod-${T(3000)}`), 'kept-mod', '4.0.0');
+    // Staging, frisch (juenger als die Stunde von cleanupStaleStaging): beim Start trotzdem weg.
+    fs.mkdirSync(at(`${STAGE}/kept-mod`), { recursive: true });
+    // Kein Name aus einem Ersetzen (keine gueltige Id): bleibt fuer den Betreiber.
+    fs.mkdirSync(at(`.backup-x-${T(1)}`));
+    // Von Hand angelegt, ohne Installationsdatei: weder zurueckgeholt (ohne Datei
+    // liefe es eingeschaltet) noch geloescht, ob modules/<id> fehlt oder da ist.
+    seedModuleDir(at(`.backup-hand-mod-${T(123)}`), 'hand-mod', '1.0.0', { record: false });
+    seedModuleDir(at(`.backup-hand-two-${T(456)}`), 'hand-two', '1.0.0', { record: false });
+    seedModuleDir(at('hand-two'), 'hand-two', '2.0.0', { record: false });
+    // modules/flat-mod ist eine Datei (vom Betreiber): die Sicherung mit Datei bleibt.
+    seedModuleDir(at(`.backup-flat-mod-${T(7000)}`), 'flat-mod', '1.0.0');
+    fs.writeFileSync(at('flat-mod'), 'not a folder');
+    // Unter den Praefixen, aber nicht so benannt, wie die Installation benennt:
+    // vom Betreiber, bleibt - auch mit Installationsdatei (eine Kopie per
+    // `cp -r modules/web-mod modules/.backup-web-mod-20261001` traegt eine).
+    fs.mkdirSync(at('.install-notes'));
+    fs.writeFileSync(at('.install-notes/todo.txt'), 'mine');
+    fs.mkdirSync(at('.install-0123'));
+    seedModuleDir(at('web-mod'), 'web-mod', '3.0.0');
+    seedModuleDir(at('.backup-web-mod-20261001'), 'web-mod', '2.0.0');
+    seedModuleDir(at('.backup-web-mod-1234567890123x'), 'web-mod', '2.0.0');
+    // Eine DATEI unter einem Staging-Namen: kein Ordner einer Installation, bleibt.
+    fs.writeFileSync(at('.install-fedcba9876543210'), 'a file, not a staging folder');
+    const handMade = [`.backup-flat-mod-${T(7000)}`, `.backup-hand-mod-${T(123)}`, `.backup-hand-two-${T(456)}`,
+      '.backup-web-mod-1234567890123x', '.backup-web-mod-20261001', `.backup-x-${T(1)}`,
+      '.install-0123', '.install-fedcba9876543210', '.install-notes'].sort();
+    seeded.push(...handMade);
+
+    // Waehrend eine Installation die Sperre haelt, wird nichts angefasst.
+    const release = modulesSvc.acquireInstallLock();
+    try {
+      assert.deepEqual(await install.recoverInterruptedInstalls(), NOTHING_DONE);
+    } finally {
+      release();
+    }
+    assert.ok(fs.existsSync(at(`.backup-lost-mod-${T(2000)}`)) && fs.existsSync(at(STAGE)));
+
+    // Schreibgeschuetzt: geloggt, nichts wirft, nichts ist halb erledigt.
+    const readOnly = () => { throw Object.assign(new Error('read-only file system'), { code: 'EROFS' }); };
+    const restoreOps = install.__setInstallFsOpsForTests({ rename: readOnly, rm: readOnly });
+    const restoreModOps = modulesSvc.__setModulesFsOpsForTests({ writeFile: readOnly });
+    try {
+      assert.deepEqual(await install.recoverInterruptedInstalls(), NOTHING_DONE);
+    } finally {
+      restoreModOps();
+      restoreOps();
+    }
+    assert.ok(!fs.existsSync(at('lost-mod')));
+
+    // Nur die Installationsdatei ist nicht schreibbar: erst AUS, dann zurueck -
+    // die Sicherung bleibt liegen, statt eingeschaltet zurueckzukommen.
+    const restoreWrite = modulesSvc.__setModulesFsOpsForTests({ writeFile: readOnly });
+    try {
+      const r = await install.recoverInterruptedInstalls();
+      assert.deepEqual(r.restored, []);
+    } finally {
+      restoreWrite();
+    }
+    assert.ok(!fs.existsSync(at('lost-mod')), 'ohne geschriebene Freigabe kein Zurueckholen');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(at(`.backup-lost-mod-${T(2000)}`), '.yuvomi-install.json'), 'utf8')).approved, true);
+    // Dieser Lauf hat Staging und die Sicherung von kept-mod schon entfernt.
+    fs.mkdirSync(at(`${STAGE}/kept-mod`), { recursive: true });
+    seedModuleDir(at(`.backup-kept-mod-${T(3000)}`), 'kept-mod', '4.0.0');
+    assert.deepEqual(stagingLeftovers().sort(),
+      [...handMade, `.backup-kept-mod-${T(3000)}`, `.backup-lost-mod-${T(1000)}`, `.backup-lost-mod-${T(2000)}`, STAGE].sort());
+
+    const result = await install.recoverInterruptedInstalls();
+    assert.deepEqual(result.restored, ['lost-mod']);
+    assert.deepEqual(result.removedStaging, [STAGE]);
+    assert.deepEqual(result.removedBackups.sort(), [`.backup-kept-mod-${T(3000)}`, `.backup-lost-mod-${T(1000)}`]);
+    assert.equal(versionOf('lost-mod'), '2.0.0', 'die NEUESTE Sicherung kommt zurueck');
+    assert.equal(recordOf('lost-mod').source, 'zip', 'samt ihrer eigenen Installationsdatei');
+    assert.equal(recordOf('lost-mod').approved, false, 'aber ausgeschaltet, wie jedes Ersetzen');
+    assert.equal(versionOf('kept-mod'), '5.0.0', 'ein vorhandener Ordner bleibt, wie er ist');
+    assert.equal(recordOf('kept-mod').approved, false);
+    assert.ok(!fs.existsSync(at('hand-mod')), 'ein Ordner ohne Installationsdatei wird nicht zurueckgeholt');
+    assert.equal(versionOf('hand-two'), '2.0.0');
+    assert.equal(versionOf('web-mod'), '3.0.0');
+    assert.equal(fs.readFileSync(at('flat-mod'), 'utf8'), 'not a folder');
+    assert.equal(fs.readFileSync(at('.install-notes/todo.txt'), 'utf8'), 'mine');
+    assert.equal(fs.readFileSync(at('.install-fedcba9876543210'), 'utf8'), 'a file, not a staging folder');
+    assert.deepEqual(stagingLeftovers().sort(), handMade, 'was die Installation nicht so benennt, bleibt');
+    const listed = await adminListed('lost-mod');
+    assert.equal(listed?.install?.source, 'zip', 'die Liste kennt das Modul wieder');
+    assert.equal(listed.enabled, false, 'und es ist aus, bis ein Admin es freigibt');
+
+    // Ein zweiter Start findet nichts mehr zu tun.
+    assert.deepEqual(await install.recoverInterruptedInstalls(), NOTHING_DONE);
+    assert.equal(versionOf('lost-mod'), '2.0.0');
+    assert.deepEqual(stagingLeftovers().sort(), handMade);
+  } finally {
+    // Auch nach einer gescheiterten Zusicherung: nichts davon bleibt fuer die
+    // naechsten Tests liegen.
+    for (const name of [...seeded, `.backup-lost-mod-${T(1000)}`, `.backup-lost-mod-${T(2000)}`, `.backup-kept-mod-${T(3000)}`, STAGE]) {
+      fs.rmSync(at(name), { recursive: true, force: true });
+    }
+  }
+});
+
+test('eine Sicherung, die ein Link ist, wird beim Start nicht zurueckgeholt, auch mit Installationsdatei dahinter', async (t) => {
+  const outside = path.join(TMP_ROOT, 'outside-backup');
+  const link = path.join(MODULES_DIR, `.backup-linked-mod-${T(9000)}`);
+  try {
+    seedModuleDir(outside, 'linked-mod', '1.0.0');
+    try {
+      fs.symlinkSync(outside, link, 'junction');
+    } catch (err) {
+      t.skip(`Symlink nicht anlegbar: ${err.code}`);
+      return;
+    }
+    assert.deepEqual(await install.recoverInterruptedInstalls(), NOTHING_DONE);
+    assert.ok(!fs.existsSync(path.join(MODULES_DIR, 'linked-mod')), 'kein modules/linked-mod aus dem Link');
+    assert.ok(fs.lstatSync(link).isSymbolicLink(), 'der Link bleibt, wo er ist');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(outside, '.yuvomi-install.json'), 'utf8')).approved, true,
+      'und hinter ihm wurde nichts umgeschrieben');
+  } finally {
+    try { fs.unlinkSync(link); } catch { /* nicht angelegt */ }
+    try { fs.unlinkSync(path.join(MODULES_DIR, 'linked-mod')); } catch { /* nicht entstanden */ }
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('Loeschen nimmt liegengebliebene Sicherungen mit: das Modul kommt beim Start nicht zurueck', async () => {
+  const at = (name) => path.join(MODULES_DIR, name);
+  // Ohne Installationsdatei, oder nicht so benannt, wie ein Ersetzen benennt
+  // (auch mit Installationsdatei): gehoert dem Betreiber und bleibt.
+  const kept = [`.backup-gone-mod-${T(500)}`, '.backup-gone-mod-1234567890123x', '.backup-gone-mod-20261001'];
+  try {
+    assert.equal((await postZip(makeZip(moduleFiles('gone-mod')))).status, 201);
+    // Ein frueheres Ersetzen konnte seine Sicherung nicht entfernen (nur geloggt).
+    seedModuleDir(at(`.backup-gone-mod-${T(1000)}`), 'gone-mod', '0.9.0');
+    seedModuleDir(at(kept[0]), 'gone-mod', '0.5.0', { record: false });
+    seedModuleDir(at(kept[1]), 'gone-mod', '0.8.0');
+    seedModuleDir(at(kept[2]), 'gone-mod', '0.7.0');
+    const r = await call('DELETE', '/gone-mod');
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(stagingLeftovers().sort(), [...kept].sort());
+    assert.deepEqual(await install.recoverInterruptedInstalls(), NOTHING_DONE);
+    assert.ok(!fs.existsSync(at('gone-mod')), 'geloescht bleibt geloescht');
+    assert.deepEqual(stagingLeftovers().sort(), [...kept].sort());
+  } finally {
+    for (const name of ['gone-mod', `.backup-gone-mod-${T(1000)}`, ...kept]) fs.rmSync(at(name), { recursive: true, force: true });
+  }
+});
+
+test('Loeschen: scheitert die Suche nach Sicherungen, ist das Modul trotzdem geloescht (200) und der Schalter frei', async (t) => {
+  const at = (name) => path.join(MODULES_DIR, name);
+  const backup = `.backup-lstat-mod-${T(1000)}`;
+  try {
+    assert.equal((await postZip(makeZip(moduleFiles('lstat-mod')))).status, 201);
+    await modulesSvc.setModuleEnabled('lstat-mod', true);
+    await modulesSvc.setModuleEnabled('lstat-mod', false);
+    assert.equal(modulesSvc.isModuleDisabled('lstat-mod'), true);
+    seedModuleDir(at(backup), 'lstat-mod', '0.9.0');
+    // lstat einer Sicherung scheitert (EACCES), alles andere laeuft wie immer.
+    const fsp = (await import('node:fs/promises')).default;
+    const realLstat = fsp.lstat;
+    t.mock.method(fsp, 'lstat', (p, ...rest) => {
+      if (path.basename(String(p)).startsWith('.backup-lstat-mod-')) {
+        return Promise.reject(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
+      }
+      return realLstat.call(fsp, p, ...rest);
+    });
+    const r = await call('DELETE', '/lstat-mod');
+    t.mock.restoreAll();
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.ok(!fs.existsSync(at('lstat-mod')));
+    assert.equal(modulesSvc.isModuleDisabled('lstat-mod'), false, 'der Haushaltsschalter ist trotzdem frei');
+  } finally {
+    t.mock.restoreAll();
+    for (const name of ['lstat-mod', backup]) fs.rmSync(at(name), { recursive: true, force: true });
+  }
+});
+
+test('der Server ruft die Wiederherstellung beim Start auf, vor der ersten Modulliste', () => {
+  // server/index.js startet beim Import den Server; hier genuegt sein Text.
+  const src = fs.readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  const recover = src.indexOf('await recoverInterruptedInstalls();');
+  const firstScan = src.indexOf('await listModules({ admin: true });');
+  assert.ok(recover > 0, 'recoverInterruptedInstalls() wird beim Start aufgerufen');
+  assert.ok(firstScan > recover, 'und zwar vor dem ersten listModules()');
 });
 
 // ── GitHub ──────────────────────────────────────────────────────────────────
@@ -1074,6 +1307,155 @@ test('Rate-Limit von GitHub (403, remaining 0) → 429 rate_limited mit resetAt'
   const other = fakeTransport({ [`${API}/o/r/releases/latest`]: fakeResponse(500) });
   await assert.rejects(github.createGithubInstaller({ request: other.request }).resolve('o/r'),
     (e) => e.reason === 'github_failed' && e.status === 502);
+});
+
+test('sekundaeres Rate-Limit von GitHub (429, 403 mit retry-after) → 429 rate_limited; nacktes 403 bleibt github_failed', async () => {
+  const resolveWith = (res) => github.createGithubInstaller({
+    request: fakeTransport({ [`${API}/o/r/releases/latest`]: res }).request,
+  }).resolve('o/r');
+
+  // 429 ganz ohne Kopfzeilen: zu oft, nur ohne Zeitpunkt.
+  await assert.rejects(resolveWith(fakeResponse(429)), (e) => {
+    assert.equal(e.reason, 'rate_limited');
+    assert.equal(e.status, 429);
+    assert.equal(e.extra.resetAt, undefined);
+    return true;
+  });
+
+  // 403 mit retry-after und remaining > 0: das sekundaere Limit. Der Zeitpunkt
+  // kommt aus retry-after, nicht aus x-ratelimit-reset (Ende des Stundenfensters).
+  const before = Date.now();
+  await assert.rejects(resolveWith(fakeResponse(403, {
+    headers: { 'retry-after': '60', 'x-ratelimit-remaining': '4999', 'x-ratelimit-reset': '1900000000' },
+  })), (e) => {
+    assert.equal(e.reason, 'rate_limited');
+    assert.equal(e.status, 429);
+    const at = Date.parse(e.extra.resetAt);
+    assert.ok(at >= before + 60_000 && at <= Date.now() + 60_000, e.extra.resetAt);
+    assert.match(e.message, /^GitHub is limiting requests from this server\./);
+    return true;
+  });
+
+  // Ein leeres oder unlesbares retry-after ist kein Zeitpunkt (Number('') waere 0, "jetzt").
+  for (const value of ['', 'soon', '-5']) {
+    await assert.rejects(resolveWith(fakeResponse(403, { headers: { 'retry-after': value } })), (e) => {
+      assert.equal(e.reason, 'rate_limited', JSON.stringify(value));
+      assert.equal(e.extra.resetAt, undefined, JSON.stringify(value));
+      return true;
+    });
+  }
+
+  // 403 ohne beide Kopfzeilen (gesperrtes Repo, DMCA): kein Limit, sondern eine Absage.
+  await assert.rejects(resolveWith(fakeResponse(403, { headers: { 'x-ratelimit-remaining': '4999' } })), (e) => {
+    assert.equal(e.reason, 'github_failed');
+    assert.equal(e.status, 502);
+    return true;
+  });
+});
+
+test('Rate-Limit: ein Zeitpunkt jenseits dessen, was ein Datum fassen kann, ist keiner (kein RangeError, kein 500)', async () => {
+  const resolveWith = (res) => github.createGithubInstaller({
+    request: fakeTransport({ [`${API}/o/r/releases/latest`]: res }).request,
+  }).resolve('o/r');
+  for (const headers of [
+    { 'retry-after': '99999999999999999' },
+    { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '99999999999999999' },
+  ]) {
+    await assert.rejects(resolveWith(fakeResponse(403, { headers })), (e) => {
+      assert.equal(e.reason, 'rate_limited', JSON.stringify(headers));
+      assert.equal(e.status, 429);
+      assert.equal(e.extra.resetAt, undefined, JSON.stringify(headers));
+      assert.match(e.message, /Try again later\.$/);
+      return true;
+    });
+  }
+});
+
+test('Rate-Limit nur bei 403/429: eine erfolgreiche Antwort mit remaining 0 (der letzte Aufruf der Stunde) gilt', async () => {
+  const t = fakeTransport({
+    [`${API}/o/r/releases/latest`]: fakeResponse(200, {
+      json: { tag_name: 'v1.2.0' },
+      headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1900000000' },
+    }),
+  });
+  const target = await github.createGithubInstaller({ request: t.request }).resolve('o/r');
+  assert.equal(target.ref, 'v1.2.0');
+});
+
+test('429 des sekundaeren Limits ohne retry-after: x-ratelimit-reset (Ende der Stunde) wird nicht genannt, solange remaining > 0', async () => {
+  const t = fakeTransport({
+    [`${API}/o/r/releases/latest`]: fakeResponse(429, {
+      headers: { 'x-ratelimit-remaining': '4999', 'x-ratelimit-reset': '1900000000' },
+    }),
+  });
+  await assert.rejects(github.createGithubInstaller({ request: t.request }).resolve('o/r'), (e) => {
+    assert.equal(e.reason, 'rate_limited');
+    assert.equal(e.extra.resetAt, undefined);
+    assert.match(e.message, /Try again later\.$/);
+    return true;
+  });
+});
+
+test('JSON-Antworten von GitHub haben eine Grenze von 1 MiB', async () => {
+  const MIB = 1024 * 1024;
+  const releaseOf = (size) => {
+    const empty = JSON.stringify({ tag_name: 'v1.0.0', pad: '' }).length;
+    return fakeResponse(200, { json: { tag_name: 'v1.0.0', pad: 'x'.repeat(size - empty) } });
+  };
+  const resolveWith = (res) => github.createGithubInstaller({
+    request: fakeTransport({ [`${API}/o/r/releases/latest`]: res }).request,
+  }).resolve('o/r');
+  assert.equal((await resolveWith(releaseOf(MIB))).ref, 'v1.0.0', 'genau 1 MiB geht noch');
+  await assert.rejects(resolveWith(releaseOf(MIB + 1)), (e) => e.reason === 'too_large');
+});
+
+// Ein Transport, der nur antwortet, wenn sein signal abbricht: so haengt eine
+// Verbindung, die GitHub offen laesst. Ohne signal scheitert er sofort anders.
+const hangingTransport = (seen = []) => async (url, opts) => {
+  seen.push(url);
+  const signal = opts?.signal;
+  if (!signal) throw new Error('no signal handed to the transport');
+  return new Promise((_, reject) => {
+    if (signal.aborted) reject(signal.reason);
+    else signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+};
+
+test('das Zeitbudget des GitHub-Austauschs: eine haengende Verbindung endet mit "in time", danach ist die Sperre frei', { timeout: 10000 }, async (t) => {
+  // Direkt, mit kleinem Budget.
+  const started = Date.now();
+  await assert.rejects(github.createGithubInstaller({ request: hangingTransport(), timeoutMs: 50 }).fetchArchive('o/r', { ref: 'main' }), (e) => {
+    assert.equal(e.reason, 'github_failed');
+    assert.equal(e.message, 'GitHub did not answer in time.');
+    return true;
+  });
+  assert.ok(Date.now() - started >= 40, 'erst nach dem Budget');
+
+  // Ueber die Route: die 30 s werden fuer den Test auf 50 ms verkuerzt
+  // (AbortSignal.timeout selbst, die Vorgabe des Dienstes bleibt).
+  const requested = [];
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+  t.mock.method(AbortSignal, 'timeout', (ms) => { requested.push(ms); return realTimeout(50); });
+  const seen = [];
+  github.__setGithubRequestForTests(hangingTransport(seen));
+  try {
+    const r = await call('POST', '/install/github', { json: { url: 'o/hang', ref: 'main' } });
+    assert.equal(r.status, 502, JSON.stringify(r.body));
+    assert.equal(r.body.reason, 'github_failed');
+    assert.match(r.body.error, /in time/);
+    assert.deepEqual(requested, [30_000], 'ein Budget von 30 s fuer den ganzen Austausch');
+    assert.ok(seen.length >= 1);
+  } finally {
+    github.__setGithubRequestForTests(null);
+    t.mock.restoreAll();
+  }
+  // Die Sperre ist wieder frei: die naechste Installation ist kein 409 busy.
+  try {
+    const next = await postZip(makeZip(moduleFiles('after-hang')));
+    assert.equal(next.status, 201, JSON.stringify(next.body));
+  } finally {
+    fs.rmSync(path.join(MODULES_DIR, 'after-hang'), { recursive: true, force: true });
+  }
 });
 
 test('Download ueber der Grenze → too_large (Content-Length und gestreamt)', async () => {

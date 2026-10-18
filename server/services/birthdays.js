@@ -616,6 +616,7 @@ export {
   listBirthdayImportCandidates,
   nextBirthdayAge,
   nextBirthdayDate,
+  nameDayEventTitle,
   nextNameDayDate,
   retitleBirthdayEvents,
   syncAllBirthdayReminders,

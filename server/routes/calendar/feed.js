@@ -18,23 +18,32 @@ router.get('/feed', (req, res) => {
     const token = icsExport.getFeedToken(db.get(), getUserId(req));
     if (!token) return res.json({ data: null });
     const showAssignees = icsExport.getFeedShowAssignees(db.get(), getUserId(req));
-    res.json({ data: { token, url: feedUrl(req, token), showAssignees } });
+    const includeBirthdays = icsExport.getFeedIncludeBirthdays(db.get(), getUserId(req));
+    res.json({ data: { token, url: feedUrl(req, token), showAssignees, includeBirthdays } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
 });
 
-// PUT /api/v1/calendar/feed → Feed-Optionen setzen (showAssignees, #482)
+// PUT /api/v1/calendar/feed → personal feed options (#482, D#1965)
 router.put('/feed', (req, res) => {
   try {
-    if (typeof req.body?.showAssignees !== 'boolean') {
-      return res.status(400).json({ error: 'showAssignees (boolean) required.', code: 400 });
+    const { showAssignees, includeBirthdays } = req.body ?? {};
+    if ((showAssignees === undefined && includeBirthdays === undefined)
+        || (showAssignees !== undefined && typeof showAssignees !== 'boolean')
+        || (includeBirthdays !== undefined && typeof includeBirthdays !== 'boolean')) {
+      return res.status(400).json({ error: 'showAssignees or includeBirthdays (boolean) required.', code: 400 });
     }
-    const showAssignees = icsExport.setFeedShowAssignees(
-      db.get(), getUserId(req), req.body.showAssignees
-    );
-    res.json({ data: { showAssignees } });
+    const database = db.get();
+    const userId = getUserId(req);
+    const data = database.transaction(() => {
+      if (showAssignees !== undefined) icsExport.setFeedShowAssignees(database, userId, showAssignees);
+      if (includeBirthdays !== undefined) icsExport.setFeedIncludeBirthdays(database, userId, includeBirthdays);
+      return { showAssignees: icsExport.getFeedShowAssignees(database, userId),
+        includeBirthdays: icsExport.getFeedIncludeBirthdays(database, userId) };
+    })();
+    res.json({ data });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

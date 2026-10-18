@@ -321,7 +321,7 @@ test('ein Konto, das es nicht gibt', () => {
   assert.deepEqual(removeUser(db, 987654321), { outcome: 'not_found', traces: [] });
 });
 
-test('beim Deaktivieren enden alle fuenf Abo-Adressen - und es gibt keine sechste', () => {
+test('beim Deaktivieren enden alle Abo-Adressen, auch neue', () => {
   const feedColumns = db.prepare('PRAGMA table_info(users)').all()
     .map((c) => c.name).filter((name) => /_feed_token$/.test(name)).sort();
   assert.deepEqual([...FEED_TOKEN_COLUMNS].sort(), feedColumns,
@@ -349,6 +349,7 @@ const SECRET_COLUMNS = {
   'users.password_hash': 'kept: nur POST /auth/login (canSignIn) und PATCH /auth/me/password (requireAuth) lesen ihn',
   'users.oidc_sub': 'kept: der SSO-Rueckweg muss das Konto finden, um es abzuweisen statt ein neues anzulegen',
   'users.calendar_feed_token': 'ended: auf NULL gesetzt',
+  'users.birthday_feed_token': 'ended: cleared on account deactivation; birthday exports use active-account token lookup',
   'users.inventory_deadlines_feed_token': 'ended: auf NULL gesetzt',
   'users.cycle_feed_token': 'ended: auf NULL gesetzt',
   'users.schedule_feed_token': 'ended: auf NULL gesetzt',

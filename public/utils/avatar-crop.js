@@ -1,5 +1,6 @@
 import { t } from '/i18n.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { dismissDialog, revealDialog } from '/utils/dialog-surface.js';
 
 const CANVAS_SIZE = 288;
 const CROP_SIZE = 240;
@@ -32,21 +33,9 @@ function injectStyles() {
   const style = document.createElement('style');
   style.textContent = `
 .avatar-crop-dialog {
-  border: none;
-  border-radius: var(--radius-lg);
-  padding: 0;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-xl);
+  /* Tafel, Grund und Bewegung: .dialog-surface (layout.css, D7). */
   max-width: 360px;
   width: calc(100vw - var(--space-8));
-}
-.avatar-crop-dialog::backdrop {
-  /* --color-overlay ist der kanonische Modal-Grund (0.4), und dieser Dialog ist
-   * einer. Hier stand 0.55, dunkler als alle fünf Overlay-Stufen aus tokens.css
-   * und in keiner davon begründet - dass es durchkam, liegt an der Datei: die
-   * CSS-Guards lesen public/styles/, und dieses Stylesheet lebt eingebettet in
-   * einer .js. */
-  background: var(--color-overlay);
 }
 .avatar-crop-dialog__header {
   padding: var(--space-4) var(--space-4) 0;
@@ -106,7 +95,8 @@ function clampPos(x, y, drawnW, drawnH) {
 
 function buildDialog(img, resolve) {
   const dialog = document.createElement('dialog');
-  dialog.className = 'avatar-crop-dialog';
+  // `.dialog-surface`: Tafel, Grund, Ein- und Ausgang wie das geteilte Modal (D7).
+  dialog.className = 'avatar-crop-dialog dialog-surface';
   dialog.setAttribute('aria-label', t('settings.cropDialogTitle'));
 
   const header = document.createElement('div');
@@ -253,18 +243,20 @@ function buildDialog(img, resolve) {
     renderCanvas();
   });
 
+  // Erst nach dem Ausgang aufloesen: der Aufrufer fokussiert danach im
+  // Formular darunter, und das ist bis dahin noch inert.
   function cleanup() {
-    dialog.remove();
+    return dismissDialog(dialog);
   }
 
   cancelBtn.addEventListener('click', () => {
-    cleanup();
-    resolve(null);
+    cleanup().then(() => resolve(null));
   });
 
-  dialog.addEventListener('cancel', () => {
-    cleanup();
-    resolve(null);
+  // Esc faehrt aus wie Abbrechen, statt hart zu verschwinden.
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    cleanup().then(() => resolve(null));
   });
 
   confirmBtn.addEventListener('click', () => {
@@ -276,8 +268,8 @@ function buildDialog(img, resolve) {
     out.width = OUTPUT_SIZE;
     out.height = OUTPUT_SIZE;
     out.getContext('2d').drawImage(img, cropImgX, cropImgY, cropImgSize, cropImgSize, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
-    cleanup();
-    resolve(out.toDataURL('image/jpeg', 0.88));
+    const dataUrl = out.toDataURL('image/jpeg', 0.88);
+    cleanup().then(() => resolve(dataUrl));
   });
 
   return dialog;
@@ -300,6 +292,7 @@ function openCropDialog(imageDataUrl) {
       const dialog = buildDialog(img, resolve);
       document.body.appendChild(dialog);
       dialog.showModal();
+      revealDialog(dialog);
       /* AUCH EIN NATIVES `<dialog>` MELDET SICH AN (#871).
        *
        * Es traegt kein `aria-modal`-Attribut - das setzt der Browser bei
@@ -323,6 +316,33 @@ function openCropDialog(imageDataUrl) {
     img.onerror = () => reject(new Error('image decode failed'));
     img.src = imageDataUrl;
   });
+}
+
+/** Der Zuschnitt, den pickCroppedImage() oeffnet - ersetzbar nur fuer Tests. */
+let cropDialog = openCropDialog;
+
+/**
+ * NUR FUER TESTS: den Zuschnitt ersetzen. Ohne Browser gibt es weder Canvas
+ * noch `<dialog>`; so laesst sich die Pruefung NACH dem Zuschnitt
+ * (`dataTooLarge`) trotzdem als Programm fahren. `null` stellt zurueck.
+ */
+export function _setCropDialogForTest(fn) {
+  cropDialog = fn ?? openCropDialog;
+}
+
+/**
+ * Eine Datei, die nicht taugt: traegt ihren schon uebersetzten Satz (#1909).
+ * Ein eigener Typ, damit ein Aufrufer ihn von jedem anderen Wurf (ein
+ * Ladefehler, ein Programmfehler) unterscheidet, ohne den Text eines Fehlers zu
+ * lesen. `message` traegt denselben Satz - wer noch `err.message` zeigt, sagt
+ * damit nichts anderes als vorher.
+ */
+export class ImageProblem extends Error {
+  constructor(sentence) {
+    super(sentence);
+    this.name = 'ImageProblem';
+    this.sentence = sentence;
+  }
 }
 
 /**
@@ -352,20 +372,21 @@ function openCropDialog(imageDataUrl) {
  * @param {{maxDataLength?: number, messageKeys?: Record<string,string>}} [options]
  * @returns {Promise<string|undefined>} das zugeschnittene Bild als Data-URL,
  *   oder `undefined`, wenn nichts gewählt oder der Zuschnitt abgebrochen wurde.
- *   Wirft mit einer übersetzten Meldung, wenn die Datei nicht taugt.
+ *   Wirft ein `ImageProblem` mit einer übersetzten Meldung, wenn die Datei
+ *   nicht taugt.
  */
 export async function pickCroppedImage(file, options = {}) {
   const maxDataLength = options.maxDataLength ?? MAX_PORTRAIT_DATA_LENGTH;
   const keys = { ...DEFAULT_MESSAGE_KEYS, ...(options.messageKeys || {}) };
 
   if (!file) return undefined;
-  if (!ACCEPTED_TYPES.includes(file.type)) throw new Error(t(keys.type));
-  if (file.size > MAX_FILE_BYTES) throw new Error(t(keys.fileTooLarge));
+  if (!ACCEPTED_TYPES.includes(file.type)) throw new ImageProblem(t(keys.type));
+  if (file.size > MAX_FILE_BYTES) throw new ImageProblem(t(keys.fileTooLarge));
 
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error(t(keys.read)));
+    reader.onerror = () => reject(new ImageProblem(t(keys.read)));
     reader.readAsDataURL(file);
   });
 
@@ -375,11 +396,11 @@ export async function pickCroppedImage(file, options = {}) {
    * nicht dekodierbares Bild dasselbe wie eines, das sich nicht lesen ließ. */
   let cropped;
   try {
-    cropped = await openCropDialog(dataUrl);
+    cropped = await cropDialog(dataUrl);
   } catch {
-    throw new Error(t(keys.read));
+    throw new ImageProblem(t(keys.read));
   }
   if (cropped === null) return undefined;
-  if (cropped.length > maxDataLength) throw new Error(t(keys.dataTooLarge));
+  if (cropped.length > maxDataLength) throw new ImageProblem(t(keys.dataTooLarge));
   return cropped;
 }

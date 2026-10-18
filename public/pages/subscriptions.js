@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import {
   formatDate,
   getLocale,
@@ -14,6 +14,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
@@ -22,6 +23,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -29,6 +31,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { leadCardClass } from '/utils/metric-card.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
 // (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
@@ -51,6 +54,117 @@ let state = {
 let container = null;
 /** Handle des geteilten Suchfelds (wirePageSearch) - Zuruecksetzen leert es mit. */
 let searchField = null;
+
+/**
+ * KEIN AELTERER STAND UEBER EINEM NEUEREN (#1909, Codex an #2001). Jedes Laden
+ * zieht eine Nummer und uebernimmt sein Ergebnis nur, wenn seither kein
+ * neueres gestartet ist. Ein ueberholtes Laden wartet auf das neueste und
+ * meldet dessen Ergebnis: wer danach zeichnet oder einen Dialog neu aufbaut,
+ * tut das mit dem frischen Stand, nicht mit dem, der beim Ueberholen noch da
+ * war (Review zu #2003).
+ */
+let loadTicket = 0;
+let latestLoad = null;
+
+/**
+ * WEM EINE ANTWORT GEHOERT (#1909, Codex an #2001). Jeder Aufbau der Seite
+ * (`render()`) ist eine eigene Instanz mit eigener Nummer. Eine Handlung haelt
+ * ihre Instanz VOR dem Request fest (`pageOwner()`) und reicht sie durch: wer
+ * sie erst nach der Antwort liest, bekommt nach "weg und zurueck" die NEUE
+ * Seite, und eine spaete Antwort raeumte dort auf. Verglichen werden Nummer
+ * und Knoten, und ob der Knoten noch im Dokument haengt - die Variable
+ * `container` leert beim Verlassen niemand.
+ */
+let pageGeneration = 0;
+function pageOwner() {
+  return { el: container, gen: pageGeneration };
+}
+function isCurrentOwner(owner) {
+  return Boolean(owner?.el) && container === owner.el && pageGeneration === owner.gen && owner.el.isConnected === true;
+}
+
+/**
+ * Eine Pruefung der Seite selbst (Logo-Datei: Typ, Groesse, nicht lesbar):
+ * traegt ihren schon uebersetzten Satz. Ein eigener Typ, damit die Fehlerstelle
+ * ihn von einer Antwort des Servers unterscheidet, ohne den Text irgendeines
+ * Fehlers zu lesen.
+ */
+class PageProblem extends Error {
+  constructor(sentence) {
+    super(sentence);
+    this.name = 'PageProblem';
+    this.sentence = sentence;
+  }
+}
+
+/**
+ * DER SATZ EINES FEHLERS IN DEN ABOS (#1909). Die eigene Pruefung sagt ihren
+ * Satz; alles andere den Satz der App (`errorSentence`): den Fall, den der
+ * Server mit `reason` nennt, sonst den allgemeinen der Stelle. Der Text des
+ * Servers kommt nie an.
+ */
+function errorText(err, fallbackKey = 'common.unknownError') {
+  if (err instanceof PageProblem) return err.sentence;
+  return errorSentence(err, fallbackKey);
+}
+
+// Welche Gruende eine Kategorie oder Zahlungsart meinen, die es nicht mehr gibt.
+const GONE_META = new Map([
+  ['subscriptions_category_not_found', 'categoryId'],
+  ['subscriptions_selected_category_not_found', 'categoryId'],
+  ['subscriptions_payment_method_not_found', 'paymentMethodId'],
+  ['subscriptions_selected_payment_method_not_found', 'paymentMethodId'],
+]);
+
+/**
+ * Steht der Filter auf der Kategorie oder Zahlungsart, die es nicht mehr gibt,
+ * geht er VOR dem Laden auf "alle" zurueck - sonst fragte das Laden mit der
+ * geloeschten id und die Liste stuende leer unter einem toten Filter.
+ *
+ * @param {string} reason
+ * @param {number|string|null|undefined} id - die id, die der Aufrufer kennt
+ */
+function resetGoneFilter(reason, id) {
+  const filterKey = GONE_META.get(reason);
+  if (!filterKey || id === null || id === undefined || id === '') return;
+  if (state[filterKey] !== '' && Number(state[filterKey]) === Number(id)) {
+    state[filterKey] = '';
+    syncFilterSheet();
+  }
+}
+
+/**
+ * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909). Sagt der Grund, dass es das
+ * Ziel der Handlung nicht mehr gibt (ein anderes Haushaltsmitglied hat das Abo,
+ * die Kategorie oder die Zahlungsart geloescht), laedt die Seite ueber das
+ * normale Laden mit Ladenummer neu - Liste, Kennzahlen und Filter rechnet der
+ * Server (Zuschnitt vom 15.10.: kein lokales Nachbauen). `owner` ist die
+ * Seiteninstanz, VOR dem Request festgehalten. `dialog` ist der Modal-Kontext
+ * der Handlung (`captureModalContext()` vor der Anfrage): geschlossen wird nur,
+ * wenn genau dieser Dialog noch offen ist (Codex an #1994). `reopen` baut ihn
+ * neu auf (Verwalten-Dialog), aber erst, wenn das neueste Laden angewandt ist.
+ * Nach jedem await fragt die Seite, ob sie noch dieselbe ist.
+ */
+async function reportError(err, { fallbackKey = 'common.unknownError', owner = null, dialog = null, goneId = null, reopen = null } = {}) {
+  window.yuvomi?.showToast(errorText(err, fallbackKey), 'danger');
+  if (!isGone(err)) return;
+  // Ohne die vor dem Request festgehaltene Instanz wird nichts nachgezogen.
+  if (!isCurrentOwner(owner)) return;
+  const wasOpen = Boolean(dialog) && isModalContextCurrent(dialog);
+  if (wasOpen) await closeModal({ force: true });
+  if (!isCurrentOwner(owner)) return;
+  resetGoneFilter(err.data.reason, goneId);
+  // Ein scheiterndes Laden meldet nichts weiter - der Satz steht schon da.
+  if (!await reload(undefined, { owner, quiet: true })) return;
+  refocusAfterRender();
+  if (wasOpen && reopen) reopen();
+}
+
+const SELECTED_META_GONE = new Map([
+  ['subscriptions_selected_category_not_found', 'subscription-category'],
+  ['subscriptions_selected_payment_method_not_found', 'subscription-method'],
+]);
+const selectedMetaGone = (err) => (isGone(err) ? SELECTED_META_GONE.get(err.data.reason) : undefined);
 
 // --------------------------------------------------------
 // Nur-lesen (#467, #1265 P7)
@@ -190,7 +304,13 @@ function dueLabel(subscription) {
   return t('subscriptions.dueInDays', { count: days });
 }
 
-async function load({ refreshRates = false } = {}) {
+function load(options) {
+  const run = loadOnce(options);
+  latestLoad = run;
+  return run;
+}
+
+async function loadOnce({ refreshRates = false } = {}) {
   const params = new URLSearchParams();
   if (state.query) params.set('q', state.query);
   if (state.categoryId) params.set('category_id', state.categoryId);
@@ -198,20 +318,37 @@ async function load({ refreshRates = false } = {}) {
   if (state.status !== 'all') params.set('status', state.status);
   if (refreshRates) params.set('refresh_rates', 'true');
 
-  const [list, meta, settings] = await Promise.all([
-    api.get(`/budget/subscriptions?${params}`),
-    api.get('/budget/subscriptions/meta'),
-    api.get('/budget/subscriptions/settings'),
-  ]);
+  // Siehe loadTicket: ein ueberholtes Laden uebernimmt nichts, auch keinen
+  // Fehler, und meldet das Ergebnis des neuesten (false, wenn das scheitert -
+  // dessen Aufrufer sagt es dann).
+  const ticket = ++loadTicket;
+  const outdated = () => ticket !== loadTicket;
+  const newest = () => latestLoad.then(() => true, () => false);
+  let answers;
+  try {
+    answers = await Promise.all([
+      api.get(`/budget/subscriptions?${params}`),
+      api.get('/budget/subscriptions/meta'),
+      api.get('/budget/subscriptions/settings'),
+    ]);
+  } catch (err) {
+    if (outdated()) return newest();
+    throw err;
+  }
+  if (outdated()) return newest();
+  const [list, meta, settings] = answers;
   state.subscriptions = list.data?.subscriptions || [];
   state.summary = list.data?.summary || null;
   state.rates = list.data?.rates || null;
   state.meta = meta.data || state.meta;
   state.settings = settings.data || state.settings;
+  return true;
 }
 
 export async function render(target, { user } = {}) {
   container = target;
+  pageGeneration += 1;
+  const owner = pageOwner();
   state.user = user || null;
   // `full`, nicht `reading`: die Seite ist nicht auf das Mass migriert. Ihr
   // Analytik-Raster (drei Spalten, zusammen mindestens 724px) und die Liste
@@ -274,7 +411,10 @@ export async function render(target, { user } = {}) {
   `);
   if (window.lucide) window.lucide.createIcons({ el: container });
   try {
-    await load();
+    // Ein Ergebnis, das nicht uebernommen wurde, oder eine Seite, die
+    // inzwischen verlassen oder neu aufgebaut ist: nichts zeichnen, nichts
+    // binden (Review zu #2003).
+    if (!await load() || !isCurrentOwner(owner)) return;
     renderFilters();
     renderContent();
     bindToolbar();
@@ -549,13 +689,27 @@ function bindToolbar() {
   });
 }
 
-async function reload(options, { motion = false } = {}) {
+/**
+ * Neu laden und zeichnen - nur, solange die Seite noch dieselbe ist.
+ *
+ * @returns {Promise<boolean>} ob ein frischer Stand gezeichnet wurde (dann darf
+ *   der Aufrufer den Fokus zuruecktragen oder einen Dialog neu aufbauen)
+ */
+async function reload(options, { motion = false, quiet = false, owner = pageOwner() } = {}) {
+  // Eine Antwort fuer eine andere Instanz laedt nicht: das Laden schriebe den
+  // Stand, den die neue Seite gerade zeigt.
+  if (!isCurrentOwner(owner)) return false;
   try {
-    await load(options);
+    const applied = await load(options);
+    if (!applied || !isCurrentOwner(owner)) return false;
     renderFilters();
     renderContent({ motion });
+    return true;
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || t('subscriptions.loadError'), 'danger');
+    if (!isCurrentOwner(owner)) return false;
+    if (quiet) console.warn('[Subscriptions] reload failed:', err);
+    else window.yuvomi?.showToast(errorSentence(err, 'subscriptions.loadError'), 'danger');
+    return false;
   }
 }
 
@@ -659,7 +813,7 @@ function renderSummary() {
   // dann „0,00 €" mit leerem Balken, direkt neben „Kein Budgetlimit -
   // Unbegrenzt". Wo kein Budget gesetzt ist, gibt es keine Zahl dafuer; den
   // Zustand nennt die Karte daneben. Drei Karten sind die Grundform der Reihe
-  // (panel.css), `--quad` traegt die Reihe nur mit vier.
+  // (panel.css) - seit R19 auch MIT Budget: es steht in der Kostenkarte.
   const budgetFlow = hasBudget
     ? { label: t(isOverBudget ? 'subscriptions.overBudget' : 'subscriptions.remainingBudget'),
       amount: money(Math.abs(summary.remaining_budget)), tone: isOverBudget ? 'negative' : '' }
@@ -674,21 +828,22 @@ function renderSummary() {
     lead: true,
     flows: [{ label: t('subscriptions.activeCount', { count: summary.active_count }) }, budgetFlow],
   })}
-    <section class="metric-grid metric-grid--led${hasBudget ? ' metric-grid--quad' : ''} budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
+    <section class="metric-grid metric-grid--led budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
+      ${/* KOSTEN UND BUDGET IN EINER KARTE (R19, Critique 2026-10-16). Zwei
+         Karten sagten "113,60 €" und "90,00 €" nebeneinander, den Vergleich
+         musste man selbst ziehen. Jetzt "113,60 € von 90,00 €" mit dem Balken
+         darunter - dieselbe Form wie das Ziel im Plan (budget.planTargetOf);
+         die Reihe hat damit immer drei Karten. */ ''}
       <article class="metric-card ${leadCardClass(money(used))}">
         <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
-        <div class="metric-card__value">${money(used)}</div>
-        <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
-      </article>
-      ${hasBudget ? `<article class="metric-card">
-        <div class="metric-card__label">${t('subscriptions.monthlyBudget')}</div>
-        <div class="metric-card__value">${money(budget)}</div>
-        <div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
+        <div class="metric-card__value">${money(used)}${hasBudget ? ` <span class="metric-card__of">${esc(t('budget.planTargetOf', { amount: money(budget) }))}</span>` : ''}</div>
+        ${hasBudget ? `<div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
              role="progressbar" aria-label="${esc(t('subscriptions.monthlyBudget'))}"
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${realPercentage}%">
           <span style="--fill:${percentage / 100}"></span>
-        </div>
-      </article>` : ''}
+        </div>` : ''}
+        <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
+      </article>
       <article class="metric-card${isOverBudget ? ' metric-card--over' : ''}">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
@@ -845,6 +1000,11 @@ function renderBreakdown(title, rows) {
   `;
 }
 
+/** Abgeschlossen (#594)? Karte, Leseansicht und Dialog fragen dasselbe (#2009). */
+function isCompleted(subscription) {
+  return subscription?.status === 'completed';
+}
+
 function statusMeta(subscription) {
   const status = subscription.status || (subscription.enabled ? 'active' : 'paused');
   if (status === 'completed') return { cardClass: 'subscription-card--completed', badgeClass: 'subscription-status--completed', label: t('subscriptions.completed') };
@@ -911,14 +1071,25 @@ function renderCard(subscription) {
   const converted = subscription.monthly_base === null
     ? t('subscriptions.conversionUnavailable')
     : (sameAsMonthly ? '' : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) }));
-  const overdue = daysUntil(subscription.next_payment_date) < 0 && status.cardClass !== 'subscription-card--completed';
+  // EIN ABGESCHLOSSENES ABO HAT KEINE FAELLIGKEIT (#2009). Sein Datum ist das
+  // der Zahlung, die nach dem Abschluss kaeme - es zaehlt erst wieder, wenn das
+  // Abo reaktiviert wird, und der Dialog bietet es dann an. Auf der Karte stand
+  // es als „in 30 Tagen"; die Ende-Zeile sagt stattdessen „Abgeschlossen am".
+  //
+  // Es hat auch keine naechste ZAHLUNG und keine Erinnerung (#2011): der Server
+  // lehnt "Bezahlt" ab, syncReminder hat die Erinnerung entfernt. Knopf,
+  // Wischgeste und Erinnerungs-Chip fallen deshalb weg, statt eine Handlung
+  // und einen Termin anzubieten, die es nicht gibt.
+  const completed = isCompleted(subscription);
+  const overdue = !completed && daysUntil(subscription.next_payment_date) < 0;
+  const canRenew = !ro && !completed;
   return `
     <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${subscription.id}">
-      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
+      ${canRenew ? `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="calendar-check" class="icon-md"></i>
         <span>${t('subscriptions.markRenewed')}</span>
-      </div>
-      <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
+      </div>` : ''}
+      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
         <i data-lucide="trash-2" class="icon-md"></i>
         <span>${t('common.delete')}</span>
       </div>`}
@@ -938,10 +1109,16 @@ function renderCard(subscription) {
             ${status.badgeClass === 'subscription-status--active' ? '' : `<span class="subscription-status ${status.badgeClass}">${status.label}</span>`}
           </span>
           <span class="subscription-card__meta">
-            <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>
+            ${/* SCHMAL STEHT DIE BESCHREIBUNG IN DER META-ZEILE (R19, Critique
+                 2026-10-16): hinter dem Namen blieben ihr bei 390px 40-60px
+                 ("Lind...", "Bis zu 6 Ko..."), der Name selbst kuerzte mit
+                 ("Microsoft 365 Fa..."). Immer genau eine der beiden Fassungen
+                 (subscriptions.css), wie beim Turnus. */ ''}
+            <span class="subscription-card__meta-desc">${esc(subscription.description || rowCategoryLabel(subscription))}</span>
+            ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
-            <span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
+            ${completed ? '' : `<span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>`}
             ${endInfo ? `<span><i data-lucide="${endInfo.icon}" aria-hidden="true"></i>${esc(endInfo.text)}</span>` : ''}
           </span>
         </span>
@@ -952,9 +1129,9 @@ function renderCard(subscription) {
         </span>
         ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>
-      ${ro ? '' : `<div class="row-actions subscription-card__actions">
+      ${canRenew ? `<div class="row-actions subscription-card__actions">
         ${rowActionHtml({ icon: 'calendar-check', action: 'renew', label: t('subscriptions.markRenewedNamed', { name: subscription.name }) })}
-      </div>`}
+      </div>` : ''}
     </article>
     </div>
   `;
@@ -978,6 +1155,8 @@ function wireSubscriptionSwipe(host) {
       reveal: '.swipe-reveal--done',
       run: (row) => {
         const subscription = subscriptionFor(row);
+        // Eine abgeschlossene Zeile hat kein Panel am Anfang (#2011); der Wisch
+        // dorthin federt zurueck, renewSubscription fragt gar nicht erst.
         if (subscription) renewSubscription(subscription);
       },
     },
@@ -1157,12 +1336,17 @@ function wireCombobox(panel, id) {
       open();
       (visible[Math.min(active + 1, visible.length - 1)] || visible[0])?.focus();
     }
-    if (event.key === 'Enter' && visible.length) {
+    if (event.key === 'Enter' && visible.length && !isImeComposing(event)) {
       event.preventDefault();
       event.stopPropagation();
       selectFromKeyboard(visible[0]);
     }
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape' && !root.querySelector('.subscriptions-combobox__options').hidden) {
+      // Offene Liste: Esc schliesst nur sie. preventDefault sagt dem Modal
+      // (onEscape), dass das Esc verbraucht ist - sonst ginge das Formular mit.
+      event.preventDefault();
+      close();
+    }
   });
   options.forEach((option) => {
     option.addEventListener('pointerdown', (event) => {
@@ -1180,6 +1364,7 @@ function wireCombobox(panel, id) {
         visible[Math.max(0, Math.min(visible.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
       }
       if (event.key === 'Escape') {
+        event.preventDefault();
         close();
         search.focus();
       }
@@ -1210,9 +1395,12 @@ function subscriptionReadSections(subscription) {
     { icon: 'align-left', label: t('subscriptions.descriptionLabel'), value: subscription.description || '', multiline: true },
     { icon: 'repeat-2', label: t('subscriptions.billingCycleLabel'), value: cycleLabel(subscription) },
     { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
-      value: subscription.next_payment_date ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+      // Abgeschlossen: keine naechste Zahlung (#2009, wie die Karte).
+      value: subscription.next_payment_date && !isCompleted(subscription)
+        ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+    // Abgeschlossen: keine Erinnerung (#2011) - syncReminder hat sie entfernt.
     { icon: subscription.reminder_enabled === false ? 'bell-off' : 'bell', label: t('subscriptions.reminderDaysLabel'),
-      value: subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
+      value: isCompleted(subscription) ? '' : subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
     { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },
     { icon: 'tags', label: t('subscriptions.categoryLabel'), value: subscription.category_id ? rowCategoryLabel(subscription) : '' },
     { icon: 'wallet-cards', label: t('subscriptions.paymentMethodLabel'),
@@ -1236,6 +1424,59 @@ function openSubscriptionReadView(subscription) {
   });
 }
 
+/**
+ * Kategorie und Zahlungsart im Abo-Dialog: EIN Helfer fuer Beschriftung und
+ * Optionen, beim Oeffnen wie beim Neuaufbau nach "die gewaehlte gibt es nicht
+ * mehr" - damit beide nicht auseinanderlaufen (#1909, Codex an #1994).
+ */
+const META_COMBOBOXES = {
+  'subscription-category': {
+    label: 'subscriptions.categoryLabel',
+    placeholder: 'subscriptions.categorySearchPlaceholder',
+    items: () => [
+      { value: '', label: t('subscriptions.uncategorized') },
+      ...state.meta.categories.map((item) => ({ value: item.id, label: categoryLabel(item) })),
+    ],
+  },
+  'subscription-method': {
+    label: 'subscriptions.paymentMethodLabel',
+    placeholder: 'subscriptions.paymentMethodSearchPlaceholder',
+    items: () => [
+      { value: '', label: t('subscriptions.unspecified') },
+      ...state.meta.payment_methods.map((item) => ({ value: item.id, label: paymentMethodLabel(item) })),
+    ],
+  },
+};
+
+function metaComboboxMarkup(id, value = '', { without = null } = {}) {
+  const config = META_COMBOBOXES[id];
+  const items = config.items().filter((item) => without === null || String(item.value) !== without);
+  return comboboxMarkup({ id, label: t(config.label), items, value, placeholder: t(config.placeholder) });
+}
+
+/**
+ * Die im Abo-Dialog GEWAEHLTE Kategorie oder Zahlungsart ist weg (#1909): der
+ * Dialog bleibt mit der Eingabe offen. Die Seite laedt ueber das normale Laden
+ * mit Ladenummer neu (ein Filter auf die geloeschte geht vorher auf "alle"),
+ * dann wird die Auswahl ueber denselben Helfer wie beim Oeffnen aus dem
+ * frischen Stand gebaut, steht auf "keine" und traegt den Fokus. Scheitert
+ * das Laden, faellt wenigstens die geloeschte aus der Auswahl. Eine andere
+ * Seiteninstanz bleibt unberuehrt.
+ */
+async function offerCurrentMeta(panel, id, reason, owner) {
+  const goneId = String(panel.querySelector(`#${id}`)?.value ?? '');
+  if (!isCurrentOwner(owner)) return;
+  resetGoneFilter(reason, goneId);
+  await reload(undefined, { owner, quiet: true });
+  if (!isCurrentOwner(owner)) return;
+  const root = panel.querySelector(`[data-combobox="${id}"]`);
+  if (!root) return;
+  root.insertAdjacentHTML('afterend', metaComboboxMarkup(id, '', { without: goneId }));
+  root.remove();
+  wireCombobox(panel, id);
+  panel.querySelector(`#${id}-search`)?.focus();
+}
+
 export function openSubscriptionModal(subscription = null) {
   // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
   // bestehendes Abo geht als Leseansicht auf (P1-Muster wie openNoteModal).
@@ -1251,14 +1492,6 @@ export function openSubscriptionModal(subscription = null) {
     value: cycle,
     label: t(`subscriptions.cycle.${cycle}`),
   }));
-  const categoryItems = [
-    { value: '', label: t('subscriptions.uncategorized') },
-    ...state.meta.categories.map((item) => ({ value: item.id, label: categoryLabel(item) })),
-  ];
-  const methodItems = [
-    { value: '', label: t('subscriptions.unspecified') },
-    ...state.meta.payment_methods.map((item) => ({ value: item.id, label: paymentMethodLabel(item) })),
-  ];
   const initialLogo = subscription?.logo_data || '';
   const initialName = subscription?.name || '';
 
@@ -1276,20 +1509,8 @@ export function openSubscriptionModal(subscription = null) {
       <section class="subscription-form__section">
         <h3><i data-lucide="tags" aria-hidden="true"></i>${t('subscriptions.organizationDetails')}</h3>
         <div class="subscription-form__organization-grid">
-          ${comboboxMarkup({
-            id: 'subscription-category',
-            label: t('subscriptions.categoryLabel'),
-            items: categoryItems,
-            value: subscription?.category_id || '',
-            placeholder: t('subscriptions.categorySearchPlaceholder'),
-          })}
-          ${comboboxMarkup({
-            id: 'subscription-method',
-            label: t('subscriptions.paymentMethodLabel'),
-            items: methodItems,
-            value: subscription?.payment_method_id || '',
-            placeholder: t('subscriptions.paymentMethodSearchPlaceholder'),
-          })}
+          ${metaComboboxMarkup('subscription-category', subscription?.category_id || '')}
+          ${metaComboboxMarkup('subscription-method', subscription?.payment_method_id || '')}
           <div class="form-group subscription-form__color">
             <label class="form-label" for="subscription-color">${t('subscriptions.brandColorLabel')}</label>
             <input class="form-input form-input--color" id="subscription-color" type="color" value="${esc(subscription?.brand_color || '#0F766E')}">
@@ -1395,6 +1616,7 @@ export function openSubscriptionModal(subscription = null) {
             <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
             <yuvomi-datepicker id="subscription-next-date" type="date"
                    value="${esc(subscription?.next_payment_date || todayKey())}"></yuvomi-datepicker>
+            ${isCompleted(subscription) ? `<p class="form-hint" id="subscription-next-date-hint">${t('subscriptions.nextPaymentCompletedHint')}</p>` : ''}
           </div>
           <div class="form-group">
             <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
@@ -1487,7 +1709,7 @@ export function openSubscriptionModal(subscription = null) {
           showLogo(searchedLogoData);
         } catch (err) {
           event.target.value = '';
-          window.yuvomi?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(errorText(err), 'danger');
         }
       });
       panel.querySelector('#subscription-name').addEventListener('input', () => {
@@ -1516,14 +1738,14 @@ const LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg
 
 async function fileToDataUrl(file) {
   if (!file) return null;
-  if (!LOGO_ACCEPTED_TYPES.includes(file.type)) throw new Error(t('subscriptions.logoTypeError'));
-  if (file.size > 500000) throw new Error(t('subscriptions.logoTooLarge'));
+  if (!LOGO_ACCEPTED_TYPES.includes(file.type)) throw new PageProblem(t('subscriptions.logoTypeError'));
+  if (file.size > 500000) throw new PageProblem(t('subscriptions.logoTooLarge'));
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     // Roh weitergereicht war das der ProgressEvent - `err.message` im Toast
     // des Aufrufers zeigte dann `undefined`.
-    reader.onerror = () => reject(new Error(t('documents.fileReadError')));
+    reader.onerror = () => reject(new PageProblem(t('documents.fileReadError')));
     reader.readAsDataURL(file);
   });
 }
@@ -1532,34 +1754,45 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   if (readOnly()) return;
   const dateInput = panel.querySelector('#subscription-next-date');
   const currencyInput = panel.querySelector('#subscription-currency');
-  if (!isDateInputValid(dateInput.value)) {
+  // Alle Feldfehler auf einmal, Fokus aufs erste im Bild (Critique R19): bis
+  // hierher brach die Pruefung beim ersten ab, ein Fehler je Klick.
+  const fieldErrors = [];
+  const nextDateValid = isDateInputValid(dateInput.value);
+  if (!nextDateValid) {
     // Fehler am Feld statt als ortloser Toast (geteiltes Muster, Critique P1).
-    reportFieldError(dateInput, t('subscriptions.invalidDate'));
-    return;
+    fieldErrors.push([dateInput, t('subscriptions.invalidDate')]);
   }
   if (!currencyInput.value) {
     // Die Meldung klebt am sichtbaren Suchfeld der Combobox, nicht am
     // versteckten Wert-Input.
-    reportFieldError(panel.querySelector('#subscription-currency-search'), t('subscriptions.currencyRequired'));
-    return;
+    fieldErrors.push([panel.querySelector('#subscription-currency-search'), t('subscriptions.currencyRequired')]);
   }
   // Ende-Bedingung (#594): nur das aktive Zusatzfeld liefert einen Wert.
   const endType = panel.querySelector('#subscription-end-type').value;
+  const staysCompleted = isCompleted(existing) && !panel.querySelector('#subscription-enabled').checked;
   let endDate = null;
   let occurrenceCount = null;
   if (endType === 'on_date') {
     const endDateInput = panel.querySelector('#subscription-end-date');
     if (!isDateInputValid(endDateInput.value)) {
-      reportFieldError(endDateInput, t('subscriptions.invalidDate'));
-      return;
+      fieldErrors.push([endDateInput, t('subscriptions.invalidDate')]);
+    } else {
+      endDate = parseDateInput(endDateInput.value);
+      // Dieselbe Regel wie der Server (endConfigErrors), vor dem Absenden und am
+      // Feld statt als Toast (Review-Runde 1 zu #2010). Ein abgeschlossenes Abo
+      // mit Enddatum steht immer nach seinem Ende: wer es wieder aufnimmt,
+      // braucht ein spaeteres. Bleibt es abgeschlossen, gilt der Vergleich nicht.
+      if (nextDateValid && !staysCompleted && endDate < parseDateInput(dateInput.value)) {
+        fieldErrors.push([endDateInput, t('subscriptions.errorEndBeforeNextPayment')]);
+      }
     }
-    endDate = parseDateInput(endDateInput.value);
   } else if (endType === 'after_count') {
     const countInput = panel.querySelector('#subscription-end-count');
     const count = Number(countInput.value);
     if (!Number.isInteger(count) || count < 1) {
-      reportFieldError(countInput, t('subscriptions.endCountInvalid'));
-      return;
+      fieldErrors.push([countInput, t('subscriptions.endCountInvalid')]);
+    } else if (!staysCompleted && count <= Number(existing?.occurrences_done || 0)) {
+      fieldErrors.push([countInput, t('subscriptions.errorOccurrenceCountTooLow')]);
     }
     occurrenceCount = count;
   }
@@ -1567,22 +1800,26 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   // sich das vorhandene Abo überhaupt noch speichern lässt. Das gilt aber fürs
   // ganze Feld: ohne diese Prüfung wäre aus 12,5 JPY anschliessend auch
   // 12,555 JPY speicherbar, also mehr Bruch als die feste Schrittweite zuliess.
+  // Ohne Waehrung gibt es kein Raster - dann meldet nur das Waehrungsfeld.
   const amountInput = panel.querySelector('#subscription-amount');
   const amountValue = Number(amountInput.value);
   const targetCurrency = currencyInput.value.trim().toUpperCase();
-  if (!amountIsSavable(amountValue, targetCurrency, {
+  if (targetCurrency && !amountIsSavable(amountValue, targetCurrency, {
     original: existing?.amount ?? null,
     originalCurrency: existing?.currency ?? null,
   })) {
-    reportFieldError(amountInput, t('common.amountPrecisionRequired', {
+    fieldErrors.push([amountInput, t('common.amountPrecisionRequired', {
       currency: targetCurrency,
       step: smallestUnitLabel(targetCurrency),
-    }));
-    return;
+    })]);
   }
+  if (reportFieldErrors(fieldErrors)) return;
 
   const submit = panel.querySelector('[type="submit"]');
   submit.disabled = true;
+  // Der Dialog und die Seite dieser Handlung, vor jeder Anfrage gemerkt (reportError).
+  const dialog = captureModalContext();
+  const owner = pageOwner();
   try {
     const file = panel.querySelector('#subscription-logo').files[0];
     const logoData = searchedLogoData || (file ? await fileToDataUrl(file) : existing?.logo_data || null);
@@ -1612,12 +1849,19 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     };
     if (existing) await api.put(`/budget/subscriptions/${existing.id}`, payload);
     else await api.post('/budget/subscriptions', payload);
-    await closeModal({ force: true });
-    await reload(undefined, { motion: true });
-    refocusAfterRender();
+    // Nur DIESEN Dialog: einen inzwischen geoeffneten anderen laesst die
+    // spaete Antwort stehen (#1997).
+    await closeModal({ force: true, context: dialog });
+    if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
     window.yuvomi?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+    const goneSelect = selectedMetaGone(err);
+    if (goneSelect) {
+      window.yuvomi?.showToast(errorText(err), 'danger');
+      await offerCurrentMeta(panel, goneSelect, err.data.reason, owner);
+      return;
+    }
+    reportError(err, { owner, dialog });
   } finally {
     submit.disabled = false;
   }
@@ -1633,7 +1877,11 @@ function logoOptionsMarkup(options) {
 }
 
 function openLogoPickerModal(panel, initialQuery, onSelect) {
-  panel.querySelector('.subscriptions-logo-picker-modal')?.remove();
+  // Der Knopf "Logo suchen", der den Picker oeffnet - dorthin geht der Fokus zurueck.
+  const opener = document.activeElement;
+  const stale = panel.querySelector('.subscriptions-logo-picker-modal');
+  stale?._releaseBackground?.();
+  stale?.remove();
   panel.insertAdjacentHTML('beforeend', `
     <div class="subscriptions-logo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-logo-picker-title">
       <div class="subscriptions-logo-picker-panel">
@@ -1660,10 +1908,22 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     </div>
   `);
   const overlay = panel.querySelector('.subscriptions-logo-picker-modal');
+  // Das Abo-Formular darunter ist gesperrt, solange der Picker offen ist
+  // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+  overlay._releaseBackground = inertOutside(overlay);
   const results = overlay.querySelector('#subscription-logo-results');
   const input = overlay.querySelector('#subscription-logo-search-input');
   let options = [];
-  const close = () => overlay.remove();
+  const close = () => {
+    // Mit dem Picker ginge das fokussierte Suchfeld weg, und der Fokus fiele auf
+    // body - aus der Fokusfalle des Abo-Formulars heraus (Codex-Review zu #2055).
+    const hadFocus = overlay.contains(document.activeElement);
+    overlay._releaseBackground();
+    overlay.remove();
+    if (!hadFocus) return;
+    const target = opener?.isConnected ? opener : panel.querySelector('#subscription-find-logo');
+    target?.focus();
+  };
   // Der Picker liegt ueber dem Abo-Formular; die Zurueck-Geste meint ihn (#871).
   attachOverlay(overlay, close);
   const search = async () => {
@@ -1677,7 +1937,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
       options = response.data?.options || [];
       setHtml(results, logoOptionsMarkup(options));
     } catch (err) {
-      const message = err.data?.error || t('subscriptions.logoSearchError');
+      const message = errorSentence(err, 'subscriptions.logoSearchError');
       options = [];
       setHtml(results, `<p class="subscriptions-logo-empty">${esc(message)}</p>`);
       window.yuvomi?.showToast(message, 'danger');
@@ -1696,7 +1956,12 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     close();
   });
   overlay.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape') {
+      // Esc meint den Picker, nicht das Abo-Formular darunter (onEscape in
+      // modal.js wertet preventDefault als "schon erledigt").
+      event.preventDefault();
+      close();
+    }
   });
   overlay.querySelector('#subscription-logo-picker-close').addEventListener('click', close);
   overlay.querySelector('#subscription-logo-search-form').addEventListener('submit', async (event) => {
@@ -1715,18 +1980,27 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
 // eine Eigenschaft des Wegs.
 async function renewSubscription(subscription) {
   if (readOnly()) return;
+  // Ein abgeschlossenes Abo hat keine naechste Zahlung (#2011): weder Knopf
+  // noch Geste fragen nach, der Server lehnt es ohnehin ab.
+  if (isCompleted(subscription)) return;
   const confirmed = await confirmModal(
     t('subscriptions.renewConfirm', { name: subscription.name }),
     { detail: t('subscriptions.renewConfirmDetail', { date: formatDate(subscription.next_payment_date) }) });
   if (!confirmed) return;
+  const owner = pageOwner();
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
-    await reload(undefined, { motion: true });
-    refocusAfterRender();
+    if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    await reportError(err, { owner });
+    // Schon abgeschlossen (#2011): die Karte war veraltet - ein anderes
+    // Haushaltsmitglied hat die letzte Zahlung gebucht. Neu laden, damit der
+    // Knopf verschwindet; der Satz steht schon da.
+    if (err?.status !== 403 && err?.data?.reason === 'subscriptions_subscription_completed' && isCurrentOwner(owner)) {
+      if (await reload(undefined, { owner, quiet: true })) refocusAfterRender();
+    }
   }
 }
 
@@ -1735,18 +2009,26 @@ async function deleteSubscription(subscription) {
   const confirmed = await confirmModal(t('subscriptions.deleteConfirm', { name: subscription.name }),
     { danger: true, detail: t('subscriptions.deleteConfirmDetail') });
   if (!confirmed) return;
+  const owner = pageOwner();
   try {
     await api.delete(`/budget/subscriptions/${subscription.id}`);
-    // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
-    // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
-    // collapseRow sofort auf).
-    await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
-    await reload(undefined, { motion: true });
-    refocusAfterRender();
-    window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied war
+    // schneller. Die 404 eines Abos heisst nur das - die Route liest es ohne
+    // Sichtbarkeitsfilter, ein fremdes privates Abo endet dort mit 403.
+    if (!isAlreadyDeleted(err, 'subscriptions_subscription_not_found')) {
+      reportError(err, { owner });
+      return;
+    }
   }
+  // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
+  // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
+  // collapseRow sofort auf). Ist die Seite inzwischen eine andere Instanz,
+  // bleibt sie unberuehrt; der Toast sagt trotzdem, dass geloescht ist.
+  if (isCurrentOwner(owner)) await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
+  // Ob gerade geloescht oder schon geloescht: die Liste kommt vom Server.
+  if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
+  window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
 }
 
 async function openSettingsModal() {
@@ -1807,17 +2089,18 @@ async function openSettingsModal() {
           }));
           return;
         }
+        const owner = pageOwner();
+        const dialog = captureModalContext();
         try {
           await api.put('/budget/subscriptions/settings', {
             monthly_budget: Number(panel.querySelector('#subscriptions-budget').value),
             base_currency: baseCurrency,
           });
-          await closeModal({ force: true });
-          await reload({ refreshRates: true });
-          refocusAfterRender();
+          await closeModal({ force: true, context: dialog });
+          if (await reload({ refreshRates: true }, { owner })) refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.settingsSaved'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+          reportError(err, { owner });
         }
       });
     },
@@ -1862,6 +2145,40 @@ function metadataRows(items, kind) {
   }).join('');
 }
 
+/**
+ * Eine Schreibhandlung im Verwalten-Dialog: nach dem Erfolg schliessen, neu
+ * laden und den Dialog mit dem frischen Stand neu aufbauen. Scheitert sie,
+ * sagt der Toast den Satz der App; "gibt es nicht mehr" baut den Dialog
+ * ebenfalls frisch auf, eine vergebene Bezeichnung laesst ihn mit der Eingabe
+ * stehen.
+ *
+ * @returns {Promise<boolean>} ob der Server die Handlung angenommen hat
+ */
+async function saveMetadata(write, goneId = null) {
+  const dialog = captureModalContext();
+  const owner = pageOwner();
+  try {
+    await write();
+  } catch (err) {
+    reportError(err, { owner, dialog, goneId, reopen: openMetadataModal });
+    return false;
+  }
+  // Nur DIESEN Dialog schliessen, und nur ihn neu aufbauen: hat der Nutzer
+  // inzwischen einen anderen geoeffnet, schloesse openMetadataModal() ihn
+  // ebenso wie ein closeModal() ohne Kontext (#1997).
+  const own = isOwnModalOpen(dialog);
+  await closeModal({ force: true, context: dialog });
+  // Auch das Laden danach braucht Zeit: was der Nutzer IN DIESER Zeit oeffnet,
+  // gehoert ebenso ihm. Der Kontext von jetzt (eigener Dialog zu) muss nach dem
+  // Laden noch gelten - sonst hat inzwischen ein anderer Dialog den Slot.
+  const afterClose = captureModalContext();
+  if (await reload(undefined, { owner }) && own && isModalContextCurrent(afterClose)) {
+    refocusAfterRender();
+    openMetadataModal();
+  }
+  return true;
+}
+
 function openMetadataModal() {
   if (readOnly()) return;
   const content = `
@@ -1898,24 +2215,18 @@ function openMetadataModal() {
         if (readOnly()) return;
         const name = panel.querySelector('#subscription-new-category').value.trim();
         if (!name) return;
-        await api.post('/budget/subscriptions/categories', {
+        // Bis #1909 ohne catch: eine vergebene Kategorie lief als unbehandelte
+        // Ablehnung bis in den Router und zeigte dort den Text des Servers.
+        await saveMetadata(() => api.post('/budget/subscriptions/categories', {
           name,
           color: panel.querySelector('#subscription-new-category-color').value,
-        });
-        await closeModal({ force: true });
-        await reload();
-        refocusAfterRender();
-        openMetadataModal();
+        }));
       });
       panel.querySelector('#subscription-add-method').addEventListener('click', async () => {
         if (readOnly()) return;
         const name = panel.querySelector('#subscription-new-method').value.trim();
         if (!name) return;
-        await api.post('/budget/subscriptions/payment-methods', { name });
-        await closeModal({ force: true });
-        await reload();
-        refocusAfterRender();
-        openMetadataModal();
+        await saveMetadata(() => api.post('/budget/subscriptions/payment-methods', { name }));
       });
       panel.querySelectorAll('[data-move]').forEach((button) => {
         button.addEventListener('click', async () => {
@@ -1929,11 +2240,7 @@ function openMetadataModal() {
           const target = index + Number(button.dataset.move);
           [rows[index], rows[target]] = [rows[target], rows[index]];
           const key = list.id.includes('category') ? 'categories' : 'payment_methods';
-          await api.put('/budget/subscriptions/meta/order', { [key]: rows.map((row) => Number(row.dataset.id)) });
-          await closeModal({ force: true });
-          await reload();
-          refocusAfterRender();
-          openMetadataModal();
+          await saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: rows.map((row) => Number(row.dataset.id)) }));
         });
       });
 
@@ -1967,6 +2274,7 @@ function openMetadataModal() {
       // im Panel zu klicken bzw. das ganze Modal via Escape zu schließen.
       panel.querySelectorAll('.subscriptions-metadata-row__edit input').forEach((input) => {
         input.addEventListener('keydown', (event) => {
+          if (isImeComposing(event)) return;
           if (event.key !== 'Enter' && event.key !== 'Escape') return;
           event.preventDefault();
           event.stopPropagation();
@@ -1990,20 +2298,11 @@ function openMetadataModal() {
             ? (nameInput.dataset.originalName ?? typed)
             : typed;
           const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
-          try {
-            if (li.dataset.kind === 'categories') {
-              await api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value });
-            } else {
-              await api.put(`/budget/subscriptions/payment-methods/${id}`, { name });
-            }
-            await closeModal({ force: true });
-            await reload();
-            refocusAfterRender();
-            openMetadataModal();
-            window.yuvomi?.showToast(t('subscriptions.metaSavedToast'), 'success');
-          } catch (err) {
-            window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
-          }
+          const isCat = li.dataset.kind === 'categories';
+          const saved = await saveMetadata(() => (isCat
+            ? api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value })
+            : api.put(`/budget/subscriptions/payment-methods/${id}`, { name })), id);
+          if (saved) window.yuvomi?.showToast(t('subscriptions.metaSavedToast'), 'success');
         });
       });
       panel.querySelectorAll('[data-act="delete"]').forEach((button) => {
@@ -2034,14 +2333,24 @@ function openMetadataModal() {
             },
           );
           if (!confirmed) return;
+          const owner = pageOwner();
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
-            await reload();
-            refocusAfterRender();
-            window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
           } catch (err) {
-            window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+            // Schon geloescht ist ein Erfolg (#1909): Kategorien und
+            // Zahlungsarten haben keine Sichtbarkeit, die 404 heisst nur das.
+            if (!isAlreadyDeleted(err, isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found')) {
+              window.yuvomi?.showToast(errorText(err), 'danger');
+              if (isCurrentOwner(owner)) openMetadataModal();
+              return;
+            }
           }
+          if (!isCurrentOwner(owner)) return;
+          // Ein Filter auf die geloeschte geht vor dem Laden auf "alle".
+          resetGoneFilter(isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', id);
+          if (!await reload(undefined, { owner })) return;
+          refocusAfterRender();
+          window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
           openMetadataModal();
         });
       });
@@ -2057,4 +2366,8 @@ export const __test = {
   readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state, toolsMenuHtml, activeFilters,
   renderBreakdown, renderAreaChart,
   subscriptionReadSections, openSubscriptionModal, saveSubscription,
+  // #1909: die Fehlerwege der Seite (test:subscriptions-errors).
+  reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
+  // Eine neue Instanz der Seite, wie ein render() sie anlegt.
+  setContainerForTest: (target) => { container = target; pageGeneration += 1; },
 };

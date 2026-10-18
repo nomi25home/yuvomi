@@ -5,9 +5,9 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -15,6 +15,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { previewKind } from '/utils/document-preview.js';
 import { fileShareSupport } from '/utils/web-share.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { findPageFab } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 // Im Solo-Haushalt hat „Wer darf das sehen" genau eine Antwort - gefragt wird
@@ -24,7 +25,8 @@ import { rowActionHtml } from '/utils/row-action.js';
 import { hidesPrivacyControls } from '/utils/household.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { maxUploadBytes } from '/utils/upload-limit.js';
-import { mountEmptyState } from '/utils/empty-state.js';
+import { holdDocumentAttachStyle } from '/components/document-attach.js';
+import { mountEmptyState, mountSearchEmpty } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
 import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
@@ -83,8 +85,13 @@ const SHARE_NOTE_KEYS = {
 
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 
+// Jeder Ladeweg in den modulweiten Stand nimmt nur seine JUENGSTE Antwort an.
+// Mitglieder und Metadaten gehoeren dazu (#2005): sonst ueberschriebe die spaete
+// Antwort einer verlassenen Seite, was die neu betretene schon geladen hat.
 const applyLatestDocumentsResponse = createLatestResponseApplier();
 const applyLatestFoldersResponse = createLatestResponseApplier();
+const applyLatestMembersResponse = createLatestResponseApplier();
+const applyLatestMetaOptionsResponse = createLatestResponseApplier();
 
 
 const CATEGORY_ICONS = {
@@ -149,23 +156,37 @@ function errorText(err) {
  * Zeile steht noch. Ein Loeschen mit diesem Grund laeuft deshalb wie jede
  * andere Handlung hier durch: der Satz, und die Seite zeigt, was wirklich steht.
  */
-async function reportError(err, { dialog = null } = {}) {
+/**
+ * Zeigt die Seite noch diesen Traeger? Die Navigation in ein anderes Modul
+ * leert `_container` nicht, die Variable zeigt dann weiter auf den
+ * abgehaengten Traeger. "Derselbe Traeger" allein haelt deshalb nicht: er muss
+ * auch noch im DOM haengen (Codex an #2001). Sonst zeichnete ein spaetes
+ * Nachladen in eine Seite, die niemand mehr sieht, und zoege den Fokus auf
+ * der neuen Seite weg.
+ */
+function stillShown(owner) {
+  return Boolean(owner) && _container === owner && owner.isConnected === true;
+}
+
+async function reportError(err, { owner = null, dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
   // Nachladen nach "gibt es nicht mehr". Die DMS-Konten kommen mit: ein Konto,
   // das ein Admin entfernt hat, stuende sonst weiter im Menue. Ein scheiterndes
   // Nachladen meldet nichts weiter - der Satz steht schon da.
   // Wie deleteDocuments: wer die Seite inzwischen verlassen hat, bekommt
-  // nichts mehr gezeichnet (Review zu #1994).
-  const owner = _container;
+  // nichts mehr gezeichnet (Review zu #1994). `owner` merkt die Aufrufstelle
+  // VOR ihrer Anfrage: hier gelesen, waere es nach "verlassen und zurueck"
+  // schon der neue Container (Codex an #2001).
   if (dialog && isModalContextCurrent(dialog)) await closeModal({ force: true });
+  if (!stillShown(owner)) return;
   try {
     await Promise.all([loadFolders(), loadDocuments(), loadMetaOptions()]);
   } catch (loadErr) {
     console.warn('[Documents] reload after a gone answer failed:', loadErr);
     return;
   }
-  if (_container !== owner) return;
+  if (!stillShown(owner)) return;
   renderDmsHeaderBtn();
   renderAll();
   refocusAfterRender();
@@ -183,17 +204,19 @@ async function reportError(err, { dialog = null } = {}) {
  * @param {string} rootKey - Beschriftung der Wurzel ("kein Ordner", "oberste Ebene")
  * @param {(goneId: string) => string} optionsHtml - die Optionen in der
  *   Reihenfolge, die der Dialog beim Oeffnen hatte, ohne `goneId`
+ * @param {object|null} owner - der Container der Seite, VOR der Anfrage gemerkt
  */
-async function offerCurrentFolders(select, rootKey, optionsHtml) {
+async function offerCurrentFolders(select, rootKey, optionsHtml, owner) {
   if (!select) return;
+  // Der Dialog gehoert zu einer Seite, die nicht mehr angezeigt wird.
+  if (!stillShown(owner)) return;
   const goneId = String(select.value);
-  const owner = _container;
   try {
     await Promise.all([loadFolders(), loadDocuments()]);
   } catch (err) {
     console.warn('[Documents] folder reload failed:', err);
   }
-  if (_container === owner) renderAll();
+  if (stillShown(owner)) renderAll();
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
   select.value = '';
@@ -286,6 +309,8 @@ function persistExpandedFolders() {
   }
 }
 let _container = null;
+// Der Container, dessen erster Aufbau fertig ist (applyFolderDeleteResult, #2005).
+let _built = null;
 let _search = null;
 let _statusTablist = null;
 // Seitenleben (utils/page-lifecycle.js): faellt mit dem Router-Signal, wenn die
@@ -363,12 +388,15 @@ export async function render(container, context = {}) {
             <i data-lucide="link" class="icon-md" aria-hidden="true"></i>
             <span class="documents-dms-link-btn__label">${t('documents.linkFromDms')}</span>
           </button>
-          <div class="documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
-            <button class="documents-view-toggle__btn ${state.view === 'grid' ? 'documents-view-toggle__btn--active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
-              <i data-lucide="layout-grid" aria-hidden="true"></i>
+          ${/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1, Critique 2026-10-16):
+                `.segmented` in der Icon-Variante statt einer runden Eigen-Pille
+                - dieselbe Form wie Aufgaben und Kalender. */ ''}
+          <div class="segmented segmented--icons documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
+            <button type="button" class="segmented__item documents-view-toggle__btn${state.view === 'grid' ? ' is-active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" title="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
+              <i data-lucide="layout-grid" class="icon-md" aria-hidden="true"></i>
             </button>
-            <button class="documents-view-toggle__btn ${state.view === 'list' ? 'documents-view-toggle__btn--active' : ''}" data-view="list" aria-label="${t('documents.listView')}" aria-pressed="${state.view === 'list'}">
-              <i data-lucide="list" aria-hidden="true"></i>
+            <button type="button" class="segmented__item documents-view-toggle__btn${state.view === 'list' ? ' is-active' : ''}" data-view="list" aria-label="${t('documents.listView')}" title="${t('documents.listView')}" aria-pressed="${state.view === 'list'}">
+              <i data-lucide="list" class="icon-md" aria-hidden="true"></i>
             </button>
           </div>
           ${documentsToolsMenuHtml()}
@@ -395,6 +423,20 @@ export async function render(container, context = {}) {
              schwersten erreichbare. Er steht nur, wenn er etwas findet, und
              eine Haarlinie trennt ihn von der Kategoriegruppe. */ ''}
         <div class="documents-filters__chips">
+          ${/* DER ORDNER IST DER ERSTE CHIP (Critique 2026-10-16, P2 mobil).
+               Unter 1024px stand der Auslöser der Ordnerauswahl als eigene
+               48px-Zeile zwischen Filterzeile und Liste - erstes Dokument bei
+               y=216. Jetzt fuehrt er die Chip-Spur an: dieselbe Kapsel wie die
+               Facetten, mit Pfeil, weil er aufklappt statt umzuschalten. Die
+               Liste klappt weiter an ihrem Ort auf (aria-controls). KEIN
+               `aria-label` - Begruendung am alten Ort, siehe unten. Am Desktop
+               ist er ausgeblendet; dort steht die Ordnerspalte. */ ''}
+          <button class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"
+                  aria-expanded="false" aria-controls="documents-folder-browser">
+            <i data-lucide="folders" class="icon-md" aria-hidden="true"></i>
+            <span class="documents-folder-browser__toggle-label">${esc(t('documents.allDocuments'))}</span>
+            <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
+          </button>
           <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
           <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
         </div>
@@ -403,7 +445,9 @@ export async function render(container, context = {}) {
         <aside class="documents-folder-browser" aria-label="${t('documents.folderFilterLabel')}">
           <div class="documents-folder-browser__head">
             <h2 class="documents-folder-browser__title" id="documents-folder-browser-title">${t('documents.folderBrowserTitle')}</h2>
-            ${/* KEIN `aria-label` hier. Es trug "Ordner durchsuchen", waehrend der
+            ${/* Der Auslöser der Auswahl (unter 1024px) steht seit der Critique
+                2026-10-16 als erster Chip in der Filterzeile (`#documents-folder-toggle`).
+                KEIN `aria-label` dort. Es trug "Ordner durchsuchen", waehrend der
                 Knopf sichtbar den AKTUELLEN Ordner zeigt: der sichtbare Text stand
                 damit nicht im zugaenglichen Namen (WCAG 2.5.3 - Sprachsteuerung
                 kann den Knopf nicht ansprechen), und der gewaehlte Ordner, unter
@@ -414,12 +458,6 @@ export async function render(container, context = {}) {
                 (PR-Review #754). Die Beschriftung startet mit dem Standardordner,
                 damit der Knopf nie namenlos ist - `renderFolderBrowser` schreibt
                 sie danach bei jedem Rendern fort. */ ''}
-            <button class="documents-folder-browser__toggle" id="documents-folder-toggle" type="button"
-                    aria-expanded="false" aria-controls="documents-folder-browser">
-              <i data-lucide="folders" aria-hidden="true"></i>
-              <span class="documents-folder-browser__toggle-label">${esc(t('documents.allDocuments'))}</span>
-              <i data-lucide="chevron-down" aria-hidden="true" class="documents-folder-browser__chevron"></i>
-            </button>
             ${readOnly() ? '' : `
             <button class="documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
               <i data-lucide="folder-plus" aria-hidden="true"></i>
@@ -449,6 +487,10 @@ export async function render(container, context = {}) {
 
   await Promise.all([loadMembers(), loadFolders(), loadMetaOptions()]);
   await loadDocuments();
+  // Waehrend des ersten Ladens verlassen (oder schon neu betreten): die
+  // Antwort zeichnet nicht in eine Seite, die sie nicht mehr ist.
+  if (!stillShown(container)) return;
+  _built = container;
   renderDmsHeaderBtn();
   bindPageEvents();
   renderCategoryChips();
@@ -504,9 +546,13 @@ function renderBreadcrumb() {
  * fehlte das Kaestchen einer bestehenden Freigabe, und Speichern entzoege sie.
  */
 async function loadMembers() {
-  const [members, directory] = await Promise.all([api.get('/family/members'), api.get('/auth/users')]);
-  state.members = members.data || [];
-  state.directory = directory.data || [];
+  return applyLatestMembersResponse(
+    () => Promise.all([api.get('/family/members'), api.get('/auth/users')]),
+    ([members, directory]) => {
+      state.members = members.data || [];
+      state.directory = directory.data || [];
+    },
+  );
 }
 
 // Nur der Status wird serverseitig gefiltert: Kategorie und Ordner sind
@@ -535,15 +581,17 @@ async function loadFolders() {
 
 async function loadMetaOptions() {
   try {
-    const res = await api.get('/documents/meta/options');
-    state.dmsAccounts = res.data?.dms_accounts || [];
-    state.activeUploadBackend = res.data?.active_upload_backend || 'local';
-    state.isAdmin = res.data?.is_admin === true;
-    // Grenzwerte vom Server übernehmen, statt sie im Client zu duplizieren —
-    // sonst driften Hinweistext und tatsächliche Annahme auseinander.
-    state.maxFileSize = Number(res.data?.max_file_size) || maxUploadBytes();
-    state.allowedMimeTypes = Array.isArray(res.data?.allowed_mime_types) ? res.data.allowed_mime_types : [];
+    return await applyLatestMetaOptionsResponse(() => api.get('/documents/meta/options'), (res) => {
+      state.dmsAccounts = res.data?.dms_accounts || [];
+      state.activeUploadBackend = res.data?.active_upload_backend || 'local';
+      state.isAdmin = res.data?.is_admin === true;
+      // Grenzwerte vom Server übernehmen, statt sie im Client zu duplizieren -
+      // sonst driften Hinweistext und tatsächliche Annahme auseinander.
+      state.maxFileSize = Number(res.data?.max_file_size) || maxUploadBytes();
+      state.allowedMimeTypes = Array.isArray(res.data?.allowed_mime_types) ? res.data.allowed_mime_types : [];
+    });
   } catch {
+    // Hier kommt nur die juengste Anfrage an: eine ueberholte scheitert still.
     state.dmsAccounts = [];
     state.activeUploadBackend = 'local';
     state.isAdmin = false;
@@ -876,7 +924,7 @@ function bindPageEvents() {
     localStorage.setItem('yuvomi-documents-view', state.view);
     _container.querySelectorAll('.documents-view-toggle__btn').forEach((el) => {
       const active = el === btn;
-      el.classList.toggle('documents-view-toggle__btn--active', active);
+      el.classList.toggle('is-active', active);
       el.setAttribute('aria-pressed', String(active));
     });
     syncToolsMenu();
@@ -973,7 +1021,9 @@ async function selectStatus(status) {
   state.status = status;
   exitSelectMode();
   showDocumentsLoading();
+  const owner = _container;
   await loadDocuments();
+  if (!stillShown(owner)) return;
   renderAll();
 }
 
@@ -1078,14 +1128,13 @@ async function probeOtherStatusSearch() {
 }
 
 function emptyStateFor() {
+  // Die leere SUCHE baut der geteilte Leerzustand (searchEmptyOptions, R19):
+  // Titel „Keine Treffer", Begriff als Chip, „Suche zuruecksetzen". Hier
+  // stehen nur die Wege, die es nur in den Dokumenten gibt.
   if (state.query) {
     return {
-      variant: 'no-results',
-      icon: 'search-x',
-      title: t('documents.emptySearchTitle'),
-      description: t('documents.emptySearchDescription', { query: state.queryText }),
+      search: true,
       actions: [
-        { id: 'documents-empty-clear-search', label: t('common.searchClear'), icon: 'x', variant: 'primary' },
         ...(otherStatusHits() > 0
           ? [{
             id: 'documents-empty-other-status',
@@ -1143,22 +1192,32 @@ function emptyStateFor() {
 
 function renderEmptyState(list) {
   const empty = emptyStateFor();
+  const actions = empty.actions.map((action) => ({
+    label: action.label,
+    icon: action.icon,
+    tone: action.variant,
+    attrs: { id: action.id },
+  }));
   // Suche und Filter sind Reaktionen auf eine Eingabe und werden als
   // `no-results` angesagt; „noch nichts hochgeladen" ist gewoehnlicher
   // Seiteninhalt. Der Unterschied stand bisher nur im Text.
-  mountEmptyState(list, {
-    variant: empty.variant,
-    className: 'documents-empty-state',
-    icon: empty.icon,
-    title: empty.title,
-    description: empty.description,
-    actions: empty.actions.map((action) => ({
-      label: action.label,
-      icon: action.icon,
-      tone: action.variant,
-      attrs: { id: action.id },
-    })),
-  });
+  if (empty.search) {
+    mountSearchEmpty(list, {
+      query: state.queryText,
+      resetAttrs: { id: 'documents-empty-clear-search' },
+      actions,
+      className: 'documents-empty-state',
+    });
+  } else {
+    mountEmptyState(list, {
+      variant: empty.variant,
+      className: 'documents-empty-state',
+      icon: empty.icon,
+      title: empty.title,
+      description: empty.description,
+      actions,
+    });
+  }
   list.querySelector('#documents-empty-upload')?.addEventListener('click', () => openDocumentModal());
   list.querySelector('#documents-empty-folder')?.addEventListener('click', () => openFolderModal());
   list.querySelector('#documents-empty-clear-search')?.addEventListener('click', () => clearSearch());
@@ -1391,7 +1450,7 @@ function renderFolderBrowser() {
         ${showCounts ? `<span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>` : ''}
       </button>
       ${item.managed && !readOnly() ? `
-      ${rowActionHtml({ icon: 'more-vertical', className: 'documents-folder-item__menu', label: t('documents.folderActionsFor', { name: item.name }), attrs: { 'data-folder-menu': item.id, title: t('documents.folderActionsFor', { name: item.name }), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } })}` : ''}
+      ${rowActionHtml({ icon: 'ellipsis', className: 'documents-folder-item__menu', label: t('documents.folderActionsFor', { name: item.name }), attrs: { 'data-folder-menu': item.id, title: t('documents.folderActionsFor', { name: item.name }), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } })}` : ''}
     </li>`;
   }).join(''));
   if (window.lucide) lucide.createIcons({ el: browser });
@@ -1402,6 +1461,9 @@ function renderFolderBrowser() {
   if (toggleLabel) {
     toggleLabel.textContent = items.find((i) => String(state.folderId) === i.id)?.name ?? items[0].name;
   }
+  // Ein gewaehlter Ordner ist ein aktiver Filter: der Chip traegt den Aktivton.
+  _container?.querySelector('#documents-folder-toggle')
+    ?.toggleAttribute('data-folder-active', Boolean(state.folderId));
 }
 
 // Rand-Fade horizontal scrollender Leisten: geteilte has-fade-*-Konvention via
@@ -1549,6 +1611,7 @@ async function moveFolder(folder) {
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
   if (chosen === null) return;
+  const owner = _container;
   try {
     await api.put(`/documents/folders/${folder.id}`, { parent_id: chosen === '' ? null : Number(chosen) });
     window.yuvomi?.showToast(t('documents.folderMovedToast'), 'success');
@@ -1557,10 +1620,11 @@ async function moveFolder(folder) {
     if (chosen !== '') state.expanded.add(Number(chosen));
     persistExpandedFolders();
     await Promise.all([loadFolders(), loadDocuments()]);
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -1609,16 +1673,18 @@ async function renameFolder(folder) {
   if (readOnly()) return;
   const newName = await promptModal(t('documents.renameFolder'), folder.name);
   if (!newName || newName === folder.name) return;
+  const owner = _container;
   try {
     await api.put(`/documents/folders/${folder.id}`, { name: newName });
     window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
     // Dokumente mitladen: `folder_name` steckt im Server-Join und stünde sonst
     // auf den Karten weiter mit dem alten Namen.
     await Promise.all([loadFolders(), loadDocuments()]);
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -1685,12 +1751,13 @@ function folderDeleteChoice(folder, impact) {
 
 async function deleteFolder(folder) {
   if (readOnly()) return;
+  const owner = _container;
   let impact;
   try {
     const response = await api.get(`/documents/folders/${folder.id}/delete-impact`);
     impact = response.data;
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
     return;
   }
 
@@ -1721,18 +1788,15 @@ async function deleteFolder(folder) {
       requestDelete: ({ keepalive }) => (
         commitFolderDeletion(folder, impact, choice, { keepalive })
       ),
-      isViewActive: () => Boolean(_container?.isConnected),
-      applyResult: (result, { viewActive }) => (
-        applyFolderDeleteResult(result, choice, selectedSubtree, {
-          showSuccess: false,
-          renderView: viewActive,
-        })
+      isViewActive: () => stillShown(owner),
+      applyResult: (result) => (
+        applyFolderDeleteResult(result, choice, selectedSubtree, { owner, showSuccess: false })
       ),
-      handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true }),
+      handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true, owner }),
       // The server deletion has already succeeded at this point. A failed
       // refresh must not restore records that no longer exist server-side.
       handleApplyError: (err) => {
-        reportError(err);
+        reportError(err, { owner });
       },
       render: () => {
         persistExpandedFolders();
@@ -1745,10 +1809,9 @@ async function deleteFolder(folder) {
 
   try {
     const result = await commitFolderDeletion(folder, impact, choice);
-    await applyFolderDeleteResult(result, choice, selectedSubtree);
-    refocusAfterRender();
+    if (await applyFolderDeleteResult(result, choice, selectedSubtree, { owner })) refocusAfterRender();
   } catch (err) {
-    await handleFolderDeleteError(err, folder);
+    await handleFolderDeleteError(err, folder, { owner });
   }
 }
 
@@ -1769,7 +1832,7 @@ async function applyFolderDeleteResult(
   result,
   choice,
   selectedSubtree,
-  { showSuccess = true, renderView = true } = {},
+  { owner = null, showSuccess = true } = {},
 ) {
   const hasNonConcurrencyFailure = result.failed_documents
     ?.some((failure) => failure.failure_stage !== 'concurrency');
@@ -1790,18 +1853,33 @@ async function applyFolderDeleteResult(
     window.yuvomi?.showToast(t('documents.folderDeletedToast'), 'default');
   }
   if (result.folder_deleted !== false && selectedSubtree.has(Number(state.folderId))) state.folderId = '';
-  await Promise.all([loadFolders(), loadDocuments()]);
-  if (renderView) renderAll();
+  const applied = await Promise.all([loadFolders(), loadDocuments()]);
+  if (stillShown(owner)) {
+    renderAll();
+    return true;
+  }
+  // VERLASSEN UND ZURUECK (#2005). Der Stand ist modulweit: ohne den Ordner
+  // ist er jetzt auch der der neu betretenen Seite, und die soll den
+  // geloeschten Ordner nicht weiter zeigen. Gezeichnet wird nur,
+  //  - wenn beide Antworten angenommen wurden - hat die neue Seite inzwischen
+  //    selbst neuer geladen (Status-Reiter), zeichnet sie das selbst;
+  //  - wenn ihr erster Aufbau fertig ist - vorher zeichnet der aus demselben Stand;
+  //  - mit ihrem Fokus: die Zeile, der Chip, auf dem sie steht, bleibt es.
+  // Die Rueckgabe sagt dem Aufrufer, dass der Fokus nicht ihm gehoert.
+  if (applied.every(Boolean) && _built === _container && stillShown(_container)) {
+    renderKeepingFocus(() => renderAll());
+  }
+  return false;
 }
 
-async function handleFolderDeleteError(err, folder, { delayed = false } = {}) {
+async function handleFolderDeleteError(err, folder, { delayed = false, owner = null } = {}) {
   await handleFolderDeleteFailure({
     err,
     delayed,
     translate: t,
     showToast: (...args) => window.yuvomi?.showToast(...args),
     refreshImpact: () => deleteFolder(folder),
-    reportOther: (error) => reportError(error),
+    reportOther: (error) => reportError(error, { owner }),
   });
 }
 
@@ -2060,7 +2138,7 @@ function renderActions(doc) {
   return `
     ${rowActionHtml({ icon: 'eye', action: 'view', label: t('documents.viewNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '0', title: t('documents.viewAction') } })}
     ${rowActionHtml({ icon: 'download', href: `/api/v1/documents/${doc.id}/download`, label: t('documents.downloadNamed', { name: doc.name }), attrs: { download: true, tabindex: '-1', title: t('documents.downloadAction') } })}
-    ${mayManage(doc) ? rowActionHtml({ icon: 'more-vertical', action: 'menu', label: t('common.moreActionsNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '-1', title: t('nav.more'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } }) : ''}
+    ${mayManage(doc) ? rowActionHtml({ icon: 'ellipsis', action: 'menu', label: t('common.moreActionsNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '-1', title: t('nav.more'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } }) : ''}
   `;
 }
 
@@ -2206,13 +2284,15 @@ async function runDocumentAction(action, doc) {
   // Wie archiveSelected(): ein abgewiesener Schreibvorgang wird gemeldet,
   // nicht als unbehandelte Rejection verschluckt, und die Liste bleibt, wie sie war.
   if (action === 'archive') {
+    const owner = _container;
     try {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
       await loadDocuments();
+      if (!stillShown(owner)) return;
       renderAll({ motion: true });
     } catch (err) {
-      reportError(err);
+      reportError(err, { owner });
     }
   }
   if (action === 'push-dms') {
@@ -2227,11 +2307,12 @@ async function runDocumentAction(action, doc) {
       );
       if (!accountId) return;
     }
+    const owner = _container;
     try {
       await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
       window.yuvomi?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
-      reportError(err);
+      reportError(err, { owner });
     }
     return;
   }
@@ -2262,7 +2343,7 @@ function deleteDocuments(docs) {
       .filter((row) => ids.has(Number(row.dataset.id)))
     : [];
   Promise.all(leaving.map((row) => collapseRow(row))).then(() => {
-    if (_container === owner) renderAll({ motion: true });
+    if (stillShown(owner)) renderAll({ motion: true });
   });
 
   const restore = () => {
@@ -2285,17 +2366,20 @@ function deleteDocuments(docs) {
       if (failed) throw failed.reason;
       // Seite inzwischen verlassen: die Löschung ist durch, aber es gibt nichts
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
-      if (keepalive || _container !== owner) return;
+      if (keepalive || !stillShown(owner)) return;
       await loadDocuments();
+      // Und noch einmal NACH dem Laden (Codex an #2001): waehrend des GET kann
+      // die Seite verlassen oder neu betreten worden sein.
+      if (!stillShown(owner)) return;
       renderAll();
     },
     restore: (err) => {
-      if (_container !== owner) return;
+      if (!stillShown(owner)) return;
       // "Gibt es nicht mehr": nicht zurueckstellen, was der Server nicht mehr
       // zeigt - reportError laedt nach, und die Liste sagt, was steht.
-      if (err && isGone(err)) { reportError(err); return; }
+      if (err && isGone(err)) { reportError(err, { owner }); return; }
       restore();
-      if (err) reportError(err);
+      if (err) reportError(err, { owner });
     },
   });
 }
@@ -2385,6 +2469,7 @@ async function archiveSelected() {
   // sonst archivieren. Kein gemischter Zustand möglich, da beides nie zugleich sichtbar ist.
   const archived = state.status === 'archived';
   exitSelectMode();
+  const owner = _container;
   try {
     await Promise.all(docs.map((doc) => api.patch(`/documents/${doc.id}/archive`, { archived: !archived })));
     window.yuvomi?.showToast(
@@ -2394,9 +2479,10 @@ async function archiveSelected() {
       'success',
     );
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -2409,6 +2495,7 @@ async function moveSelected() {
   ]);
   if (target === null) return;
   exitSelectMode();
+  const owner = _container;
   try {
     await Promise.all(docs.map((doc) => api.put(`/documents/${doc.id}`, {
       name: doc.name,
@@ -2421,10 +2508,11 @@ async function moveSelected() {
     })));
     window.yuvomi?.showToast(t('documents.bulkMovedToast', { count: docs.length }), 'success');
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -2471,7 +2559,11 @@ export const __test = {
   memberOptions, loadMembers, documentVisibilityFieldHtml, openDocumentViewer,
   // R8 H14: der Auswahlkreis als Programm (Markup und Tipp).
   state, renderSelectBox, toggleDocumentSelection,
-  setContainerForTest(container) { _container = container; },
+  setContainerForTest(container, { built = false } = {}) {
+    _container = container;
+    if (built) _built = container;
+  },
+  loadMetaOptions, loadDocuments,
   // #1265: Nur-lesen und Besitzregel. Die Suite faehrt Markup und Handler.
   readOnly, mayManage, READ_SAFE_ACTIONS,
   renderActions, renderGridCard, renderListItem, emptyStateFor,
@@ -2553,7 +2645,7 @@ function openDocumentModal(doc = null) {
   // kein <label>: er liegt ausserhalb der Drop-Zone, ist selbst fokussierbar
   // und oeffnet den Picker im selben Klick - die Nutzeraktivierung bleibt.
   const fileFieldHtml = `
-        <div class="form-group">
+        <div class="form-group form-field">
           <label class="label" for="document-file">${t('documents.fileLabel')}</label>
           <label class="document-dropzone" id="document-dropzone" for="document-file">
             <input class="sr-only" id="document-file" type="file" multiple
@@ -2588,7 +2680,7 @@ function openDocumentModal(doc = null) {
         ${isEdit ? '' : fileFieldHtml}
         <div class="modal-grid modal-grid--2">
           <div class="form-group">
-            <label class="label" for="document-name">${t('documents.nameLabel')}</label>
+            <label class="label" for="document-name">${t('documents.nameLabel')}${isEdit ? REQUIRED_MARK : ''}</label>
             <input class="input" id="document-name" name="name" maxlength="200" value="${esc(doc?.name || '')}"
                    ${isEdit ? 'required' : `placeholder="${esc(t('documents.namePlaceholder'))}"`}>
             ${isEdit ? '' : `<p class="document-form__hint" id="document-name-hint">${t('documents.nameHint')}</p>`}
@@ -2646,6 +2738,7 @@ function openDocumentModal(doc = null) {
 
 function bindDropzone(panel) {
   const dropzone = panel.querySelector('#document-dropzone');
+  holdDocumentAttachStyle(dropzone);
   const input = panel.querySelector('#document-file');
   const selected = panel.querySelector('#document-selected-file');
   const nameField = panel.querySelector('#document-name');
@@ -2687,6 +2780,47 @@ function bindDropzone(panel) {
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
+}
+
+/**
+ * Der Fehler der Dateiwahl steht AN DER ABLAGE (Re-Critique 2026-10-17, P1).
+ *
+ * "Bitte waehle eine Datei aus." stand als Formularfehler am Fuss des Dialogs,
+ * mobil bei y=1086 von 844 - unsichtbar, und der Fokus blieb auf "Hochladen".
+ * Jetzt wie jedes Feld (reportFieldError): Meldung direkt unter der Ablage,
+ * rote Kante, Ablage in den Blick, Fokus in die Dateiwahl.
+ *
+ * Die Meldung haengt am Datei-Input, nicht am Label: er bekommt den Fokus, und
+ * der Screenreader liest sie dort ueber aria-describedby (Guide
+ * accessible-error-announcement: Zustand am fokussierten Feld, keine zweite
+ * Ansage per Alarm-Rolle). Platziert wird sie hinter der Ablage, weil der
+ * Input sr-only IN ihr liegt. Die naechste Dateiwahl raeumt den Fehler weg.
+ */
+function reportDropzoneError(form, message) {
+  const dropzone = form.querySelector('#document-dropzone');
+  const input = form.querySelector('#document-file');
+  if (!dropzone || !input) return false;
+  reportFieldError(dropzone, message, { focus: false, live: false });
+  // reportFieldError markiert, was es bekommt - hier das Label. Zustand und
+  // Beschreibung gehoeren an das Feld, das den Fokus bekommt.
+  dropzone.removeAttribute('aria-invalid');
+  const errorEl = dropzone.parentElement?.querySelector('.form-field__error');
+  const errorId = dropzone.getAttribute('aria-describedby');
+  dropzone.removeAttribute('aria-describedby');
+  if (errorEl && errorId) {
+    const ids = (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+    if (!ids.includes(errorId)) input.setAttribute('aria-describedby', [...ids, errorId].join(' '));
+  }
+  input.setAttribute('aria-invalid', 'true');
+  input.addEventListener('change', () => {
+    input.setAttribute('aria-invalid', 'false');
+    const rest = (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((id) => id && id !== errorId);
+    if (rest.length) input.setAttribute('aria-describedby', rest.join(' '));
+    else input.removeAttribute('aria-describedby');
+  }, { once: true });
+  input.focus({ preventScroll: true });
+  dropzone.scrollIntoView({ block: 'center' });
+  return false;
 }
 
 const FOLDER_UPLOAD_REASON_KEYS = {
@@ -3080,6 +3214,7 @@ function renderFolderUploadResult(panel, plan, result) {
 async function saveFolderUpload(panel, payload) {
   const upload = panel._folderUpload;
   if (!upload?.ready) throw new PageProblem(t('common.unknownError'));
+  const owner = _container;
   const plan = renderFolderUploadPreview(panel);
   if (!plan || (plan.counts.upload < 1 && plan.counts.createFolders < 1)) {
     throw new PageProblem(t('documents.folderUpload.noUploadableFiles'));
@@ -3125,7 +3260,7 @@ async function saveFolderUpload(panel, payload) {
     await runRateLimitedOperation(
       () => Promise.all([loadFolders(), loadDocuments()]),
     );
-    renderAll();
+    if (stillShown(owner)) renderAll();
   } catch (refreshError) {
     // The writes have already completed. A failed refresh must not turn a
     // persisted upload into a reported upload failure.
@@ -3146,6 +3281,7 @@ async function saveDocument(event, doc, panel) {
   event.preventDefault();
   // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
   const modalContext = captureModalContext();
+  const owner = _container;
   const form = event.target;
   const error = form.querySelector('#document-error');
   // Die Fußzeile mit dem Submit-Button wird beim Öffnen ans Panel gehoben
@@ -3186,10 +3322,16 @@ async function saveDocument(event, doc, panel) {
         return;
       }
       const files = Array.from(form.querySelector('#document-file').files || []);
-      if (!files.length) throw new PageProblem(t('documents.fileRequired'));
+      if (!files.length) {
+        reportDropzoneError(form, t('documents.fileRequired'));
+        return;
+      }
       const maxSize = state.maxFileSize || maxUploadBytes();
       const tooBig = files.find((file) => file.size > maxSize);
-      if (tooBig) throw new PageProblem(t('documents.fileTooLargeNamed', { name: tooBig.name }));
+      if (tooBig) {
+        reportDropzoneError(form, t('documents.fileTooLargeNamed', { name: tooBig.name }));
+        return;
+      }
 
       // Fortschritt sichtbar machen: das Einlesen einer mehrere MB großen Datei
       // als Data-URL dauert spürbar, und bei Mehrfachauswahl erst recht. Ein
@@ -3219,15 +3361,18 @@ async function saveDocument(event, doc, panel) {
         'success',
       );
     }
-    closeModal({ force: true });
+    // Nur DIESEN Dialog: hat der Nutzer ihn waehrend des Speicherns geschlossen
+    // und einen anderen geoeffnet, bleibt der andere samt Eingaben offen (#1997).
+    closeModal({ force: true, context: modalContext });
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll({ motion: true });
     refocusAfterRender();
   } catch (err) {
     // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
     // er geht zu, und die Liste kommt frisch.
     if (isGone(err) && !isSelectedFolderGone(err)) {
-      reportError(err, { dialog: modalContext });
+      reportError(err, { owner, dialog: modalContext });
       return;
     }
     error.textContent = errorText(err);
@@ -3236,7 +3381,7 @@ async function saveDocument(event, doc, panel) {
       // Dieselbe Reihenfolge wie beim Oeffnen (openDocumentModal): die Liste.
       await offerCurrentFolders(form.querySelector('#document-folder'), 'documents.noFolder',
         (goneId) => state.folders.filter((folder) => String(folder.id) !== goneId)
-          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''));
+          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''), owner);
     }
   } finally {
     submit.disabled = panel._folderUpload?.completed === true;
@@ -3267,7 +3412,7 @@ function openFolderModal({ parentId = null } = {}) {
     content: `
       <form id="document-folder-form" class="document-form">
         <div class="form-group">
-          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}</label>
+          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}${REQUIRED_MARK}</label>
           <input class="input" id="document-folder-name" required maxlength="200" autocomplete="off">
         </div>
         <div class="form-group">
@@ -3292,6 +3437,9 @@ function openFolderModal({ parentId = null } = {}) {
         const parentSelect = panel.querySelector('#document-folder-parent');
         const parent = parentSelect.value ? Number(parentSelect.value) : null;
         error.hidden = true;
+        const owner = _container;
+        // Der Dialog dieser Handlung, vor der Anfrage gemerkt (#1997).
+        const modalContext = captureModalContext();
         try {
           const res = await api.post('/documents/folders', { name: input.value.trim(), parent_id: parent });
           // Der Elternteil wird aufgeklappt - ein neuer Ordner, den man nicht
@@ -3301,10 +3449,14 @@ function openFolderModal({ parentId = null } = {}) {
             persistExpandedFolders();
           }
           window.yuvomi?.showToast(t('documents.folderCreatedToast'), 'success');
-          state.folderId = String(res.data?.id || '');
+          // Den neuen Ordner waehlt nur die Seite, die ihn angelegt hat: nach
+          // "verlassen und zurueck" gehoert die Auswahl der neuen Seite (#2005).
+          if (stillShown(owner)) state.folderId = String(res.data?.id || '');
           await loadFolders();
           await loadDocuments();
-          closeModal({ force: true });
+          // Nur diesen Dialog, nie einen inzwischen geoeffneten anderen (#1997).
+          closeModal({ force: true, context: modalContext });
+          if (!stillShown(owner)) return;
           applyFilters();
           renderAll();
         } catch (err) {
@@ -3314,7 +3466,7 @@ function openFolderModal({ parentId = null } = {}) {
             // Dieselbe Reihenfolge wie beim Oeffnen: der Baum, eingerueckt.
             await offerCurrentFolders(parentSelect, 'documents.folderRootLevel',
               (goneId) => visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId)
-                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''));
+                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''), owner);
           }
         }
       });
@@ -3571,6 +3723,7 @@ function setMediaAffordance(el, label) {
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
   const modalContext = captureModalContext();
+  const owner = _container;
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -3581,15 +3734,17 @@ async function linkDmsDocument(item, accountId) {
       category: 'other',
       visibility: 'family',
     });
-    closeModal({ force: true });
+    // Nur den Verknuepfen-Dialog, nie einen inzwischen geoeffneten anderen (#1997).
+    closeModal({ force: true, context: modalContext });
     await loadDocuments();
+    if (!stillShown(owner)) return true;
     renderAll({ motion: true });
     refocusAfterRender();
     return true;
   } catch (err) {
     // Der Verknuepfen-Dialog zeigt einen veralteten Stand, wenn das Konto
     // oder das Dokument im DMS fehlt: dann geht er zu.
-    reportError(err, { dialog: modalContext });
+    reportError(err, { owner, dialog: modalContext });
     return false;
   }
 }
@@ -3658,9 +3813,11 @@ function openDmsPreview({ item, src, canOpen, onLink }) {
   box.append(header, figure, actions);
   layer.appendChild(box);
 
+  let releaseBackground = () => {};
   const dismiss = () => {
     document.removeEventListener('keydown', onKey, true);
     layer.remove();
+    releaseBackground();
     opener?.focus?.();
   };
   // Wie bei Escape gilt fuer die Zurueck-Geste: sie schliesst zuerst die
@@ -3679,6 +3836,9 @@ function openDmsPreview({ item, src, canOpen, onLink }) {
   layer.addEventListener('click', (e) => { if (e.target === layer) dismiss(); });
 
   panel.appendChild(layer);
+  // Die Auswahl darunter ist gesperrt, solange die Vorschau offen ist
+  // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+  releaseBackground = inertOutside(layer);
   if (window.lucide) lucide.createIcons({ el: layer });
   close.focus();
 }
@@ -3925,7 +4085,7 @@ function openDocumentViewer(doc) {
   }
 }
 
-const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=FitH';
+const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=Fit&zoom=page-fit';
 
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   const kind = previewKind(doc.mime_type);
@@ -3940,7 +4100,11 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
       // Betrachter von Chromium und Firefox liest die PDF-Open-Parameter im
       // Fragment. `toolbar=0` nimmt seine Leiste (zweite Kopfzeile mit Zoom,
       // Druck, Download in fremder Optik unter der eigenen), `navpanes=0` die
-      // Seitenleiste, `view=FitH` passt die Seite in die Breite. Safari kennt
+      // Seitenleiste. SEITE EINPASSEN (R19, Critique 2026-10-16): `view=FitH`
+      // passte die Seite in die Breite, und am Desktop standen davon rund 44 %
+      // im Bild - eine Vorschau, die man erst scrollen muss. `view=Fit`
+      // (Chromium) und `zoom=page-fit` (pdf.js in Firefox) zeigen die ganze
+      // erste Seite; Lesen im Detail bleibt "In neuem Tab oeffnen". Safari kennt
       // sie nicht - der Rueckfall ist der Stand davor. Zoom und Druck bleiben
       // ueber "In neuem Tab oeffnen" (dort MIT Leiste: die Adresse traegt das
       // Fragment nicht) und den Download der eigenen Leiste.
