@@ -10,6 +10,7 @@ modules/
     module.json
     index.js
     style.css
+    settings.js
 ```
 
 The folder name must match the manifest `id`. A module installed from Settings gets its folder named after the `id` automatically (see [Installing From Settings](#installing-from-settings)), so the folder in a repository or archive may be called anything.
@@ -25,6 +26,7 @@ The folder name must match the manifest `id`. A module installed from Settings g
   "description": "Adds a small page to Yuvomi.",
   "entry": "index.js",
   "style": "style.css",
+  "settings": { "entry": "settings.js", "sections": ["mine", "household"], "labelKey": "settings.title" },
   "icon": "box",
   "accent": "#6366F1",
   "menu": {
@@ -50,6 +52,19 @@ Required fields:
 Optional fields:
 
 - `style`: a relative `.css` file loaded only for this module page.
+- `settings.entry`: optional relative `.js` file exporting `render(container, { section, user, query })`.
+  It adds a sheet at Settings -> Modules -> your module, even when `menu.show` is false.
+  The sheet uses the same icon as the navigation entry, and the module accent. Disabled or errored modules have no sheet.
+- `settings.sections`: required when `settings` is present. A non-empty array containing `mine`,
+  `household` or both, without duplicates. There is no default; missing or invalid sections
+  error the module. `mine` is shown to every member with access to the module; `household`
+  only to administrators. A household-only sheet is not offered to other members in the list,
+  in search results or by direct URL.
+  This is only a visibility gate. The module's own API must enforce roles and `ext:<module-id>`
+  permissions for every settings action. JavaScript assets remain readable to authenticated
+  users; hiding a sheet neither grants nor enforces API permissions.
+- `settings.labelKey`: optional extension locale key for the sheet title. If it is absent or
+  has no translation, the sheet uses the same name as the navigation.
 - `menu.show`: set to `false` if the module should not appear in the left menu.
 - `menu.label`, `menu.icon`, `menu.order`: left-menu label, Lucide icon name, and order.
 - `accent`: a `#RRGGBB` color. It is your module's **tone**: the app exposes it as
@@ -75,6 +90,38 @@ Optional fields:
   measured modes; `full` and `split` roots take the shell height, so a body section can scroll
   internally without your CSS sizing the page. `full` is the one mode whose body has no gutter.
 - `page.navigation` / `page.responsive`: currently `standard` only.
+
+## Settings Entry
+
+A settings entry uses the same protected module asset route, relative path validation,
+module enable check, and browser CSP as the main page entry. It renders inside a Settings
+sheet. The entry is imported only when the sheet opens. It is not a separate iframe or security
+sandbox; browser code has the same trust boundary as any extension page.
+
+Settings helpers and class names are not part of the module contract; build the sheet's
+content with the module's own means. The manifest `style` is not loaded on the sheet: the
+sheet's look stays with the app.
+
+The shell calls `render` once per visible declared section, each time with its own container
+inside the matching "For me" or "For the household" block. Personal sections come first.
+`section` is `mine` or `household`; `user` is the current user and `query` contains the URL
+parameters. Render only the content for the supplied section. The block already has an
+`<h2>` title, so headings inside a section start at `<h3>`.
+
+```js
+import { t } from '/i18n.js';
+
+export async function render(container, { section, user, query }) {
+  const heading = document.createElement('h3');
+  heading.textContent = t(`extensions.example-module.settings.${section}`);
+  container.replaceChildren(heading);
+}
+```
+
+The URL is `/settings/modules/ext/<module-id>`; direct links and Settings search use the same
+sheet and visibility rules. The module's settings entry should be a separate file from its main
+page if it needs different controls. The `modules/` directory contains no committed
+example module; the manifest and entry above are the example.
 
 ## Client Entry
 
@@ -269,7 +316,7 @@ Which version is installed:
 
 What is installed is the state of that ref at that moment; the commit is recorded (see [Install record](#install-record)). Nothing updates itself later.
 
-Only `github.com` is supported, and only public repositories: no GitLab, Codeberg or self-hosted Git, and no GitHub tokens. The download talks only to `github.com`, `api.github.com` and `codeload.github.com` (every redirect is checked against that list), goes through the same private-network guard as Yuvomi's other outbound requests, and has 30 seconds for the whole exchange. GitHub allows about 60 unauthenticated API calls per hour per server address; when that is used up, the page says so and names the time it resets.
+Only `github.com` is supported, and only public repositories: no GitLab, Codeberg or self-hosted Git, and no GitHub tokens. The download talks only to `github.com`, `api.github.com` and `codeload.github.com` (every redirect is checked against that list), goes through the same private-network guard as Yuvomi's other outbound requests, and has 30 seconds for the whole exchange. GitHub allows about 60 unauthenticated API calls per hour per server address; when that is used up, or when GitHub asks the server to slow down after many requests in a short time (its secondary limit), the page says so and names the time to try again where GitHub gives one.
 
 ### From a ZIP file
 
@@ -312,7 +359,7 @@ Refused outright: symbolic links and other non-regular files; paths that are abs
 
 A newly installed module is **disabled**, and that state lives in the module's folder, not in the database: the install record (`.yuvomi-install.json`, see below) carries `"approved": false`, and a folder whose record lacks an explicit `"approved": true` is off whatever the database says. Restoring a database backup from before the install, or starting a fresh database over a kept modules volume, therefore never switches on a module nobody has looked at. The module appears in Settings -> Modules -> Active modules, where its Details disclosure shows id, version, description, source, install date, who installed it and the folder, and an admin approves it there with the usual switch. **Enabling needs a browser session:** `PATCH /api/v1/modules/:id` with `enabled: true` is refused for API tokens and the MCP endpoint (`403 module_session_required`), the same rule as for installing, because the step that makes installed code live must not be weaker than the step that placed it. Disabling by token stays allowed. Once approved, the switch behaves as it always has, and its state travels with the folder as well: switching off writes `"approved": false` into the record (and the id onto the disabled list), switching on writes `"approved": true` again, so `approved` means "an admin has this version switched on", and a restored database cannot switch on what an admin switched off any more than what nobody has looked at. An install or a replace resets it too. Enabling takes the same lock as installing and deleting, so while one of those runs (a GitHub download may take up to 30 s) the switch answers `409 busy` and can simply be retried; when the record cannot be written (the module folder is read-only) it answers `503 not_writable`. Disabling is never refused or delayed for either: the disabled list is written first and the record best effort, and while an install or delete holds the lock the record is left as it is. Unlike the household switch for built-in modules, which only stops what the server does on its own and leaves their routes open ([docs/DECISIONS.md](docs/DECISIONS.md#11-switching-a-module-off-is-not-a-lock), entry 11), the switch for a third-party module is a hard gate on purpose: a disabled module has no route, is not served, and its assets answer `404`.
 
-Updating a module means installing it again, for example from its new release. When a module with the same `id` is already installed, the page asks before replacing it and names the installed and the incoming version. The new folder replaces the old one in a single rename; if that fails, the old folder is put back unchanged. **Every replacement arrives disabled**, whatever the module's state before and wherever the new copy comes from: a GitHub ref is a branch or a movable tag, so "the same repository" is no proof that the same code arrived, and a ZIP upload shows no origin at all. The replace writes `"approved": false` into the record; review the new version in Active modules and switch it on again there. A module that was copied by hand (no install record) is **not** replaced from Settings: both install routes answer `409 not_web_installed`, and the page shows that message instead of the replace question. Such a folder may be a working checkout with uncommitted work, and the web interface removes or replaces only what it installed. Remove the folder on the server first, then install again.
+Updating a module means installing it again, for example from its new release. When a module with the same `id` is already installed, the page asks before replacing it and names the installed and the incoming version. The new folder replaces the old one in a single rename; if that fails, the old folder is put back unchanged. If Yuvomi stops in the middle of a replace (a crash or a restart), the next start puts the previous version back from its backup folder (`.backup-<id>-` and the 13 digits of the time of the replace) when `modules/<id>` is missing; it arrives **disabled**, like every replacement, and has to be approved again. When `modules/<id>` is there as a folder, the swap went through and the leftover backups are deleted; when it is a link or a file, they are left alone. Only backup folders under exactly that name that carry an install record are touched; any other `.backup-*` name, and a folder without a record (made by hand), is left alone and named in the server log. The same start removes leftover staging folders, again only under the name an install gives them (`.install-` and 16 hex characters): a folder such as `.install-notes` stays. Deleting a module also removes backups of it that an earlier replace could not remove. The start does this whether or not `MODULES_ALLOW_WEB_INSTALL` is set, so a module whose replace was cut short comes back (off) even if the switch was closed afterwards. It also means that a web-installed module removed by hand on the server comes back, switched off, at the next start if a backup of it is still there; remove its `.backup-<id>-*` folders with it, or delete it from Settings. This start-up clean-up assumes one Yuvomi process per modules folder: two containers sharing a modules volume (for example during a rolling update) could remove each other's staging folders. **Every replacement arrives disabled**, whatever the module's state before and wherever the new copy comes from: a GitHub ref is a branch or a movable tag, so "the same repository" is no proof that the same code arrived, and a ZIP upload shows no origin at all. The replace writes `"approved": false` into the record; review the new version in Active modules and switch it on again there. A module that was copied by hand (no install record) is **not** replaced from Settings: both install routes answer `409 not_web_installed`, and the page shows that message instead of the replace question. Such a folder may be a working checkout with uncommitted work, and the web interface removes or replaces only what it installed. Remove the folder on the server first, then install again.
 
 If `modules/<id>` exists but is a symbolic link or a file rather than a folder, the installer refuses to touch it; fix that on the server. Only one install or delete runs at a time; a second one started meanwhile is refused with "busy" and can simply be retried.
 
@@ -357,7 +404,7 @@ API, for completeness (session only, as above):
 - `PATCH /api/v1/modules/:id` with `{ enabled: true }` approves (session only; `409 busy` while an install or delete runs, `503 not_writable` when the record cannot be written); `{ enabled: false }` works with a token too and is never refused for either. Its error bodies carry `reason` when there is one.
 - `DELETE /api/v1/modules/:id` returns `{ data: { id, deleted: true } }`; only for folders with an install record.
 
-A successful install answers `201` with `{ data: <module>, replaced, skipped }`; the module in `data` is always disabled. Errors carry `{ error, code, reason }`: `409 exists` adds `existing: { id, name, version, install }` (the record, never `null` here) and `incoming: { id, name, version }`, `422 multiple` adds `candidates: [{ path, id, name, version }]`, and a GitHub rate limit adds `resetAt`. Both install routes answer `409 not_web_installed` when `modules/<id>` already exists without an install record (a hand-copied folder; no `existing` in the body, with or without `overwrite`). `not_a_module` (`modules/<id>` is a link or a file) is `409` on install and `400` on delete; delete also answers `400 bad_id` for an id that is not a valid module id and `409 not_web_installed` for a folder without an install record. A record that is present but corrupt is refused by delete and replace alike; that is fixed on the server.
+A successful install answers `201` with `{ data: <module>, replaced, skipped }`; the module in `data` is always disabled. Errors carry `{ error, code, reason }`: `409 exists` adds `existing: { id, name, version, install }` (the record, never `null` here) and `incoming: { id, name, version }`, `422 multiple` adds `candidates: [{ path, id, name, version }]`, and a GitHub rate limit (`429 rate_limited`, the hourly and the secondary limit alike) adds `resetAt` when GitHub names a time. Both install routes answer `409 not_web_installed` when `modules/<id>` already exists without an install record (a hand-copied folder; no `existing` in the body, with or without `overwrite`). `not_a_module` (`modules/<id>` is a link or a file) is `409` on install and `400` on delete; delete also answers `400 bad_id` for an id that is not a valid module id and `409 not_web_installed` for a folder without an install record. A record that is present but corrupt is refused by delete and replace alike; that is fixed on the server.
 
 ### Preparing a module for installation
 
@@ -368,6 +415,13 @@ If you publish a module, a few habits make it install cleanly:
 - **The folder name need not equal the `id`.** The installer names the folder on the server after the manifest; only a hand copy has to match.
 - **Tag releases.** A plain repository address installs the latest release, so a tag gives admins a defined version and a meaningful update. Without releases they get whatever the default branch holds at that moment.
 - **Ship built files.** Nothing is built or installed on the server: commit the JavaScript and CSS the browser loads, use only the file types listed under [What is copied](#what-is-copied), and stay inside the [archive limits](#archive-limits).
+- **Set the GitHub topic `yuvomi-module`** on the repository, so it shows up where people look for modules (see [Finding Modules](#finding-modules)).
+
+## Finding Modules
+
+Yuvomi keeps no index of modules, neither in this repository nor in the app. Authors mark their repository with the GitHub topic `yuvomi-module`, and [github.com/topics/yuvomi-module](https://github.com/topics/yuvomi-module) lists every repository that carries it. Once the community keeps a list of its own, it can be linked from here.
+
+Nothing found that way has been tested or is recommended by this project: every author sets the topic on their own repository, and anyone can. A module runs with the session of every member who opens it, so read **Trust first** under [Installing From Settings](#installing-from-settings) before installing one. Why there is no curated list, and what would change that, is in [docs/DECISIONS.md](docs/DECISIONS.md), entry 15.
 
 ## Compatibility Across Yuvomi Releases
 

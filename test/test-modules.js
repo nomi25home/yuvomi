@@ -52,8 +52,10 @@ function writeModule(folder, manifest, files = {}) {
 writeModule('alpha-mod', {
   id: 'alpha-mod', name: 'Alpha', version: '1.0.0', description: 'Alpha module',
   entry: 'index.js', style: 'style.css', icon: 'star', accent: '#112233',
+  settings: { entry: 'settings.js', sections: ['household'], labelKey: 'settings' },
   menu: { order: 10, label: 'Alpha Menu', icon: 'sparkles', show: true },
-}, { 'index.js': 'export default {};\n', 'style.css': '.alpha{}\n' });
+}, { 'index.js': 'export default {};\n', 'style.css': '.alpha{}\n',
+  'settings.js': 'export async function render() {}\n' });
 
 // Minimal-Manifest: prüft die Default-Ableitungen (accent-Fallback, menu-Defaults,
 // style=null). menu.show=false ist reine UI-Sichtbarkeit, NICHT enabled.
@@ -85,6 +87,7 @@ writeModule('cap-mod', {
   id: 'cap-mod',
   name: 'Capabilities Module',
   entry: 'index.js',
+  settings: { entry: 'settings/admin.js', sections: ['household', 'mine'] },
   capabilities: {
     permissions: {
       module: { label: 'Cap Module', icon: 'star' },
@@ -103,8 +106,13 @@ writeModule('cap-mod', {
   },
 }, {
   'index.js': 'export async function render() {}\n',
+  'settings/admin.js': 'export async function render() {}\n',
   'widgets/tile.js': 'export async function renderWidget(c) { c.textContent = "ok"; }\n',
 });
+
+writeModule('bad-settings-mod', {
+  id: 'bad-settings-mod', entry: 'index.js', settings: { entry: '../outside.js' },
+}, { 'index.js': '' });
 
 writeModule('bad-cap-mod', {
   id: 'bad-cap-mod',
@@ -130,7 +138,7 @@ writeModule('i18n-mod', {
 
 const VALID_IDS = ['alpha-mod', 'beta-mod', 'omega-mod', 'cap-mod', 'i18n-mod'];
 const ERROR_IDS = ['broken-json-mod', 'mismatch-mod', 'no-entry-mod', 'bad-entry-mod',
-  'bad-style-mod', 'no-style-file-mod', 'bad-cap-mod'];
+  'bad-style-mod', 'no-style-file-mod', 'bad-settings-mod', 'bad-cap-mod'];
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -205,6 +213,9 @@ test('listModules(admin): valide Manifeste werden vollständig normalisiert', as
   assert.equal(alpha.accent, '#112233');
   assert.equal(alpha.status, 'enabled');
   assert.equal(alpha.enabled, true);
+  assert.deepEqual(alpha.settings, {
+    entry: '/api/v1/modules/assets/alpha-mod/settings.js', sections: ['household'], labelKey: 'settings',
+  });
   // Öffentliche Asset-URLs werden aus id + relativem Pfad gebaut.
   assert.equal(alpha.route.path, '/m/alpha-mod');
   assert.equal(alpha.route.entry, '/api/v1/modules/assets/alpha-mod/index.js');
@@ -221,6 +232,69 @@ test('listModules(admin): valide Manifeste werden vollständig normalisiert', as
   assert.equal(beta.menu.show, false, 'menu.show wird übernommen');
   assert.equal(beta.menu.label, 'beta-mod', 'menu.label fällt auf name zurück');
   assert.equal(beta.enabled, true, 'menu.show=false lässt das Modul dennoch enabled');
+});
+
+test('settings require explicit valid sections and preserve their asset URL', async () => {
+  const norm = (settings) => svc.normalizeManifest({ id: 'x-mod', entry: 'index.js', settings }, 'x-mod');
+  assert.equal(norm(undefined).settings, null);
+  for (const sections of [['mine'], ['household'], ['mine', 'household'], ['household', 'mine']]) {
+    assert.deepEqual(norm({ entry: 'config/settings.js', sections, labelKey: 'settings' }).settings, {
+      entry: '/api/v1/modules/assets/x-mod/config/settings.js', sections, labelKey: 'settings',
+    });
+  }
+  for (const sections of [undefined, null, [], 'mine', {}, ['other'], ['mine', 'other'], ['mine', 'mine'], [null]]) {
+    assert.throws(() => norm({ entry: 'settings.js', sections }), /settings.sections/);
+  }
+  for (const settings of [null, [], {}, { entry: '../outside.js', sections: ['mine'] },
+    { entry: 'x.css', sections: ['mine'] }, { entry: 'x.js', sections: ['mine'], labelKey: '../bad' }]) {
+    assert.throws(() => norm(settings), /settings/);
+  }
+  const mods = await svc.listModules({ admin: true });
+  assert.equal(mods.find((mod) => mod.id === 'bad-settings-mod').status, 'error');
+});
+
+test('extension settings sheets follow enable state, role and module permissions', async () => {
+  const registry = await import('../public/settings/registry.js');
+  const permissions = await import('../public/permissions.js');
+  const admin = { role: 'admin' };
+  const member = { role: 'member' };
+  try {
+    registry.setExtensionSettingsModules(await svc.listModules());
+    assert.ok(registry.findSettingsLeaf('/settings/modules/ext/alpha-mod', admin));
+    assert.equal(registry.findSettingsLeaf('/settings/modules/ext/alpha-mod', admin).icon, 'sparkles',
+      'the sheet shows the same icon as the navigation (menu.icon before icon)');
+    assert.equal(registry.findSettingsLeaf('/settings/modules/ext/alpha-mod', member), null);
+    assert.equal(registry.settingsSheetsForDomain('modules', member)
+      .some((sheet) => sheet.path === '/settings/modules/ext/alpha-mod'), false);
+    assert.deepEqual(registry.searchSettings('Alpha', { user: member, translate: (key) => key }),
+      { leaves: [], sections: [], options: [] });
+    assert.ok(registry.searchSettings('Alpha', { user: admin, translate: (key) => key })
+      .leaves.some((sheet) => sheet.path === '/settings/modules/ext/alpha-mod'));
+    const mixed = registry.findSettingsLeaf('/settings/modules/ext/cap-mod', member);
+    assert.ok(mixed);
+    assert.deepEqual(registry.settingsSheetSections(mixed, member).map((section) => section.scope), ['mine']);
+    const adminSections = registry.settingsSheetSections(mixed, admin);
+    assert.deepEqual(adminSections.map((section) => section.scope), ['mine', 'household']);
+    assert.equal(new Set(adminSections.map((section) => section.id)).size, 2);
+    assert.ok(registry.settingsSheetsForDomain('modules', member)
+      .some((sheet) => sheet.path === '/settings/modules/ext/cap-mod'));
+    permissions.setExtensionNavMap(await svc.listModules());
+    permissions.setPermissions({ modules: { 'ext:cap-mod': 'none' } });
+    assert.equal(registry.findSettingsLeaf('/settings/modules/ext/cap-mod', member), null);
+    assert.deepEqual(registry.searchSettings('Capabilities', { user: member, translate: (key) => key }),
+      { leaves: [], sections: [], options: [] });
+    permissions.clearPermissions();
+    await svc.setModuleEnabled('cap-mod', false);
+    registry.setExtensionSettingsModules(await svc.listModules());
+    assert.equal(registry.findSettingsLeaf('/settings/modules/ext/cap-mod', admin), null);
+    assert.equal(registry.extensionSettingsPaths().includes('/settings/modules/ext/cap-mod'), false);
+  } finally {
+    permissions.clearPermissions();
+    permissions.setExtensionNavMap([]);
+    await svc.setModuleEnabled('cap-mod', true);
+    registry.setExtensionSettingsModules(await svc.listModules());
+    db.prepare("DELETE FROM sync_config WHERE key = 'third_party_disabled_modules'").run();
+  }
 });
 
 // ── Formatvertrag des Manifests (#919 Folgearbeit) ──────────────────────────────
@@ -791,4 +865,32 @@ test('isWidgetId nimmt Kern- und Namensraum-Ids an und weist kaputte ab (#1013)'
   // Fremdmodul-Widget gelten, sobald jemand die beiden Pruefungen verwechselt.
   assert.equal(isNamespacedWidgetId('weather'), false);
   assert.equal(isNamespacedWidgetId('my-addon:chart'), true);
+});
+
+test('web-installed settings sheets stay hidden until approval and validate the settings entry', async () => {
+  const registry = await import('../public/settings/registry.js');
+  const id = 'installed-settings';
+  const folder = path.join(MODULES_DIR, id);
+  const manifest = { id, name: 'Installed settings', entry: 'index.js',
+    settings: { entry: 'settings.js', sections: ['mine', 'household'] } };
+  writeModule(id, manifest, { 'index.js': '', 'settings.js': '', '.yuvomi-install.json': installRecord() });
+  try {
+    await svc.loadModuleDir(folder, id);
+    registry.setExtensionSettingsModules(await svc.listModules({ admin: true }));
+    assert.equal(registry.findSettingsLeaf(`/settings/modules/ext/${id}`, { role: 'admin' }), null);
+    assert.equal(registry.extensionSettingsPaths().includes(`/settings/modules/ext/${id}`), false);
+    await svc.setModuleEnabled(id, true);
+    registry.setExtensionSettingsModules(await svc.listModules());
+    assert.ok(registry.findSettingsLeaf(`/settings/modules/ext/${id}`, { role: 'member' }));
+    assert.equal(registry.settingsSheetsForDomain('modules', { role: 'admin' }).at(-1).placement, 'end');
+    await svc.setModuleEnabled(id, false);
+    registry.setExtensionSettingsModules(await svc.listModules({ admin: true }));
+    assert.equal(registry.findSettingsLeaf(`/settings/modules/ext/${id}`, { role: 'admin' }), null);
+    fs.rmSync(path.join(folder, 'settings.js'));
+    await assert.rejects(svc.loadModuleDir(folder, id), /settings.entry file does not exist/);
+  } finally {
+    registry.setExtensionSettingsModules([]);
+    fs.rmSync(folder, { recursive: true, force: true });
+    clearDisabledConfig();
+  }
 });

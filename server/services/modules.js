@@ -153,6 +153,33 @@ export function normalizeManifest(raw, folderName) {
     throw new Error('module.json style must be a safe relative CSS file path.');
   }
 
+  let settings = null;
+  if (manifest.settings !== undefined) {
+    const rawSettings = manifest.settings;
+    if (!rawSettings || typeof rawSettings !== 'object' || Array.isArray(rawSettings)) {
+      throw new Error('module.json settings must be an object.');
+    }
+    const settingsEntry = rawSettings.entry;
+    if (typeof settingsEntry !== 'string' || !isSafeRelativeFile(settingsEntry) || !settingsEntry.endsWith('.js')) {
+      throw new Error('module.json settings.entry must be a safe relative JavaScript file path.');
+    }
+    const sections = rawSettings.sections;
+    if (!Array.isArray(sections) || !sections.length
+      || !sections.every((section) => section === 'mine' || section === 'household')
+      || new Set(sections).size !== sections.length) {
+      throw new Error('module.json settings.sections must be a non-empty array of unique mine or household values.');
+    }
+    if (rawSettings.labelKey !== undefined
+      && (typeof rawSettings.labelKey !== 'string' || !MENU_LABEL_KEY_RE.test(rawSettings.labelKey))) {
+      throw new Error('module.json settings.labelKey is invalid.');
+    }
+    settings = {
+      entry: settingsEntry,
+      sections: [...sections],
+      labelKey: rawSettings.labelKey || null,
+    };
+  }
+
   const name = String(manifest.name || id).trim().slice(0, 80);
   const version = String(manifest.version || '').trim().slice(0, 40);
   const description = String(manifest.description || '').trim().slice(0, 240);
@@ -206,6 +233,7 @@ export function normalizeManifest(raw, folderName) {
     accent,
     entry,
     style: style || null,
+    settings: settings ? { ...settings, entry: modulePublicUrl(id, settings.entry) } : null,
     page: {
       composition,
       width,
@@ -448,6 +476,12 @@ export async function loadModuleDir(basePath, folderName) {
     const stylePath = path.resolve(basePath, manifest.style);
     if (!stylePath.startsWith(`${basePath}${path.sep}`) || !(await pathExists(stylePath))) {
       throw new Error('style file does not exist.');
+    }
+  }
+  if (raw.settings !== undefined) {
+    const settingsPath = path.resolve(basePath, raw.settings.entry);
+    if (!settingsPath.startsWith(`${basePath}${path.sep}`) || !(await pathExists(settingsPath))) {
+      throw new Error('settings.entry file does not exist.');
     }
   }
   const capabilities = await normalizeCapabilities(

@@ -324,7 +324,8 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
   // sie nicht mit; nach dem Wiedereinschalten holt der naechste Abruf sie zurueck.
   // Der Feed selbst bleibt auch bei abgeschaltetem Kalender erreichbar - er ist
   // die eigene Ausgabe des Moduls, keine Mischstelle (docs/DECISIONS.md 11).
-  const withoutBirthdays = birthdaysSwitchedOff(conn) ? `
+  const withoutBirthdays = (birthdaysSwitchedOff(conn)
+    || (!options.localCalendarId && !getFeedIncludeBirthdays(conn, userId))) ? `
     AND ${notBirthdayEventSql('e')}` : '';
 
   const queriedRows = conn.prepare(`
@@ -463,8 +464,11 @@ function clearFeedToken(conn, userId) {
   conn.prepare(`UPDATE users SET calendar_feed_token = NULL WHERE id = ?`).run(userId);
 }
 
+/** Spalten, die `findUserIdByFeedToken` lesen darf - niemals aus dem Input. */
+const FEED_TOKEN_COLUMNS = new Set(['calendar_feed_token', 'waste_feed_token', 'birthday_feed_token']);
+
 /**
- * Findet den Besitzer eines Feed-Tokens ueber timingSafeEqual statt eine
+ * Findet den Besitzer eines Feed-Tokens ueber timingSafeEqual statt einer
  * SQL-Gleichheit `WHERE token = ?` (die als String-Vergleich je Zeile frueh
  * abbrechen kann, sobald das erste Byte abweicht - dieselbe Klasse Fehler,
  * gegen die CSRF/TOTP timingSafeEqual schon einsetzen). Ein Token ist immer
@@ -472,15 +476,29 @@ function clearFeedToken(conn, userId) {
  * vom Client dagegen beliebig lang - die Laengenpruefung selbst verraet
  * nichts Geheimes, sie steht nur davor, weil timingSafeEqual bei
  * ungleicher Laenge wirft.
+ *
+ * `column` muss eine der drei bekannten Feed-Token-Spalten sein - sie kommt
+ * aus einer Konstante im Aufrufer, nie aus dem Request.
  */
-function findUserIdByFeedToken(conn, token) {
+function findUserIdByFeedToken(conn, column, token) {
+  if (!FEED_TOKEN_COLUMNS.has(column)) throw new Error(`Unknown feed token column: ${column}`);
   if (!token) return null;
   const candidate = Buffer.from(token, 'utf8');
-  for (const row of conn.prepare(`SELECT id, calendar_feed_token AS t FROM users WHERE calendar_feed_token IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
+  for (const row of conn.prepare(`SELECT id, ${column} AS t FROM users WHERE ${column} IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
     const stored = Buffer.from(row.t, 'utf8');
     if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
   }
   return null;
+}
+
+function getFeedIncludeBirthdays(conn, userId) {
+  const row = conn.prepare('SELECT calendar_feed_include_birthdays AS v FROM users WHERE id = ?').get(userId);
+  return row?.v !== 0;
+}
+
+function setFeedIncludeBirthdays(conn, userId, value) {
+  conn.prepare('UPDATE users SET calendar_feed_include_birthdays = ? WHERE id = ?').run(value ? 1 : 0, userId);
+  return value;
 }
 
 function getFeedShowAssignees(conn, userId) {
@@ -500,6 +518,7 @@ export {
   escapeICSText, foldLine, buildFeed, buildCalendarFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
   getFeedShowAssignees, setFeedShowAssignees,
+  getFeedIncludeBirthdays, setFeedIncludeBirthdays,
   resolveFeedZone, stampProp,
 };
 

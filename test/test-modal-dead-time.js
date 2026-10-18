@@ -120,7 +120,7 @@ const pointerClick = (target, pointerType = 'mouse') => makeEvent('click', { tar
 /** Ein per Tastatur ausgeloester Klick: leere Zeigerart, detail 0. */
 const keyboardClick = (target) => makeEvent('click', { target, pointerType: '', detail: 0 });
 
-const { armPointerDeadTime, openModal, closeModal, whenModalClosed } = await import('../public/components/modal.js');
+const { armPointerDeadTime, openModal, closeModal, whenModalClosed, captureModalContext, askOverModal, isOwnModalOpen } = await import('../public/components/modal.js');
 
 // --------------------------------------------------------
 // 1) Die Sperre selbst - mit eigener Uhr, ohne openModal
@@ -553,4 +553,131 @@ test('closeModal: ohne fremden Fokus gibt das Ende des Ausgangs ihn weiter dem A
   await settled(whenModalClosed());
   assert.equal(document.activeElement, trigger);
   assert.deepEqual(log, ['focus']);
+});
+
+// --------------------------------------------------------
+// 3) Spaete Antwort: closeModal({ context }) schliesst nur den EIGENEN Dialog (#1997)
+// --------------------------------------------------------
+
+/**
+ * Der Ablauf einer Seite, wie er nach #1997 aussehen soll: Dialog festhalten,
+ * Anfrage abwarten, dann nur diesen Dialog schliessen. Die Anfrage ist ein
+ * Promise, das der Test selbst aufloest - so liegt dazwischen, was der Nutzer
+ * waehrend des Wartens tut.
+ */
+function startSave() {
+  let answer;
+  const request = new Promise((resolve) => { answer = resolve; });
+  const dialog = captureModalContext();
+  const done = (async () => {
+    await request;
+    await closeModal({ force: true, context: dialog });
+  })();
+  return { answer: () => { answer(); return done; } };
+}
+
+const withLocation = () => { window.location = { pathname: '/recipes', search: '', hash: '' }; };
+
+test('spaete Erfolgsantwort: ein inzwischen geoeffneter Dialog B bleibt offen (#1997)', async () => {
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  const a = openDialog({ openedAt: 0 });
+  const save = startSave();
+  await closeModal({ force: true });
+  assert.equal(a.closed, true, 'Vorbedingung: A ist zu');
+  const b = openDialog({ openedAt: 1000 });
+
+  await save.answer();
+
+  assert.equal(b.closed, false, 'die spaete Antwort aus A hat B geschlossen');
+  assert.equal(b.overlay.isConnected, true, 'B haengt nicht mehr im Dokument');
+  await closeModal({ force: true });
+  assert.equal(b.closed, true, 'ein Schliessen ohne context schliesst B weiter');
+});
+
+test('spaete Erfolgsantwort: derselbe Dialog neu geoeffnet ist ein anderer Dialog', async () => {
+  // Gleiche Maske, frische Eingaben: auch die gehoeren dem Nutzer.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  openDialog({ openedAt: 0 });
+  const save = startSave();
+  await closeModal({ force: true });
+  const again = openDialog({ openedAt: 1000 });
+  await save.answer();
+  assert.equal(again.closed, false);
+  await closeModal({ force: true });
+});
+
+test('Erfolgsantwort, waehrend der eigene Dialog noch offen ist: er geht zu', async () => {
+  // Die andere Richtung: ein Waechter, der nie schliesst, waere der neue Fehler.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  const a = openDialog({ openedAt: 0 });
+  const save = startSave();
+  await save.answer();
+  assert.equal(a.closed, true, 'der eigene Dialog blieb nach dem Erfolg offen');
+  assert.equal(a.overlay.isConnected, false);
+});
+
+test('Erfolgsantwort nach einer Rueckfrage ueber dem Dialog: der zurueckgeholte Dialog geht zu', async () => {
+  // Eine Rueckfrage parkt den Dialog und laeuft selbst durch openModal(); danach
+  // kommt DERSELBE Dialog zurueck. Haengt die Pruefung an einem Zaehler je
+  // openModal(), gilt er danach als fremd und bliebe nach dem Speichern offen.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  const a = openDialog({ openedAt: 0 });
+  const save = startSave();
+  const answer = await askOverModal(async () => {
+    openDialog({ openedAt: 1000 });
+    await closeModal({ force: true });
+    return 'abgebrochen';
+  });
+  assert.equal(answer, 'abgebrochen');
+  assert.equal(a.closed, false, 'Vorbedingung: A ist zurueck und offen');
+  await save.answer();
+  assert.equal(a.closed, true, 'der zurueckgeholte eigene Dialog blieb nach dem Erfolg offen');
+});
+
+test('Erfolgsantwort, waehrend der eigene Dialog unter einer Rueckfrage geparkt liegt: die Rueckfrage bleibt, beim Zurueckholen geht er zu', async () => {
+  // Codex an #2021: der geparkte Dialog ist nicht der aktive, aber auch nicht
+  // ersetzt. Als „weg" behandelt, blieb er nach „Abbrechen" offen, obwohl er
+  // gespeichert war - mit gesperrtem Speichern-Knopf.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  const a = openDialog({ openedAt: 0 });
+  const save = startSave();
+  let frage = null;
+  let frageZuDurchAntwort = null;
+  const answer = await askOverModal(async () => {
+    frage = openDialog({ openedAt: 1000 });
+    await save.answer();
+    frageZuDurchAntwort = frage.closed;
+    await closeModal({ force: true }); // „Abbrechen"
+    return 'abgebrochen';
+  });
+  assert.equal(answer, 'abgebrochen');
+  assert.equal(frageZuDurchAntwort, false, 'die spaete Antwort hat die Rueckfrage geschlossen');
+  assert.equal(a.closed, true, 'der gespeicherte Dialog blieb nach dem Abbrechen der Rueckfrage offen');
+});
+
+test('ein Dialog in seiner Schliess-Animation gehoert dem Ablauf nicht mehr (#1997, Codex an #2021)', async () => {
+  // Der Nutzer schliesst den Verwalten-Dialog bewusst; die Antwort kommt
+  // waehrend des Ausgangs. activeOverlay zeigt bis _doClose() noch auf den
+  // Knoten - als "offen" gelesen, baute die Seite ihn nach dem Laden neu auf.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: false }); // mit Ausgang
+  const a = openDialog({ openedAt: 0 });
+  const ctx = captureModalContext();
+  assert.equal(isOwnModalOpen(ctx), true, 'Vorbedingung: offen gehoert er dem Ablauf');
+  await closeModal({ force: true });
+  assert.equal(a.overlay.isConnected, true, 'Vorbedingung: der Ausgang laeuft noch');
+  assert.equal(isOwnModalOpen(ctx), false, 'der schliessende Dialog gilt weiter als offen');
+  fireAnimationEnd(a.overlay);
+  await settled(whenModalClosed());
 });

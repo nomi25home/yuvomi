@@ -33,6 +33,14 @@ export function birthdaysPaths() {
         tag: 'Birthdays',
       }),
     },
+    '/api/v1/birthdays/feed': {
+      get: op({ summary: 'Get own birthday ICS subscription link', tag: 'Birthdays',
+        description: 'The independent feed includes all saved birthdays and name days, even with reminders disabled, and excludes unrelated calendar events. Calendar and birthday feed tokens are separate.' }),
+      delete: op({ summary: 'Disable own birthday ICS subscription', tag: 'Birthdays', stateChanging: true }),
+    },
+    '/api/v1/birthdays/feed/regenerate': {
+      post: op({ summary: 'Enable or rotate own birthday ICS subscription link', tag: 'Birthdays', stateChanging: true }),
+    },
     // BEIDE IMPORT-ROUTEN VERLANGEN KONTAKT-ZUGRIFF, nicht nur Kalender (#1241).
     // Sie lesen aus `contacts`, obwohl ihr Pfad `birthdays` sagt; `op()` haengt
     // ein 403 nur bei `admin: true` an, hier ist es ein Modul-Gate - also

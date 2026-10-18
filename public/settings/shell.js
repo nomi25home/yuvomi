@@ -1,8 +1,8 @@
 import { t } from '/i18n.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
-import { renderSkeletonList } from '/utils/skeleton.js';
+import { renderSkeletonList, placeSkeletonUntilContent } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { swapContent } from '/utils/content-swap.js';
+import { swapRegion } from '/utils/content-swap.js';
 import { createRetryState } from './components.js';
 import { watchLeafForms } from './dirty-guard.js';
 import { KITCHEN_CHILD_IDS } from './module-order.js';
@@ -18,6 +18,7 @@ import {
   settingsSheetJumpTargets,
   settingsSheetSections,
   settingsSheetsForDomain,
+  settingsLeafLabel, settingsLeafDescription,
 } from './registry.js';
 
 // Unter dieser Schwelle ist ein Blatt gefuehlt sofort da; ein Skelett waere
@@ -73,10 +74,19 @@ function createIcon(name, className) {
  * @param {string} className Klasse der Marke in ihrem Umfeld (Geometrie)
  * @returns {HTMLElement}
  */
+/* EINE FORM FUER JEDE MARKE (R19, Critique 2026-10-16: "gemischte Icon-Stile
+ * in der Einstellungsliste"). Module standen als gefuellte Kachel im Vollton,
+ * alles andere (Konto, Haushalt, System) als blasse Mulde mit grauer Glyphe -
+ * zwei Formen in einer Liste. Jetzt ist jede Marke eine gefuellte Kachel wie
+ * in den iOS-Einstellungen; die FARBE bleibt die Aussage der Vollton-Regel:
+ * ein Modul traegt seinen Ton, Konfiguration ohne Modul das Grau der
+ * Einstellungen (--module-settings). */
 function createLeafMark(entry, className) {
   const mark = document.createElement('span');
-  mark.className = entry.module ? `${className} vivid-mark` : className;
-  if (entry.module) mark.style.setProperty('--seal-accent', moduleAccentVar(entry.module));
+  mark.className = `${className} vivid-mark`;
+  if (entry.extensionModule) mark.style.setProperty('--seal-accent', entry.extensionModule.accent);
+  else if (entry.module) mark.style.setProperty('--seal-accent', moduleAccentVar(entry.module));
+  else mark.style.setProperty('--seal-accent', 'var(--module-settings)');
   mark.setAttribute('aria-hidden', 'true');
   mark.appendChild(createIcon(entry.icon, `${className}-glyph`));
   return mark;
@@ -122,7 +132,7 @@ function createNavigationLink(entry, activeLeaf) {
   link.dataset.leafId = entry.id;
   link.append(
     createLeafMark(entry, 'settings-shell__navigation-link-icon'),
-    document.createTextNode(t(entry.labelKey)),
+    document.createTextNode(settingsLeafLabel(entry, t)),
   );
   if (entry.id === activeLeaf?.id) {
     link.classList.add('settings-shell__navigation-link--active');
@@ -207,7 +217,7 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
       ...hits.leaves.map((entry) => createNavigationResult({
         entry,
         href: entry.path,
-        label: t(entry.labelKey),
+        label: settingsLeafLabel(entry, t),
         context: domainLabels.get(entry.domainId) ?? '',
         activeLeaf,
       })),
@@ -215,7 +225,7 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
         entry: leaf,
         href: settingsSectionUrl(leaf, section.id),
         label,
-        context: t(leaf.labelKey),
+        context: settingsLeafLabel(leaf, t),
         activeLeaf,
         exact: false,
       })),
@@ -223,7 +233,7 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
         entry: leaf,
         href: settingsOptionUrl(leaf, key),
         label,
-        context: t(leaf.labelKey),
+        context: settingsLeafLabel(leaf, t),
         activeLeaf,
         exact: false,
       })),
@@ -277,8 +287,46 @@ function createNavigation(domains, user, activeLeaf) {
   }
 
   createNavigationSearch(navigation, domains, user, activeLeaf);
+  navigation.prepend(createSheetSkipLink());
   return navigation;
 }
+
+/**
+ * DIE SPRUNGMARKE ZUM BLATT (R20, Re-Critique 2026-10-17 A5, Sam). Am Desktop
+ * standen vor dem ersten Feld eines Blatts 30 Tab-Stopps: die Suche und alle
+ * Eintraege der Seitenleiste. Dasselbe Muster wie „Zum Inhalt springen" der
+ * Shell und „Zu den Dokumenten": `.sr-only`, sichtbar nur bei Tastaturfokus
+ * (layout.css, `.sr-only:focus-visible`), als ERSTER Stopp der Leiste.
+ * Kein Roving: die Eintraege sind Links in einer Navigation, und eine Liste,
+ * die nur noch mit Pfeilen geht, nimmt dem Screenreader die Linkliste.
+ *
+ * Ziel ist das erste Bedienelement des Blatts, sonst das Blatt selbst. Ohne
+ * Blatt (Uebersicht) und ohne Seitenleiste daneben (schmal, Drill-down)
+ * blendet settings.css die Marke aus - dort gibt es nichts zu ueberspringen.
+ * Ohne Hash: der Sprung ist ein Fokuswechsel, kein Ort fuer Zurueck.
+ */
+function createSheetSkipLink() {
+  const link = document.createElement('a');
+  link.className = 'sr-only settings-shell__skip';
+  link.href = '#settings-sheet';
+  link.textContent = t('settings.skipToSheet');
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    const content = link.closest('.settings-shell')?.querySelector('.settings-shell__content');
+    if (!content) return;
+    const first = [...content.querySelectorAll(SKIP_TARGET)]
+      .find((el) => !el.disabled && el.getClientRects().length > 0 && !el.closest('[inert], [hidden]'));
+    if (first) {
+      first.focus();
+      return;
+    }
+    content.setAttribute('tabindex', '-1');
+    content.focus();
+  });
+  return link;
+}
+
+const SKIP_TARGET = 'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
  * Die Seitenleiste scrollt fuer sich (settings.css): das aktive Blatt muss in
@@ -354,11 +402,11 @@ function createOverviewRow(entry) {
 
   const label = document.createElement('span');
   label.className = 'settings-overview__row-title';
-  label.textContent = t(entry.labelKey);
+  label.textContent = settingsLeafLabel(entry, t);
 
   const description = document.createElement('span');
   description.className = 'settings-overview__row-description';
-  description.textContent = t(entry.descriptionKey);
+  description.textContent = settingsLeafDescription(entry, t);
 
   copy.append(label, description);
   link.append(
@@ -453,7 +501,7 @@ function createOptionRow({ leaf, href, label }) {
   title.textContent = label;
   const context = document.createElement('span');
   context.className = 'settings-overview__row-context';
-  context.textContent = t(leaf.labelKey);
+  context.textContent = settingsLeafLabel(leaf, t);
   copy.append(title, context);
   link.append(copy, createIcon('chevron-right', 'settings-overview__row-chevron'));
   return link;
@@ -537,9 +585,19 @@ function renderToolbar(toolbar, content, { activeLeaf, domain }) {
     label.className = 'settings-toolbar__back-label';
     label.textContent = t('settings.title');
     back.append(createIcon('chevron-left', 'settings-toolbar__back-icon'), label);
+    // DER MODULKOPF WIE UEBERALL (D8, Critique 2026-10-16). Am Desktop stand
+    // ueber einem Blatt kein Kopf - die Einstellungen waren das einzige Modul
+    // ohne Siegel und Titelzeile, und ihr Blatt begann 12px hoeher als jedes
+    // andere Modul. Ab 1024px traegt der Kopf jetzt den Modulnamen (settings.css
+    // blendet je Breite Rueckweg ODER Titel aus). Kein <h1>: auf einem Blatt
+    // ist der Blatt-Titel die eine Hauptueberschrift (test:typography); der
+    // Name hier ist die Ortsangabe der Shell wie in jedem Modul.
+    const moduleTitle = document.createElement('p');
+    moduleTitle.className = 'page-toolbar__title settings-toolbar__module-title';
+    moduleTitle.textContent = t('settings.title');
     toolbar.dataset.mode = 'leaf';
     toolbar.classList.remove('page-toolbar--title-tools');
-    toolbar.replaceChildren(back);
+    toolbar.replaceChildren(back, moduleTitle);
     hydrateIcons(toolbar);
     return;
   }
@@ -596,7 +654,7 @@ function createBreadcrumb(domain, leaf) {
 
   const currentItem = document.createElement('li');
   currentItem.className = 'settings-breadcrumb__item settings-breadcrumb__item--current';
-  currentItem.textContent = t(leaf.labelKey);
+  currentItem.textContent = settingsLeafLabel(leaf, t);
   currentItem.setAttribute('aria-current', 'page');
 
   for (const item of [settingsItem, domainItem, currentItem]) {
@@ -620,13 +678,17 @@ function createLeafHeader(leaf) {
 
   const heading = document.createElement('h1');
   heading.className = 'settings-leaf-header__title';
-  heading.textContent = t(leaf.labelKey);
+  heading.textContent = settingsLeafLabel(leaf, t);
 
-  const description = document.createElement('p');
-  description.className = 'settings-leaf-header__description';
-  description.textContent = t(leaf.descriptionKey);
-
-  header.append(heading, description);
+  header.appendChild(heading);
+  // Extension sheets without a manifest description get no empty paragraph.
+  const text = settingsLeafDescription(leaf, t);
+  if (text) {
+    const description = document.createElement('p');
+    description.className = 'settings-leaf-header__description';
+    description.textContent = text;
+    header.appendChild(description);
+  }
   return header;
 }
 
@@ -650,7 +712,7 @@ function moduleEnabled(moduleId) {
  * Uebersicht und Einstellungen sind gesperrt (nie aus) und bekommen keine Zeile.
  */
 function createModuleStatus(leaf, user) {
-  if (!leaf.module || leaf.module === 'dashboard') return null;
+  if (!leaf.module || leaf.module === 'dashboard' || leaf.extensionModule) return null;
   const enabled = moduleEnabled(leaf.module);
   const row = document.createElement('div');
   row.className = `settings-sheet-status settings-sheet-status--${enabled ? 'on' : 'off'}`;
@@ -659,7 +721,7 @@ function createModuleStatus(leaf, user) {
   state.className = 'settings-sheet-status__state';
   state.append(
     createIcon(enabled ? 'circle-check' : 'circle-off', 'settings-sheet-status__icon'),
-    document.createTextNode(t(enabled ? 'settings.moduleStatusOn' : 'settings.moduleStatusOff', { module: t(leaf.labelKey) })),
+    document.createTextNode(t(enabled ? 'settings.moduleStatusOn' : 'settings.moduleStatusOff', { module: settingsLeafLabel(leaf, t) })),
   );
   row.appendChild(state);
 
@@ -868,7 +930,10 @@ function syncJumpLabels(leafContainer) {
     const host = leafContainer.querySelector(`#${CSS.escape(sheetSectionId(link.dataset.jumpSection))}`);
     // Ein Abschnitt ohne eigene Ueberschrift (ein Feed: ein Schalter, der
     // seinen Namen selbst traegt) heisst wie seine erste Zeile.
-    const heading = host?.querySelector('.settings-section__title, .settings-navigation-panel__title')
+    // `.settings-card__title` gehoert dazu (R19): ein Abschnitt, dessen erste
+    // Ueberschrift ein Kartentitel ist (Gesundheit: "Vorsorge-Arten"), hiess
+    // in der Marke noch wie sein Registry-Blatt ("Gesundheit").
+    const heading = host?.querySelector('.settings-section__title, .settings-navigation-panel__title, .settings-card__title')
       ?? host?.querySelector('.settings-group .toggle-row__label, .settings-group .settings-setting-row__label');
     const text = collapseText(heading?.textContent);
     if (text && link.textContent !== text) link.textContent = text;
@@ -886,7 +951,7 @@ async function renderSheetSection(host, section, user, query) {
       const module = await section.loader();
       if (typeof module.render !== 'function') throw new TypeError('Settings leaf must export render()');
       host.replaceChildren();
-      await module.render(host, { user, query });
+      await module.render(host, { user, query, section: section.scope });
       hydrateIcons(host);
       // Jeder fertige Abschnitt zieht seine Sprungmarke nach - auch einer, der
       // erst nach der Wartefrist des Blatts ankommt.
@@ -948,7 +1013,13 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   }
 
   const sections = settingsSheetSections(leaf, user);
-  const scoped = Boolean(leaf.module);
+  // REICHWEITEN-UEBERSCHRIFTEN NUR, WO ES ZWEI REICHWEITEN GIBT (R19,
+  // Critique 2026-10-16: "gestapelte Ueberschriften"). Ein Modulblatt mit nur
+  // EINER Reichweite trug sie trotzdem - "Fuer den Haushalt" ueber
+  // "Essensplan" ueber "Sichtbare Mahlzeiten": drei Koepfe, von denen der
+  // oberste nichts unterschied. Ob ein Blatt ganz dem Haushalt gehoert, sagt
+  // dort schon die Statuszeile darueber.
+  const scoped = Boolean(leaf.module) && new Set(sections.map((section) => section.scope)).size > 1;
   const status = createModuleStatus(leaf, user);
   if (status) leafContainer.appendChild(status);
   // Sprungmarken (R16): nur in Blaettern mit mehr als drei Abschnitten.
@@ -996,13 +1067,12 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   // Der Blattwechsel laedt Module und danach deren Daten. aria-busy gilt
   // sofort; das Skelett kommt erst nach einer kurzen Frist, damit ein Blatt aus
   // dem Modul-Cache nicht kurz aufblitzt.
+  // Das Skelett raeumt sich selbst, sobald ein Abschnitt Inhalt hat - auch
+  // wenn der Abschnitt seinen Inhalt HINTER das Skelett haengt, statt den
+  // Traeger zu ersetzen (Critique R19, placeSkeletonUntilContent).
   leafContainer.setAttribute('aria-busy', 'true');
   const skeletonTimer = setTimeout(() => {
-    for (const [host] of hosts) {
-      if (host.isConnected && !host.firstChild) {
-        host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 3 }));
-      }
-    }
+    for (const [host] of hosts) placeSkeletonUntilContent(host, renderSkeletonList({ rows: 2, lines: 3 }));
   }, SKELETON_DELAY_MS);
 
   const finishLeaf = () => {
@@ -1122,6 +1192,34 @@ function watchSplit(container, page, { user, domainId }) {
   splitObserver.observe(page);
 }
 
+/**
+ * DIE SEITENLEISTE KLEBT UNTER DEM KOPF, NICHT DARUNTER (Re-Critique
+ * 2026-10-16). Seit der Kopf am Desktop den Modulnamen traegt (D8), klebt er
+ * 69px hoch ueber dem Scrollport. Die Leiste klebte weiter bei `--space-4`:
+ * gescrollt lagen ihre ersten 53px unter dem Kopf, in Ruhe ragte sie 69px
+ * unter das Fenster, und der aktive Link eines Modul-Blatts stand bei y=929
+ * von 900 - `revealActiveNavigationLink` hielt ihn nur in der Leiste sichtbar,
+ * nicht im Fenster. Gemessen statt als Token, wie im Inventar: der Kopf
+ * bricht in langen Locales um und ist unter 1024px ein anderer.
+ */
+let headObserver = null;
+function watchHeadBlock(page, toolbar) {
+  headObserver?.disconnect();
+  headObserver = null;
+  const sync = () => page.style.setProperty('--settings-head-block', `${toolbar.offsetHeight}px`);
+  sync();
+  if (typeof ResizeObserver !== 'function') return;
+  headObserver = new ResizeObserver(() => {
+    if (!page.isConnected) {
+      headObserver?.disconnect();
+      headObserver = null;
+      return;
+    }
+    sync();
+  });
+  headObserver.observe(toolbar);
+}
+
 export async function renderSettingsShell(container, {
   user,
   leaf = null,
@@ -1168,10 +1266,12 @@ export async function renderSettingsShell(container, {
     const navigation = createNavigation(domains, user, activeLeaf);
     content = document.createElement('div');
     content.className = 'settings-shell__content';
+    content.id = 'settings-sheet';
     shell.append(navigation, content);
     body.appendChild(shell);
     page.append(toolbar, body);
     container.replaceChildren(page);
+    watchHeadBlock(page, toolbar);
     // Sidebar-Icons einmalig bei der Montage hydrieren; die Detail-Icons werden
     // pro Render separat (nur im Content-Bereich) hydriert.
     hydrateIcons(navigation);
@@ -1216,18 +1316,35 @@ export async function renderSettingsShell(container, {
     // Teil von renderLeafContent setzt Kopf und Blatt noch in diesem Takt ein,
     // das Blatt gleitet also mit seinem Geruest herein, nicht erst nach den
     // Abschnitten.
-    if (drill) swapContent(content, null, { direction: drill });
+    //
+    // SEIT R19 MIT ALTEM BILD (swapRegion, utils/content-swap.js): hinein
+    // schiebt sich das Blatt ueber die Uebersicht, zurueck schiebt es sich
+    // hinaus - vorher kam nur das neue Bild 8px von der Seite, die alte Ebene
+    // war schlagartig weg. Der synchrone Teil laeuft im Wechsel, das Laden
+    // danach wie bisher.
+    if (drill) {
+      let loading = null;
+      await swapRegion(content, () => {
+        if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
+        loading = renderLeafContent(content, activeLeaf, leafDomain, user, query);
+      }, { direction: drill });
+      await loading;
+      return;
+    }
     if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
     await renderLeafContent(content, activeLeaf, leafDomain, user, query);
     return;
   }
-  renderOverview(content, domains, user);
-  hydrateIcons(content);
-  if (drill) swapContent(content, null, { direction: drill });
-  if (toolbar) renderToolbar(toolbar, content, {});
+  const paintOverview = () => {
+    renderOverview(content, domains, user);
+    hydrateIcons(content);
+    if (toolbar) renderToolbar(toolbar, content, {});
+  };
+  if (drill) await swapRegion(content, paintOverview, { direction: drill });
+  else paintOverview();
   revealOverviewSection(content, focusDomain?.id);
   if (page) watchSplit(container, page, { user, domainId: focusDomain?.id ?? null });
 }
 
 /** Nur fuer Tests (test-settings-navigation.js). */
-export const __test = { awaitSections, SECTION_WAIT_MS, revealActiveNavigationLink };
+export const __test = { awaitSections, SECTION_WAIT_MS, revealActiveNavigationLink, renderLeafContent };
