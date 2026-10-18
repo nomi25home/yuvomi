@@ -2032,3 +2032,390 @@ test('#1932: eine Bearbeitung ausserhalb der gespiegelten Felder merkt nichts vo
   assert.equal(row.assigned_to, 1, 'die Bearbeitung ist angekommen');
   assert.equal(row.outbound_dirty, 0, 'die Zuweisung geht nicht zu Google, also ist nichts nachzusenden');
 });
+
+// ── #2019: ein von Google abgelehntes oder rotiertes Refresh-Token ─────────────
+// Gefahren über den ECHTEN OAuth2-Client aus loadAuthorizedClient(); ersetzt ist
+// nur sein Transport zum Token-Endpunkt. So laufen Refresh, 'tokens'-Ereignis
+// und Fehler genau wie in der Produktion, ohne Netz.
+const { google } = await import('googleapis');
+const { getStatus } = await import('../server/services/google-calendar.js');
+const { queueDeletion } = await import('../server/services/calendar-outbound.js');
+
+const OAUTH_ENV = {
+  GOOGLE_CLIENT_ID: 'test-client', GOOGLE_CLIENT_SECRET: 'test-client-secret',
+  GOOGLE_REDIRECT_URI: 'http://localhost/api/v1/calendar/google/callback',
+};
+
+/** Der echte Client mit abgelaufenem Access-Token; `answer` ersetzt den Token-Endpunkt. */
+function realClient(answer) {
+  const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, OAUTH_ENV);
+  try {
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_token_expiry', '1')").run();
+    const client = __test.loadAuthorizedClient();
+    client.tokenRequests = 0;
+    client.transporter.request = async (opts) => { client.tokenRequests++; return answer(opts); };
+    return client;
+  } finally {
+    // Die Suite verlässt sich darauf, dass die Routen ohne Credentials keinen Client bauen.
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+function cfg(key) {
+  return db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value ?? null;
+}
+
+test('#2019: invalid_grant meldet "neu verbinden", verbraucht keine Vormerkung und pausiert den Sync', async () => {
+  reset();
+  __test.setCalendarEnabled('primary', true, { name: 'Primary' });
+  queueDeletion({ source: 'google', calendarExternalId: 'primary', eventExternalId: 'gev-2019' });
+  assert.equal(tombstones().length, 1);
+
+  const client = realClient(() => {
+    // So meldet gaxios die Ablehnung am Token-Endpunkt.
+    const err = new Error('invalid_grant');
+    err.response = { status: 400, config: {}, data: { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' } };
+    throw err;
+  });
+  let built = 0;
+  const createCalendar = () => { built++; return google.calendar({ version: 'v3', auth: client }); };
+
+  await assert.rejects(sync({ createCalendar }), (err) => err.reauthRequired === true);
+
+  const status = getStatus();
+  assert.equal(status.connected, true, 'die Tokens stehen noch');
+  assert.equal(status.needsReauth, true, 'die Karte sagt "neu verbinden" statt verbunden');
+  assert.match(status.lastError, /Reconnect required/);
+  assert.equal(tombstones().length, 1,
+    'die Löschung wartet auf das neue Token - invalid_grant kommt als 400 und darf sie nicht verwerfen');
+
+  // Weitere Läufe greifen nicht mehr zu: kein Client, keine Anfrage an Google.
+  const requestsBefore = client.tokenRequests;
+  queueDeletion({ source: 'google', calendarExternalId: 'primary', eventExternalId: 'gev-2019-b' });
+  await assert.rejects(sync({ createCalendar }), (err) => err.reauthRequired === true);
+  assert.deepEqual(await flushOutbound({ createCalendar }), { deleted: 0, updated: 0 });
+  assert.equal(built, 1, 'nach der Ablehnung baut weder Sync noch Sofortversuch einen Client');
+  assert.equal(client.tokenRequests, requestsBefore);
+  assert.equal(tombstones().length, 2);
+
+  disconnect();
+  assert.equal(cfg('google_needs_reauth'), null, 'Trennen nimmt den Zustand mit');
+});
+
+test('#2019: ein von Google rotiertes Refresh-Token ersetzt das gespeicherte', async () => {
+  reset();
+  const client = realClient(() => ({
+    data: { access_token: 'a-new', refresh_token: 'r-rotated', expires_in: 3600 },
+  }));
+  await client.getAccessToken();
+  assert.equal(client.tokenRequests, 1, 'der Refresh lief über den Token-Endpunkt');
+  assert.equal(cfg('google_access_token'), 'a-new');
+  assert.equal(cfg('google_refresh_token'), 'r-rotated');
+
+  // Ohne refresh_token in der Antwort bleibt das gespeicherte stehen.
+  const plain = realClient(() => ({ data: { access_token: 'a-third', expires_in: 3600 } }));
+  await plain.getAccessToken();
+  assert.equal(cfg('google_access_token'), 'a-third');
+  assert.equal(cfg('google_refresh_token'), 'r-rotated');
+});
+
+// Codex-Runde 1 auf #2029: die Kalenderliste läuft ohne die Sperre 'google' -
+// vom Terminformular (sync-targets) und von der Kalenderauswahl aus.
+const { listCalendars } = await import('../server/services/google-calendar.js');
+
+/** Ersetzt den Refresh JEDES OAuth2-Clients, auch des intern gebauten. */
+async function withRefresh(answer, fn) {
+  const proto = google.auth.OAuth2.prototype;
+  const original = proto.refreshTokenNoCache;
+  const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
+  const calls = { n: 0 };
+  proto.refreshTokenNoCache = async function refreshStub(token) { calls.n++; return answer(token); };
+  Object.assign(process.env, OAUTH_ENV);
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_token_expiry', '1')").run();
+  try {
+    return await fn(calls);
+  } finally {
+    proto.refreshTokenNoCache = original;
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+function invalidGrant() {
+  const err = new Error('invalid_grant');
+  err.response = { status: 400, config: {}, data: { error: 'invalid_grant' } };
+  return err;
+}
+
+test('#2019: steht "neu verbinden", fragt die Kalenderliste Google nicht mehr', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  await withRefresh(() => { throw invalidGrant(); }, async (calls) => {
+    assert.deepEqual(await listCalendars(), [], 'keine Ziele, bis neu verbunden ist');
+    assert.equal(calls.n, 0, 'kein Refresh-Versuch bei Google');
+  });
+});
+
+test('#2019: die Ablehnung eines inzwischen ersetzten Tokens hält die Verbindung nicht an', async () => {
+  reset();
+  await withRefresh(() => {
+    // Während diese Anfrage läuft, speichert ein Refresh nebenan oder ein neues
+    // OAuth ein anderes Token; Google lehnt das alte ab.
+    db.prepare("UPDATE sync_config SET value = 'r-replaced' WHERE key = 'google_refresh_token'").run();
+    throw invalidGrant();
+  }, async (calls) => {
+    await assert.rejects(listCalendars());
+    assert.equal(calls.n, 1);
+  });
+  assert.equal(cfg('google_needs_reauth'), null, 'das gültige neue Token bleibt in Betrieb');
+  assert.equal(getStatus().needsReauth, false);
+
+  // Gegenstück: dasselbe mit dem noch gespeicherten Token hält an.
+  await withRefresh(() => { throw invalidGrant(); }, async () => {
+    await assert.rejects(listCalendars(), (err) => err.reauthRequired === true);
+  });
+  assert.equal(cfg('google_needs_reauth'), '1');
+});
+
+// Codex-Runde 3 auf #2029: ein Lauf mit zwei Refreshes.
+test('#2019: rotiert ein Lauf r1 -> r2 und lehnt Google dann r2 ab, steht "neu verbinden"', async () => {
+  reset();
+  // Ein aktivierter Kalender, damit der Lauf nach der Vorabprobe noch Google fragt.
+  __test.setCalendarEnabled('primary', true, { name: 'Primary' });
+  const sent = [];
+  const client = realClient((opts) => {
+    sent.push(new URLSearchParams(opts.data).get('refresh_token'));
+    // Erster Refresh rotiert, mit einem Access-Token, das gleich wieder abläuft;
+    // der zweite wird abgelehnt.
+    if (sent.length === 1) return { data: { access_token: 'a2', refresh_token: 'r2', expires_in: 1 } };
+    throw invalidGrant();
+  });
+  const createCalendar = () => google.calendar({ version: 'v3', auth: client });
+
+  await assert.rejects(sync({ createCalendar }), (err) => err.reauthRequired === true);
+  assert.deepEqual(sent, ['r', 'r2'], 'der zweite Refresh lief mit dem rotierten Token');
+  assert.equal(cfg('google_refresh_token'), 'r2');
+  assert.equal(cfg('google_needs_reauth'), '1', 'abgelehnt wurde das gespeicherte Token');
+});
+
+test('#2019: lehnt Google r1 ab, während schon r3 gespeichert ist, bleibt die Verbindung (Sync-Weg)', async () => {
+  reset();
+  const client = realClient(() => {
+    db.prepare("UPDATE sync_config SET value = 'r3' WHERE key = 'google_refresh_token'").run();
+    throw invalidGrant();
+  });
+  await assert.rejects(sync({ createCalendar: () => google.calendar({ version: 'v3', auth: client }) }),
+    (err) => err.reauthRequired !== true);
+  assert.equal(cfg('google_needs_reauth'), null);
+  assert.equal(cfg('google_refresh_token'), 'r3');
+});
+
+// Codex-Runde 4 auf #2029: Refreshes laufen single-flight.
+test('#2019: zwei gleichzeitige Kalenderlisten teilen sich EINEN Refresh', async () => {
+  reset();
+  let open;
+  const gate = new Promise((r) => { open = r; });
+  await withRefresh(async () => { await gate; throw invalidGrant(); }, async (calls) => {
+    const first  = listCalendars();
+    const second = listCalendars();
+    await new Promise((r) => setImmediate(r));
+    open();
+    await assert.rejects(first);
+    await assert.rejects(second);
+    assert.equal(calls.n, 1, 'ein Refresh-Request für beide');
+  });
+});
+
+test('#2019: ein gelungener Refresh der aktuellen Generation nimmt "neu verbinden" zurück', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  const client = realClient(() => ({ data: { access_token: 'a-ok', expires_in: 3600 } }));
+  await client.getAccessToken();
+  assert.equal(cfg('google_needs_reauth'), null);
+  assert.equal(getStatus().needsReauth, false);
+});
+
+test('#2019: GET /google/calendars meldet ein abgelehntes Token mit eigenem Grund', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  const res = await callRoute('GET', '/google/calendars');
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).reason, 'google_reauth_required');
+});
+
+// Guard (#2019): JEDE Google-Route des Kalender-Routers ist eingeordnet. Wer
+// Google anspricht oder einen Sync anstößt, meldet ein abgelehntes Token als 409
+// mit Grund; wer es nicht tut, steht mit Begründung in der zweiten Liste. Eine
+// neue /google/-Route in keiner der beiden ist rot.
+const GOOGLE_ROUTES_REACHING_GOOGLE = {
+  'GET /google/calendars': null,
+  'PATCH /google/calendars': { calendarId: 'primary', enabled: true },
+  'POST /google/sync': {},
+};
+const GOOGLE_ROUTES_LOCAL_ONLY = {
+  'GET /google/auth': 'baut nur die OAuth-Adresse',
+  'GET /google/callback': 'Weiterleitung zurück in die Einstellungen; das neue Token löscht den Marker vor dem Sync',
+  'GET /google/status': 'liest sync_config',
+  'DELETE /google/disconnect': 'löscht lokal',
+  'DELETE /google/mirrored-events': 'löscht lokal',
+  'PUT /google/readonly': 'Schalter in sync_config',
+};
+
+function routesOf(router, prefix = '') {
+  const found = [];
+  for (const layer of router.stack ?? []) {
+    if (layer.route) {
+      for (const method of Object.keys(layer.route.methods)) {
+        found.push(`${method.toUpperCase()} ${prefix}${layer.route.path}`);
+      }
+    } else if (layer.handle?.stack) {
+      found.push(...routesOf(layer.handle, prefix));
+    }
+  }
+  return found;
+}
+
+test('#2019: jede Google-Route ist eingeordnet, und jede, die Google anspricht, meldet ein abgelehntes Token als 409', async () => {
+  const google = [...new Set(routesOf(calendarRouter).filter((r) => r.split(' ')[1].startsWith('/google/')))].sort();
+  assert.ok(google.length >= 9, `zu wenige Google-Routen gefunden (${google.length}) - die Aufzählung greift nicht`);
+  assert.deepEqual(google,
+    [...Object.keys(GOOGLE_ROUTES_REACHING_GOOGLE), ...Object.keys(GOOGLE_ROUTES_LOCAL_ONLY)].sort(),
+    'eine Google-Route ist in keiner Liste (oder eine gelistete gibt es nicht mehr)');
+
+  for (const [route, body] of Object.entries(GOOGLE_ROUTES_REACHING_GOOGLE)) {
+    reset();
+    db.prepare('DELETE FROM google_calendar_selection').run();
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+    const [method, path] = route.split(' ');
+    const res = await callRoute(method, path, body ?? undefined);
+    assert.equal(res.status, 409, `${route}: Status`);
+    assert.equal((await res.json()).reason, 'google_reauth_required', `${route}: Grund`);
+  }
+  assert.deepEqual(__test.listSelection().filter((r) => r.enabled), [],
+    'PATCH ändert bei abgelehntem Token die Auswahl nicht');
+});
+
+test('#2019: POST /google/sync meldet ein abgelehntes Token mit demselben Grund', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  const res = await callRoute('POST', '/google/sync', {});
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).reason, 'google_reauth_required');
+});
+
+// Sicherheitsprüfung zu #2029: geteilt wird nur ein Refresh mit DEMSELBEN Token.
+async function parallelRefresh(tokens) {
+  let open;
+  const gate = new Promise((r) => { open = r; });
+  return withRefresh(async (token) => {
+    await gate;
+    return { tokens: { access_token: `access-for-${token}`, expiry_date: Date.UTC(2099, 0, 1) }, res: {} };
+  }, async (calls) => {
+    const clients = tokens.map((token) => {
+      db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_refresh_token', ?)").run(token);
+      return __test.loadAuthorizedClient();
+    });
+    const pending = clients.map((c) => c.getAccessToken());
+    await new Promise((r) => setImmediate(r));
+    open();
+    const results = await Promise.all(pending);
+    return { requests: calls.n, access: results.map((r) => r.token) };
+  });
+}
+
+test('#2019: zwei Clients mit verschiedenen Tokens refreshen getrennt und bekommen je ihr Ergebnis', async () => {
+  reset();
+  const { requests, access } = await parallelRefresh(['r-old', 'r-other-account']);
+  assert.equal(requests, 2, 'kein geteilter Refresh über Tokengrenzen');
+  assert.deepEqual(access, ['access-for-r-old', 'access-for-r-other-account']);
+});
+
+test('#2019: zwei Clients mit demselben Token teilen sich einen Refresh', async () => {
+  reset();
+  const { requests, access } = await parallelRefresh(['r-same', 'r-same']);
+  assert.equal(requests, 1);
+  assert.deepEqual(access, ['access-for-r-same', 'access-for-r-same']);
+});
+
+// Codex-Runde 2 auf #2029.
+
+test('#2019: invalid_grant aus einem einzelnen Patch verwirft die Änderung nicht und meldet "neu verbinden"', async () => {
+  reset();
+  const event = seedDirty({ title: 'Zahnarzt' });
+  // Die Attrappe hat keinen Auth-Client: die Vorabprobe greift nicht, die
+  // Ablehnung kommt erst aus dem Patch - wie bei einem widerrufenen Token,
+  // dessen Access-Token lokal noch gültig aussah.
+  const calendar = fakeCalendar({ calendars: writableCalendars(), onPatch: () => { throw invalidGrant(); } });
+
+  await assert.rejects(flushOutbound({ createCalendar: () => calendar }), (err) => err.reauthRequired === true);
+  assert.equal(calendar.patches.length, 1);
+  assert.equal(reload(event.id).outbound_dirty, 1, 'die Änderung bleibt vorgemerkt');
+  assert.equal(reload(event.id).outbound_attempts, 0, 'und verbraucht keinen Versuch');
+  assert.equal(cfg('google_needs_reauth'), '1');
+});
+
+test('#2019: invalid_grant aus einer einzelnen Löschung verwirft den Tombstone nicht', async () => {
+  reset();
+  queueDeletion({ source: 'google', calendarExternalId: 'primary', eventExternalId: 'gev-2019-del' });
+  const calendar = fakeCalendar({ onDelete: () => { throw invalidGrant(); } });
+
+  await assert.rejects(flushOutbound({ createCalendar: () => calendar }), (err) => err.reauthRequired === true);
+  assert.equal(tombstones().length, 1);
+  assert.equal(tombstones()[0].attempts, 0);
+  assert.equal(cfg('google_needs_reauth'), '1');
+});
+
+test('#2019: ein spätes tokens-Ereignis nach dem Trennen verbindet nicht wieder', () => {
+  reset();
+  const client = realClient(() => { throw new Error('unused'); });
+  disconnect();
+  client.emit('tokens', { access_token: 'late', refresh_token: 'r-late', expiry_date: 42 });
+  assert.equal(getStatus().connected, false, 'getrennt bleibt getrennt');
+  assert.equal(cfg('google_refresh_token'), null);
+});
+
+test('#2019: ein spätes tokens-Ereignis überschreibt die Tokens eines neuen Verbindens nicht', () => {
+  reset();
+  const client = realClient(() => { throw new Error('unused'); });
+  db.prepare("UPDATE sync_config SET value = 'r-reconnected' WHERE key = 'google_refresh_token'").run();
+  db.prepare("UPDATE sync_config SET value = 'a-reconnected' WHERE key = 'google_access_token'").run();
+  client.emit('tokens', { access_token: 'late', refresh_token: 'r-late', expiry_date: 42 });
+  assert.equal(cfg('google_refresh_token'), 'r-reconnected');
+  assert.equal(cfg('google_access_token'), 'a-reconnected');
+});
+
+test('#2019: Neu verbinden mit einem anderen Konto nimmt die Kalender des alten aus der Auswahl', async () => {
+  reset();
+  __test.setCalendarEnabled('old-account-cal', true, { name: 'Alt' });
+  __test.setCalendarEnabled('shared-cal', true, { name: 'Geteilt' });
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+
+  const proto = google.auth.OAuth2.prototype;
+  const { getToken, request } = proto;
+  const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
+  proto.getToken = async () => ({
+    tokens: { access_token: 'a-other', refresh_token: 'r-other', expiry_date: Date.UTC(2099, 0, 1) },
+  });
+  // Die Kalenderliste des neu verbundenen Kontos: der geteilte Kalender ja, der alte nicht.
+  proto.request = async () => ({ data: { items: [{ id: 'shared-cal', accessRole: 'owner' }, { id: 'other-own' }] } });
+  Object.assign(process.env, OAUTH_ENV);
+  try {
+    const { handleCallback } = await import('../server/services/google-calendar.js');
+    await handleCallback('code-2019');
+  } finally {
+    proto.getToken = getToken;
+    proto.request = request;
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+
+  assert.deepEqual(__test.listSelection().map((r) => r.calendar_id).sort(), ['shared-cal'],
+    'der Kalender des alten Kontos fällt, der weiter angebotene bleibt');
+  assert.equal(cfg('google_refresh_token'), 'r-other');
+  assert.equal(cfg('google_needs_reauth'), null);
+});
