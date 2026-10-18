@@ -3851,8 +3851,8 @@ function buildTodayCockpitModel(data, cfg = [], {
   cap = onPhoneStage() ? PROGRAM_ROW_CAP_PHONE : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
-  viewer = dashboardViewer,
   isDisplay = false,
+  viewer = dashboardViewer,
 } = {}) {
   // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
   // Programm-Zeilen — jede Domäne hat genau eine Repräsentation (Cockpit ODER
