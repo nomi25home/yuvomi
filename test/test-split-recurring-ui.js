@@ -132,7 +132,11 @@ function hauptteil() {
   // Zurueck auf den stummen Container: das Neuzeichnen nach einem Schreibweg
   // (renderAll) fragt Kopf und Gruppenliste, die dieser Griff nicht kennt.
   split.renderMainForTest(_stumm);
-  return main.html.slice(main.html.indexOf('id="split-recurring-list"'), main.html.indexOf('class="split-activity"'));
+  // Seit #2042 steht der Anlegen-Knopf im Abschnittskopf VOR split-recurring-list,
+  // also den Schnitt dort beginnen.
+  const listPos = main.html.indexOf('id="split-recurring-list"');
+  const headPos = main.html.lastIndexOf('<div class="split-section-head">', listPos);
+  return main.html.slice(headPos >= 0 ? headPos : listPos, main.html.indexOf('class="split-activity"'));
 }
 
 /** Klick auf ein Element aus dem ECHTEN Markup - Attribute kommen von dort. */
@@ -155,7 +159,7 @@ function klick(attribute) {
 // --------------------------------------------------------------------------
 // (1) Liste und Nur-lesen-Regel
 // --------------------------------------------------------------------------
-test('Schreibrecht: die eigene Serie laesst sich oeffnen und umschalten, die fremde nur lesen; Anlegen steht darunter', async () => {
+test('Schreibrecht: die eigene Serie laesst sich oeffnen und umschalten, die fremde nur lesen; Anlegen steht im Abschnittskopf', async () => {
   await buehne({}, () => {
     const html = hauptteil();
     // Seit R20 (WCAG 2.5.3) liest die Zeile, was sie zeigt, und nennt die Handlung als sr-only-Nachsatz.
@@ -297,7 +301,9 @@ test('Klick auf die Zeile: eigene Serie oeffnet den Dialog, fremde die Leseansic
     assert.equal(spur.leseansichten[0].edit, undefined);
     assert.equal(spur.leseansichten[0].actions, undefined);
 
-    await split.onRecurringClick(klickAus(html, 'data-recurring-add'));
+    // Seit #2042 hat der Anlegen-Knopf einen eigenen Hoerer im Abschnittskopf,
+    // nicht mehr in onRecurringClick - direkter Aufruf wie der echte Klick.
+    await split.openRecurringModal();
     assert.equal(spur.dialoge.length, 2);
     assert.equal(spur.dialoge[1].title, 'splitExpenses.recurring.add');
   });
