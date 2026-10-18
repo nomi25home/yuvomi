@@ -664,7 +664,7 @@ function renderOverview(el) {
           <div class="rw-section__actions">
             ${popoverMenuHtml({
     id: 'rw-standings-more',
-    label: t('rewards.manageParticipants'),
+    label: t('common.moreActions'),
     items: [{ icon: 'users-round', label: t('rewards.manageParticipants'), action: 'manage-participants' }],
     triggerClass: 'btn btn--secondary btn--icon btn--sm rw-section-tools',
   })}

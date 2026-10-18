@@ -766,6 +766,7 @@ test('Uebersicht: "Bonus vergeben" steht im Kopf der Punktestaende und oeffnet d
     assert.match(knoepfe[0].cls, /\bbtn--secondary\b/, 'der Bonus ist die Abschnittsaktion');
     assert.match(knoepfe[0].cls, /\bbtn--sm\b/, 'Abschnittsaktion traegt --sm');
     assert.match(head, /rw-section-tools\b/, 'das Mehr-Menue fuer Teilnehmer verwalten steht im Kopf');
+    assert.match(head, /aria-label="common\.moreActions"/, 'der Mehr-Knopf traegt common.moreActions, nicht den Menue-Inhalt');
     assert.match(head, /data-action="manage-participants"/, 'der Menue-Eintrag traegt den Aktions-Schluessel');
     assert.equal((el.html.match(/rw-grant-bonus/g) || []).length, 1, 'genau EIN Knopf - keiner je Personenzeile');
 

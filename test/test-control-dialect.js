@@ -786,12 +786,18 @@ export function scanSectionAction(src) {
   while ((m = re.exec(src))) {
     if (inComment(src, m.index)) continue;
     const chunk = src.slice(m.index, m.index + 800);
+    let labelledCount = 0;
     for (const c of templateControls(chunk)) {
       if (/\bbtn--ghost\b/.test(c.cls)) {
         found.push({ line: lineOf(src, m.index + c.index), what: `btn--ghost in Abschnittsaktion: ${c.cls}` });
       } else if (/\bbtn--secondary\b/.test(c.cls) && !/\bbtn--sm\b/.test(c.cls) && !/\bpopover-menu__item\b/.test(c.cls)) {
         found.push({ line: lineOf(src, m.index + c.index), what: `btn--secondary ohne --sm in Abschnittsaktion: ${c.cls}` });
+      } else if (/\bbtn--secondary\b/.test(c.cls) && /\bbtn--sm\b/.test(c.cls) && !/\bbtn--icon\b/.test(c.cls) && !/\bpopover-menu__item\b/.test(c.cls)) {
+        labelledCount++;
       }
+    }
+    if (labelledCount > 1) {
+      found.push({ line: lineOf(src, m.index), what: `mehr als eine beschriftete btn--secondary btn--sm im Abschnittskopf (${labelledCount})` });
     }
   }
   return found;
@@ -1088,6 +1094,12 @@ test('Scanner: section-action faengt btn--ghost und btn--secondary ohne --sm im 
       <button class="btn btn--secondary x-create" type="button"><i data-lucide="plus" aria-hidden="true"></i>\${t('b')}</button>
     </div>`;
   assert.equal(scanSectionAction(bad).length, 2);
+  const twoLabelled = `
+    <div class="rw-section__actions">
+      <button class="btn btn--secondary btn--sm rw-action-a" type="button"><i data-lucide="users-round" aria-hidden="true"></i>\${t('a')}</button>
+      <button class="btn btn--secondary btn--sm rw-action-b" type="button"><i data-lucide="plus" aria-hidden="true"></i>\${t('b')}</button>
+    </div>`;
+  assert.equal(scanSectionAction(twoLabelled).length, 1, 'zwei beschriftete Aktionen werden als Fehler gemeldet');
   const good = `
     <div class="rw-section__actions">
       <button class="btn btn--secondary btn--icon btn--sm rw-section-tools popover-menu__trigger" type="button" aria-label="\${t('a')}"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
