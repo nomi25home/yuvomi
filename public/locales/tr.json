@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Aramanızla eşleşen bir şey yok.",
         "searchNoResultsFilteredDescription": "Aramanız ve filtrelerinizle eşleşen bir şey yok.",
         "searchReset": "Aramayı sıfırla",
-        "passwordMinLength": "En az 8 karakter."
+        "passwordMinLength": "En az 8 karakter.",
+        "savedReloadFailed": "Değişiklik kaydedildi ancak görünüm yenilenemedi. Eksik bir şey varsa sayfayı yeniden yükleyin."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -493,6 +494,7 @@
         "historyView": "Geçmiş",
         "historyPersonFilter": "Kişiye göre filtrele",
         "historyUnknownMember": "Artık evde değil",
+        "historyViaSync": "Senkronizasyon yoluyla",
         "historyEmptyTitle": "Henüz bir kayıt yok",
         "historyEmptyPersonTitle": "Bu kişi için kayıt yok",
         "historyEmptyDescription": "Hangi görevi kimin ne zaman yaptığını burada görürsün.",
@@ -1895,7 +1897,7 @@
         "oidcLinked": "Bu hesap SSO hesabınla bağlı.",
         "oidcLinkedWithProvider": "Bu hesap {{provider}} ile bağlı.",
         "oidcUnlink": "Bağlantıyı kaldır",
-        "oidcUnlinkNeedsPassword": "Önce bir parola belirle - bağlantı şu anda bu hesaba giden tek yol.",
+        "oidcUnlinkNeedsPassword": "Bir yöneticiden hesabın için parola belirlemesini iste - bağlantı şu anda bu hesaba giden tek yol.",
         "oidcLinkSuccess": "SSO hesabı bağlandı.",
         "oidcLinkError_already_linked": "Bu hesap zaten başka bir SSO hesabıyla bağlı. Önce mevcut bağlantıyı kaldır.",
         "oidcLinkError_sub_taken": "Bu SSO hesabı zaten başka bir Yuvomi hesabına ait.",
@@ -2695,6 +2697,7 @@
         "moduleStatusOff": "{{module}} ev için kapalı.",
         "pageAccount": "Hesap",
         "pageAccountDescription": "Profili, iletişim bilgilerini ve parolayı yönet.",
+        "pageAccountDescriptionSsoOnly": "Profili ve iletişim bilgilerini yönet.",
         "pageAppearance": "Görünüm",
         "pageAppearanceDescription": "Tema, dil, bölge, para birimi ile tarih ve saat biçimini seçme.",
         "pageDevice": "Bu cihaz",
@@ -4915,8 +4918,7 @@
                 "earlyConfirm": "Doz, en kısa aralık dolmadan kaydedilsin mi?",
                 "earlyDetail": "Sonraki doz ancak {{time}} itibarıyla öngörülüyor ({{remaining}}).",
                 "earlyConfirmAction": "Yine de kaydet"
-            },
-            "stockUpdateFailed": "Doz kaydedildi, ancak stok güncellenemedi."
+            }
         },
         "prevention": {
             "title": "Önleyici bakım ve aşılar",

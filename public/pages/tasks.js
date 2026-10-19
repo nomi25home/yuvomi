@@ -48,6 +48,7 @@ import {
   openTaskDetail, deleteTaskWithUndo,
   setTaskArchived, toggleSubtaskStatus,
 } from '/components/task-detail.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // --------------------------------------------------------
 // Die geteilten Regeln, mit dem Blickwinkel DIESER Seite
@@ -2489,7 +2490,7 @@ function openBulkTagDialog(taskIds, mode, container) {
           state.selectedTaskIds.clear();
           updateBulkActionsBar(container);
           renderFilters(container);
-          await loadTasks(container);
+          await reloadAfterSave(() => loadTasks(container));
           refocusAfterRender();
         } catch (err) {
           window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
@@ -2766,7 +2767,7 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
           // schickt dieselbe Liste.
           resetSubmit(t('tasks.documentsLinkFailed'));
           btnError(submitBtn);
-          await refreshTags();
+          await reloadAfterSave(() => refreshTags());
           await onChanged();
           return;
         }
@@ -2831,7 +2832,7 @@ async function handleRenameSubtask(id, currentTitle, container) {
   if (!title || title.trim() === currentTitle) return;
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
-    await loadTasks(container);
+    await reloadAfterSave(() => loadTasks(container));
     refocusAfterRender();
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
@@ -3485,6 +3486,17 @@ function renderDoerPicker(task, isDone, archived) {
 }
 
 /**
+ * Wen eine Verlaufszeile nennt. Ein Eintrag ohne Person kommt aus zwei
+ * Richtungen: die Person hat den Haushalt verlassen, oder der CalDAV-Sync hat
+ * einen auf dem Telefon gesetzten Haken uebernommen und weiss nicht, von wem
+ * (#1836) - "Nicht mehr im Haushalt" waere fuer den zweiten Fall falsch.
+ */
+function historyPersonLabel(entry) {
+  if (entry.person_name) return entry.person_name;
+  return entry.source === 'caldav' ? t('tasks.historyViaSync') : t('tasks.historyUnknownMember');
+}
+
+/**
  * DER VERLAUF NENNT, WER ES GETAN HAT (#1205). `person_*` ist die benannte
  * erledigende Person und ohne Benennung die abhakende - der Server loest das in
  * EINEM Ausdruck auf, damit die Rueckfallregel nicht in jedem Renderer noch
@@ -3495,7 +3507,7 @@ function renderDoerPicker(task, isDone, archived) {
  * gesetzt hat.
  */
 function renderHistoryEntry(entry) {
-  const name = entry.person_name || t('tasks.historyUnknownMember');
+  const name = historyPersonLabel(entry);
   const tickedBy = entry.done_by_user_id && entry.done_by_user_id !== entry.user_id
     ? (entry.user_name || t('tasks.historyUnknownMember'))
     : null;
@@ -4721,7 +4733,7 @@ async function resetTaskOrder(groupEl, container) {
     // ueberholen, und die Raenge waeren wieder da. Erst abwarten.
     await taskOrderRuns.get(key)?.done;
     await api.post('/tasks/reorder/reset', { ids });
-    await loadTasks(container);
+    await reloadAfterSave(() => loadTasks(container));
     const el = container.querySelector('#tasks-reorder-announce');
     if (el) el.textContent = t('tasks.resetOrderDone', { group: label });
     const toggles = [...container.querySelectorAll('[data-group-toggle]')];

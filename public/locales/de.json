@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Nichts passt zu deiner Suche.",
         "searchNoResultsFilteredDescription": "Nichts passt zu deiner Suche und den Filtern.",
         "searchReset": "Suche zurücksetzen",
-        "passwordMinLength": "Mindestens 8 Zeichen."
+        "passwordMinLength": "Mindestens 8 Zeichen.",
+        "savedReloadFailed": "Die Änderung ist gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Lade die Seite neu, falls etwas fehlt."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -510,6 +511,7 @@
         "historyView": "Verlauf",
         "historyPersonFilter": "Nach Person filtern",
         "historyUnknownMember": "Nicht mehr im Haushalt",
+        "historyViaSync": "Per Synchronisierung",
         "historyEmptyTitle": "Noch nichts aufgezeichnet",
         "historyEmptyPersonTitle": "Von dieser Person nichts aufgezeichnet",
         "historyEmptyDescription": "Hier steht, wer wann welche Aufgabe erledigt hat.",
@@ -2049,7 +2051,7 @@
         "oidcLinked": "Dieses Konto ist mit deinem SSO-Konto verknüpft.",
         "oidcLinkedWithProvider": "Dieses Konto ist mit {{provider}} verknüpft.",
         "oidcUnlink": "Verknüpfung lösen",
-        "oidcUnlinkNeedsPassword": "Setze zuerst ein Passwort - die Verknüpfung ist derzeit der einzige Weg in dieses Konto.",
+        "oidcUnlinkNeedsPassword": "Bitte einen Administrator, ein Passwort für dein Konto zu setzen - die Verknüpfung ist derzeit der einzige Weg in dieses Konto.",
         "oidcLinkSuccess": "SSO-Konto verknüpft.",
         "oidcLinkError_already_linked": "Dieses Konto ist bereits mit einem anderen SSO-Konto verknüpft. Löse die bestehende Verknüpfung zuerst.",
         "oidcLinkError_sub_taken": "Dieses SSO-Konto gehört bereits zu einem anderen Yuvomi-Konto.",
@@ -2734,6 +2736,7 @@
         "moduleStatusOff": "{{module}} ist für den Haushalt ausgeschaltet.",
         "pageAccount": "Konto",
         "pageAccountDescription": "Profil, Kontaktdaten und Passwort verwalten.",
+        "pageAccountDescriptionSsoOnly": "Profil und Kontaktdaten verwalten.",
         "pageAppearance": "Darstellung",
         "pageAppearanceDescription": "Design, Sprache, Region, Währung sowie Datums- und Zeitformat wählen.",
         "pageDevice": "Dieses Gerät",
@@ -4915,8 +4918,7 @@
                 "earlyConfirm": "Dosis vor Ablauf des Mindestabstands eintragen?",
                 "earlyDetail": "Die nächste Dosis ist erst ab {{time}} vorgesehen ({{remaining}}).",
                 "earlyConfirmAction": "Trotzdem eintragen"
-            },
-            "stockUpdateFailed": "Die Dosis ist eingetragen, der Bestand konnte aber nicht angepasst werden."
+            }
         },
         "prevention": {
             "title": "Vorsorge & Impfungen",
