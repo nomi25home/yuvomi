@@ -20,24 +20,35 @@ const router  = express.Router();
 const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 const VALID_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6]; // 0 = Monday, 6 = Sunday
 
+// Haushaltsweit gültige Wochenstartag-Werte, gespiegelt aus preferences.js.
+const WEEK_START_DAY = { monday: 1, sunday: 0, saturday: 6 };
+
 // --------------------------------------------------------
 // Hilfsfunktionen
 // --------------------------------------------------------
 
+/** Wochenstartag des Haushalts als JS-getDay()-Wert (0 = So, 1 = Mo, 6 = Sa). */
+function householdWeekStartDay() {
+  const row = db.get().prepare("SELECT value FROM sync_config WHERE key = 'week_start'").get();
+  return WEEK_START_DAY[row?.value] ?? 1;
+}
+
 /**
- * Gibt den ISO-Datumstring (YYYY-MM-DD) für den Montag einer Woche zurück.
+ * Gibt den ISO-Datumstring (YYYY-MM-DD) für den Wochenstart einer Woche zurück.
+ * Welcher Wochentag das ist, liest der Haushalt aus seinen Einstellungen.
  * @param {string} dateStr - beliebiges Datum der Woche (YYYY-MM-DD)
  */
 function weekStart(dateStr) {
-  const d   = new Date(dateStr + 'T00:00:00Z');
-  const day = d.getUTCDay();          // 0 = So, 1 = Mo, …
-  const diff = (day === 0 ? -6 : 1 - day);
+  const d        = new Date(dateStr + 'T00:00:00Z');
+  const day      = d.getUTCDay();
+  const startDay = householdWeekStartDay();
+  const diff     = -((day - startDay + 7) % 7);
   d.setUTCDate(d.getUTCDate() + diff);
   return d.toISOString().slice(0, 10);
 }
 
 /**
- * Gibt den ISO-Datumstring für den Sonntag einer Woche zurück.
+ * Gibt den ISO-Datumstring für den Wochenend-Tag zurück (sechs Tage nach Wochenstart).
  */
 function weekEnd(dateStr) {
   const start = weekStart(dateStr);

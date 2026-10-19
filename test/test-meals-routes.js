@@ -148,6 +148,29 @@ test('GET / ohne Woche liefert Struktur mit weekStart/weekEnd', async () => {
   assert.match(r.body.weekEnd, /^\d{4}-\d{2}-\d{2}$/);
 });
 
+test('GET /?week: weekStart/weekEnd folgen dem Haushaltswochenstartag (#2075)', async () => {
+  // 2026-03-26 ist ein Donnerstag.
+  // Montag-Start (Standard): 2026-03-23 … 2026-03-29
+  const rMo = await call('GET', '/?week=2026-03-26');
+  assert.equal(rMo.body.weekStart, '2026-03-23', 'Montag-Start: Wochenbeginn Montag');
+  assert.equal(rMo.body.weekEnd,   '2026-03-29', 'Montag-Start: Wochenende Sonntag');
+
+  // Sonntag-Start: 2026-03-22 … 2026-03-28
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('week_start', 'sunday') ON CONFLICT(key) DO UPDATE SET value = 'sunday'").run();
+  const rSo = await call('GET', '/?week=2026-03-26');
+  assert.equal(rSo.body.weekStart, '2026-03-22', 'Sonntag-Start: Wochenbeginn Sonntag');
+  assert.equal(rSo.body.weekEnd,   '2026-03-28', 'Sonntag-Start: Wochenende Samstag');
+
+  // Samstag-Start: 2026-03-21 … 2026-03-27
+  db.prepare("UPDATE sync_config SET value = 'saturday' WHERE key = 'week_start'").run();
+  const rSa = await call('GET', '/?week=2026-03-26');
+  assert.equal(rSa.body.weekStart, '2026-03-21', 'Samstag-Start: Wochenbeginn Samstag');
+  assert.equal(rSa.body.weekEnd,   '2026-03-27', 'Samstag-Start: Wochenende Freitag');
+
+  // Zurücksetzen
+  db.prepare("DELETE FROM sync_config WHERE key = 'week_start'").run();
+});
+
 test('GET /?week: nur Meals der Woche, sortiert nach meal_type (breakfast<lunch<dinner<snack)', async () => {
   // isolierte Woche im März 2026
   await createMeal({ date: '2026-03-10', meal_type: 'dinner', title: 'D' });

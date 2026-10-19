@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The meal plan now follows the household week-start setting, just like the calendar (#2075).**
+  Both the server (`GET /meals`, "add week to shopping list") and the frontend week-grid previously
+  hard-coded Monday as the week start. Both now read the household `week_start` preference
+  (monday / sunday / saturday), so a Sunday-first household sees Sun–Sat in the meal plan and
+  the shopping-list transfer covers those same seven days.
+
 - **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
   instead of only those on screen, and each picture went to Mealie or Tandoor again on every visit.
