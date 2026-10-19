@@ -100,7 +100,8 @@
         "searchNoResultsDescription": "لا شيء يطابق بحثك.",
         "searchNoResultsFilteredDescription": "لا شيء يطابق بحثك وعوامل التصفية.",
         "searchReset": "إعادة تعيين البحث",
-        "passwordMinLength": "8 أحرف على الأقل."
+        "passwordMinLength": "8 أحرف على الأقل.",
+        "savedReloadFailed": "تم حفظ التغيير، لكن تعذّر تحديث العرض. أعد تحميل الصفحة إذا كان هناك شيء مفقود."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -610,6 +611,7 @@
         "historyView": "السجل",
         "historyPersonFilter": "تصفية حسب الشخص",
         "historyUnknownMember": "لم يعد ضمن المنزل",
+        "historyViaSync": "عبر المزامنة",
         "historyEmptyTitle": "لم يُسجَّل شيء بعد",
         "historyEmptyPersonTitle": "لا يوجد سجل لهذا الشخص",
         "historyEmptyDescription": "هنا ترى من أنجز أي مهمة ومتى.",
@@ -2136,7 +2138,7 @@
         "oidcLinked": "هذا الحساب مرتبط بحساب الدخول الموحد الخاص بك.",
         "oidcLinkedWithProvider": "هذا الحساب مرتبط بـ {{provider}}.",
         "oidcUnlink": "إلغاء الربط",
-        "oidcUnlinkNeedsPassword": "عيّن كلمة مرور أولاً - الربط حالياً هو الطريق الوحيد إلى هذا الحساب.",
+        "oidcUnlinkNeedsPassword": "اطلب من أحد المسؤولين تعيين كلمة مرور لحسابك - الربط حالياً هو الطريق الوحيد إلى هذا الحساب.",
         "oidcLinkSuccess": "تم ربط حساب الدخول الموحد.",
         "oidcLinkError_already_linked": "هذا الحساب مرتبط بالفعل بحساب دخول موحد آخر. أزل الربط الحالي أولاً.",
         "oidcLinkError_sub_taken": "حساب الدخول الموحد هذا يخص بالفعل حساب Yuvomi آخر.",
@@ -2969,6 +2971,7 @@
         "moduleStatusOff": "{{module}} معطّل للمنزل.",
         "pageAccount": "الحساب",
         "pageAccountDescription": "إدارة الملف الشخصي وبيانات الاتصال وكلمة المرور.",
+        "pageAccountDescriptionSsoOnly": "إدارة الملف الشخصي وبيانات الاتصال.",
         "pageAppearance": "المظهر",
         "pageAppearanceDescription": "اختيار المظهر واللغة والمنطقة والعملة وتنسيق التاريخ والوقت.",
         "pageDevice": "هذا الجهاز",
@@ -5285,8 +5288,7 @@
                 "earlyConfirm": "هل تُسجَّل الجرعة قبل انقضاء الفاصل الأدنى؟",
                 "earlyDetail": "الجرعة التالية مقررة ابتداءً من {{time}} فقط ({{remaining}}).",
                 "earlyConfirmAction": "سجّل على أي حال"
-            },
-            "stockUpdateFailed": "تم تسجيل الجرعة، لكن تعذّر تحديث المخزون."
+            }
         },
         "prevention": {
             "title": "الوقاية واللقاحات",

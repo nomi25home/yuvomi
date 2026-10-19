@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Semmi sem felel meg a keresésnek.",
         "searchNoResultsFilteredDescription": "Semmi sem felel meg a keresésnek és a szűrőknek.",
         "searchReset": "Keresés visszaállítása",
-        "passwordMinLength": "Legalább 8 karakter."
+        "passwordMinLength": "Legalább 8 karakter.",
+        "savedReloadFailed": "A módosítás mentve, de a nézetet nem sikerült frissíteni. Ha valami hiányzik, töltsd újra az oldalt."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -518,6 +519,7 @@
         "historyView": "Előzmények",
         "historyPersonFilter": "Szűrés személy szerint",
         "historyUnknownMember": "Már nem tagja a háztartásnak",
+        "historyViaSync": "Szinkronizálással",
         "historyEmptyTitle": "Még nincs rögzítve semmi",
         "historyEmptyPersonTitle": "Ehhez a személyhez nincs rögzítve semmi",
         "historyEmptyDescription": "Itt látod, ki melyik feladatot végezte el, és mikor.",
@@ -2006,7 +2008,7 @@
         "oidcLinked": "Ez a fiók össze van kötve az SSO-fiókoddal.",
         "oidcLinkedWithProvider": "Ez a fiók a következővel van összekötve: {{provider}}.",
         "oidcUnlink": "Összekötés megszüntetése",
-        "oidcUnlinkNeedsPassword": "Előbb állíts be jelszót - jelenleg az összekötés az egyetlen út ebbe a fiókba.",
+        "oidcUnlinkNeedsPassword": "Kérd meg egy adminisztrátort, hogy állítson be jelszót a fiókodhoz - jelenleg az összekötés az egyetlen út ebbe a fiókba.",
         "oidcLinkSuccess": "SSO-fiók összekötve.",
         "oidcLinkError_already_linked": "Ez a fiók már össze van kötve egy másik SSO-fiókkal. Előbb szüntesd meg a meglévő összekötést.",
         "oidcLinkError_sub_taken": "Ez az SSO-fiók már egy másik Yuvomi-fiókhoz tartozik.",
@@ -2695,6 +2697,7 @@
         "moduleStatusOff": "A(z) {{module}} ki van kapcsolva a háztartásban.",
         "pageAccount": "Fiók",
         "pageAccountDescription": "Profil, elérhetőségek és jelszó kezelése.",
+        "pageAccountDescriptionSsoOnly": "Profil és elérhetőségek kezelése.",
         "pageAppearance": "Megjelenés",
         "pageAppearanceDescription": "Téma, nyelv, régió, pénznem, valamint dátum- és időformátum kiválasztása.",
         "pageDevice": "Ez az eszköz",
@@ -4915,8 +4918,7 @@
                 "earlyConfirm": "Rögzíted az adagot a minimális időköz letelte előtt?",
                 "earlyDetail": "A következő adag csak {{time}} után esedékes ({{remaining}}).",
                 "earlyConfirmAction": "Rögzítés mégis"
-            },
-            "stockUpdateFailed": "Az adag rögzítve, de a készletet nem sikerült frissíteni."
+            }
         },
         "prevention": {
             "title": "Megelőzés és védőoltások",

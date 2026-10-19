@@ -98,7 +98,8 @@
         "searchNoResultsDescription": "Vašemu hledání nic neodpovídá.",
         "searchNoResultsFilteredDescription": "Vašemu hledání a filtrům nic neodpovídá.",
         "searchReset": "Zrušit hledání",
-        "passwordMinLength": "Alespoň 8 znaků."
+        "passwordMinLength": "Alespoň 8 znaků.",
+        "savedReloadFailed": "Změna je uložena, ale zobrazení se nepodařilo obnovit. Pokud něco chybí, načtěte stránku znovu."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -559,6 +560,7 @@
         "historyView": "Historie",
         "historyPersonFilter": "Filtrovat podle osoby",
         "historyUnknownMember": "Již není v domácnosti",
+        "historyViaSync": "Přes synchronizaci",
         "historyEmptyTitle": "Zatím nic zaznamenáno",
         "historyEmptyPersonTitle": "Pro tuto osobu nic zaznamenáno",
         "historyEmptyDescription": "Zde uvidíte, kdo kterou úlohu splnil a kdy.",
@@ -2114,7 +2116,7 @@
         "oidcLinked": "Tento účet je propojen s tvým účtem SSO.",
         "oidcLinkedWithProvider": "Tento účet je propojen s {{provider}}.",
         "oidcUnlink": "Zrušit propojení",
-        "oidcUnlinkNeedsPassword": "Nejprve nastav heslo - propojení je momentálně jediná cesta do tohoto účtu.",
+        "oidcUnlinkNeedsPassword": "Požádej administrátora, aby ti k účtu nastavil heslo - propojení je momentálně jediná cesta do tohoto účtu.",
         "oidcLinkSuccess": "Účet SSO propojen.",
         "oidcLinkError_already_linked": "Tento účet je již propojen s jiným účtem SSO. Nejprve zruš stávající propojení.",
         "oidcLinkError_sub_taken": "Tento účet SSO již patří jinému účtu Yuvomi.",
@@ -2786,6 +2788,7 @@
         "moduleStatusOff": "{{module}} je pro domácnost vypnutý.",
         "pageAccount": "Účet",
         "pageAccountDescription": "Správa profilu, kontaktních údajů a hesla.",
+        "pageAccountDescriptionSsoOnly": "Správa profilu a kontaktních údajů.",
         "pageAppearance": "Vzhled",
         "pageAppearanceDescription": "Zvolit vzhled, jazyk, region, měnu a formát data a času.",
         "pageDevice": "Toto zařízení",
@@ -5039,8 +5042,7 @@
                 "earlyConfirm": "Zapsat dávku před uplynutím minimálního odstupu?",
                 "earlyDetail": "Další dávka je na řadě až od {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Přesto zapsat"
-            },
-            "stockUpdateFailed": "Dávka je zapsána, zásobu se ale nepodařilo upravit."
+            }
         },
         "prevention": {
             "title": "Prevence a očkování",

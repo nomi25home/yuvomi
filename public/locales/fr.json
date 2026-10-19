@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Rien ne correspond à votre recherche.",
         "searchNoResultsFilteredDescription": "Rien ne correspond à votre recherche et à vos filtres.",
         "searchReset": "Réinitialiser la recherche",
-        "passwordMinLength": "8 caractères minimum."
+        "passwordMinLength": "8 caractères minimum.",
+        "savedReloadFailed": "La modification est enregistrée, mais l’affichage n’a pas pu être actualisé. Rechargez la page s’il manque quelque chose."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -493,6 +494,7 @@
         "historyView": "Historique",
         "historyPersonFilter": "Filtrer par personne",
         "historyUnknownMember": "Ne fait plus partie du foyer",
+        "historyViaSync": "Via la synchronisation",
         "historyEmptyTitle": "Rien d’enregistré pour l’instant",
         "historyEmptyPersonTitle": "Rien d’enregistré pour cette personne",
         "historyEmptyDescription": "Ici, vous voyez qui a fait quelle tâche, et quand.",
@@ -1895,7 +1897,7 @@
         "oidcLinked": "Ce compte est associé à votre compte SSO.",
         "oidcLinkedWithProvider": "Ce compte est associé à {{provider}}.",
         "oidcUnlink": "Dissocier",
-        "oidcUnlinkNeedsPassword": "Définissez d'abord un mot de passe - l'association est actuellement le seul accès à ce compte.",
+        "oidcUnlinkNeedsPassword": "Demandez à un administrateur de définir un mot de passe pour votre compte - l'association est actuellement le seul accès à ce compte.",
         "oidcLinkSuccess": "Compte SSO associé.",
         "oidcLinkError_already_linked": "Ce compte est déjà associé à un autre compte SSO. Dissociez-le d'abord.",
         "oidcLinkError_sub_taken": "Ce compte SSO appartient déjà à un autre compte Yuvomi.",
@@ -2695,6 +2697,7 @@
         "moduleStatusOff": "{{module}} est désactivé pour le foyer.",
         "pageAccount": "Compte",
         "pageAccountDescription": "Gérer le profil, les coordonnées et le mot de passe.",
+        "pageAccountDescriptionSsoOnly": "Gérer le profil et les coordonnées.",
         "pageAppearance": "Apparence",
         "pageAppearanceDescription": "Choisir le thème, la langue, la région, la devise et le format de date et d'heure.",
         "pageDevice": "Cet appareil",
@@ -4915,8 +4918,7 @@
                 "earlyConfirm": "Enregistrer la dose avant la fin de l'intervalle minimal ?",
                 "earlyDetail": "La prochaine dose n'est prévue qu'à partir de {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Enregistrer quand même"
-            },
-            "stockUpdateFailed": "La dose est enregistrée, mais le stock n'a pas pu être mis à jour."
+            }
         },
         "prevention": {
             "title": "Prévention et vaccinations",

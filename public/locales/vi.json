@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Không có mục nào khớp với tìm kiếm của bạn.",
         "searchNoResultsFilteredDescription": "Không có mục nào khớp với tìm kiếm và bộ lọc của bạn.",
         "searchReset": "Đặt lại tìm kiếm",
-        "passwordMinLength": "Ít nhất 8 ký tự."
+        "passwordMinLength": "Ít nhất 8 ký tự.",
+        "savedReloadFailed": "Thay đổi đã được lưu nhưng không thể làm mới chế độ xem. Hãy tải lại trang nếu thiếu thứ gì đó."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -518,6 +519,7 @@
         "historyView": "Lịch sử",
         "historyPersonFilter": "Lọc theo người",
         "historyUnknownMember": "Không còn trong hộ gia đình",
+        "historyViaSync": "Qua đồng bộ",
         "historyEmptyTitle": "Chưa có ghi nhận nào",
         "historyEmptyPersonTitle": "Chưa có ghi nhận cho người này",
         "historyEmptyDescription": "Ở đây bạn thấy ai đã làm việc nào và khi nào.",
@@ -2006,7 +2008,7 @@
         "oidcLinked": "Tài khoản này đã liên kết với tài khoản SSO của bạn.",
         "oidcLinkedWithProvider": "Tài khoản này đã liên kết với {{provider}}.",
         "oidcUnlink": "Hủy liên kết",
-        "oidcUnlinkNeedsPassword": "Hãy đặt mật khẩu trước - liên kết hiện là cách duy nhất vào tài khoản này.",
+        "oidcUnlinkNeedsPassword": "Hãy nhờ quản trị viên đặt mật khẩu cho tài khoản của bạn - liên kết hiện là cách duy nhất vào tài khoản này.",
         "oidcLinkSuccess": "Đã liên kết tài khoản SSO.",
         "oidcLinkError_already_linked": "Tài khoản này đã liên kết với một tài khoản SSO khác. Hãy hủy liên kết hiện có trước.",
         "oidcLinkError_sub_taken": "Tài khoản SSO đó đã thuộc về một tài khoản Yuvomi khác.",
@@ -2695,6 +2697,7 @@
         "moduleStatusOff": "{{module}} đang tắt cho gia đình.",
         "pageAccount": "Tài khoản",
         "pageAccountDescription": "Quản lý hồ sơ, thông tin liên hệ và mật khẩu.",
+        "pageAccountDescriptionSsoOnly": "Quản lý hồ sơ và thông tin liên hệ.",
         "pageAppearance": "Giao diện",
         "pageAppearanceDescription": "Chọn giao diện, ngôn ngữ, khu vực, tiền tệ và định dạng ngày giờ.",
         "pageDevice": "Thiết bị này",
@@ -4915,8 +4918,7 @@
                 "earlyConfirm": "Ghi nhận liều trước khi hết khoảng cách tối thiểu?",
                 "earlyDetail": "Liều tiếp theo chỉ được tính từ {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Vẫn ghi nhận"
-            },
-            "stockUpdateFailed": "Đã ghi nhận liều, nhưng không cập nhật được tồn kho."
+            }
         },
         "prevention": {
             "title": "Phòng ngừa & tiêm chủng",

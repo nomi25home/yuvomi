@@ -22,6 +22,9 @@ const {
   prnDoseState,
   splitRemaining,
   scheduledLogs,
+  createDoseAttempts,
+  doseOutcomeUnknown,
+  randomIdempotencyKey,
 } = await import('../public/utils/health-meds.js');
 
 const { __test: healthHelpers } = await import('../public/pages/health.js');
@@ -649,9 +652,9 @@ test('R20: ein neues Medikament nimmt seinen Einnahmeplan im selben Dialog mit, 
     assert.equal(posts.length, 0, 'ein Entwurf geht noch nicht an den Server');
     assert.match(editorHtml, /health-sched-row" data-schedule-id="draft-0"/, 'das Zeitfenster steht als Zeile im Entwurf');
     await listeners.submit({ preventDefault() {} });
-    assert.deepEqual(posts.map((p) => p.path), ['/health/medications', '/health/medications/41/schedules'],
-      'erst das Medikament, dann sein Zeitfenster unter der neuen id');
-    assert.deepEqual(posts[1].body, { time_of_day: '08:00', days_mask: posts[1].body.days_mask, dose_qty: 1 });
+    assert.deepEqual(posts.map((p) => p.path), ['/health/medications'],
+      'Medikament und Zeitfenster in einem Request (#2054)');
+    assert.deepEqual(posts[0].body.schedules, [{ time_of_day: '08:00', days_mask: posts[0].body.schedules[0].days_mask, dose_qty: 1 }]);
 
     healthHelpers.openMedModal({ id: 7, name: 'Vitamin D', stock_qty: 30 });
     assert.equal(sections.at(-1)?.open, true, 'mit Bestand steht der Aufklapper offen');
@@ -662,103 +665,23 @@ test('R20: ein neues Medikament nimmt seinen Einnahmeplan im selben Dialog mit, 
   }
 });
 
-// Codex-Review PR #2053 (P1): scheiterte nach dem Anlegen eines neuen
-// Medikaments ein Zeitfenster, blieb der Dialog offen und `isEdit` falsch -
-// der zweite Versuch legte das Medikament (und die schon gespeicherten
-// Zeitfenster) ein zweites Mal an.
-test('R20: scheitert ein Zeitfenster nach dem Anlegen, aendert der naechste Versuch das Medikament statt es zu verdoppeln', async () => {
+// #2054 (Folge aus dem Review von #2053): das Speichern legte das Medikament
+// an und schickte danach jedes Zeitfenster einzeln. Scheiterte eines, stand
+// das Medikament schon; Abbrechen, Schliessen oder Verwerfen liess es ohne
+// Plan zurueck, und die Liste lud nicht nach. Jetzt geht alles in EINEM
+// Request, den der Server als Transaktion schreibt: scheitert er, steht nichts.
+test('#2054: ein neues Medikament und sein Plan gehen in einem Request, ein Fehlschlag hinterlaesst nichts', async () => {
   const keep = { open: globalThis.__openModal, adv: globalThis.__advancedSection, api: globalThis.__apiStub, win: globalThis.window, err: console.error };
   const opened = [];
   globalThis.__openModal = (opts) => { opened.push(opts); };
   globalThis.__advancedSection = (inner) => inner;
   const calls = [];
-  let failSecondSchedule = true;
-  let schedPosts = 0;
+  let failNext = true;
   globalThis.__apiStub = {
     post: async (path, body) => {
-      calls.push({ method: 'POST', path, body });
-      if (path === '/health/medications') return { data: { id: 41 } };
-      schedPosts += 1;
-      if (schedPosts === 2 && failSecondSchedule) { failSecondSchedule = false; throw Object.assign(new Error('boom'), { status: 500 }); }
-      return { data: { id: 100 + schedPosts } };
-    },
-    patch: async (path, body) => { calls.push({ method: 'PATCH', path, body }); return { data: {} }; },
-    get: async () => ({ data: [] }),
-  };
-  globalThis.window = globalThis.window ?? {};
-  console.error = () => {};
-  const listeners = {};
-  const field = (value = '') => ({ value, checked: false, style: {}, dataset: {}, disabled: false, addEventListener(type, fn) { listeners[type] = fn; } });
-  const addButton = { disabled: false, addEventListener(type, fn) { listeners.schedAdd = fn; } };
-  let time = '08:00';
-  const host = {
-    replaceChildren() {},
-    insertAdjacentHTML() {},
-    querySelector(sel) {
-      if (sel === '#sched-time') return { value: time };
-      if (sel === '#sched-dose') return { value: '1' };
-      if (sel === '[data-action="sched-add"]') return addButton;
-      return null;
-    },
-    querySelectorAll(sel) {
-      if (sel === '.health-weekday.is-active') return [0, 1, 2, 3, 4, 5, 6].map((d) => ({ dataset: { day: String(d) } }));
-      return [];
-    },
-  };
-  const form = { addEventListener(type, fn) { listeners.submit = fn; } };
-  const fields = { '#med-name': field('Ibuprofen'), '#med-prn': field(), '#med-prn-fields': field(), '#med-active': { ...field(), checked: true } };
-  const panel = {
-    querySelector(sel) {
-      if (sel === '#med-sched-editor') return host;
-      if (sel === '#med-form') return form;
-      if (sel === '[type="submit"]') return { disabled: false };
-      return fields[sel] ?? field();
-    },
-    querySelectorAll: () => [],
-  };
-  try {
-    healthHelpers.openMedModal(null);
-    opened.at(-1).onSave(panel);
-    await listeners.schedAdd({ currentTarget: addButton });
-    time = '20:00';
-    await listeners.schedAdd({ currentTarget: addButton });
-    await listeners.submit({ preventDefault() {} });
-    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
-      'POST /health/medications', 'POST /health/medications/41/schedules', 'POST /health/medications/41/schedules',
-    ], 'das zweite Zeitfenster scheitert, das Medikament steht schon');
-    calls.length = 0;
-    await listeners.submit({ preventDefault() {} });
-    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
-      'PATCH /health/medications/41', 'POST /health/medications/41/schedules',
-    ], 'kein zweites Medikament, nur das fehlende Zeitfenster');
-    assert.equal(calls[1].body.time_of_day, '20:00', 'es ist das gescheiterte Zeitfenster');
-  } finally {
-    console.error = keep.err;
-    for (const [k, v] of [['__openModal', keep.open], ['__advancedSection', keep.adv], ['__apiStub', keep.api], ['window', keep.win]]) {
-      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
-    }
-  }
-});
-
-// Codex-Review PR #2053, zweite Runde (P2): nach einem Teil-Speichern steht
-// ein Zeitfenster des Entwurfs schon am Medikament. Loeschte man es danach im
-// Entwurf, verschwand es nur lokal; der naechste Versuch uebersprang es, und
-// das Medikament behielt den Plan, den niemand mehr wollte.
-test('R20: ein schon gespeichertes Zeitfenster, das man nach einem Teil-Speichern loescht, verschwindet auch am Server', async () => {
-  const keep = { open: globalThis.__openModal, adv: globalThis.__advancedSection, api: globalThis.__apiStub, win: globalThis.window, err: console.error };
-  const opened = [];
-  globalThis.__openModal = (opts) => { opened.push(opts); };
-  globalThis.__advancedSection = (inner) => inner;
-  const calls = [];
-  let failSecondSchedule = true;
-  let schedPosts = 0;
-  globalThis.__apiStub = {
-    post: async (path, body) => {
-      calls.push({ method: 'POST', path, body });
-      if (path === '/health/medications') return { data: { id: 41 } };
-      schedPosts += 1;
-      if (schedPosts === 2 && failSecondSchedule) { failSecondSchedule = false; throw Object.assign(new Error('boom'), { status: 500 }); }
-      return { data: { id: 100 + schedPosts } };
+      calls.push({ method: 'POST', path, body: structuredClone(body) });
+      if (failNext) { failNext = false; throw Object.assign(new Error('boom'), { status: 500 }); }
+      return { data: { id: 41 } };
     },
     patch: async (path, body) => { calls.push({ method: 'PATCH', path, body }); return { data: {} }; },
     delete: async (path) => { calls.push({ method: 'DELETE', path }); return { data: {} }; },
@@ -811,25 +734,111 @@ test('R20: ein schon gespeichertes Zeitfenster, das man nach einem Teil-Speicher
     time = '20:00';
     await listeners.schedAdd({ currentTarget: addButton });
     await listeners.submit({ preventDefault() {} });
-    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
-      'POST /health/medications', 'POST /health/medications/41/schedules', 'POST /health/medications/41/schedules',
-    ], 'das erste Zeitfenster steht (id 101), das zweite scheitert');
+    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['POST /health/medications'],
+      'ein einziger Request; scheitert er, gibt es kein Medikament, das ein Abbrechen zuruecklassen koennte');
+    assert.deepEqual(calls[0].body.schedules.map((s) => s.time_of_day), ['08:00', '20:00'], 'der Plan reist mit');
+
+    // Nach dem Fehlschlag ein Zeitfenster aus dem Entwurf nehmen: das ist rein
+    // lokal, am Server steht davon nichts.
+    calls.length = 0;
     assert.equal(deleteButtons.length, 2, 'Reichweite: beide Entwurfszeilen haben einen Loeschknopf');
-    calls.length = 0;
     await deleteButtons[0].click();
-    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['DELETE /health/schedules/101'],
-      'das schon gespeicherte 08:00-Fenster wird am Server geloescht');
-    calls.length = 0;
+    assert.deepEqual(calls, [], 'kein Request beim Loeschen einer Entwurfszeile');
+
+    // Der naechste Versuch legt wieder an (kein PATCH auf ein halbes Medikament)
+    // und schickt den Plan, wie er jetzt im Dialog steht.
     await listeners.submit({ preventDefault() {} });
-    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
-      'PATCH /health/medications/41', 'POST /health/medications/41/schedules',
-    ], 'der naechste Versuch schickt nur das fehlende 20:00-Fenster');
-    assert.equal(calls[1].body.time_of_day, '20:00');
-    assert.equal('savedId' in calls[1].body && Object.keys(calls[1].body).includes('savedId'), false, 'die Server-id reist nie im Body');
+    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['POST /health/medications']);
+    assert.deepEqual(calls[0].body.schedules, [{ time_of_day: '20:00', days_mask: calls[0].body.schedules[0].days_mask, dose_qty: 1 }]);
+    assert.equal(calls[0].body.name, 'Ibuprofen');
   } finally {
     console.error = keep.err;
     for (const [k, v] of [['__openModal', keep.open], ['__advancedSection', keep.adv], ['__apiStub', keep.api], ['window', keep.win]]) {
       if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
     }
   }
+});
+
+// --------------------------------------------------------
+// Wiederholbare Dosis-Buchung (#2069)
+// --------------------------------------------------------
+
+test('createDoseAttempts: ein Wiederholversuch nach offenem Ausgang behaelt Schluessel und Rumpf', () => {
+  let n = 0;
+  const attempts = createDoseAttempts({ newKey: () => `k${++n}` });
+  let built = 0;
+  const body = () => ({ taken_at: `T${++built}` });
+  const first = attempts.attempt('prn:1', body);
+  attempts.settle('prn:1', { status: 0 }); // Netzfehler: die Dosis kann gebucht sein
+  const retry = attempts.attempt('prn:1', body);
+  assert.equal(retry.key, first.key, 'derselbe Schluessel');
+  assert.deepEqual(retry.body, first.body, 'derselbe Rumpf - ein neues taken_at waere fuer die Middleware ein Konflikt');
+  assert.equal(built, 1);
+  attempts.settle('prn:1', { status: 503 });
+  assert.equal(attempts.attempt('prn:1', body).key, 'k1', 'auch nach einem Serverfehler');
+  // Erfolg beendet den Vorgang: der naechste Tipp ist eine neue Dosis.
+  attempts.settle('prn:1');
+  assert.equal(attempts.has('prn:1'), false);
+  assert.equal(attempts.attempt('prn:1', body).key, 'k2');
+  // Eine eindeutige Absage ebenso.
+  attempts.settle('prn:1', { status: 400 });
+  assert.equal(attempts.attempt('prn:1', body).key, 'k3');
+  // Verschiedene Aktionen teilen sich keinen Schluessel.
+  assert.notEqual(attempts.attempt('dose:1:2:2026-06-04T08:00:take', body).key, 'k3');
+});
+
+test('createDoseAttempts: eine spaetere Bedarfsdosis bekommt einen frischen Schluessel (#2069, Codex)', () => {
+  // Der offene Versuch gilt nur fuer den unmittelbaren Wiederholversuch.
+  // Bliebe er liegen, schickte eine gewollte zweite Dosis den alten Schluessel,
+  // der Server spielte die alte Antwort zurueck, und die neue Dosis fehlte still.
+  let n = 0;
+  let clock = 1_000_000;
+  const attempts = createDoseAttempts({ newKey: () => `k${++n}`, now: () => clock, retryWindowMs: 120_000 });
+  const body = () => ({ taken_at: `T${clock}` });
+
+  // 1. Nach dem Wiederholfenster ist ein Tipp eine neue Dosis.
+  attempts.attempt('prn:7', body, 7);
+  attempts.settle('prn:7', { status: 0 });
+  clock += 60_000;
+  assert.equal(attempts.attempt('prn:7', body, 7).key, 'k1', 'innerhalb des Fensters: Wiederholung');
+  attempts.settle('prn:7', { status: 0 });
+  clock += 120_001;
+  assert.equal(attempts.has('prn:7'), false);
+  assert.equal(attempts.attempt('prn:7', body, 7).key, 'k2', 'nach dem Fenster: neue Dosis');
+  attempts.settle('prn:7');
+
+  // 2. Ein Laden, das NACH dem Fehlschlag begann, klaert den Versuch.
+  attempts.attempt('prn:7', body, 7);
+  const loadBefore = clock - 1;      // lief schon vor dem Fehlschlag
+  clock += 1000;
+  attempts.settle('prn:7', { status: 503 });
+  attempts.confirmedBy(loadBefore, [7]);
+  assert.equal(attempts.has('prn:7'), true, 'ein Laden von vorher kann den Stand vor der Buchung zeigen');
+  attempts.confirmedBy(clock, [8]);
+  assert.equal(attempts.has('prn:7'), true, 'die Ansicht eines anderen Medikaments klaert nichts');
+  clock += 1000;
+  attempts.confirmedBy(clock, [7, 8]);
+  assert.equal(attempts.has('prn:7'), false, 'der Stand ist da: der naechste Tipp ist eine neue Dosis');
+  assert.equal(attempts.attempt('prn:7', body, 7).key, 'k4');
+
+  // 3. Eine laufende Anfrage klaert kein Laden weg.
+  attempts.confirmedBy(clock + 5000, [7]);
+  assert.equal(attempts.has('prn:7'), true);
+});
+
+test('doseOutcomeUnknown: nur Netz, Zeitueberschreitung, Bremse und Serverfehler lassen den Ausgang offen', () => {
+  for (const status of [0, 408, 429, 500, 502, 503]) assert.equal(doseOutcomeUnknown({ status }), true, String(status));
+  for (const status of [400, 403, 404, 409, 422]) assert.equal(doseOutcomeUnknown({ status }), false, String(status));
+  assert.equal(doseOutcomeUnknown(new Error('x')), false);
+  // Eine 409 "noch in Arbeit" heisst: die erste Anfrage laeuft noch, ihr Ausgang
+  // ist offen. Der Versuch muss bleiben, sonst bucht der naechste Tipp mit
+  // neuem Schluessel ein zweites Mal.
+  assert.equal(doseOutcomeUnknown({ status: 409, data: { reason: 'idempotency_in_progress' } }), true);
+  assert.equal(doseOutcomeUnknown({ status: 409, data: { reason: 'idempotency_key_reused' } }), false);
+});
+
+test('randomIdempotencyKey: 32 Hex-Zeichen, ohne randomUUID (plain HTTP im Heimnetz)', () => {
+  const a = randomIdempotencyKey();
+  assert.match(a, /^[0-9a-f]{32}$/);
+  assert.notEqual(a, randomIdempotencyKey());
 });
