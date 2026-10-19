@@ -9,8 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **"Manage participants" in rewards now lives in a More-actions menu.** The section header showed two equally-weighted buttons; only "Grant bonus" stays as the primary section action. "Manage participants" is reached via the ⋯ button next to it.
-- **"Add recurring expense" moved to the recurring-expenses section header.** The button used to appear below the list; it now sits in the section title row, consistent with the D5 section-action pattern.
+- **"Manage participants" in rewards now lives in a More-actions menu.** The section header showed
+  two equally-weighted buttons; only "Grant bonus" stays as the primary section action. "Manage
+  participants" is reached via the ⋯ button next to it.
+- **"Add recurring expense" moved to the recurring-expenses section header.** The button used to
+  appear below the list; it now sits in the section title row, consistent with the D5
+  section-action pattern.
 
 - **Task, calendar and Overview lists load much faster in households with profile pictures.**
   Every task, event, note, housekeeping visit and money ledger row used to carry the full profile

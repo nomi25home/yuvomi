@@ -309,6 +309,30 @@ test('Klick auf die Zeile: eigene Serie oeffnet den Dialog, fremde die Leseansic
   });
 });
 
+// #2042: der Anlegen-Knopf hat seit dem PR einen eigenen Hoerer in renderMain().
+// Ohne diesen Test koennte man Zeile 865 aus split-expenses.js loeschen und
+// jede Suite bliebe gruen - der Klick waere tot, ohne es zu zeigen.
+test('Klick auf [data-recurring-add] im Abschnittskopf oeffnet den Anlagen-Dialog (#2042)', async () => {
+  await buehne({}, async (spur) => {
+    let clickHandler = null;
+    const addBtn = { addEventListener(typ, fn) { if (typ === 'click') clickHandler = fn; } };
+    const main = {
+      html: '',
+      removeAttribute() {},
+      replaceChildren() { this.html = ''; },
+      insertAdjacentHTML(_p, m) { this.html += m; },
+      querySelector(sel) { return sel === '[data-recurring-add]' ? addBtn : null; },
+      querySelectorAll: () => [],
+    };
+    split.renderMainForTest({ querySelector: (sel) => (sel === '#split-main' ? main : null) });
+    split.renderMainForTest(_stumm); // Seitencontainer zurueckstellen
+    assert.ok(clickHandler !== null, '[data-recurring-add] hat keinen click-Hoerer bekommen');
+    clickHandler();
+    assert.equal(spur.dialoge.length, 1, 'Klick auf [data-recurring-add] hat openRecurringModal() nicht aufgerufen');
+    assert.equal(spur.dialoge[0].title, 'splitExpenses.recurring.add');
+  });
+});
+
 test('Der Riegel haengt nicht am Markup: ein Bearbeiten-Klick ohne Recht oeffnet die Leseansicht, Anlegen und Umschalten tun nichts', async () => {
   const lagen = [
     { name: 'budget: read', lage: { modus: 'read' }, id: '11' },
