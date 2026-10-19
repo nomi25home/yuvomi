@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Nada coincide con tu búsqueda.",
         "searchNoResultsFilteredDescription": "Nada coincide con tu búsqueda y los filtros.",
         "searchReset": "Restablecer búsqueda",
-        "passwordMinLength": "Al menos 8 caracteres."
+        "passwordMinLength": "Al menos 8 caracteres.",
+        "savedReloadFailed": "El cambio se ha guardado, pero no se pudo actualizar la vista. Recarga la página si falta algo."
     },
     "kitchen": {
         "noShoppingLists": "Todavía no hay lista de la compra.",
@@ -493,6 +494,7 @@
         "historyView": "Historial",
         "historyPersonFilter": "Filtrar por persona",
         "historyUnknownMember": "Ya no está en el hogar",
+        "historyViaSync": "Mediante sincronización",
         "historyEmptyTitle": "Aún no hay nada registrado",
         "historyEmptyPersonTitle": "Nada registrado para esta persona",
         "historyEmptyDescription": "Aquí verás quién hizo cada tarea y cuándo.",
@@ -1895,7 +1897,7 @@
         "oidcLinked": "Esta cuenta está vinculada a tu cuenta SSO.",
         "oidcLinkedWithProvider": "Esta cuenta está vinculada a {{provider}}.",
         "oidcUnlink": "Desvincular",
-        "oidcUnlinkNeedsPassword": "Establece primero una contraseña - el vínculo es actualmente la única forma de entrar en esta cuenta.",
+        "oidcUnlinkNeedsPassword": "Pide a un administrador que establezca una contraseña para tu cuenta - el vínculo es actualmente la única forma de entrar en esta cuenta.",
         "oidcLinkSuccess": "Cuenta SSO vinculada.",
         "oidcLinkError_already_linked": "Esta cuenta ya está vinculada a otra cuenta SSO. Elimina primero el vínculo existente.",
         "oidcLinkError_sub_taken": "Esa cuenta SSO ya pertenece a otra cuenta de Yuvomi.",
@@ -2695,6 +2697,7 @@
         "moduleStatusOff": "{{module}} está desactivado para el hogar.",
         "pageAccount": "Cuenta",
         "pageAccountDescription": "Gestiona tu perfil, datos de contacto y contraseña.",
+        "pageAccountDescriptionSsoOnly": "Gestiona tu perfil y tus datos de contacto.",
         "pageAppearance": "Apariencia",
         "pageAppearanceDescription": "Elegir tema, idioma, región, moneda y formato de fecha y hora.",
         "pageDevice": "Este dispositivo",
@@ -4915,8 +4918,7 @@
                 "earlyConfirm": "¿Registrar la dosis antes de que pase el intervalo mínimo?",
                 "earlyDetail": "La próxima dosis no está prevista hasta las {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Registrar igualmente"
-            },
-            "stockUpdateFailed": "La dosis quedó registrada, pero no se pudo actualizar el stock."
+            }
         },
         "prevention": {
             "title": "Prevención y vacunas",

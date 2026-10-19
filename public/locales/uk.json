@@ -99,7 +99,8 @@
         "searchNoResultsDescription": "Нічого не відповідає вашому пошуку.",
         "searchNoResultsFilteredDescription": "Нічого не відповідає вашому пошуку та фільтрам.",
         "searchReset": "Скинути пошук",
-        "passwordMinLength": "Щонайменше 8 символів."
+        "passwordMinLength": "Щонайменше 8 символів.",
+        "savedReloadFailed": "Зміну збережено, але не вдалося оновити екран. Перезавантажте сторінку, якщо чогось бракує."
     },
     "kitchen": {
         "noShoppingLists": "Списку покупок ще немає.",
@@ -571,6 +572,7 @@
         "historyView": "Історія",
         "historyPersonFilter": "Фільтр за учасником",
         "historyUnknownMember": "Більше не в родині",
+        "historyViaSync": "Через синхронізацію",
         "historyEmptyTitle": "Поки нічого не записано",
         "historyEmptyPersonTitle": "Для цього учасника нічого не записано",
         "historyEmptyDescription": "Тут видно, хто і коли виконав яке завдання.",
@@ -2055,7 +2057,7 @@
         "oidcLinked": "Цей обліковий запис приєднано до вашого облікового запису SSO.",
         "oidcLinkedWithProvider": "Цей обліковий запис приєднано до {{provider}}.",
         "oidcUnlink": "Від'єднати",
-        "oidcUnlinkNeedsPassword": "Спершу встановіть пароль - приєднання наразі єдиний шлях до цього облікового запису.",
+        "oidcUnlinkNeedsPassword": "Попросіть адміністратора встановити пароль для вашого облікового запису - приєднання наразі єдиний шлях до цього облікового запису.",
         "oidcLinkSuccess": "Обліковий запис SSO приєднано.",
         "oidcLinkError_already_linked": "Цей обліковий запис уже приєднано до іншого облікового запису SSO. Спершу видаліть наявне приєднання.",
         "oidcLinkError_sub_taken": "Цей обліковий запис SSO уже належить іншому обліковому запису Yuvomi.",
@@ -2877,6 +2879,7 @@
         "moduleStatusOff": "{{module}} вимкнено для дому.",
         "pageAccount": "Обліковий запис",
         "pageAccountDescription": "Керування профілем, контактами та паролем.",
+        "pageAccountDescriptionSsoOnly": "Керування профілем і контактами.",
         "pageAppearance": "Вигляд",
         "pageAppearanceDescription": "Обрати тему, мову, регіон, валюту, а також формат дати й часу.",
         "pageDevice": "Цей пристрій",
@@ -5161,8 +5164,7 @@
                 "earlyConfirm": "Записати дозу до завершення мінімального інтервалу?",
                 "earlyDetail": "Наступна доза передбачена лише з {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Усе одно записати"
-            },
-            "stockUpdateFailed": "Дозу записано, але запас не вдалося оновити."
+            }
         },
         "prevention": {
             "title": "Профілактика та щеплення",

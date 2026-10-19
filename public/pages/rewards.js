@@ -28,6 +28,7 @@ import {
   formatMoney, amountPlaceholder, amountExample, amountInputProblem,
   amountToInput, currencyFractionDigits, toDecimalString,
 } from '/utils/money.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
 
@@ -1044,7 +1045,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
           });
           closeModal({ force: true, context: modalContext });
           toast(isAdmin() ? t('rewards.toastRedeemed') : t('rewards.toastRequested'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           // Zwischen Dialog-Aufbau und Absenden kann die letzte Einheit weg
@@ -1098,7 +1099,7 @@ async function decideRedemption(id, action, btn) {
     // mit der letzten geht der ganze Abschnitt (Titel + Traeger).
     const row = btn?.closest?.('.rw-pending');
     await collapseRow(row, { group: row?.closest?.('.rw-section'), selector: '.rw-pending' });
-    await refreshActiveTab();
+    await reloadAfterSave(() => refreshActiveTab());
     // Nur nach der Rueckfrage: "Einloesen" fragt nicht, schliesst also keinen
     // Dialog, und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
     if (gefragt) refocusAfterRender();
@@ -1173,7 +1174,7 @@ function openBonusModal() {
           });
           closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastBonus'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
@@ -1268,7 +1269,7 @@ function openRewardModal(item) {
           else await api.post('/rewards/catalog', body);
           closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
@@ -1673,7 +1674,7 @@ function openMoneyRequestModal(kind, memberId) {
           });
           closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastRequested'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           errEl.textContent = err?.data?.reason === 'insufficient_funds'
@@ -1738,7 +1739,7 @@ function openMoneyBookModal(memberId) {
           });
           closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           errEl.textContent = err?.data?.reason === 'insufficient_funds'
@@ -1850,7 +1851,7 @@ function openMoneyPlanModal(memberId) {
           });
           closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
@@ -1897,7 +1898,7 @@ function openMoneyAccountModal() {
           await api.post('/rewards/money/accounts', { user_id: Number(panel.querySelector('#rw-account-member').value) });
           closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
-          await refreshActiveTab();
+          await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
         } catch (err) {
           errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;

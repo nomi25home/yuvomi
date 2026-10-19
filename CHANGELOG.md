@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Every task, event, note, housekeeping visit and money ledger row used to carry the full profile
   picture of its person, and a task twice. With 200 tasks and five pictures the task list weighed
   17 MB, and over plain HTTP in a home network about 13 MB of it crossed the wire on every load. The
-  rows now carry a short picture address instead, and the browser loads each picture once (now
-  about 215 KB, under 5 KB compressed). Pictures still show offline where the list does.
+  rows now carry a short picture address instead, and the browser downloads each picture once (now
+  about 215 KB, under 5 KB compressed) and afterwards only asks whether it changed, so a signed-out
+  browser no longer shows it. Pictures still show offline where the list does.
   **API:** requests with an API token see no change and keep receiving data URLs. For the app
   itself (session and wall display) the fields `assigned_avatar`, `assigned_users[].avatar_data`
   (tasks, events), `creator_avatar` (notes), `worker_avatar_data` (housekeeping visits),
@@ -36,6 +37,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Recurring events on the day the clocks change are no longer an hour off (#2034).**
+  A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
+  on the day of the clock change one hour early or late, both in the calendar and in subscribed
+  calendars. Each occurrence now keeps its local time. Where that time does not exist on the day the
+  clocks go forward (02:30 in Berlin), the occurrence moves forward by the skipped hour; where it
+  exists twice when the clocks go back, the first one counts. Occurrences you deleted or changed keep
+  their place.
+- **Older series ends now reach Google, CalDAV, iCloud and the calendar feed on the same last day Yuvomi shows (#1992).**
+  Before #1989 the repeat form saved a series end as the end of the UTC day, and series saved that
+  way still carry it. For a series without its own time zone Yuvomi ends it on that date, while
+  other calendars read the UTC moment: west of UTC (for example Chicago, 8 pm) they dropped the last
+  occurrence, east of UTC (Berlin, 0:30) they showed one more. Such a series now goes out with the
+  end of that day in the household's time zone, so both sides end on the same occurrence. Nothing
+  stored is rewritten: the calendar feed shows the corrected end right away, Google, CalDAV and
+  iCloud receive it with the next change sent for that series, and reading it back counts as
+  Yuvomi's own change rather than an edit in the other calendar. Series imported from other
+  calendars still go back word for word.
+- **Reconnecting or disconnecting Google Calendar now stops a sync that is still running (#2035).**
+  A sync that was waiting on Google while you reconnected, perhaps with another account, or
+  disconnected used to carry on with the old connection: it could still send queued changes to the
+  previous account, import its events after the disconnect, and leave its progress and errors on the
+  new connection. It now stops at its next step, and the new connection's own sync takes over. A
+  reconnect also no longer removes calendars from the selection based on the calendar list of an
+  account that was replaced in the meantime.
+- **An account that signs in only through single sign-on no longer sees a change-password form.**
+  Such an account has no password, yet the account page asked it for the current one, so the form
+  could never succeed. The card now only appears for accounts that have a password, linked to a
+  provider or not. For such an account the page subtitle no longer mentions a password, and the
+  single sign-on card now says to ask an administrator to set one instead of "Set a password first"
+  (#1703).
+- **A task ticked off in Apple Reminders or another synced reminders app now counts as done (#1836).**
+  It used to be marked done without a record of when, so it was missing from the task history, and
+  an overdue one disappeared from the wall display instead of getting its check mark. It now shows
+  in the history at the time it was completed on the phone, labelled "Via sync" since the sync
+  cannot tell who ticked it off, and reopening it there removes the entry again. Marking a
+  housekeeping visit as paid likewise records its payment task as done by the person who marked
+  it, and taking the payment back removes that again. Tasks completed this way before the update
+  stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
+  **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
+  (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+- **Moving a completed reminder into or out of a parent reminder now updates the task history (#2078).**
+  When the reminders app changed only which reminder a completed one belongs to, the history kept
+  its old state: a completed task moved under another one stayed in the history, although subtasks
+  never appear there, and a completed subtask moved out to stand on its own never showed up. Now
+  the first loses its entry, and the second gets one at the time it was completed on the phone. If
+  the reminder carries no completion time, it stays without an entry rather than claiming it was
+  done at the time of the sync.
+- **Saving no longer counts as failed when only the refresh afterwards fails.** Many dialogs
+  reloaded their list in the same step as the save. When the save went through but the reload hit
+  a network blip or a busy server, the dialog stayed open with a "could not save" message, and
+  saving again created the entry a second time. Now the dialog closes once the save went through,
+  and a failed refresh says so in its own notice. This covers pantry, budget, inventory, meals,
+  tasks, health, housekeeping, waste, rewards, documents, schedule, calendar and several settings
+  pages.
+- **Logging a dose counts down the stock in the same step.** Taking a planned or as-needed dose
+  used to log it and then update the stock in a second request; when the second one failed, the
+  dose was logged but the stock stayed where it was. The server now does both together, from the
+  stored stock. Tapping the dose again after a dropped connection no longer logs it twice or
+  counts the stock down twice: the app repeats the same request, and the server answers it once.
+  **API:** `POST /api/v1/health/medications/{id}/logs` and `POST /api/v1/health/logs/{id}/take`
+  accept `stock_deduct`. A second `POST .../logs` for the same `schedule_id` and `scheduled_at`
+  updates the existing entry (200) instead of adding another one.
+- **A countdown to an evening event no longer names the next day.** With the server running in UTC
+  (the default container) and a household east of UTC, an event at 23:30 counted down to the day
+  after; west of UTC, an early-morning event could count down to the day before. The countdown now
+  reads the event's time in the household's time zone, wherever the server runs (#1998).
+- **A session that ends while the sign-in page is open no longer wipes what you typed** (#1945).
+  When a request found the session gone, the app drew the sign-in page again even when it was
+  already showing, so a half-typed user name and password were cleared; with setup still pending
+  the same happened to the setup page. A session that ends on a page that needs no sign-in (sign-in,
+  setup, invitation, display pairing, password reset) now leaves that page as it is. On every other
+  page it still leads to the sign-in page.
+
+- **A new medication is saved together with its intake plan, or not at all.** If saving one of
+  the plan's times failed, the medication itself was already stored. Cancelling the dialog then
+  left it behind without its plan and without showing it in the list, so it was easy to add it a
+  second time. The medication and its plan are now saved in one step; if that fails, nothing is
+  stored and the dialog keeps everything you entered, so Save simply tries again (#2054).
+  **API:** `POST /api/v1/health/medications` accepts an optional `schedules` array and writes the
+  medication and its schedules in one transaction.
 - **Saving in a rewards dialog no longer force-closes whichever dialog is open when the answer arrives (#1997).**
   All seven save paths in the rewards module now capture the modal context before the request and
   pass it to `closeModal`, so a dialog the user opened while the save was in flight stays open.
