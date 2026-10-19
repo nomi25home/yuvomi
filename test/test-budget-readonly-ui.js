@@ -826,7 +826,7 @@ test('Geteilte Ausgaben: Kopfknopf und Gruppe-Anlegen haengen am Recht', () => {
     split.state.groupStatus = 'archived';
     withAccess({ budget: 'write' }, () => assert.equal(split.canAddSplitExpense(), false, 'im Archiv keine neue Ausgabe'));
   } finally { split.state.groupStatus = status; }
-  assert.match(render, /\$\{readOnly\(\) \? '' : `<button class="btn btn--icon" id="split-add-group"/);
+  assert.match(render, /readOnly\(\) \|\| isSplitGuest\(\) \? '' : popoverMenuHtml\(/, 'Gruppe anlegen ist hinter readOnly/isSplitGuest und popoverMenuHtml');
 });
 
 // -------------------------------------------------------------------------
