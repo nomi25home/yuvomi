@@ -11063,7 +11063,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 254,
+    version: 253,
     description: 'push_subscriptions: wall_paused_at timestamp pauses delivery while the wall is shown (#1904)',
     // EIN GERAET IM WANDMODUS SOLL KEINE PERSOENLICHEN SYSTEM-BENACHRICHTIGUNGEN
     // BEKOMMEN (#1904). Der Server ueberspringt Abos, bei denen `wall_paused_at`
