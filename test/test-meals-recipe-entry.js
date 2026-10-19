@@ -182,7 +182,7 @@ test('Spalte: Klick auf den Knopf oeffnet "Mahlzeit hinzufuegen" mit gesetztem R
   const savedMeals = meals.state.meals;
   meals.state.recipes = [PIZZA];
   meals.state.meals = [];
-  meals.state.currentWeek = meals.getMondayOf(todayKey());
+  meals.state.currentWeek = meals.getWeekStartOf(todayKey());
   meals.setContainerForTest({ querySelector: (sel) => (sel === '#recipe-sidebar' ? sidebar : null) });
   let opened = null;
   const zuvor = globalThis.__openModal;
