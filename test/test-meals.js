@@ -593,26 +593,28 @@ test('Autocomplete ohne Treffer gibt leeres Array', () => {
 test('Wochenberechnung: erster Tag der Woche je Haushaltswochenstartag', () => {
   // 2026-03-24 ist ein Dienstag; 2026-03-22 ist der Sonntag davor,
   // 2026-03-21 ist der Samstag davor.
-  function getWeekStartOf(dateStr, startDay) {
-    const d   = new Date(dateStr + 'T00:00:00Z');
-    const day = d.getUTCDay();
-    const diff = -((day - startDay + 7) % 7);
-    d.setUTCDate(d.getUTCDate() + diff);
-    return d.toISOString().slice(0, 10);
+  // Ruft die echte mealsUi.getWeekStartOf()-Funktion mit state.weekStart gesetzt auf.
+  const zuvor = mealsUi.state.weekStart;
+  try {
+    // Montag-Start (1)
+    mealsUi.state.weekStart = 1;
+    assert(mealsUi.getWeekStartOf('2026-03-24') === '2026-03-23', 'Dienstag → Montag');
+    assert(mealsUi.getWeekStartOf('2026-03-23') === '2026-03-23', 'Montag bleibt Montag');
+    assert(mealsUi.getWeekStartOf('2026-03-29') === '2026-03-23', 'Sonntag → voriger Montag');
+    assert(mealsUi.getWeekStartOf('2026-03-30') === '2026-03-30', 'Nächster Montag');
+    // Sonntag-Start (0)
+    mealsUi.state.weekStart = 0;
+    assert(mealsUi.getWeekStartOf('2026-03-24') === '2026-03-22', 'Dienstag → voriger Sonntag');
+    assert(mealsUi.getWeekStartOf('2026-03-22') === '2026-03-22', 'Sonntag bleibt Sonntag');
+    assert(mealsUi.getWeekStartOf('2026-03-28') === '2026-03-22', 'Samstag → voriger Sonntag');
+    // Samstag-Start (6)
+    mealsUi.state.weekStart = 6;
+    assert(mealsUi.getWeekStartOf('2026-03-24') === '2026-03-21', 'Dienstag → voriger Samstag');
+    assert(mealsUi.getWeekStartOf('2026-03-21') === '2026-03-21', 'Samstag bleibt Samstag');
+    assert(mealsUi.getWeekStartOf('2026-03-27') === '2026-03-21', 'Freitag → voriger Samstag');
+  } finally {
+    mealsUi.state.weekStart = zuvor;
   }
-  // Montag-Start (1)
-  assert(getWeekStartOf('2026-03-24', 1) === '2026-03-23', 'Dienstag → Montag');
-  assert(getWeekStartOf('2026-03-23', 1) === '2026-03-23', 'Montag bleibt Montag');
-  assert(getWeekStartOf('2026-03-29', 1) === '2026-03-23', 'Sonntag → voriger Montag');
-  assert(getWeekStartOf('2026-03-30', 1) === '2026-03-30', 'Nächster Montag');
-  // Sonntag-Start (0)
-  assert(getWeekStartOf('2026-03-24', 0) === '2026-03-22', 'Dienstag → voriger Sonntag');
-  assert(getWeekStartOf('2026-03-22', 0) === '2026-03-22', 'Sonntag bleibt Sonntag');
-  assert(getWeekStartOf('2026-03-28', 0) === '2026-03-22', 'Samstag → voriger Sonntag');
-  // Samstag-Start (6)
-  assert(getWeekStartOf('2026-03-24', 6) === '2026-03-21', 'Dienstag → voriger Samstag');
-  assert(getWeekStartOf('2026-03-21', 6) === '2026-03-21', 'Samstag bleibt Samstag');
-  assert(getWeekStartOf('2026-03-27', 6) === '2026-03-21', 'Freitag → voriger Samstag');
 });
 
 // PR #1200 Review Runde 3, Nice-to-have 2: keine Suite pinnte fest, dass

@@ -742,6 +742,13 @@ export async function render(container, { user }) {
   renderKitchenTabsBar(container, '/meals');
   installPopoverMenus(container.querySelector('.meals-toolbar'));
 
+  // Präferenz zuerst laden: weekBegin hängt von state.weekStart ab, das
+  // loadPreferences() setzt. Läuft loadPreferences() parallel, steht
+  // state.weekStart beim Aufruf von getWeekStartOf() noch auf dem Standardwert
+  // (Montag), und die erste Wochenanfrage und state.currentWeek landen auf dem
+  // falschen Tag (z.B. Montag statt Sonntag für Sonntag-Haushalte).
+  await loadPreferences();
+
   const today     = todayKey();
   const weekBegin = getWeekStartOf(today);
 
@@ -754,7 +761,7 @@ export async function render(container, { user }) {
   state.currentWeek = weekBegin;
   syncTodayButton();
 
-  await Promise.all([loadWeek(weekBegin), loadLists(), loadPreferences(), loadCategories(), loadRecipes(), loadMembers()]);
+  await Promise.all([loadWeek(weekBegin), loadLists(), loadCategories(), loadRecipes(), loadMembers()]);
   renderWeekGrid();
   renderRecipeSidebar();
   wireNav();
@@ -2942,6 +2949,11 @@ export const __test = {
   cookPickerHtml,
   loadMembers,
   showCookForScope,
+  // #2075: loadPreferences() und loadWeek() werden exportiert, damit der Test
+  // die echte Ladereihenfolge (Präferenz zuerst, dann Wochenberechnung) als
+  // Programm fahren kann.
+  loadPreferences,
+  loadWeek,
 };
 
 // --------------------------------------------------------
