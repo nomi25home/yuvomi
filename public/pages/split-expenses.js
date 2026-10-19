@@ -10,7 +10,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { installPopoverMenus } from '/utils/popover-menu.js';
+import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { stagger } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
@@ -206,9 +206,12 @@ export async function render(container, { user, embedded = false, onAddableChang
     clearLabel: t('common.searchClear'),
     className: 'split-search',
   })}
-            ${readOnly() ? '' : `<button class="btn btn--icon" id="split-add-group" aria-label="${t('splitExpenses.addGroup')}" ${isSplitGuest() ? 'hidden' : ''}>
-              <i data-lucide="plus" aria-hidden="true"></i>
-            </button>`}
+            ${readOnly() || isSplitGuest() ? '' : popoverMenuHtml({
+    id: 'split-group-panel-more',
+    label: t('common.moreActions'),
+    items: [{ icon: 'plus', label: t('splitExpenses.addGroup'), action: 'add-group' }],
+    triggerClass: 'btn btn--secondary btn--icon btn--sm split-group-panel-more',
+  })}
           </div>
           <!-- Geteilter Umschalter-Baustein des Budget-Moduls statt eigener
                Pillen-Optik, und role="radiogroup" statt role="group": eine
@@ -427,7 +430,7 @@ async function loadMemberCandidates() {
 }
 
 function bindShell() {
-  _container.querySelector('#split-add-group')?.addEventListener('click', () => openGroupModal());
+  _container.querySelector('[data-action="add-group"]')?.addEventListener('click', () => openGroupModal());
   _container.querySelector('#split-add-expense')?.addEventListener('click', () => openExpenseModal());
   findPageFab('split-fab')?.addEventListener('click', () => openExpenseModal());
   // 250ms wie vorher: die Suche laedt die Gruppen vom Server neu.

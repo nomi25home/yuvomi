@@ -803,6 +803,22 @@ export function scanSectionAction(src) {
   return found;
 }
 
+export function scanSectionToolbarCreate(src) {
+  const found = [];
+  const re = /\bsection-toolbar\b/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const chunk = src.slice(m.index, m.index + 800);
+    for (const c of templateControls(chunk)) {
+      if (/\bbtn--icon\b/.test(c.cls) && c.icon === 'plus' && !/\bpopover-menu__trigger\b/.test(c.cls)) {
+        found.push({ line: lineOf(src, m.index + c.index), what: `nackter Erstell-Knopf (btn--icon plus) im Abschnittskopf: ${c.cls}` });
+      }
+    }
+  }
+  return found;
+}
+
 // ---------------------------------------------------------------------------
 // Scanner-Proben: jede Regel faengt ihr Beispiel und laesst die Kanonform durch
 // ---------------------------------------------------------------------------
@@ -1108,6 +1124,26 @@ test('Scanner: section-action faengt btn--ghost und btn--secondary ohne --sm im 
   assert.deepEqual(scanSectionAction(good), []);
 });
 
+test('Scanner: section-toolbar-create faengt nackten Erstell-Knopf im Abschnittskopf', () => {
+  const bad = `
+    <div class="split-panel-head section-toolbar">
+      <h2>Gruppen</h2>
+      <button class="btn btn--icon" id="split-add-group" aria-label="\${t('x')}">
+        <i data-lucide="plus" aria-hidden="true"></i>
+      </button>
+    </div>`;
+  assert.equal(scanSectionToolbarCreate(bad).length, 1);
+  const good = `
+    <div class="split-panel-head section-toolbar">
+      <h2>Gruppen</h2>
+      <button type="button" class="btn btn--secondary btn--icon btn--sm split-group-panel-more popover-menu__trigger"
+              aria-label="\${t('common.moreActions')}">
+        <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+      </button>
+    </div>`;
+  assert.deepEqual(scanSectionToolbarCreate(good), []);
+});
+
 test('Scanner: sheet-drag faengt Touch-Gesten an Blatt und Tafel ausserhalb des Helfers', () => {
   const bad = `
     panel.addEventListener('touchstart', (e) => {}, { passive: true });
@@ -1301,6 +1337,8 @@ const PENDING = {
   // --- Issue #2042 (2026-10-17): D5 Abschnittsaktion - leer ab Beginn. ---
   // Genau EINE btn--secondary btn--sm im Abschnittskopf; kein btn--ghost.
   'section-action': {},
+  // Kein nackter btn--icon mit Plus-Icon in einer section-toolbar (#2042).
+  'section-toolbar-create': {},
 };
 
 const HEAD_SEARCH = headSearchClasses(JS);
@@ -1327,6 +1365,7 @@ const RULES = {
   'sheet-drag': { files: JS, scan: (s, f) => scanSheetDrag(s, f), canon: '`wireSheetDrag()` (utils/sheet-drag.js)' },
   'native-date': { files: JS, scan: (s, f) => scanNativeDate(s, f), canon: '`<yuvomi-datepicker type="date">` (components/datepicker.js)' },
   'section-action': { files: JS, scan: (s) => scanSectionAction(s), canon: 'genau EINE `btn--secondary btn--sm` (Icon + Wort) im Abschnittskopf; Nebenaktionen hinter `popover-menu__trigger` mit `<modul>-section-tools` (DESIGN.md D5)' },
+  'section-toolbar-create': { files: JS, scan: (s) => scanSectionToolbarCreate(s), canon: 'Erstell-Aktion im Abschnittskopf hinter `popover-menu__trigger`, kein nackter `btn--icon` mit Plus-Icon (DESIGN.md D5)' },
 };
 
 function census(rule) {
