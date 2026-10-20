@@ -508,10 +508,19 @@ export async function render(container, { user } = {}) {
     testBtn.addEventListener('click', async () => {
       testBtn.disabled = true;
       try {
-        const sendTest = () => api.post('/push/test', {
-          title: t('settings.pushTestTitle'),
-          body: t('settings.pushTestBody'),
-        });
+        const sendTest = async () => {
+          let endpoint;
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            endpoint = sub?.endpoint;
+          } catch { /* ignore - push may not be set up */ }
+          return api.post('/push/test', {
+            title: t('settings.pushTestTitle'),
+            body: t('settings.pushTestBody'),
+            ...(endpoint ? { endpoint } : {}),
+          });
+        };
 
         // sent === 0 heisst: nichts zugestellt. Ohne diese Unterscheidung meldet
         // der Button Erfolg, obwohl kein Geraet erreicht wurde.

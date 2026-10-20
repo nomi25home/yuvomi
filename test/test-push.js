@@ -592,8 +592,8 @@ test('router.js: initPushAndReport ruft reportWallPauseState(isWallActive()) nac
 test('POST /test hebt die Wand-Pause nur am anfragenden Geraet auf, nicht bei anderen Abos desselben Nutzers (#1904)', async () => {
   const db = makeDb();
   const webpush = makeWebpushMock();
-  // Zwei Abos: das Telefon fragt den Test an, das Wandtablett ist pausiert.
-  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/phone','p','a')").run();
+  // Beide Abos sind pausiert; nur das Telefon schickt den Test.
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth,wall_paused_at) VALUES (1,'https://push/phone','p','a',datetime('now'))").run();
   db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth,wall_paused_at) VALUES (1,'https://push/wall','p','a',datetime('now'))").run();
   const app = await startApp(db, webpush);
   const res = await fetchRetry(`${app.baseUrl}/test`, {
@@ -602,6 +602,62 @@ test('POST /test hebt die Wand-Pause nur am anfragenden Geraet auf, nicht bei an
     body: JSON.stringify({ endpoint: 'https://push/phone' }),
   });
   assert.equal(res.status, 200);
+  const phone = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/phone'").get();
+  assert.equal(phone.wall_paused_at, null, 'die Pause des anfragenden Telefons wird aufgehoben');
   const wall = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/wall'").get();
-  assert.ok(wall.wall_paused_at !== null, 'die Pause des Wandtablets bleibt - nur das Telefon wurde entsperrt');
+  assert.ok(wall.wall_paused_at !== null, 'die Pause des Wandtablets bleibt');
+});
+
+test('POST /test ohne endpoint laesst alle Wand-Pausen unveraendert (#1904)', async () => {
+  const db = makeDb();
+  const webpush = makeWebpushMock();
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth,wall_paused_at) VALUES (1,'https://push/wall','p','a',datetime('now'))").run();
+  const app = await startApp(db, webpush);
+  const res = await fetchRetry(`${app.baseUrl}/test`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ title: 'Test' }),
+  });
+  assert.equal(res.status, 200);
+  const wall = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/wall'").get();
+  assert.ok(wall.wall_paused_at !== null, 'keine Pause geloescht ohne endpoint-Angabe');
+});
+
+test('router.js: onWallActiveChange(reportWallPauseState) und Lebendauer-Erneuerung sind verdrahtet (#1904)', () => {
+  const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(src, /onWallActiveChange\s*\(\s*reportWallPauseState\s*\)/,
+    'onWallActiveChange(reportWallPauseState) muss in router.js stehen');
+  assert.match(src, /document\.addEventListener\s*\(\s*['"]visibilitychange['"]/,
+    'visibilitychange-Listener fuer die Erneuerung nach Aufwachen muss in router.js stehen');
+  assert.match(src, /setInterval\s*\(.*reportWallPauseState.*60\s*\*\s*60\s*\*\s*1000/s,
+    'stuendlicher setInterval fuer laufende Wand muss in router.js stehen');
+});
+
+test('POST /subscribe setzt wall_paused_at zurueck wenn ein anderer Nutzer dasselbe Endpoint uebernimmt (#1904)', async () => {
+  const db = makeDb();
+  // Nutzer 1 hat das Geraet mit aktiver Wand-Pause.
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth,wall_paused_at) VALUES (1,'https://push/shared','p','a',datetime('now'))").run();
+  const app = await startApp(db, makeWebpushMock(), 2);
+  const res = await fetchRetry(`${app.baseUrl}/subscribe`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://push/shared', keys: { p256dh: 'p2', auth: 'a2' } }),
+  });
+  assert.equal(res.status, 201);
+  const row = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/shared'").get();
+  assert.equal(row.wall_paused_at, null, 'Nutzerwechsel loescht wall_paused_at');
+});
+
+test('POST /subscribe behält wall_paused_at wenn derselbe Nutzer erneut abonniert (#1904)', async () => {
+  const db = makeDb();
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth,wall_paused_at) VALUES (1,'https://push/self','p','a',datetime('now'))").run();
+  const app = await startApp(db, makeWebpushMock(), 1);
+  const res = await fetchRetry(`${app.baseUrl}/subscribe`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://push/self', keys: { p256dh: 'p2', auth: 'a2' } }),
+  });
+  assert.equal(res.status, 201);
+  const row = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/self'").get();
+  assert.ok(row.wall_paused_at !== null, 'wall_paused_at bleibt bei erneut-Abonnieren desselben Nutzers');
 });

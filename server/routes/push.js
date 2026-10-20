@@ -97,12 +97,10 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
       const devices = getDb()
         .prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?')
         .get(userId)?.n ?? 0;
-      // Wand-Pause nur am anfragenden Geraet aufheben, damit ein Test vom Telefon
-      // die Pause des Wandtablets nicht loescht (#1904).
+      // Wand-Pause nur am anfragenden Geraet aufheben. Ohne Endpoint bleibt
+      // die Pause bestehen - kein Fallback-Loeschen aller Geraete (#1904).
       if (testEndpoint) {
         getDb().prepare("UPDATE push_subscriptions SET wall_paused_at = NULL WHERE user_id = ? AND endpoint = ?").run(userId, testEndpoint);
-      } else {
-        getDb().prepare("UPDATE push_subscriptions SET wall_paused_at = NULL WHERE user_id = ?").run(userId);
       }
       const sent = await pushService.sendPushToUser(userId, { title, body, url: '/reminders', tag: 'push-test' });
       res.json({ data: { sent, devices } });
