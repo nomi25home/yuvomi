@@ -6,12 +6,13 @@
  */
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { openModal, closeModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { vibrate, isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 const view = { month: '', data: null, error: false, ctx: null, root: null };
 
@@ -354,12 +355,15 @@ async function savePlan(panel, category, original = null) {
     return;
   }
   const btn = panel.querySelector('#plan-save');
+  // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der Anfrage
+  // aufgegangen ist (#1997).
+  const modalContext = captureModalContext();
   btn.disabled = true;
   try {
     await api.put(`/budget/plans/${encodeURIComponent(category)}`, { amount });
     vibrate(10);
-    closeModal({ force: true });
-    await load();
+    closeModal({ force: true, context: modalContext });
+    await reloadAfterSave(() => load());
     refocusAfterRender();
     window.yuvomi?.showToast(t('budget.planSavedToast'), 'success');
   } catch (err) {
@@ -378,17 +382,18 @@ async function deletePlan(category) {
   const previous = category === '__savings__'
     ? view.data?.savings?.planned
     : view.data?.plans?.find((p) => p.category === category)?.planned;
+  const modalContext = captureModalContext();
   try {
     await api.delete(`/budget/plans/${encodeURIComponent(category)}`);
     vibrate(10);
-    closeModal({ force: true });
+    closeModal({ force: true, context: modalContext });
     await load();
     refocusAfterRender();
     window.yuvomi?.showToast(t('budget.planRemovedToast'), 'default', 5000, async () => {
       if (previous == null) return;
       try {
         await api.put(`/budget/plans/${encodeURIComponent(category)}`, { amount: previous });
-        await load();
+        await reloadAfterSave(() => load());
         refocusAfterRender();
       } catch (err) {
         console.error('[Budget] plan restore error:', err);
@@ -405,4 +410,4 @@ async function deletePlan(category) {
  * Messflaeche fuer die Nur-lesen-Regel (#1265 P7): die drei Renderer sind reine
  * Funktionen ueber `view`, das der Test mit `ctx` fuellt.
  */
-export const __test = { readOnly, renderSavingsCard, renderRows, view, openAddPlan, toneForRatio };
+export const __test = { readOnly, renderSavingsCard, renderRows, view, openAddPlan, openPlanEditor, toneForRatio };

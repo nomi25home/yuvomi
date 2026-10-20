@@ -78,6 +78,7 @@ import {
   createCalendarLoadCoordinator,
   scheduleCalendarDeleteWithUndo,
 } from '/utils/calendar-delete.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -5945,7 +5946,7 @@ async function openLocalCalendarsModal() {
     try {
       await api.post('/calendar/calendars', { name, color });
       window.yuvomi?.showToast(t('calendar.localCalendarCreated'), 'success');
-      await refreshLocalCalendarsPanel(panel);
+      await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
       refocusAfterRender();
     } catch (err) {
       window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
@@ -5974,11 +5975,11 @@ async function openLocalCalendarsModal() {
         if (name !== calendar.name) changes.name = name;
         await api.put(`/calendar/calendars/${id}`, changes);
         window.yuvomi?.showToast(t('calendar.localCalendarSaved'), 'success');
-        await refreshLocalCalendarsPanel(panel);
+        await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
         refocusAfterRender();
       } else if (e.target.closest('[data-action="calendar-enable-feed"]')) {
         await api.post(`/calendar/calendars/${id}/feed/regenerate`);
-        await refreshLocalCalendarsPanel(panel);
+        await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
         refocusAfterRender();
       } else if (e.target.closest('[data-action="calendar-copy-feed"]')) {
         if (calendar.feed_url) await copyText(calendar.feed_url, 'calendar.localCalendarExportCopied');
@@ -6007,7 +6008,7 @@ async function openLocalCalendarsModal() {
         if (!ok) return;
         await api.delete(`/calendar/calendars/${id}`);
         window.yuvomi?.showToast(t('calendar.localCalendarDeleted'), 'success');
-        await refreshLocalCalendarsPanel(panel);
+        await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
         refocusAfterRender();
       }
     } catch (err) {
@@ -7117,7 +7118,7 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
           // nach dem Verwerfen von Änderungen, die der Reset ohnehin
           // zurückgenommen hat (#625).
           await close({ force: true });
-          await reloadForView();
+          await reloadAfterSave(() => reloadForView());
           window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
         } catch (err) {
           // Server-Meldung bevorzugen (nutzerorientiert), sonst lokalisierter
@@ -8780,7 +8781,20 @@ function calendarSaveErrorMessage(err) {
   const reason = err?.data?.reason;
   if (reason === 'ATTACHMENT_CHANGE_REFUSED') return t('calendar.attachmentChangeRefused');
   if (reason === 'ATTACHMENT_UPLOAD_REFUSED') return t('calendar.attachmentUploadRefused');
-  return err?.data?.error ?? t('calendar.saveError');
+  return occurrenceErrorMessage(err) ?? err?.data?.error ?? t('calendar.saveError');
+}
+
+/**
+ * Der Satz fuer die Gruende, mit denen der Server ein Vorkommen ablehnt
+ * (#2034, #1909-Muster) - oder nichts, dann gilt der bisherige Text. Erreicht
+ * wird er, wenn der Kalender veraltet ist: das gewaehlte Vorkommen gibt es
+ * nicht mehr, oder sein Schluessel kam nicht lesbar an.
+ */
+function occurrenceErrorMessage(err) {
+  const reason = err?.data?.reason;
+  if (reason === 'invalid_recurrence_id') return t('calendar.occurrenceGoneError');
+  if (reason === 'malformed_recurrence_id') return t('calendar.occurrenceMalformedError');
+  return null;
 }
 
 /**
@@ -9122,7 +9136,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     if (savedEventId) refreshReminders();
 
     if (reloadAfter) {
-      const reload = await reloadCalendarEventsOnly();
+      const reload = await reloadAfterSave(() => reloadCalendarEventsOnly());
       // Scheitert das Neuladen oder kommt es aus dem Cache, kennt der Zustand
       // die neue Serie nicht. Dann steht sie wie vor dem Neuladen als
       // Stammzeile an ihrem Beginn - lieber dort als gar nicht, bis die
@@ -9402,7 +9416,7 @@ async function deleteThisAndFollowing(event) {
     keepFocus: renderKeepingFocus,
     refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
-      err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
     render: renderView,
@@ -9432,7 +9446,7 @@ async function deleteSingleOccurrence(event) {
     keepFocus: renderKeepingFocus,
     refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
-      err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
     render: renderView,

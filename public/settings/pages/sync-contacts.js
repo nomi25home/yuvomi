@@ -3,6 +3,7 @@ import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { emptyHintEl } from '/utils/empty-state.js';
 import {
+  captureModalContext,
   closeModal,
   confirmModal,
   openModal,
@@ -19,6 +20,7 @@ import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
 import { renderSkeletonList } from '/utils/skeleton.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -253,7 +255,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
       try {
         await api.post(`/contacts/cardav/accounts/${account.id}/sync`);
         showToast(t('settings.cardavSyncSuccess'), 'success');
-        await refresh();
+        await reloadAfterSave(() => refresh());
       } catch (err) {
         showToast(err?.data?.errorCode ? errorMessage(err) : (err.message || t('settings.cardavSyncFailed')), 'danger');
       }
@@ -350,7 +352,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
     try {
       await api.post(`/contacts/cardav/accounts/${account.id}/addressbooks/refresh`);
       showToast(t('settings.addressbooksRefreshed'), 'success');
-      await refresh();
+      await reloadAfterSave(() => refresh());
     } catch (err) {
       showToast(errorMessage(err), 'danger');
     }
@@ -586,13 +588,16 @@ function openAccountModal(account, onDone) {
           password: panel.querySelector('#cardav-password').value,
         };
 
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const modalContext = captureModalContext();
         try {
           if (isEdit) {
             await api.put(`/contacts/cardav/accounts/${account.id}`, payload);
           } else {
             await api.post('/contacts/cardav/accounts', payload);
           }
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           showToast(
             isEdit ? t('settings.cardavAccountUpdated') : t('settings.cardavAccountAdded'),
             'success',
@@ -622,3 +627,6 @@ export async function render(container, { user }) {
   await loadAccounts(container, user);
   window.lucide?.createIcons({ el: container });
 }
+
+// #1997: der Konto-Dialog, bis in seinen Speichern-Weg.
+export const __test = { openAccountModal };

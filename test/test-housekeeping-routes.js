@@ -108,6 +108,16 @@ test('POST /worker: negativer daily_rate -> 400', async () => {
 test('POST /worker: ungültiger Username -> 400', async () => {
   const r = await call('POST', '/worker', { as: ADM, body: { display_name: 'Putzhilfe', daily_rate: 50, username: 'a b!' } });
   assert.equal(r.status, 400);
+  // #1909: der Fall hat einen Namen, die Seite sagt den Satz der App.
+  assert.equal(r.body.reason, 'housekeeping_username_invalid');
+});
+
+test('POST /worker: vergebener Username -> 409 mit reason (#1909)', async () => {
+  const r = await call('POST', '/worker', { as: ADM, body: { display_name: 'Doppelt', daily_rate: 50, username: 'admin' } });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.reason, 'housekeeping_username_taken');
+  // Der Fehlversuch legt nichts an: die Zaehlung im naechsten Test bleibt bei eins.
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE display_name = 'Doppelt'").get().n, 0);
 });
 
 let WORKER_ID;
@@ -168,11 +178,13 @@ test('check-in: zweiter Check-in bei OFFENER Session -> 409', async () => {
   // dem Test davor ist noch offen. Ueberlappende Sessions bleiben gesperrt.
   const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: WORKER_ID, daily_rate: 50 } });
   assert.equal(r.status, 409);
+  assert.equal(r.body.reason, 'housekeeping_already_checked_in');
 });
 
 test('check-in: unbekannter Worker -> 404', async () => {
   const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: 999999, daily_rate: 50 } });
   assert.equal(r.status, 404);
+  assert.equal(r.body.reason, 'housekeeping_worker_not_found');
 });
 
 test('check-out: schließt offene Session, Besuch erscheint mit total_amount = rate + extras', async () => {
@@ -188,6 +200,7 @@ test('check-out: schließt offene Session, Besuch erscheint mit total_amount = r
 test('check-out: keine offene Session mehr -> 404', async () => {
   const r = await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: WORKER_ID } });
   assert.equal(r.status, 404);
+  assert.equal(r.body.reason, 'housekeeping_open_session_not_found');
 });
 
 test('check-in: nach dem Auschecken ist am selben Tag eine zweite Session erlaubt (#1138)', async () => {
@@ -278,6 +291,19 @@ test('DELETE /visits/:id: entfernt Besuch (danach 404)', async () => {
   assert.equal(del.status, 200);
   const get = await call('GET', `/visits/${SESSION_ID}`, { as: ADM });
   assert.equal(get.status, 404);
+  // #1909: jeder Weg an den geloeschten Einsatz nennt denselben Fall - die
+  // Seite sagt den Satz der App, laedt nach, und ein zweites Loeschen ist erledigt.
+  assert.equal(get.body.reason, 'housekeeping_visit_not_found');
+  for (const [method, path, body] of [
+    ['PUT', `/visits/${SESSION_ID}`, { daily_rate: 50, extras: 0 }],
+    ['POST', `/visits/${SESSION_ID}/pay`, {}],
+    ['POST', `/visits/${SESSION_ID}/unpay`, {}],
+    ['DELETE', `/visits/${SESSION_ID}`, undefined],
+  ]) {
+    const r = await call(method, path, { as: ADM, body });
+    assert.equal(r.status, 404, `${method} ${path}`);
+    assert.equal(r.body.reason, 'housekeeping_visit_not_found', `${method} ${path}`);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -312,6 +338,15 @@ test('DELETE /decay-tasks/:id: löscht, danach 404', async () => {
   assert.equal(del.status, 200);
   const again = await call('DELETE', `/decay-tasks/${DECAY_ID}`, { as: ADM });
   assert.equal(again.status, 404);
+  assert.equal(again.body.reason, 'housekeeping_task_not_found');
+  for (const [method, path, body] of [
+    ['PATCH', `/decay-tasks/${DECAY_ID}`, { frequency_days: 7 }],
+    ['POST', `/decay-tasks/${DECAY_ID}/complete`, {}],
+  ]) {
+    const r = await call(method, path, { as: ADM, body });
+    assert.equal(r.status, 404, `${method} ${path}`);
+    assert.equal(r.body.reason, 'housekeeping_task_not_found', `${method} ${path}`);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -531,6 +566,12 @@ test('POST /visits/:id/pay: markiert verknüpfte Aufgabe als done', async () => 
   assert.ok(r.body.data.paid_at);
   const task = db.prepare('SELECT status FROM tasks WHERE id = ?').get(PAYMENT_TASK_ID);
   assert.equal(task.status, 'done', 'Bezahl-Aufgabe abgeschlossen');
+  // Derselbe Erledigungseintrag wie beim Abhaken (#1836): ohne ihn fehlte die
+  // bezahlte Aufgabe im Verlauf und an der Wand.
+  const completion = db.prepare('SELECT user_id, source FROM task_completions WHERE task_id = ?').get(PAYMENT_TASK_ID);
+  assert.ok(completion, 'die Zahlung hinterlaesst einen Erledigungseintrag');
+  assert.equal(completion.user_id, ADMIN, 'abgehakt hat, wer die Zahlung vermerkt');
+  assert.equal(completion.source, null, 'in Yuvomi vermerkt, nicht vom Sync');
 });
 
 // --------------------------------------------------------------------------
@@ -645,6 +686,10 @@ test('POST /visits/:id/unpay: Admin setzt paid_at zurueck und oeffnet die Zahlun
 
   assert.equal(sessionRow(PAY_SESSION_ID).paid_at, null, 'paid_at in der Zeile zurueckgesetzt');
   assert.equal(taskRow(PAYMENT_TASK_ID).status, 'open', 'die Zahlungsaufgabe ist wieder offen');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(PAYMENT_TASK_ID).n, 0,
+    'der Erledigungseintrag geht mit der Zahlung (#1836)',
+  );
 
   // reconcilePaymentTasks() laeuft in GET /visits und bucht jede Zeile mit einer
   // abgehakten Aufgabe als bezahlt. Bliebe die Aufgabe done, kaeme die Zahlung

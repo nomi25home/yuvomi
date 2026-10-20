@@ -99,7 +99,8 @@
         "searchNoResultsDescription": "Нічого не відповідає вашому пошуку.",
         "searchNoResultsFilteredDescription": "Нічого не відповідає вашому пошуку та фільтрам.",
         "searchReset": "Скинути пошук",
-        "passwordMinLength": "Щонайменше 8 символів."
+        "passwordMinLength": "Щонайменше 8 символів.",
+        "savedReloadFailed": "Зміну збережено, але не вдалося оновити екран. Перезавантажте сторінку, якщо чогось бракує."
     },
     "kitchen": {
         "noShoppingLists": "Списку покупок ще немає.",
@@ -571,6 +572,7 @@
         "historyView": "Історія",
         "historyPersonFilter": "Фільтр за учасником",
         "historyUnknownMember": "Більше не в родині",
+        "historyViaSync": "Через синхронізацію",
         "historyEmptyTitle": "Поки нічого не записано",
         "historyEmptyPersonTitle": "Для цього учасника нічого не записано",
         "historyEmptyDescription": "Тут видно, хто і коли виконав яке завдання.",
@@ -727,7 +729,10 @@
         "kanbanColExpand": "Розгорнути стовпець",
         "kanbanArchiveDone": "Архівувати всі виконані",
         "kanbanArchiveDoneConfirm": "Архівувати всі виконані завдання в цьому стовпці?",
-        "kanbanArchiveDoneAction": "Архівувати"
+        "kanbanArchiveDoneAction": "Архівувати",
+        "errorTaskGone": "Цього завдання більше немає.",
+        "errorParentGone": "Батьківського завдання цього підзавдання більше немає.",
+        "errorCommentGone": "Цього коментаря більше немає."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",
@@ -1061,6 +1066,8 @@
         "loadError": "Не вдалося завантажити події.",
         "saveError": "Помилка збереження",
         "deleteError": "Помилка видалення",
+        "occurrenceGoneError": "Це повторення більше не входить до серії. Перезавантажте календар і виберіть його знову.",
+        "occurrenceMalformedError": "Повторення серії вказано неправильно. Перезавантажте календар і виберіть його знову.",
         "titleRequired": "Заголовок є обов'язковим",
         "monthJanuary": "Січень",
         "monthFebruary": "Лютий",
@@ -1382,7 +1389,9 @@
         "checkConflict": "Нотатку тим часом змінено. Її буде завантажено знову.",
         "pinnedState": "Закріплена",
         "checklistDone": "Виконано",
-        "checklistOpen": "Відкрито"
+        "checklistOpen": "Відкрито",
+        "errorNoteGone": "Цієї нотатки більше немає.",
+        "errorSelectedCategoryGone": "Однієї з вибраних категорій більше немає."
     },
     "markdown": {
         "bold": "Жирний (Ctrl+B)",
@@ -1506,7 +1515,9 @@
         "bulkDeleteConfirm_one": "Видалити {{count}} контакт?",
         "bulkDeleteConfirm_few": "Видалити {{count}} контакти?",
         "bulkDeleteConfirm_many": "Видалити {{count}} контактів?",
-        "bulkDeletedToast": "Видалено контактів: {{count}}"
+        "bulkDeletedToast": "Видалено контактів: {{count}}",
+        "errorContactGone": "Цього контакту більше немає.",
+        "errorSelectedCategoryGone": "Вибраної категорії більше немає."
     },
     "budget": {
         "title": "Бюджет",
@@ -2055,7 +2066,7 @@
         "oidcLinked": "Цей обліковий запис приєднано до вашого облікового запису SSO.",
         "oidcLinkedWithProvider": "Цей обліковий запис приєднано до {{provider}}.",
         "oidcUnlink": "Від'єднати",
-        "oidcUnlinkNeedsPassword": "Спершу встановіть пароль - приєднання наразі єдиний шлях до цього облікового запису.",
+        "oidcUnlinkNeedsPassword": "Попросіть адміністратора встановити пароль для вашого облікового запису - приєднання наразі єдиний шлях до цього облікового запису.",
         "oidcLinkSuccess": "Обліковий запис SSO приєднано.",
         "oidcLinkError_already_linked": "Цей обліковий запис уже приєднано до іншого облікового запису SSO. Спершу видаліть наявне приєднання.",
         "oidcLinkError_sub_taken": "Цей обліковий запис SSO уже належить іншому обліковому запису Yuvomi.",
@@ -2877,6 +2888,7 @@
         "moduleStatusOff": "{{module}} вимкнено для дому.",
         "pageAccount": "Обліковий запис",
         "pageAccountDescription": "Керування профілем, контактами та паролем.",
+        "pageAccountDescriptionSsoOnly": "Керування профілем і контактами.",
         "pageAppearance": "Вигляд",
         "pageAppearanceDescription": "Обрати тему, мову, регіон, валюту, а також формат дати й часу.",
         "pageDevice": "Цей пристрій",
@@ -3724,7 +3736,8 @@
         "importSubmit": "Додати {{count}}",
         "importSuccess": "Додано днів народження: {{count}}.",
         "importNothingSelected": "Виберіть принаймні один контакт.",
-        "importSelected": "Вибрано контактів: {{count}}"
+        "importSelected": "Вибрано контактів: {{count}}",
+        "errorBirthdayGone": "Цього дня народження більше немає."
     },
     "onboarding": {
         "step1Title": "Ласкаво просимо до {{name}}",
@@ -4091,6 +4104,10 @@
         "deleted": "Швидке посилання видалено",
         "loadError": "Не вдалося завантажити швидкі посилання.",
         "orderError": "Не вдалося зберегти порядок.",
+        "errorLinkGone": "Цього швидкого посилання більше немає.",
+        "errorLimitReached": "На огляді вміщується не більше {{limit}} швидких посилань.",
+        "saveError": "Не вдалося зберегти швидке посилання.",
+        "deleteError": "Не вдалося видалити швидке посилання.",
         "iconSymbol": "Вибрати піктограму",
         "iconChoose": "Вибрати піктограму або зображення"
     },
@@ -4273,7 +4290,12 @@
         "errorAmountsHidden": "Позначити оплату може лише той, кому видно суми помічниці по дому.",
         "notHereToday": "Сьогодні ще не прийшла",
         "tabVisits": "Відвідування",
-        "tabChores": "Хатні справи"
+        "tabChores": "Хатні справи",
+        "errorWorkerGone": "Цього працівника більше немає.",
+        "errorVisitGone": "Цього відвідування більше немає.",
+        "errorTaskGone": "Цього завдання більше немає.",
+        "errorAlreadyCheckedOut": "Виїзд цього працівника вже записано.",
+        "errorAlreadyCheckedIn": "Прихід цього працівника вже записано."
     },
     "userMultiSelect": {
         "moreUsers": "інші",
@@ -5161,8 +5183,7 @@
                 "earlyConfirm": "Записати дозу до завершення мінімального інтервалу?",
                 "earlyDetail": "Наступна доза передбачена лише з {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Усе одно записати"
-            },
-            "stockUpdateFailed": "Дозу записано, але запас не вдалося оновити."
+            }
         },
         "prevention": {
             "title": "Профілактика та щеплення",
@@ -5937,6 +5958,7 @@
         "importDiagnosticMissingUidFallback_many": "У {{count}} записів календаря не було UID; використано резервний ідентифікатор на основі мітки та дати.",
         "importDiagnosticDuplicateInstance": "Об'єднано дублікатів вивезення (з однаковим ідентифікатором): {{count}}.",
         "importDiagnosticDuplicateInstance_one": "Об'єднано дублікат вивезення (з однаковим ідентифікатором): {{count}}.",
+        "importDiagnosticOther": "Один запис календаря не відповідає очікуваному формату.",
         "importDiagnosticDuplicateInstance_few": "Об'єднано дублікатів вивезення (з однаковим ідентифікатором): {{count}}.",
         "importDiagnosticDuplicateInstance_many": "Об'єднано дублікатів вивезення (з однаковим ідентифікатором): {{count}}.",
         "importUnresolvedBlockingError": "Спершу усуньте всі блокувальні попередження або явно пропустіть відповідні події.",
@@ -6180,8 +6202,20 @@
             "closeAccount": "Закрити рахунок",
             "confirmCloseAccount": "Закрити рахунок для {{name}}?",
             "closeAccountDetail": "Історія зберігається. Наново відкритий рахунок починається у валюті, якою родина користується на той момент.",
-            "accountNotEmpty": "Рахунок можна закрити лише тоді, коли на ньому немає залишку, плану та відкритих запитів."
-        }
+            "accountNotEmpty": "Рахунок можна закрити лише тоді, коли на ньому немає залишку, плану та відкритих запитів.",
+            "errorAccountDeactivated": "Цей рахунок деактивовано і його можна лише виплатити.",
+            "errorBalanceTooLarge": "Залишок став би завеликим. Запит залишається відкритим.",
+            "errorAccountExists": "Ця людина вже має рахунок кишенькових грошей.",
+            "errorNoAccount": "Ця людина не має рахунку кишенькових грошей.",
+            "errorCurrencyChanged": "Валюта цього рахунку змінилася."
+        },
+        "errorRewardGone": "Ця нагорода більше недоступна.",
+        "errorRequestGone": "Цього запиту більше немає.",
+        "errorRequestDecided": "Щодо цього запиту вже ухвалено рішення.",
+        "errorNotEnoughPoints": "Балів на це не вистачає.",
+        "errorNotParticipating": "Ця людина не накопичує бали.",
+        "errorMoneyAccountGone": "Цього рахунку більше немає.",
+        "errorMoneyPlanGone": "Цього плану більше немає."
     },
     "datepicker": {
         "openCalendar": "Відкрити календар",
@@ -6452,7 +6486,15 @@
         "detailPaneLabel": "Відомості про предмет",
         "pickOne": "Виберіть предмет",
         "pickOneHint": "Тут з’являться дані, терміни та історія.",
-        "moreDetailsHint": "Купівля, гарантія, фото, документи"
+        "moreDetailsHint": "Купівля, гарантія, фото, документи",
+        "errorItemGone": "Цього предмета більше немає.",
+        "errorTrackedDateGone": "Цього терміну більше немає.",
+        "errorSelectedLocationGone": "Вибраного місця більше немає.",
+        "errorBookingGone": "Цієї операції більше немає.",
+        "errorBookingAlreadyLinked": "Ця операція вже пов'язана.",
+        "errorLocationExists": "Таке місце тут уже є. Виберіть іншу назву.",
+        "errorLocationGone": "Цього місця більше немає.",
+        "errorCategoryGone": "Цієї категорії більше немає."
     },
     "documentAttach": {
         "label": "Вкладення",
@@ -6726,7 +6768,13 @@
             "seminar": "С",
             "lab": "ЛР"
         },
-        "typesWithTime": "З часом"
+        "typesWithTime": "З часом",
+        "errorShiftTypeGone": "Цього типу зміни більше немає.",
+        "errorSelectedShiftTypeGone": "Вибраного типу зміни більше немає.",
+        "errorCustomFieldGone": "Цього поля більше немає.",
+        "errorSelectedCustomFieldGone": "Одного з вибраних полів більше немає.",
+        "errorPatternGone": "Цього циклу змін більше немає.",
+        "errorEntryGone": "Цього запису більше немає."
     },
     "pairDisplay": {
         "title": "Підключення планшета",

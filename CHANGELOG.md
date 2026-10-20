@@ -7,21 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Wall display shows today's meals, shopping count, housekeeping status, waste pickups, and
+  expiring pantry items** (#1903). Paired wall displays previously showed only the calendar,
+  tasks, rewards, and weather sections of the today sheet. The dashboard now delivers the five
+  missing sources to display sessions with the same narrow fields the wall tile uses: meal title,
+  type, and cook - no private notes or recipe content; shopping open-item count; housekeeping
+  presence, worker name, and check-in time - without the unpaid amount or visit count;
+  waste-pickup type names and icons; and expiring pantry items. Individual module routes for
+  these remain closed to displays. Paired displays pick this up with the update - no
+  configuration needed.
+
+- **Stock: every batch now belongs to a household product** (part 1 of #1448). Nothing changes on
+  the page yet. Batches with the same name, compared trimmed, case-insensitive and with collapsed
+  whitespace, and the same unit share one product; existing stock is grouped once on update. The
+  product is the groundwork for a minimum over all batches, recipe matches that survive the last
+  bottle, and a grouped stock page. For API clients, pantry items additionally return
+  `product_id`; a batch whose name or unit is edited moves to the matching product.
+
 ### Changed
 
 - **"Manage participants" in rewards now lives in a More-actions menu.** The section header showed
   two equally-weighted buttons; only "Grant bonus" stays as the primary section action. "Manage
   participants" is reached via the ⋯ button next to it.
 - **"Add recurring expense" moved to the recurring-expenses section header.** The button used to
-  appear below the list; it now sits in the section title row, consistent with the D5
-  section-action pattern.
-
+  appear below the list; it now sits in the section title row.
+- **"Add group" in split expenses is now in the More menu next to the group search.** The bare +
+  icon button in the Groups panel header has moved into the ⋯ More menu.
+- **A single occurrence of a calendar series is now named by its original start time (#2034).**
+  Until now an occurrence was named by a day, and around a clock change two occurrences could share
+  that day - deleting one of them could hide both. An occurrence is now named exactly as calendar
+  apps do it (RFC 5545 RECURRENCE-ID): a date for an all-day series, the original start in UTC for
+  a series with a time zone, the wall time for a local series without one. Exceptions and edited
+  occurrences saved before keep working exactly as they did; when you change the start time of a
+  series, or the household time zone, its exceptions move along with it.
+  **API:** `recurrence_id` in calendar reads, search, countdowns and MCP now takes one of three
+  forms: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ` or `YYYY-MM-DDTHH:MM:SS` (URL-encode it in a
+  path). The occurrence routes and `POST /api/v1/calendar/{id}/exceptions` still accept the old
+  `YYYY-MM-DD` form; where it matches two occurrences they answer `409` with reason
+  `ambiguous_recurrence_id`. The exceptions route takes the new field `recurrence_id` next to
+  `date` and stores the exact key. It answers `400` with reason `invalid_recurrence_id` for a key
+  that names no occurrence of the series and with reason `malformed_recurrence_id` for a value that
+  is no occurrence key at all; until now any well-formed date was stored unchecked.
 - **Task, calendar and Overview lists load much faster in households with profile pictures.**
   Every task, event, note, housekeeping visit and money ledger row used to carry the full profile
   picture of its person, and a task twice. With 200 tasks and five pictures the task list weighed
   17 MB, and over plain HTTP in a home network about 13 MB of it crossed the wire on every load. The
-  rows now carry a short picture address instead, and the browser loads each picture once (now
-  about 215 KB, under 5 KB compressed). Pictures still show offline where the list does.
+  rows now carry a short picture address instead, and the browser downloads each picture once (now
+  about 215 KB, under 5 KB compressed) and afterwards only asks whether it changed, so a signed-out
+  browser no longer shows it. Pictures still show offline where the list does.
   **API:** requests with an API token see no change and keep receiving data URLs. For the app
   itself (session and wall display) the fields `assigned_avatar`, `assigned_users[].avatar_data`
   (tasks, events), `creator_avatar` (notes), `worker_avatar_data` (housekeeping visits),
@@ -42,6 +77,225 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the page for about 0.8 s, now about 0.55 s; 300 recipes went from about 0.45 s to under 0.4 s.
 
 ### Fixed
+
+- **Deleting or editing one occurrence of a series affects only that one, also on the night of a
+  clock change (#2034).** For a series at 01:30 in Berlin, "only this one" on 25 March 2035 also
+  removed the day before. "This and following" on a series in another time zone - say Los Angeles
+  at 23:30 - left the chosen occurrence in the old series and showed it again in the new one, and
+  for a series that ends after a number of times east of UTC it failed with an error.
+- **The countdown tile skips a cancelled occurrence of a series in another time zone (#1998).**
+  A series from Los Angeles in a Berlin household counted down to an occurrence the calendar had
+  already hidden, and could name the wrong day. The tile now counts on the same occurrences as the
+  calendar and shows the day it falls on in your household.
+- **Search shows the right next date for a calendar series in another time zone (#1999).** A
+  series kept in its own time zone, such as an imported one from a calendar in Los Angeles, was
+  checked against your household's today on its own calendar day. Near midnight that is a
+  different day: at 23:30 in Los Angeles it is already the next morning in Berlin. Search then
+  skipped an occurrence that happens today and showed the one a week later, or showed one from
+  yesterday as the next date. Search and the calendar now place every occurrence on your
+  household's day before comparing.
+- **Budget category bars are one color again, and their stripes stand at 45 degrees (#2084).**
+  Every expense bar in the Overview and in Statistics started with a short stroke in the module
+  color instead of the category color, which was most visible on short bars. The two striped
+  categories (the sixth and seventh color, striped so they stay apart with color vision
+  deficiencies) showed their stripes almost upright on short bars instead of diagonal, which read
+  as a rendering error. Both now follow the category: the stroke takes its color, and the stripes
+  keep their angle at any bar length.
+- **Saving in a Health dialog no longer closes a dialog you opened in the meantime (#1997).**
+  Measurements, medications and dose entries, lab reports, activities, prevention records,
+  nutrition entries and targets, periods, cycle days, the cycle history import and the cycle
+  settings now close only the dialog the save came from. If you had closed it and opened another one
+  before the answer arrived, the other one stays open with what you typed in it.
+- **Saving in a Waste or Shopping dialog no longer closes a dialog you opened in the meantime (#1997).**
+  In Waste, waste types, collection schedules, one-off pickups, moved pickups, sources, the calendar
+  import, mapping profiles and reminder settings now close only the dialog the save or delete came
+  from. In Shopping, the same holds for editing an item, sending, duplicating, moving ticked items to
+  the pantry and taking ingredients from the meal plan, and for the reload after something was deleted
+  elsewhere. If you had closed the dialog and opened another one before the answer arrived, the other
+  one stays open with what you typed in it.
+- **Saving in a Schedule, budget plan or family settings dialog no longer closes a dialog you opened
+  in the meantime (#1997).** In Schedule, adding and editing shift types, patterns, exceptions and
+  extra shifts and saving a custom field now close only the dialog the save came from, also after
+  the overlap or range question. The same holds for setting and removing a budget plan, adding and
+  editing a household member, the prevention types in the Health settings and the recipe provider
+  accounts in the Kitchen settings. If you had closed the dialog and opened another one before the
+  answer arrived, the other one stays open with what you typed in it.
+- **Saving a task, contact, birthday, inventory item, quick link or sync account no longer closes a
+  dialog you opened in the meantime (#1997).** Adding and editing a task, a contact, a birthday or an
+  inventory item, setting a tag on several selected tasks, the vCard import, taking birthdays over
+  from contacts, marking an inventory deadline as done and adding or editing a quick link now close
+  only the dialog the save came from. The same holds for adding a CalDAV account, adding and editing
+  a CardDAV account and editing a calendar subscription in the settings. If you had closed the dialog
+  and opened another one before the answer arrived, the other one stays open with what you typed in it.
+- **Inventory, notes, contacts and birthdays: an error message is in your language and names the
+  cause** (#1909). These pages showed the server's own text when something could not be saved,
+  pinned, completed or deleted, whatever the app language, in English or in German - for example
+  "Notiz nicht gefunden" in an English session when somebody else in the household had deleted the
+  note in the meantime. An item, tracked date, booking, note, contact or birthday that no longer
+  exists, a location or note category chosen in the form that was deleted in the meantime, and a
+  booking that is already linked now get a sentence in the language of the app. When the thing
+  itself is gone, the page takes it out of the list and closes the dialog of the action; deleting
+  something somebody else has already deleted counts as done instead of bringing the row back with
+  an error, also when you delete several contacts at once. When only the chosen location or note
+  category is gone, the form stays open with your input and offers the current ones; a booking
+  noted for a new item that is gone is dropped from the form. A picture that cannot be used for an
+  item or a birthday keeps its own message, and any other failure there shows the general message
+  instead of the browser's own text. When a list cannot be refreshed after you change locations or
+  categories, the message says why (offline, server, too many requests) instead of the server's
+  text. The contact import still names the field a vCard was rejected for. For API clients: those
+  answers of `/api/v1/inventory`, `/api/v1/notes`, `/api/v1/contacts` and `/api/v1/birthdays` carry
+  a `reason` next to `error` (`inventory_item_not_found`, `inventory_tracked_date_not_found`,
+  `inventory_booking_not_found`, `inventory_booking_already_linked`,
+  `inventory_selected_location_not_found`, `notes_note_not_found`,
+  `notes_selected_category_not_found`, `category_exists`, `contacts_contact_not_found`,
+  `birthdays_birthday_not_found`), the German texts of those answers are now English, and the
+  status codes are unchanged.
+- **Saving in a Budget or Housekeeping dialog no longer closes a dialog you opened in the meantime (#1997).**
+  In Budget, entries, loans, accounts (save and archive) and confirming a planned entry now close only
+  the dialog the save came from. In Housekeeping, the same holds for adding and editing a task,
+  editing a visit and saving a staff member. If you had closed the dialog and opened another one
+  before the answer arrived, the other one stays open with what you typed in it.
+- **Tasks, inventory locations and categories, contact form: an error message is in your language**
+  (#1909). The tasks page showed the server's or the browser's own text when ticking off, moving,
+  archiving, sorting, tagging, saving or deleting a task failed, for example "Task not found." in a
+  German session. It now says the sentence of the app; a task that somebody else deleted or made
+  private in the meantime is named as such, the list is reloaded, an open edit form for it closes,
+  and deleting a task that is already gone counts as done, also when you delete several at once.
+  The managers for inventory locations and categories now say "this location already exists here"
+  and "this location (or category) no longer exists" in your language instead of the server's
+  English text, and deleting one somebody else already removed counts as done. In the contact form,
+  a chosen category that was deleted in the meantime keeps the form open with your input and offers
+  the current categories. For API clients: those answers carry a `reason` next to `error`
+  (`tasks_task_not_found`, `inventory_location_exists`, `inventory_location_not_found`,
+  `inventory_category_not_found`, `category_exists` for inventory categories,
+  `contacts_selected_category_not_found`), and the status codes are unchanged.
+- **Task view, shift schedule, confirm dialogs and module install: error messages in your language**
+  (#1909). The open task showed the server's or the browser's own text when finishing, starting,
+  archiving, adding a subtask, ticking a line or writing, editing or deleting a comment failed, for
+  example "Parent task not found." It now says the sentence of the app. A task that somebody else
+  deleted or made private in the meantime closes the view and reloads what is behind it, and
+  deleting a task or comment that is already gone counts as done. The shift schedule no longer shows
+  the server's English text: a shift type, field, plan or entry that was deleted in the meantime is
+  named as such and the page reloads, deleting one that is already gone counts as done, and the
+  messages for "shift type still in use", "cycle too short" and "choose a shift type" now come from
+  the case, not from matching the server's wording. The error line of a confirm dialog and the
+  messages of the module installer in the settings say the app's sentence instead of the server's
+  text when there is no known cause. For API clients: those answers carry a `reason` next to
+  `error` (`tasks_parent_not_found`, `tasks_comment_not_found`, `schedule_shift_type_not_found`,
+  `schedule_custom_field_not_found`, `schedule_pattern_not_found`, `schedule_override_not_found`,
+  `schedule_extra_shift_not_found`, `schedule_selected_shift_type_not_found`,
+  `schedule_selected_custom_field_not_found`, `schedule_shift_type_in_use`,
+  `schedule_cycle_length_conflict`, `schedule_shift_type_required`), and the status codes and
+  texts are unchanged.
+- **Housekeeping and rewards: error messages in your language** (#1909). Checking in or out,
+  finishing, editing or deleting a chore, paying, editing or deleting a visit, saving a housekeeper
+  and stepping through the reports showed the server's or the browser's own text, for example
+  "Visit not found." The rewards page did the same when redeeming, deciding a request, granting
+  points, editing the catalogue, the participants or pocket money. Both now say the sentence of the
+  app. A visit, chore or request that somebody else deleted or decided in the meantime, or a
+  housekeeper who was checked out already, is named as such and the page reloads; deleting one that
+  is already gone counts as done. Deleting a reward no longer fails silently. For API clients: those
+  answers carry a `reason` next to `error` (`housekeeping_worker_not_found`,
+  `housekeeping_visit_not_found`, `housekeeping_task_not_found`,
+  `housekeeping_open_session_not_found`, `housekeeping_already_checked_in`,
+  `housekeeping_username_taken`, `housekeeping_username_invalid`, `rewards_reward_not_found`,
+  `rewards_redemption_not_found`, `rewards_redemption_decided`, `rewards_insufficient_points`,
+  `rewards_not_participating`, `rewards_money_account_not_found`, `rewards_money_plan_not_found`),
+  and the status codes and texts are unchanged.
+- **Quick links, budget, waste import and recipe sources: error messages in your language**
+  (#1909). Saving or deleting a quick link showed the server's own text, for example "At most 24
+  quick links can be created." in every language, and picking an unsuitable picture for a tile
+  showed the browser's text. The budget page passed the server's text through for some failed
+  saves, a waste calendar import printed the server's English note for an entry it did not know,
+  and "Sync now" for a recipe source showed the raw error of the fetch. All of them now say the
+  sentence of the app; the recipe source card keeps naming the cause of the last failure. A quick
+  link that somebody else deleted in the meantime is named as such and the list reloads; deleting
+  one that is already gone counts as done. For API clients: those answers carry a `reason` next to
+  `error` (`quick_links_link_not_found`, and `quick_links_limit_reached` with `params.limit`), and
+  the status codes and texts are unchanged.
+- **Recurring events on the day the clocks change are no longer an hour off (#2034).**
+  A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
+  on the day of the clock change one hour early or late, both in the calendar and in subscribed
+  calendars. Each occurrence now keeps its local time. Where that time does not exist on the day the
+  clocks go forward (02:30 in Berlin), the occurrence moves forward by the skipped hour; where it
+  exists twice when the clocks go back, the first one counts. Occurrences you deleted or changed keep
+  their place.
+- **Older series ends now reach Google, CalDAV, iCloud and the calendar feed on the same last day Yuvomi shows (#1992).**
+  Before #1989 the repeat form saved a series end as the end of the UTC day, and series saved that
+  way still carry it. For a series without its own time zone Yuvomi ends it on that date, while
+  other calendars read the UTC moment: west of UTC (for example Chicago, 8 pm) they dropped the last
+  occurrence, east of UTC (Berlin, 0:30) they showed one more. Such a series now goes out with the
+  end of that day in the household's time zone, so both sides end on the same occurrence. Nothing
+  stored is rewritten: the calendar feed shows the corrected end right away, Google, CalDAV and
+  iCloud receive it with the next change sent for that series, and reading it back counts as
+  Yuvomi's own change rather than an edit in the other calendar. Series imported from other
+  calendars still go back word for word.
+- **Reconnecting or disconnecting Google Calendar now stops a sync that is still running (#2035).**
+  A sync that was waiting on Google while you reconnected, perhaps with another account, or
+  disconnected used to carry on with the old connection: it could still send queued changes to the
+  previous account, import its events after the disconnect, and leave its progress and errors on the
+  new connection. It now stops at its next step, and the new connection's own sync takes over. A
+  reconnect also no longer removes calendars from the selection based on the calendar list of an
+  account that was replaced in the meantime.
+- **An account that signs in only through single sign-on no longer sees a change-password form.**
+  Such an account has no password, yet the account page asked it for the current one, so the form
+  could never succeed. The card now only appears for accounts that have a password, linked to a
+  provider or not. For such an account the page subtitle no longer mentions a password, and the
+  single sign-on card now says to ask an administrator to set one instead of "Set a password first"
+  (#1703).
+- **A task ticked off in Apple Reminders or another synced reminders app now counts as done (#1836).**
+  It used to be marked done without a record of when, so it was missing from the task history, and
+  an overdue one disappeared from the wall display instead of getting its check mark. It now shows
+  in the history at the time it was completed on the phone, labelled "Via sync" since the sync
+  cannot tell who ticked it off, and reopening it there removes the entry again. Marking a
+  housekeeping visit as paid likewise records its payment task as done by the person who marked
+  it, and taking the payment back removes that again. Tasks completed this way before the update
+  stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
+  **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
+  (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+- **Moving a completed reminder into or out of a parent reminder now updates the task history (#2078).**
+  When the reminders app changed only which reminder a completed one belongs to, the history kept
+  its old state: a completed task moved under another one stayed in the history, although subtasks
+  never appear there, and a completed subtask moved out to stand on its own never showed up. Now
+  the first loses its entry, and the second gets one at the time it was completed on the phone. If
+  the reminder carries no completion time, it stays without an entry rather than claiming it was
+  done at the time of the sync.
+- **Saving no longer counts as failed when only the refresh afterwards fails.** Many dialogs
+  reloaded their list in the same step as the save. When the save went through but the reload hit
+  a network blip or a busy server, the dialog stayed open with a "could not save" message, and
+  saving again created the entry a second time. Now the dialog closes once the save went through,
+  and a failed refresh says so in its own notice. This covers pantry, budget, inventory, meals,
+  tasks, health, housekeeping, waste, rewards, documents, schedule, calendar and several settings
+  pages.
+- **Logging a dose counts down the stock in the same step.** Taking a planned or as-needed dose
+  used to log it and then update the stock in a second request; when the second one failed, the
+  dose was logged but the stock stayed where it was. The server now does both together, from the
+  stored stock. Tapping the dose again after a dropped connection no longer logs it twice or
+  counts the stock down twice: the app repeats the same request, and the server answers it once.
+  **API:** `POST /api/v1/health/medications/{id}/logs` and `POST /api/v1/health/logs/{id}/take`
+  accept `stock_deduct`. A second `POST .../logs` for the same `schedule_id` and `scheduled_at`
+  updates the existing entry (200) instead of adding another one.
+- **A countdown to an evening event no longer names the next day.** With the server running in UTC
+  (the default container) and a household east of UTC, an event at 23:30 counted down to the day
+  after; west of UTC, an early-morning event could count down to the day before. The countdown now
+  reads the event's time in the household's time zone, wherever the server runs (#1998).
+- **A session that ends while the sign-in page is open no longer wipes what you typed** (#1945).
+  When a request found the session gone, the app drew the sign-in page again even when it was
+  already showing, so a half-typed user name and password were cleared; with setup still pending
+  the same happened to the setup page. A session that ends on a page that needs no sign-in (sign-in,
+  setup, invitation, display pairing, password reset) now leaves that page as it is. On every other
+  page it still leads to the sign-in page.
+
+- **A new medication is saved together with its intake plan, or not at all.** If saving one of
+  the plan's times failed, the medication itself was already stored. Cancelling the dialog then
+  left it behind without its plan and without showing it in the list, so it was easy to add it a
+  second time. The medication and its plan are now saved in one step; if that fails, nothing is
+  stored and the dialog keeps everything you entered, so Save simply tries again (#2054).
+  **API:** `POST /api/v1/health/medications` accepts an optional `schedules` array and writes the
+  medication and its schedules in one transaction.
+- **Saving in a rewards dialog no longer force-closes whichever dialog is open when the answer arrives (#1997).**
+  All seven save paths in the rewards module now capture the modal context before the request and
+  pass it to `closeModal`, so a dialog the user opened while the save was in flight stays open.
 
 - **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once

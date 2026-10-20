@@ -13,7 +13,7 @@ import {
   householdTimeZone, isValidTimeZone, localToUTC, shiftDateKey, storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
 import { formatWall, vtimezoneFor } from '../utils/vtimezone.js';
-import { outboundDateRange } from './outbound-dtstart.js';
+import { outboundDateRange, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { rruleLine } from './recurrence.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { activeAccountSql } from './account-state.js';
@@ -23,6 +23,7 @@ import {
   BODY_FREE_EVENT_COLUMNS, eventProjectionSql, resolveProjectedEventRows,
 } from './calendar-event-reader.js';
 import { baseOccurrenceFor, isLinkedOccurrence } from './calendar-occurrence-overrides.js';
+import { occurrenceSlotOf } from './calendar-events.js';
 
 function escapeICSText(s) {
   if (s == null) return '';
@@ -166,8 +167,28 @@ function usesFeedZone(ev) {
 // EXDATE and RECURRENCE-ID identify the same original recurrence slot. Keeping
 // their notation in one formatter prevents a moved replacement from using a
 // date-only, floating or TZID form different from the master's RRULE set.
+/**
+ * Ein Schluessel in Format A (#2034) IST der Originalstart nach RFC 5545 und
+ * geht ohne Rechnung hinaus: ein UTC-Zeitpunkt als Wanduhr der Serienzone
+ * (oder mit `Z`), eine schwebende Wanduhr wie jeder zonenlose Wert des Feeds.
+ * null fuer die alte Form `YYYY-MM-DD` an einer getimten Serie - die braucht
+ * die Rechnung darunter.
+ */
+function exactSlotProp(prop, master, key, feedZone) {
+  if (master.all_day) return `${prop};VALUE=DATE:${formatDate(key)}`;
+  const value = String(key ?? '');
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) {
+    return usesTzid(master)
+      ? `${prop};TZID=${master.tzid}:${formatWall(value, master.tzid)}`
+      : `${prop}:${formatUTC(value)}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)) return stampProp(prop, value, feedZone);
+  return null;
+}
+
 function recurrenceSlotProp(prop, master, dateKey, feedZone) {
-  if (master.all_day) return `${prop};VALUE=DATE:${formatDate(dateKey)}`;
+  const exact = exactSlotProp(prop, master, dateKey, feedZone);
+  if (exact) return exact;
   if (usesTzid(master)) {
     const baseOccurrence = baseOccurrenceFor(master, dateKey, householdReadingZone(feedZone));
     return `${prop};TZID=${master.tzid}:${formatWall(baseOccurrence.start_datetime, master.tzid)}`;
@@ -183,7 +204,8 @@ function recurrenceSlotProp(prop, master, dateKey, feedZone) {
 // local date among the three adjacent candidates, not by reusing a UTC suffix.
 // This does not scan the rule, so retained/unreachable EXDATEs remain harmless.
 function exceptionSlotProp(master, dateKey, feedZone) {
-  if (master.all_day) return `EXDATE;VALUE=DATE:${formatDate(dateKey)}`;
+  const exact = exactSlotProp('EXDATE', master, dateKey, feedZone);
+  if (exact) return exact;
   if (usesTzid(master)) {
     // Zonenlose Ziffern zuerst in der Haushaltszone zum Zeitpunkt (#1993):
     // dieselbe Lesart wie die Expansion, deren UTC-Tag die Ausnahme traegt.
@@ -275,10 +297,12 @@ function buildVEvent(
   // Ein reines Datum als UNTIL ist neben einem getimten DTSTART ungueltig und
   // wird zum Ende des Ortstags in der Zone, in der DTSTART oben steht (#1974,
   // utils/rrule-until.js): TZID der Serie, sonst die Feed-Zone fuer naive
-  // Werte, sonst UTC.
+  // Werte, sonst UTC. Ein UNTIL mit Uhrzeit aus dem alten Formular geht an einer
+  // eigenen Serie ohne Zone zuvor als Datum hinaus (#1992, outboundRecurrenceRule).
   if (ev.recurrence_rule && !recurrenceMaster) {
     const untilZone = usesTzid(ev) ? ev.tzid : (hasExplicitOffset(dtstart) ? null : feedZone);
-    lines.push(rruleLine(ev.all_day ? ev.recurrence_rule : timedSeriesUntil(ev.recurrence_rule, untilZone)));
+    const rule = outboundRecurrenceRule(ev);
+    lines.push(rruleLine(ev.all_day ? rule : timedSeriesUntil(rule, untilZone)));
   }
   // Einzeln ausgenommene Vorkommen (EXDATE, #489). Zeit-Teil = Master-Startzeit,
   // damit die EXDATE-Instanz exakt auf ein RRULE-Vorkommen trifft.
@@ -369,6 +393,16 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
     const parentId = Number(event.series_id);
     if (!linkedSlotsByMaster.has(parentId)) linkedSlotsByMaster.set(parentId, new Set());
     linkedSlotsByMaster.get(parentId).add(event.recurrence_id);
+    // Den Slot in beiden Formen (#2034): eine Ausnahme, die noch die alte Form
+    // traegt, gehoert zu einem Einzelvorkommen, das schon die exakte traegt,
+    // und umgekehrt.
+    const slot = occurrenceSlotOf(event);
+    if (slot) {
+      linkedSlotsByMaster.get(parentId).add(slot.key);
+      if (slot.legacyKey === event.recurrence_id || slot.legacyKey === slot.key) {
+        linkedSlotsByMaster.get(parentId).add(slot.legacyKey);
+      }
+    }
   }
   for (const event of resolvedRows) {
     const linkedSlots = linkedSlotsByMaster.get(Number(event.id));

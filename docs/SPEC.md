@@ -975,9 +975,10 @@ and translated for the seeded names only, so a household that renames one keeps 
 | icon | TEXT | NOT NULL (default 'package') |
 | sort_order | INTEGER | NOT NULL (default 0) |
 
-### Pantry Items (migration v108, v109)
+### Pantry Items (migration v108, v109, v253)
 What is actually in the house. One row is one batch: two packs of milk with different best-before
-dates are two rows, which keeps the model flat instead of nesting batches under a product.
+dates are two rows. Since v253 (#1448) every batch belongs to a household product (Pantry Products
+below); the pages and the API still read the batch.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -990,6 +991,7 @@ dates are two rows, which keeps the model flat instead of nesting batches under 
 | min_quantity | REAL | nullable; at or below this amount the item counts as running low |
 | notes | TEXT | |
 | created_by | INTEGER | FK → Users (**SET NULL**, nullable since v109) — the pantry is household property, not private property, so removing a member must not delete the household's stock (v1.55.0) |
+| product_id | INTEGER | FK → Pantry Products (**CASCADE**), nullable (v253) - set in the same transaction by every write of name, unit or category (`assignPantryProduct()` in `server/services/pantry-products.js`); a changed name or unit moves the batch to the matching product. Deleting a product deletes its batches; nothing deletes a product yet |
 
 Expiry and stock status are derived in the client, not stored: "expired" depends on the user's local
 calendar day, and the server reasons in UTC. The threshold for "expiring soon" is seven days.
@@ -1021,6 +1023,29 @@ clamp, so an upgrade cannot fire every soon-expiring item at once on the first m
 
 `pantry_item` reminders are **derived, not entered**: `POST`, `PUT` and both `DELETE` paths reject
 them with 400 (see the Reminders section), because the run would recreate them within a minute.
+
+### Pantry Products (migration v253, #1448)
+A household product above the batches. Identity is the household's own wording, not a guess
+(DECISIONS.md, section 7): a batch whose name and unit match a product joins it, a new name or unit
+creates one. A product outlives its last batch. The minimum, the target and the preferred shop move
+here in later steps of #1448.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| name | TEXT | NOT NULL - set when the product is created; a batch write does not rename it (renaming one batch moves it to another product, a case or whitespace change keeps it) |
+| name_key | TEXT | nullable - the name trimmed, whitespace collapsed, lower-cased in JS (`ingredientMatchKey()`; SQLite's `lower()` folds ASCII only). NULL for a name with nothing left: such a batch gets a product of its own |
+| unit | TEXT | NOT NULL - compared as stored; "Rice, kg" and "Rice, g" are two products |
+| category | TEXT | NOT NULL (default 'Sonstiges') - the category a new batch brought or an edit last changed (an edit that leaves the category as it was does not touch it); until a product can be edited on its own, the batch dialog is the only place to change it |
+| created_by | INTEGER | FK → Users (SET NULL) |
+| | | UNIQUE (name_key, unit) |
+
+Migration 253 grouped the existing batches with a frozen copy of the key and of the grouping, kept
+inside the migration entry; name and category came from the most recently updated batch of each
+group. Batches that arrive without a product, or whose name or unit no longer match their product
+(written or renamed by an older version under `DB_ALLOW_NEWER_SCHEMA`), are grouped at start by the
+live function, `groupBatchesIntoProducts()`, with the key the writers use; a product left without
+batches stays. This runs only when the build knows every applied migration, never as the older
+version on a newer database.
 
 ### Calendar Events
 | Column | Type | Constraint |
@@ -5921,6 +5946,7 @@ Unauthenticated users are redirected here. No public registration form - the fir
   **Two kinds of account are exempt.** Guests of shared expenses (`split_expense_guest_users`) keep password login and reset - they are external people an admin creates with an assigned password and have no presence in the household's directory; the login page keeps a secondary way to their form. Invitations adapt instead of breaking: while the switch is in effect, `POST /auth/invites/accept` creates an account without a password and `GET /auth/invites/preview` reports `password_required: false` so `/join` does not ask for one. An invitation without an email address is refused rather than consumed, because that address is the only way the account can later be linked.
 
 - **Accounts without a password (#847):** `sso_only` on `POST /auth/users` and `PATCH /auth/users/:id` stores the `$oidc$` placeholder instead of a hash - the same value an SSO-provisioned account carries. Deliberately an explicit flag rather than an omitted password: a forgotten field must never quietly produce an account nobody can sign into. It requires OIDC to be configured, rejects a password sent alongside it, and requires an email address that no other unlinked member holds - checked with exactly the linker's own condition (the same `ssoLinkCandidates()` call over `contacts.email` and `contact_emails.value`, same normalisation, split-expense guests excluded), because a narrower check here would wave through the cases the linking later fails on. Switching back off requires setting a password in the same request. `GET /auth/users` reports `sso_only` per member **to administrators only**, on the same reasoning that keeps the 2FA overview a separate admin endpoint.
+- **Own account without a password (#1703):** `GET /auth/me` carries `user.sso_only` for the signed-in account itself (session and API token alike). The account page leaves out the change-password card when it is `true` - that form asks for the current password, which such an account does not have. A missing flag (cached answer, `/me` unreachable) keeps the card. On the same condition the settings shell shows the leaf's `ssoOnlyDescriptionKey` ("Profile and contact details") instead of its usual subtitle, and the SSO card's unlink hint sends the account to an administrator to set a password - it only appears when `can_unlink` is false, which for a linked account means it has no password. Two-factor stays on that page on purpose: it applies to the single sign-on path too.
 
 - **Failed-login logging (v0.55.15):** Failed attempts are logged as warnings with IP, username, and failure reason (`user_not_found` / `invalid_password`), enabling fail2ban / CrowdSec integration.
 - **Forgot password (v0.71.51, hardened in #847):** A "Forgot password?" link opens `/forgot-password`. The link is only shown when the server can actually deliver a reset mail: the public `GET /api/v1/version` response carries a `password_reset_enabled` flag (true when SMTP is configured **and** `BASE_URL` is set) and the login page gates the link on it, so it is never a dead end. On the reset page, entering a username or email always returns a generic "if an account exists…" response (anti-enumeration), regardless of whether the identifier matched a user or whether SMTP is configured. The response goes out before the lookup: resolving the account and sending the mail run afterwards in the background, so the response time does not reveal whether an account exists either. Jobs for the same account run one after another, at most one running and one waiting (a further request while one waits is dropped, since the waiting job issues the newest token anyway), so when requests overlap, the mail sent last carries the link that is still valid; the recipient's mail servers can still reorder delivery. An email identifier is compared against `contacts.email` of contacts that point to an account, with the same normalisation as SSO linking (surrounding whitespace and capitalisation ignored); it resolves only when exactly one account holds the address - guests of shared expenses do not count towards that, but a guest alone is still found - so members sharing one address reset by username. When it does match and the user has a linked email (`contacts.email`), a reset link `${BASE_URL}/reset-password?token=…` is emailed; the token is single-use and expires after 1 hour. `/reset-password` reads the token from the query string and sets a new password (min. 8 characters); on success, the token is consumed and other sessions for that user are invalidated. Requires an admin-configured SMTP server (Settings → Household → Email) and the `BASE_URL` env var - reset links are only sent when `BASE_URL` is set, since the request `Host` header is never trusted for this purpose (prevents reset-link poisoning). API: `POST /api/v1/auth/forgot-password`, `POST /api/v1/auth/reset-password` (both public, rate-limited).

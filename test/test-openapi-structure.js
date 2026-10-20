@@ -111,6 +111,15 @@ async function fragmentOf(file) {
   return { fn: fnNames[0], frag: mod[fnNames[0]]() };
 }
 
+// Refs #2056: die Bildroute antwortet `private, no-cache` mit ETag und 304,
+// nie mehr ein Cache-Jahr - ein `immutable` ueberlebte das Abmelden.
+test('people avatar dokumentiert das 304 und verspricht kein Cache-Jahr', () => {
+  const get = buildOpenApiSpec({}).paths['/api/v1/people/{id}/avatar'].get;
+  assert.ok(get.responses[304], '304 fehlt');
+  assert.match(get.description, /private, no-cache/);
+  assert.doesNotMatch(get.description, /max-age|immutable/, 'die Beschreibung verspricht kein Cache-Jahr');
+});
+
 test('es existiert eine plausible Zahl an Modul-Dateien', () => {
   assert.ok(moduleFiles.length >= 20, `unerwartet wenige Modul-Dateien: ${moduleFiles.length}`);
 });
@@ -404,7 +413,11 @@ test('calendar event responses expose optional occurrence metadata on every clie
   for (const field of occurrenceFields) {
     assert.deepEqual(occurrence.properties[field], event.properties[field]);
   }
-  assert.equal(event.properties.recurrence_id.format, 'date');
+  // Format A (#2034): drei Formen, ein Muster statt `format: date`.
+  assert.equal(event.properties.recurrence_id.format, undefined);
+  const recurrenceIdPattern = new RegExp(event.properties.recurrence_id.pattern);
+  for (const key of ['2035-03-24', '2035-03-24T23:30:00Z', '2035-03-24T01:30:00']) assert.match(key, recurrenceIdPattern);
+  for (const key of ['24.03.2035', '2035-03-24T23:30Z', '2035-03-24T01:30:00+01:00']) assert.doesNotMatch(key, recurrenceIdPattern);
   assert.equal(event.properties.reminder_anchor_start.$ref,
     '#/components/schemas/CalendarDateOrDateTime');
   for (const field of ['assignment_owner_id', 'attachment_owner_id', 'reminder_owner_id']) {
