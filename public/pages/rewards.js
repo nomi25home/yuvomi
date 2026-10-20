@@ -1594,7 +1594,7 @@ function renderMoneySection() {
   // eroeffnen kann, sieht ohne Konto einen Satz im selben Traeger.
   if (!accounts.length && !canOpen) return '';
   const setUp = canOpen ? `
-          <button class="btn btn--ghost btn--sm rw-money-setup" type="button"><i data-lucide="piggy-bank" aria-hidden="true"></i>${esc(t('rewards.money.setUp'))}</button>` : '';
+          <button class="btn btn--secondary btn--sm rw-money-setup" type="button"><i data-lucide="piggy-bank" aria-hidden="true"></i>${esc(t('rewards.money.setUp'))}</button>` : '';
   return `
       <section class="rw-section rw-money-section">
         <div class="rw-section__head">

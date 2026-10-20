@@ -805,7 +805,7 @@ export function scanSectionAction(src) {
 
 export function scanSectionToolbarCreate(src) {
   const found = [];
-  const re = /\bsection-toolbar\b/g;
+  const re = /\b(?:section-toolbar|[a-z-]+-section-head|[a-z-]+-section__head|[a-z-]+-section-actions|[a-z-]+-section__actions)\b/g;
   let m;
   while ((m = re.exec(src))) {
     if (inComment(src, m.index)) continue;
@@ -1133,10 +1133,18 @@ test('Scanner: section-toolbar-create faengt nackten Erstell-Knopf im Abschnitts
       </button>
     </div>`;
   assert.equal(scanSectionToolbarCreate(bad).length, 1);
+  const badSectionHead = `
+    <div class="split-section-head">
+      <h3>Serien</h3>
+      <button class="btn btn--icon x-recurring-add" aria-label="\${t('y')}">
+        <i data-lucide="plus" aria-hidden="true"></i>
+      </button>
+    </div>`;
+  assert.equal(scanSectionToolbarCreate(badSectionHead).length, 1, 'nackter Plus-Knopf in *-section-head wird gefangen');
   const good = `
     <div class="split-panel-head section-toolbar">
       <h2>Gruppen</h2>
-      <button type="button" class="btn btn--secondary btn--icon btn--sm split-group-panel-more popover-menu__trigger"
+      <button type="button" class="btn btn--secondary btn--icon btn--sm split-section-tools popover-menu__trigger"
               aria-label="\${t('common.moreActions')}">
         <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
       </button>

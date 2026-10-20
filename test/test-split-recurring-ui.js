@@ -333,6 +333,20 @@ test('Klick auf [data-recurring-add] im Abschnittskopf oeffnet den Anlagen-Dialo
   });
 });
 
+test('Klick auf [data-action="add-group"] in bindShell oeffnet den Gruppe-Anlegen-Dialog (#2042)', async () => {
+  await buehne({}, async (spur) => {
+    split.state.meta = { ...split.state.meta, group_types: ['household', 'other'] };
+    let clickHandler = null;
+    const addBtn = { addEventListener(typ, fn) { if (typ === 'click') clickHandler = fn; } };
+    const shell = { querySelector(sel) { return sel === '[data-action="add-group"]' ? addBtn : null; } };
+    split.bindShellForTest(shell);
+    assert.ok(clickHandler !== null, '[data-action="add-group"] hat keinen click-Hoerer bekommen');
+    await clickHandler();
+    assert.equal(spur.dialoge.length, 1, 'Klick hat openGroupModal() nicht aufgerufen');
+    assert.equal(spur.dialoge[0].title, 'splitExpenses.addGroup');
+  });
+});
+
 test('Der Riegel haengt nicht am Markup: ein Bearbeiten-Klick ohne Recht oeffnet die Leseansicht, Anlegen und Umschalten tun nichts', async () => {
   const lagen = [
     { name: 'budget: read', lage: { modus: 'read' }, id: '11' },

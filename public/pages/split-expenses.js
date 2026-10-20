@@ -207,10 +207,10 @@ export async function render(container, { user, embedded = false, onAddableChang
     className: 'split-search',
   })}
             ${readOnly() || isSplitGuest() ? '' : popoverMenuHtml({
-    id: 'split-group-panel-more',
+    id: 'split-section-tools',
     label: t('common.moreActions'),
     items: [{ icon: 'plus', label: t('splitExpenses.addGroup'), action: 'add-group' }],
-    triggerClass: 'btn btn--secondary btn--icon btn--sm split-group-panel-more',
+    triggerClass: 'btn btn--secondary btn--icon btn--sm split-section-tools',
   })}
           </div>
           <!-- Geteilter Umschalter-Baustein des Budget-Moduls statt eigener
@@ -2599,6 +2599,7 @@ export const __test = {
   renderRecurring, onRecurringClick, toggleRecurring, openRecurringModal, recurringReadSections, recurringSplitValues, changedRecurringFields,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
+  bindShellForTest(container) { _container = container; bindShell(); _statusTablist = null; },
   // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).
   renderSummaryForTest(container) { _container = container; renderSummary(); },
   // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
