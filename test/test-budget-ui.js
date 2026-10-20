@@ -5659,7 +5659,7 @@ test('R17/E5: "Ausgleichen" steht in der Salden-Zeile; schmal tritt der Gruppenk
   const main = splitExpenses.slice(splitExpenses.indexOf('function drawMain('), splitExpenses.indexOf('// So viele Namen stehen'));
   const kopf = main.slice(main.indexOf('<div class="split-header-actions">'), main.indexOf('<div class="split-content-grid">'));
   assert.doesNotMatch(kopf, /split-settle/, 'im Gruppenkopf steht "Ausgleichen" nicht mehr');
-  assert.match(main, /const balanceActions = canAct \? `\s*<div class="split-section-actions">\s*<button class="btn btn--secondary" id="split-settle">[\s\S]*?\$\{groupToolsTriggerHtml\(\)\}/,
+  assert.match(main, /const balanceActions = canAct \? `\s*<div class="split-section-actions">\s*<button class="btn btn--secondary btn--sm" id="split-settle">[\s\S]*?\$\{groupToolsTriggerHtml\(\)\}/,
     'die Salden-Zeile traegt "Ausgleichen" und den schmalen Ausloeser des Werkzeugmenues');
   assert.match(main, /<span>\$\{t\('splitExpenses\.simplified'\)\}<\/span>\s*<\/div>\$\{balanceActions\}/);
   assert.match(main, /const canAct = !ro && !archived;/, 'nur wer handeln darf, in einer aktiven Gruppe');

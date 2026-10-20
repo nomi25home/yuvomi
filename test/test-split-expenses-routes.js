@@ -410,6 +410,104 @@ test('GET /groups/:id/expenses: category-Filter + limit/offset-Pagination', asyn
   assert.equal(rec.body.data.length, 0, 'keine Ausgabe hat eine Wiederholungsregel');
 });
 
+// #2108: Offset-Seiten ueber Ausgaben DERSELBEN Sekunde. `created_at` ist
+// sekundengenau; ohne `id` als letzten Schluessel ist die Reihenfolge dort
+// unbestimmt, und eine Seite kann eine Ausgabe doppeln oder auslassen. Die
+// Zeitstempel werden per SQL gleichgezogen - so schreibt eine nachholende
+// Serie oder ein Import.
+test('GET /groups/:id/expenses: Seiten ueber dieselbe Sekunde ohne Doppel und Luecke, Reihenfolge id absteigend', async () => {
+  const owner = { id: OWNER, role: 'member' };
+  const created = await call('POST', '/groups', { actor: owner, body: { name: 'Seiten-Kasse', type: 'household', default_currency: 'EUR' } });
+  const gid = created.body.data.id;
+  const ids = [];
+  for (let i = 0; i < 7; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const e = await call('POST', `/groups/${gid}/expenses`, {
+      actor: owner,
+      body: { title: `Gleiche Sekunde ${i}`, amount: '5.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-02' },
+    });
+    assert.equal(e.status, 201, JSON.stringify(e.body));
+    ids.push(e.body.data.id);
+  }
+  db.prepare("UPDATE expenses SET created_at = '2026-04-02 08:00:00' WHERE group_id = ?").run(gid);
+
+  const seiten = [];
+  for (let offset = 0; offset < 7; offset += 3) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await call('GET', `/groups/${gid}/expenses?limit=3&offset=${offset}`, { actor: owner });
+    assert.equal(r.status, 200);
+    seiten.push(r.body);
+  }
+  const gesehen = seiten.flatMap((seite) => seite.data.map((e) => e.id));
+  assert.equal(new Set(gesehen).size, gesehen.length, 'keine Ausgabe auf zwei Seiten');
+  assert.deepEqual(gesehen, [...ids].sort((a, b) => b - a), 'alle sieben, innerhalb der Sekunde die juengste id zuerst');
+  assert.deepEqual(seiten.map((seite) => seite.pagination.has_more), [true, true, false]);
+});
+
+test('GET /groups/:id/expenses: Cursor blaettert ohne Luecke, auch wenn zwischen zwei Seiten oben geloescht wird', async () => {
+  const owner = { id: OWNER, role: 'member' };
+  const created = await call('POST', '/groups', { actor: owner, body: { name: 'Cursor-Kasse', type: 'household', default_currency: 'EUR' } });
+  const gid = created.body.data.id;
+  const ids = [];
+  for (let i = 0; i < 7; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const e = await call('POST', `/groups/${gid}/expenses`, {
+      actor: owner,
+      body: { title: `Cursor ${i}`, amount: '2.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-04' },
+    });
+    ids.push(e.body.data.id);
+  }
+  db.prepare("UPDATE expenses SET created_at = '2026-04-04T08:00:00Z' WHERE group_id = ?").run(gid);
+  const absteigend = [...ids].sort((a, b) => b - a);
+
+  const erste = await call('GET', `/groups/${gid}/expenses?limit=3`, { actor: owner });
+  assert.deepEqual(erste.body.data.map((e) => e.id), absteigend.slice(0, 3));
+  assert.deepEqual(erste.body.pagination.next_cursor, { before_date: '2026-04-04', before_at: '2026-04-04T08:00:00Z', before_id: absteigend[2] });
+  // Zwischen den Seiten loescht jemand die oberste Ausgabe. Mit offset=3 begaenne
+  // die naechste Seite eine Zeile zu spaet und liesse absteigend[3] aus.
+  const weg = await call('DELETE', `/expenses/${absteigend[0]}`, { actor: owner });
+  assert.equal(weg.status, 200);
+  const gesehen = erste.body.data.map((e) => e.id);
+  let cursor = erste.body.pagination.next_cursor;
+  while (cursor) {
+    const q = new URLSearchParams({ limit: '3', before_date: cursor.before_date, before_at: cursor.before_at, before_id: String(cursor.before_id) });
+    // eslint-disable-next-line no-await-in-loop
+    const r = await call('GET', `/groups/${gid}/expenses?${q}`, { actor: owner });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.pagination.offset, undefined, 'mit Cursor kein offset in der Antwort');
+    gesehen.push(...r.body.data.map((e) => e.id));
+    cursor = r.body.pagination.next_cursor;
+  }
+  assert.deepEqual(gesehen, absteigend, 'alle sieben genau einmal - die geloeschte nur von der ersten Seite');
+
+  const halb = await call('GET', `/groups/${gid}/expenses?before_id=${absteigend[2]}`, { actor: owner });
+  assert.equal(halb.status, 400, 'ein halber Cursor ist 400');
+  const beides = await call('GET', `/groups/${gid}/expenses?offset=3&before_date=2026-04-04&before_at=2026-04-04T08:00:00Z&before_id=${absteigend[2]}`, { actor: owner });
+  assert.equal(beides.status, 400, 'Cursor und offset zusammen sind 400');
+  const ohne = await call('GET', `/groups/${gid}/expenses?limit=3&offset=3`, { actor: owner });
+  assert.equal(ohne.body.pagination.offset, 3, 'offset bleibt fuer /api/v1 erhalten');
+});
+
+test('GET /groups/:id/expenses: has_more ist bei genau `limit` Ausgaben false (keine leere Extraseite)', async () => {
+  const owner = { id: OWNER, role: 'member' };
+  const created = await call('POST', '/groups', { actor: owner, body: { name: 'Genau-Kasse', type: 'household', default_currency: 'EUR' } });
+  const gid = created.body.data.id;
+  for (let i = 0; i < 3; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const e = await call('POST', `/groups/${gid}/expenses`, {
+      actor: owner,
+      body: { title: `Genau ${i}`, amount: '1.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-03' },
+    });
+    assert.equal(e.status, 201);
+  }
+  const genau = await call('GET', `/groups/${gid}/expenses?limit=3`, { actor: owner });
+  assert.equal(genau.body.data.length, 3);
+  assert.equal(genau.body.pagination.has_more, false, 'drei von drei: nichts mehr dahinter');
+  const knapp = await call('GET', `/groups/${gid}/expenses?limit=2`, { actor: owner });
+  assert.equal(knapp.body.data.length, 2, 'die Zusatzzeile fuer has_more geht nicht mit in die Antwort');
+  assert.equal(knapp.body.pagination.has_more, true);
+});
+
 test('member-candidates: Owner 200, Gast 403, Aussenstehender 404', async () => {
   const ok = await call('GET', `/groups/${OPS}/member-candidates`, { actor: { id: OWNER, role: 'member' } });
   assert.equal(ok.status, 200);
@@ -550,6 +648,21 @@ test('POST members via contact_id mit Geburtstag: erzeugt Nutzer + Geburtstags-A
   const bday = db.prepare('SELECT birth_date FROM birthdays WHERE family_user_id = ?').get(r.body.data.user_id);
   assert.ok(bday, 'Geburtstag aus Kontakt übernommen');
   assert.equal(bday.birth_date, '1992-07-07');
+});
+
+// #2095: ein Kontakt ohne Jahr bleibt ohne Jahr, wenn er Gast wird, und die
+// Kandidatenliste traegt die Marke als Boolean (Codex-Befund auf #2111).
+test('POST members via contact_id ohne Jahr: der Gast-Geburtstag bleibt ohne Jahr', async () => {
+  const contactId = db.prepare(`INSERT INTO contacts (name, category, birthday, birthday_year_unknown) VALUES ('Jahrlos Kontakt', 'Sonstiges', '2000-08-09', 1)`).run().lastInsertRowid;
+  const candidates = await call('GET', `/groups/${OPS}/member-candidates`, { actor: { id: OWNER, role: 'member' } });
+  const candidate = candidates.body.data.find((row) => row.source === 'contact' && row.contact_id === contactId);
+  assert.equal(candidate.birth_year_unknown, true);
+  assert.equal(candidates.body.data.filter((row) => row.source === 'user').every((row) => typeof row.birth_year_unknown === 'boolean'), true);
+
+  const r = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { contact_id: contactId, role: 'guest' } });
+  assert.equal(r.status, 201);
+  const bday = db.prepare('SELECT birth_date, year_unknown FROM birthdays WHERE family_user_id = ?').get(r.body.data.user_id);
+  assert.deepEqual({ ...bday }, { birth_date: '2000-08-09', year_unknown: 1 });
 });
 
 // Der Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (Mitglied

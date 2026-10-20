@@ -590,19 +590,31 @@ test('Autocomplete ohne Treffer gibt leeres Array', () => {
 // --------------------------------------------------------
 // Wochenhelfer-Logik (ohne Server)
 // --------------------------------------------------------
-test('Wochenberechnung: Montag der aktuellen Woche', () => {
-  // 2026-03-24 ist ein Dienstag → Montag ist 2026-03-23
-  function getMondayOf(dateStr) {
-    const d   = new Date(dateStr + 'T00:00:00Z');
-    const day = d.getUTCDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    d.setUTCDate(d.getUTCDate() + diff);
-    return d.toISOString().slice(0, 10);
+test('Wochenberechnung: erster Tag der Woche je Haushaltswochenstartag', () => {
+  // 2026-03-24 ist ein Dienstag; 2026-03-22 ist der Sonntag davor,
+  // 2026-03-21 ist der Samstag davor.
+  // Ruft die echte mealsUi.getWeekStartOf()-Funktion mit state.weekStart gesetzt auf.
+  const zuvor = mealsUi.state.weekStart;
+  try {
+    // Montag-Start (1)
+    mealsUi.state.weekStart = 1;
+    assert(mealsUi.getWeekStartOf('2026-03-24') === '2026-03-23', 'Dienstag → Montag');
+    assert(mealsUi.getWeekStartOf('2026-03-23') === '2026-03-23', 'Montag bleibt Montag');
+    assert(mealsUi.getWeekStartOf('2026-03-29') === '2026-03-23', 'Sonntag → voriger Montag');
+    assert(mealsUi.getWeekStartOf('2026-03-30') === '2026-03-30', 'Nächster Montag');
+    // Sonntag-Start (0)
+    mealsUi.state.weekStart = 0;
+    assert(mealsUi.getWeekStartOf('2026-03-24') === '2026-03-22', 'Dienstag → voriger Sonntag');
+    assert(mealsUi.getWeekStartOf('2026-03-22') === '2026-03-22', 'Sonntag bleibt Sonntag');
+    assert(mealsUi.getWeekStartOf('2026-03-28') === '2026-03-22', 'Samstag → voriger Sonntag');
+    // Samstag-Start (6)
+    mealsUi.state.weekStart = 6;
+    assert(mealsUi.getWeekStartOf('2026-03-24') === '2026-03-21', 'Dienstag → voriger Samstag');
+    assert(mealsUi.getWeekStartOf('2026-03-21') === '2026-03-21', 'Samstag bleibt Samstag');
+    assert(mealsUi.getWeekStartOf('2026-03-27') === '2026-03-21', 'Freitag → voriger Samstag');
+  } finally {
+    mealsUi.state.weekStart = zuvor;
   }
-  assert(getMondayOf('2026-03-24') === '2026-03-23', 'Montag korrekt berechnet');
-  assert(getMondayOf('2026-03-23') === '2026-03-23', 'Montag bleibt Montag');
-  assert(getMondayOf('2026-03-29') === '2026-03-23', 'Sonntag → gleicher Montag');
-  assert(getMondayOf('2026-03-30') === '2026-03-30', 'Nächster Montag');
 });
 
 // PR #1200 Review Runde 3, Nice-to-have 2: keine Suite pinnte fest, dass
@@ -933,7 +945,7 @@ test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Heute", per .is-current+in
   };
   const zuvor = mealsUi.state.currentWeek;
   try {
-    mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+    mealsUi.state.currentWeek = mealsUi.getWeekStartOf(todayKey());
     mealsUi.syncTodayButton(root);
     assert(btn.classList.contains('is-current') === true, 'in der aktuellen Woche muss der Reset .is-current tragen');
     assert(btn.inert === true, 'in der aktuellen Woche muss der Reset inert sein');
@@ -963,7 +975,7 @@ test('syncTodayButton() rettet den Fokus vor dem eigenen inert-Werden', () => {
 
     let fokussiert = false;
     prevBtn.focus = () => { fokussiert = true; globalThis.document.activeElement = prevBtn; };
-    mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey()); // jetzt wird der fokussierte Knopf aktuell
+    mealsUi.state.currentWeek = mealsUi.getWeekStartOf(todayKey()); // jetzt wird der fokussierte Knopf aktuell
     mealsUi.syncTodayButton(root);
     assert(fokussiert === true, 'der Fokus muss vor dem inert-Werden auf den Zurueck-Pfeil wandern');
     assert(btn.inert === true);
@@ -1105,7 +1117,7 @@ test('renderWeekGrid() verdrahtet syncTodayButton() wirklich in den Render-Pfad'
       // Aktuelle Woche + leerer Plan: `renderWeekGrid()` haengt am
       // Leerzustand-Zweig auf, NACHDEM es `syncTodayButton()` aufgerufen hat -
       // der guenstigste echte Durchlauf, der die Verdrahtung noch beobachtet.
-      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.currentWeek = mealsUi.getWeekStartOf(todayKey());
       mealsUi.state.meals = [];
       mealsUi.state.loadError = null;
       mealsUi.renderWeekGridForTest(testContainer);
@@ -1148,7 +1160,7 @@ test('onNarrowWeekLabelQueryChange() zeichnet die Wochen-Navigation neu, wenn de
     const zuvorMeals = mealsUi.state.meals;
     const zuvorError = mealsUi.state.loadError;
     try {
-      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.currentWeek = mealsUi.getWeekStartOf(todayKey());
       mealsUi.state.meals = [];
       mealsUi.state.loadError = null;
       mealsUi.renderWeekGridForTest(testContainer); // Container einmal "montieren"
@@ -1176,17 +1188,61 @@ test('onNarrowWeekLabelQueryChange() zeichnet die Wochen-Navigation neu, wenn de
 // .is-current/inert, und ohne diese Gegenmassnahme blitzt er bei jedem
 // frischen Laden von /meals sichtbar auf, bevor renderWeekGrid() ihn nach dem
 // ersten Laden wieder korrekt einstellt.
-test('render() synchronisiert „Heute" VOR dem ersten Laden, gegen das Aufblitzen (Befund 5)', () => {
+test('render() synchronisiert „Heute" VOR dem ersten await, gegen das Aufblitzen (Befund 5)', () => {
   const renderStart = mealsSource.indexOf('export async function render(container, { user }) {');
-  const loadIdx = mealsSource.indexOf('await Promise.all([loadWeek(monday)');
-  assert(renderStart > -1 && loadIdx > -1, 'render()/Promise.all-Aufruf nicht gefunden');
-  const syncIdx = mealsSource.indexOf('syncTodayButton();', renderStart);
-  assert(syncIdx > -1 && syncIdx < loadIdx,
-    'syncTodayButton() muss zwischen dem Beginn von render() und dem ersten Laden aufgerufen werden');
+  assert(renderStart > -1, 'render() nicht gefunden');
+  // Jedes await zaehlt, auch `const weekBegin = await startWeek(today);` -
+  // ein Suchmuster nur fuer Zeilen, die mit `await` beginnen, uebersah es.
+  const renderBody = mealsSource.slice(renderStart);
+  const firstAwaitIdx = renderBody.search(/\bawait\b/);
+  assert(firstAwaitIdx > -1, 'Kein await in render() gefunden');
+  const syncIdx = renderBody.indexOf('syncTodayButton();');
+  assert(syncIdx > -1 && syncIdx < firstAwaitIdx,
+    'syncTodayButton() muss VOR dem ersten await in render() aufgerufen werden');
+  // #2075: render() muss den Wochenanfang ueber startWeek() holen, bevor es die
+  // Woche laedt - sonst laedt es wieder die Montagswoche, und der eigene
+  // startWeek()-Test bliebe trotzdem gruen.
+  const startWeekIdx = renderBody.indexOf('await startWeek(today)');
+  const loadWeekIdx = renderBody.indexOf('loadWeek(weekBegin)');
+  assert(startWeekIdx > -1 && loadWeekIdx > -1 && startWeekIdx < loadWeekIdx,
+    'render() muss `await startWeek(today)` VOR `loadWeek(weekBegin)` aufrufen (#2075)');
+});
+
+// #2075: startWeek() laedt die Praeferenzen, berechnet den korrekten
+// Wochenanfang und setzt state.currentWeek + syncTodayButton() - testbar
+// mit einem /preferences-Stub der die Haushalts-Wochenanfangs-Einstellung
+// setzt, ohne render() als Ganzes auszufuehren.
+const _startWeekResult = await (async () => {
+  const zuvorWeekStart = mealsUi.state.weekStart;
+  const zuvorCurrentWeek = mealsUi.state.currentWeek;
+  const fakeBtn = fakeResetButton();
+  const fakeRoot = {
+    querySelector: (sel) => (sel === '#week-today' ? fakeBtn : null),
+    querySelectorAll: () => [],
+  };
+  mealsUi.setContainerForTest(fakeRoot);
+  globalThis.__apiStub = { get: async () => ({ data: { week_start: 'sunday' } }) };
+  try {
+    const weekBegin = await mealsUi.startWeek('2026-10-19'); // Montag in UTC
+    return { weekBegin, currentWeek: mealsUi.state.currentWeek };
+  } finally {
+    delete globalThis.__apiStub;
+    mealsUi.state.weekStart = zuvorWeekStart;
+    mealsUi.state.currentWeek = zuvorCurrentWeek;
+  }
+})();
+
+test('startWeek() laedt /preferences und setzt state.currentWeek auf den richtigen Wochenanfang (#2075)', () => {
+  // 2026-10-19 ist ein Montag; fuer week_start=sunday gehoert er zur Woche
+  // ab Sonntag 2026-10-18.
+  assert(_startWeekResult.weekBegin === '2026-10-18',
+    `startWeek() soll '2026-10-18' zurueckgeben (Sonntag), erhalten: ${_startWeekResult.weekBegin}`);
+  assert(_startWeekResult.currentWeek === '2026-10-18',
+    `state.currentWeek soll '2026-10-18' sein, ist: ${_startWeekResult.currentWeek}`);
 });
 
 // PR #1200 Review, Befund 8: dieser Test berechnete sein Soll bisher mit
-// demselben getMondayOf(todayKey()) wie die Seite selbst - eine Regression in
+// demselben getWeekStartOf(todayKey()) wie die Seite selbst - eine Regression in
 // der Zonenumrechnung waere hier unsichtbar geblieben, weil beide Seiten
 // denselben (moeglicherweise kaputten) Weg gegangen waeren. Eine explizit
 // gesetzte Haushaltszone, die von der Prozesszone des Testlaeufers abweicht,
@@ -1216,8 +1272,8 @@ test('„Heute" im Essensplan folgt der HAUSHALTSZONE, nicht der Prozesszone des
 
     const erwarteterHeuteKey = '2026-01-11'; // LA-Kalendertag (Sonntag) bei 2026-01-12T02:30Z
     const prozessHeuteKey = '2026-01-12'; // UTC-Kalendertag (Montag) desselben Zeitpunkts
-    const erwarteterMontag = mealsUi.getMondayOf(erwarteterHeuteKey);
-    const prozessMontag = mealsUi.getMondayOf(prozessHeuteKey);
+    const erwarteterMontag = mealsUi.getWeekStartOf(erwarteterHeuteKey);
+    const prozessMontag = mealsUi.getWeekStartOf(prozessHeuteKey);
     assert(erwarteterMontag !== prozessMontag,
       'Testaufbau fehlerhaft: LA- und Prozesstag muessen fuer diese Pruefung verschiedene Wochen ergeben');
 
@@ -1289,7 +1345,7 @@ test('onNarrowWeekLabelQueryChange() aktualisiert nur Label und Reset, nicht das
     const zuvorError = mealsUi.state.loadError;
     const zuvorDocument = globalThis.document;
     try {
-      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.currentWeek = mealsUi.getWeekStartOf(todayKey());
       mealsUi.state.meals = [];
       mealsUi.state.loadError = null;
 

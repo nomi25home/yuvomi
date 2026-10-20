@@ -90,6 +90,8 @@ test('POST /accounts: URL ohne http(s):// → 400', async () => {
   const r = await call('POST', '/accounts', { name: 'X', base_url: 'ftp://x', api_token: 't' });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /http/);
+  // #1909: der Fall hat einen Namen - den Satz sagt die App.
+  assert.equal(r.body.reason, 'recipe_providers_url_invalid');
 });
 
 test('POST /accounts: fehlgeschlagener Verbindungstest → 502, kein Account angelegt', async () => {
@@ -97,6 +99,7 @@ test('POST /accounts: fehlgeschlagener Verbindungstest → 502, kein Account ang
   const before = db.prepare('SELECT COUNT(*) AS n FROM recipe_provider_accounts').get().n;
   const r = await call('POST', '/accounts', { name: 'Kaputt', base_url: 'https://bad.example.com', api_token: 't' });
   assert.equal(r.status, 502);
+  assert.equal(r.body.reason, 'recipe_providers_connection_failed', '#1909');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipe_provider_accounts').get().n, before);
 });
 
@@ -138,6 +141,7 @@ test('POST /accounts: localhost, reserviertes Suffix und privates IP-Literal →
     assert.equal(r.status, 400, `${base_url} muss abgelehnt werden`);
     assert.match(r.body.error, SWITCH_RE, `${base_url}: die Meldung muss den Schalter nennen`);
     assert.doesNotMatch(r.body.error, /credentials/i, `${base_url}: die Ablehnung ist keine Credential-Frage`);
+    assert.equal(r.body.reason, 'recipe_providers_private_network', `${base_url}: der Fall hat einen Namen (#1909)`);
   }
   assert.equal(calls.testConnection, 0, 'entschieden VOR dem Netzaufruf - der Adapter darf nicht gefragt worden sein');
   assert.equal(accountCount(), before, 'nichts angelegt');
@@ -163,6 +167,7 @@ test('POST /accounts: die Lookup-Ablehnung eines Namens → 400 mit dem Schalter
   assert.match(r.body.error, /private IP address: 10\.0\.0\.5/, 'die Hook-Meldung bleibt drin - sie nennt die Adresse');
   assert.match(r.body.error, SWITCH_RE, 'und der Schalter kommt dazu');
   assert.doesNotMatch(r.body.error, /credentials/i);
+  assert.equal(r.body.reason, 'recipe_providers_private_network', 'derselbe Fall wie das Literal (#1909)');
   assert.equal(accountCount(), before);
   // Ein gewoehnlicher Fehlschlag bleibt das 502 von oben - der Hinweis gilt
   // nur der Lookup-Ablehnung, sonst wuerde er bei jedem falschen Token stehen.
@@ -170,6 +175,7 @@ test('POST /accounts: die Lookup-Ablehnung eines Namens → 400 mit dem Schalter
   const plain = await call('POST', '/accounts', { name: 'Kaputt 2', base_url: 'https://bad2.example.com', api_token: 't' });
   assert.equal(plain.status, 502);
   assert.doesNotMatch(plain.body.error, SWITCH_RE);
+  assert.equal(plain.body.reason, 'recipe_providers_connection_failed');
 }));
 
 test('POST /accounts/:id/test: die Lookup-Ablehnung traegt den Schalter in der Antwort UND in last_error (#1053)', () => withEnv(undefined, async () => {
@@ -212,6 +218,7 @@ test('POST /accounts: external_url ohne http(s):// → 400', async () => {
   });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /External URL/);
+  assert.equal(r.body.reason, 'recipe_providers_external_url_invalid', '#1909');
 });
 
 // Ein internes Ziel (.local) braucht seit #1053 schon beim Speichern das Opt-in -
@@ -230,6 +237,7 @@ test('POST /accounts: external_url wird getrimmt und gespeichert (base_url bleib
 test('POST /accounts: doppelte base_url → 409', async () => {
   const r = await call('POST', '/accounts', { name: 'Zweitkonto', base_url: 'https://mealie.example.com', api_token: 't2' });
   assert.equal(r.status, 409);
+  assert.equal(r.body.reason, 'recipe_providers_account_exists', '#1909');
 });
 
 test('POST /accounts: Nicht-Admin → 403', async () => {
@@ -290,11 +298,30 @@ test('PATCH /accounts/:id: external_url ohne http(s):// → 400', async () => {
   const id = list.body.data.find((a) => a.name === 'Zuhause').id;
   const r = await call('PATCH', `/accounts/${id}`, { external_url: 'not-a-url' });
   assert.equal(r.status, 400);
+  assert.equal(r.body.reason, 'recipe_providers_external_url_invalid', '#1909');
 });
 
 test('PATCH /accounts/:id: unbekannter Account → 404', async () => {
   const r = await call('PATCH', '/accounts/999999', { enabled: true });
   assert.equal(r.status, 404);
+  assert.equal(r.body.reason, 'recipe_providers_account_not_found', '#1909');
+});
+
+// #1909: ein Konto, das ein anderer Admin inzwischen entfernt hat, ist auf
+// jedem Weg derselbe Fall - die Seite laedt dann nach, statt den Text des
+// Servers zu zeigen, und ein Loeschen gilt als erledigt.
+test('ein entferntes Konto traegt auf jedem Weg recipe_providers_account_not_found (#1909)', async () => {
+  for (const [method, path, body] of [
+    ['PATCH', '/accounts/999999', { external_url: 'https://x.example.com' }],
+    ['DELETE', '/accounts/999999'],
+    ['POST', '/accounts/999999/test'],
+    ['POST', '/accounts/999999/sync'],
+  ]) {
+    const r = await call(method, path, body);
+    assert.equal(r.status, 404, `${method} ${path}`);
+    assert.equal(r.body.reason, 'recipe_providers_account_not_found', `${method} ${path}`);
+    assert.equal(r.body.error, 'Recipe provider account not found.', `${method} ${path}: der Text bleibt fuer API-Clients`);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -330,6 +357,68 @@ test('POST /sync: Nicht-Admin → 403', async () => {
 });
 
 // --------------------------------------------------------------------------
+// Der Fall des letzten Fehlschlags (#1909, Migration 255): Verbindungstest und
+// Sync speichern ihn neben `last_error`, /status liefert ihn, ein Erfolg leert ihn.
+// --------------------------------------------------------------------------
+test('Verbindungstest und Sync speichern den Fall des Fehlschlags, /status liefert ihn, ein Erfolg leert ihn (#1909)', () => withEnv('true', async () => {
+  _setAdapterFactory(fakeAdapter());
+  const created = await call('POST', '/accounts', { name: 'Fallkonto', base_url: 'https://fall.example.com', api_token: 't' });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+  const row = () => db.prepare('SELECT last_error, last_error_reason, last_error_params FROM recipe_provider_accounts WHERE id = ?').get(id);
+  const status = async () => (await call('GET', '/status')).body.data.find((a) => a.id === id);
+
+  // Verbindungstest: der Status einer Antwort ohne Erfolg (der Adapter wirft nicht).
+  for (const [probe, reason, params] of [
+    [{ ok: false, status: 401 }, 'recipe_providers_sync_auth_failed', undefined],
+    [{ ok: false, status: 404 }, 'recipe_providers_sync_wrong_url', undefined],
+    [{ ok: false, status: 503 }, 'recipe_providers_sync_http_status', { status: 503 }],
+    // Ein Wurf, den der Adapter schon eingeordnet hat (probeFailure).
+    [{ ok: false, status: 0, error: 'The operation was aborted', reason: 'recipe_providers_sync_timeout' }, 'recipe_providers_sync_timeout', undefined],
+    // Ein Wurf ohne Fall: kein Grund, der Text bleibt.
+    [{ ok: false, status: 0, error: 'Too many redirects', reason: null }, null, undefined],
+  ]) {
+    _setAdapterFactory(countingAdapter(probe).factory);
+    const r = await call('POST', `/accounts/${id}/test`);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.reason, reason, `Antwort: ${JSON.stringify(probe)}`);
+    assert.deepEqual(r.body.data.params, params);
+    assert.equal(row().last_error_reason, reason, `gespeichert: ${JSON.stringify(probe)}`);
+    assert.equal(row().last_error_params, params ? JSON.stringify(params) : null);
+    assert.equal(row().last_error, probe.error ?? `HTTP ${probe.status}`, 'last_error bleibt der rohe Text');
+    const acc = await status();
+    assert.equal(acc.lastErrorReason, reason);
+    assert.deepEqual(acc.lastErrorParams, params ?? null);
+  }
+
+  // Sync: der Wurf des Adapters, mit Zahl.
+  _setAdapterFactory(() => ({
+    testConnection: async () => ({ ok: false, status: 502 }),
+    listRecipeSummaries: async () => { throw Object.assign(new Error('Mealie request failed (502)'), { status: 502 }); },
+    getRecipe: async () => null,
+    recipeUrl: () => null,
+  }));
+  const failed = await call('POST', `/accounts/${id}/sync`);
+  assert.equal(failed.status, 200);
+  assert.equal(failed.body.data.failed, true);
+  assert.equal(failed.body.data.reason, 'recipe_providers_sync_http_status');
+  assert.deepEqual(failed.body.data.params, { status: 502 });
+  assert.equal(failed.body.data.error, 'Mealie request failed (502)', 'error bleibt fuer API-Clients');
+  const acc = await status();
+  assert.equal(acc.lastError, 'Mealie request failed (502)');
+  assert.equal(acc.lastErrorReason, 'recipe_providers_sync_http_status');
+  assert.deepEqual(acc.lastErrorParams, { status: 502 });
+
+  _setAdapterFactory(fakeAdapter());
+  const ok = await call('POST', `/accounts/${id}/sync`);
+  assert.equal(ok.body.data.failed, false);
+  const cleared = await status();
+  assert.deepEqual([cleared.lastError, cleared.lastErrorReason, cleared.lastErrorParams], [null, null, null]);
+  assert.deepEqual(row(), { last_error: null, last_error_reason: null, last_error_params: null });
+  await call('DELETE', `/accounts/${id}`);
+}));
+
+// --------------------------------------------------------------------------
 // GET /status (kein Admin-Gate)
 // --------------------------------------------------------------------------
 test('GET /status: auch für Nicht-Admin lesbar, enthält nie den Token', async () => {
@@ -362,4 +451,5 @@ test('DELETE /accounts/:id: löscht per Kaskade auch alle gespiegelten Rezepte',
 test('DELETE /accounts/:id: unbekannter Account → 404', async () => {
   const r = await call('DELETE', '/accounts/999999');
   assert.equal(r.status, 404);
+  assert.equal(r.body.reason, 'recipe_providers_account_not_found', '#1909');
 });

@@ -273,6 +273,36 @@ try {
     assert(bad.status === 400, `ungültiges Format → 400, war ${bad.status}`);
   });
 
+  // #2095: ein Geburtstag ohne Jahr. Das Datum traegt das Platzhalterjahr 2000,
+  // die Marke sagt, dass es keines ist; der Export schreibt Apples Form, damit
+  // Apple (und der eigene Import) kein Jahr 1604 oder 2000 als echtes sehen.
+  await asyncTest('birthday_year_unknown: speichern, exportieren, mit Jahr abnehmen (#2095)', async () => {
+    const created = await jsend(`${base}`, 'POST', {
+      name: 'Ohne Jahr', category: 'misc', birthday: '1987-02-29', birthday_year_unknown: true,
+    });
+    assert(created.status === 201, `Status ${created.status} ${JSON.stringify(created.body)}`);
+    assert(created.body.data.birthday === '2000-02-29', `Platzhalterjahr, war ${created.body.data.birthday}`);
+    assert(created.body.data.birthday_year_unknown === 1, 'Marke gesetzt');
+    const bId = created.body.data.id;
+
+    const { text } = await tget(`${base}/${bId}/vcard`);
+    assert(text.includes('BDAY;X-APPLE-OMIT-YEAR=1604:1604-02-29'), `Apple-Form im Export: ${text}`);
+    assert(!text.includes('BDAY:2000'), 'kein Platzhalterjahr als echtes Jahr');
+
+    const untouched = await jsend(`${base}/${bId}`, 'PUT', { notes: 'nur Notiz' });
+    assert(untouched.body.data.birthday_year_unknown === 1, 'Marke bleibt ohne Feld');
+
+    const noYear = await jsend(`${base}/${bId}`, 'PUT', { birthday_year_unknown: false });
+    assert(noYear.status === 400, `Abnehmen ohne Jahr → 400, war ${noYear.status}`);
+
+    const withYear = await jsend(`${base}/${bId}`, 'PUT', { birthday_year_unknown: false, birthday: '1988-02-29' });
+    assert(withYear.status === 200, `Status ${withYear.status}`);
+    assert(withYear.body.data.birthday === '1988-02-29' && withYear.body.data.birthday_year_unknown === 0, 'mit Jahr');
+
+    const cleared = await jsend(`${base}/${bId}`, 'PUT', { birthday: '', birthday_year_unknown: true });
+    assert(cleared.body.data.birthday === null && cleared.body.data.birthday_year_unknown === 0, 'ohne Datum keine Marke');
+  });
+
   // ------------------------------------------------------------------
   // Identitaetsfarbe eines verknuepften Mitglieds (Vollton-Regel, DESIGN.md)
   //
@@ -331,6 +361,63 @@ try {
   await asyncTest('DELETE /:id für unbekannte ID → 404', async () => {
     const { status } = await jsend(`${base}/99999`, 'DELETE');
     assert(status === 404, `Status ${status}`);
+  });
+
+  // ------------------------------------------------------------------
+  // Ein abgewiesenes Feld nennt seinen Fall (#1909): der vCard-Import zeigte
+  // bis dahin den englischen Servertext, weil nur der das Feld nannte. Jetzt
+  // traegt die Antwort `reason` und die Grenze als `params.limit`.
+  // ------------------------------------------------------------------
+  await asyncTest('POST / mit zu langem Feld nennt Grund und Grenze (#1909)', async () => {
+    for (const [field, value, reason, limit] of [
+      ['name', 'N'.repeat(201), 'contacts_name_too_long', 200],
+      ['lastName', 'L'.repeat(201), 'contacts_name_too_long', 200],
+      ['namePrefix', 'P'.repeat(101), 'contacts_name_too_long', 100],
+      ['phone', '1'.repeat(101), 'contacts_phone_too_long', 100],
+      ['email', `${'e'.repeat(200)}@x.de`, 'contacts_email_too_long', 200],
+      ['address', 'A'.repeat(5001), 'contacts_address_too_long', 5000],
+      ['notes', 'n'.repeat(5001), 'contacts_notes_too_long', 5000],
+    ]) {
+      const body = field === 'name' ? { name: value } : { name: 'Import Fall', [field]: value };
+      const { status, body: res } = await jsend(base, 'POST', body);
+      assert(status === 400, `${field}: Status ${status}`);
+      assert(res.reason === reason, `${field}: reason ${res.reason}`);
+      assert(res.params?.limit === limit, `${field}: limit ${JSON.stringify(res.params)}`);
+      assert(typeof res.error === 'string' && res.error.length > 0, `${field}: error bleibt fuer API-Clients`);
+    }
+  });
+
+  await asyncTest('POST / mit ungueltigem Geburtstag nennt den Fall, ohne Zahl (#1909)', async () => {
+    const { status, body } = await jsend(base, 'POST', { name: 'Import Fall', birthday: '1990-02-30' });
+    assert(status === 400, `Status ${status}`);
+    assert(body.reason === 'contacts_birthday_invalid', `reason ${body.reason}`);
+    assert(body.params === undefined, 'keine Zahl am Datumsfall');
+  });
+
+  await asyncTest('POST / ohne Namen bleibt ohne Grund - fehlt ist nicht zu lang (#1909)', async () => {
+    const { status, body } = await jsend(base, 'POST', { phone: '123' });
+    assert(status === 400, `Status ${status}`);
+    assert(body.reason === undefined, `reason ${body.reason}`);
+  });
+
+  await asyncTest('POST / mit zwei Befunden nennt das erste Feld, die geloeschte Kategorie nur allein (#1909)', async () => {
+    const two = await jsend(base, 'POST', { name: 'Import Fall', phone: '1'.repeat(101), notes: 'n'.repeat(5001) });
+    assert(two.body.reason === 'contacts_phone_too_long', `reason ${two.body.reason}`);
+    const withCategory = await jsend(base, 'POST', { name: 'Import Fall', category: 'gibt-es-nicht', phone: '1'.repeat(101) });
+    assert(withCategory.body.reason === 'contacts_phone_too_long', `reason ${withCategory.body.reason}`);
+    const onlyCategory = await jsend(base, 'POST', { name: 'Import Fall', category: 'gibt-es-nicht' });
+    assert(onlyCategory.body.reason === 'contacts_selected_category_not_found', `reason ${onlyCategory.body.reason}`);
+  });
+
+  await asyncTest('PUT /:id mit zu langem Feld nennt Grund und Grenze (#1909)', async () => {
+    const created = await jsend(base, 'POST', { name: 'Fall Bearbeiten' });
+    const id = created.body.data.id;
+    const notes = await jsend(`${base}/${id}`, 'PUT', { notes: 'n'.repeat(5001) });
+    assert(notes.status === 400, `Status ${notes.status}`);
+    assert(notes.body.reason === 'contacts_notes_too_long' && notes.body.params?.limit === 5000,
+      `notes: ${JSON.stringify(notes.body)}`);
+    const birthday = await jsend(`${base}/${id}`, 'PUT', { birthday: '2001-13-01' });
+    assert(birthday.body.reason === 'contacts_birthday_invalid', `birthday: ${birthday.body.reason}`);
   });
 
   // ------------------------------------------------------------------

@@ -234,6 +234,16 @@ export const CASE_MESSAGES = new Map([
   // Die im Kontaktformular GEWAEHLTE Kategorie gibt es nicht mehr: das
   // Formular bleibt offen und bietet die aktuellen Kategorien an.
   ['contacts_selected_category_not_found', 'contacts.errorSelectedCategoryGone'],
+  // Ein Feld, das der Server abweist (#1909): je Feld ein ganzer Satz, die
+  // Grenze als Zahl (CASE_PARAMS). Erreicht vor allem der vCard-Import, dessen
+  // Toast bis dahin den englischen Servertext zeigte, weil der das Feld nannte.
+  // Das Formular begrenzt seine Felder nicht alle selbst und trifft sie auch.
+  ['contacts_name_too_long', 'contacts.errorNameTooLong'],
+  ['contacts_phone_too_long', 'contacts.errorPhoneTooLong'],
+  ['contacts_email_too_long', 'contacts.errorEmailTooLong'],
+  ['contacts_address_too_long', 'contacts.errorAddressTooLong'],
+  ['contacts_notes_too_long', 'contacts.errorNotesTooLong'],
+  ['contacts_birthday_invalid', 'contacts.errorBirthdayInvalid'],
   // Orte und Kategorien des Inventars (#1909). Den Namen gibt es auf dieser
   // Ebene schon (`category_exists` deckt die Kategorien, oben); ein Ort oder
   // eine Kategorie, die inzwischen geloescht wurde, ist ein "gibt es nicht
@@ -297,6 +307,25 @@ export const CASE_MESSAGES = new Map([
   // Grund ist deshalb ein Erfolg. Die Grenze traegt ihre Zahl (CASE_PARAMS).
   ['quick_links_link_not_found', 'quickLinks.errorLinkGone'],
   ['quick_links_limit_reached', 'quickLinks.errorLimitReached'],
+  // Rezeptdienste in den Kuechen-Einstellungen (#1909). Das private Netz nennt
+  // im Satz den Schalter, den der Admin setzen kann - wie bisher der Servertext.
+  ['recipe_providers_account_not_found', 'settings.recipeProviderErrorAccountGone'],
+  ['recipe_providers_url_invalid', 'settings.recipeProviderErrorUrlInvalid'],
+  ['recipe_providers_external_url_invalid', 'settings.recipeProviderErrorExternalUrlInvalid'],
+  ['recipe_providers_private_network', 'settings.recipeProviderErrorPrivateNetwork'],
+  ['recipe_providers_connection_failed', 'settings.recipeProviderErrorConnectionFailed'],
+  ['recipe_providers_account_exists', 'settings.recipeProviderErrorAccountExists'],
+  // Der letzte gescheiterte Abgleich eines Kontos (#1909, Migration 255): der
+  // Server speichert den Fall neben dem rohen Text, die Konto-Karte sagt den
+  // Satz (server/services/recipe-providers/failure.js). Das private Netz oben
+  // gilt auch hier.
+  ['recipe_providers_sync_auth_failed', 'settings.recipeProviderErrorSyncAuth'],
+  ['recipe_providers_sync_wrong_url', 'settings.recipeProviderErrorSyncWrongUrl'],
+  ['recipe_providers_sync_http_status', 'settings.recipeProviderErrorSyncStatus'],
+  ['recipe_providers_sync_timeout', 'settings.recipeProviderErrorSyncTimeout'],
+  ['recipe_providers_sync_unreachable', 'settings.recipeProviderErrorSyncUnreachable'],
+  ['recipe_providers_sync_certificate', 'settings.recipeProviderErrorSyncCertificate'],
+  ['recipe_providers_sync_bad_response', 'settings.recipeProviderErrorSyncBadResponse'],
 ]);
 
 /**
@@ -322,6 +351,12 @@ export const CASE_PARAMS = new Map([
   ['health_cycle_import_too_many_rows', ['limit']],
   ['documents_folder_too_deep', ['limit']],
   ['quick_links_limit_reached', ['limit']],
+  ['contacts_name_too_long', ['limit']],
+  ['contacts_phone_too_long', ['limit']],
+  ['contacts_email_too_long', ['limit']],
+  ['contacts_address_too_long', ['limit']],
+  ['contacts_notes_too_long', ['limit']],
+  ['recipe_providers_sync_http_status', ['status']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
@@ -423,6 +458,7 @@ export const GONE_REASONS = new Set([
   'rewards_money_account_not_found',
   'rewards_money_plan_not_found',
   'quick_links_link_not_found',
+  'recipe_providers_account_not_found',
 ]);
 
 /**

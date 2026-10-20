@@ -132,7 +132,11 @@ function hauptteil() {
   // Zurueck auf den stummen Container: das Neuzeichnen nach einem Schreibweg
   // (renderAll) fragt Kopf und Gruppenliste, die dieser Griff nicht kennt.
   split.renderMainForTest(_stumm);
-  return main.html.slice(main.html.indexOf('id="split-recurring-list"'), main.html.indexOf('class="split-activity"'));
+  // Seit #2042 steht der Anlegen-Knopf im Abschnittskopf VOR split-recurring-list,
+  // also den Schnitt dort beginnen.
+  const listPos = main.html.indexOf('id="split-recurring-list"');
+  const headPos = main.html.lastIndexOf('<div class="split-section-head">', listPos);
+  return main.html.slice(headPos >= 0 ? headPos : listPos, main.html.indexOf('class="split-activity"'));
 }
 
 /** Klick auf ein Element aus dem ECHTEN Markup - Attribute kommen von dort. */
@@ -155,7 +159,7 @@ function klick(attribute) {
 // --------------------------------------------------------------------------
 // (1) Liste und Nur-lesen-Regel
 // --------------------------------------------------------------------------
-test('Schreibrecht: die eigene Serie laesst sich oeffnen und umschalten, die fremde nur lesen; Anlegen steht darunter', async () => {
+test('Schreibrecht: die eigene Serie laesst sich oeffnen und umschalten, die fremde nur lesen; Anlegen steht im Abschnittskopf', async () => {
   await buehne({}, () => {
     const html = hauptteil();
     // Seit R20 (WCAG 2.5.3) liest die Zeile, was sie zeigt, und nennt die Handlung als sr-only-Nachsatz.
@@ -297,9 +301,49 @@ test('Klick auf die Zeile: eigene Serie oeffnet den Dialog, fremde die Leseansic
     assert.equal(spur.leseansichten[0].edit, undefined);
     assert.equal(spur.leseansichten[0].actions, undefined);
 
-    await split.onRecurringClick(klickAus(html, 'data-recurring-add'));
+    // Seit #2042 hat der Anlegen-Knopf einen eigenen Hoerer im Abschnittskopf,
+    // nicht mehr in onRecurringClick - direkter Aufruf wie der echte Klick.
+    await split.openRecurringModal();
     assert.equal(spur.dialoge.length, 2);
     assert.equal(spur.dialoge[1].title, 'splitExpenses.recurring.add');
+  });
+});
+
+// #2042: der Anlegen-Knopf hat seit dem PR einen eigenen Hoerer in renderMain().
+// Ohne diesen Test koennte man Zeile 865 aus split-expenses.js loeschen und
+// jede Suite bliebe gruen - der Klick waere tot, ohne es zu zeigen.
+test('Klick auf [data-recurring-add] im Abschnittskopf oeffnet den Anlagen-Dialog (#2042)', async () => {
+  await buehne({}, async (spur) => {
+    let clickHandler = null;
+    const addBtn = { addEventListener(typ, fn) { if (typ === 'click') clickHandler = fn; } };
+    const main = {
+      html: '',
+      removeAttribute() {},
+      replaceChildren() { this.html = ''; },
+      insertAdjacentHTML(_p, m) { this.html += m; },
+      querySelector(sel) { return sel === '[data-recurring-add]' ? addBtn : null; },
+      querySelectorAll: () => [],
+    };
+    split.renderMainForTest({ querySelector: (sel) => (sel === '#split-main' ? main : null) });
+    split.renderMainForTest(_stumm); // Seitencontainer zurueckstellen
+    assert.ok(clickHandler !== null, '[data-recurring-add] hat keinen click-Hoerer bekommen');
+    clickHandler();
+    assert.equal(spur.dialoge.length, 1, 'Klick auf [data-recurring-add] hat openRecurringModal() nicht aufgerufen');
+    assert.equal(spur.dialoge[0].title, 'splitExpenses.recurring.add');
+  });
+});
+
+test('Klick auf [data-action="add-group"] in bindShell oeffnet den Gruppe-Anlegen-Dialog (#2042)', async () => {
+  await buehne({}, async (spur) => {
+    split.state.meta = { ...split.state.meta, group_types: ['household', 'other'] };
+    let clickHandler = null;
+    const addBtn = { addEventListener(typ, fn) { if (typ === 'click') clickHandler = fn; } };
+    const shell = { querySelector(sel) { return sel === '[data-action="add-group"]' ? addBtn : null; } };
+    split.bindShellForTest(shell);
+    assert.ok(clickHandler !== null, '[data-action="add-group"] hat keinen click-Hoerer bekommen');
+    await clickHandler();
+    assert.equal(spur.dialoge.length, 1, 'Klick hat openGroupModal() nicht aufgerufen');
+    assert.equal(spur.dialoge[0].title, 'splitExpenses.addGroup');
   });
 });
 

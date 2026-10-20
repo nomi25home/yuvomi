@@ -11,6 +11,7 @@ import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from 
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
+import { birthDateInput, placeholderBirthDate, validateYearUnknown } from '../services/birthdays.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -42,15 +43,38 @@ function readNameParts(body) {
   return { parts, provided, displayName: composeDisplayName(parts) };
 }
 
+/**
+ * Ein Textfeld mit Laengengrenze, das seinen Fall benennt (#1909): ist es zu
+ * lang, traegt die Pruefung `case` mit Grund und Grenze. Die Antwort reicht
+ * ihn als `reason` und `params.limit` neben `error` weiter (fieldCase), und die
+ * App sagt ihren Satz statt des englischen Servertexts. Gemeint ist vor allem
+ * der vCard-Import: dort nannte der Toast bis dahin den rohen Text, weil er das
+ * abgewiesene Feld nennt. Ein fehlender Pflichtwert ist kein "zu lang" und
+ * bleibt ohne Grund.
+ */
+function limitedStr(val, label, max, { reason }, required = false) {
+  const check = str(val, label, { max, required });
+  if (check.error && val !== undefined && val !== null && String(val).trim().length > max) {
+    check.case = { reason, params: { limit: max } };
+  }
+  return check;
+}
+
 /** Längen-Validierung der Namensteile (gleiche Grenze wie der Anzeigename). */
 function namePartChecks(parts) {
   return [
-    str(parts.firstName,  'Vorname',   { max: MAX_TITLE, required: false }),
-    str(parts.lastName,   'Nachname',  { max: MAX_TITLE, required: false }),
-    str(parts.middleName, 'Zweitname', { max: MAX_TITLE, required: false }),
-    str(parts.namePrefix, 'Namenszusatz', { max: MAX_SHORT, required: false }),
-    str(parts.nameSuffix, 'Namenssuffix', { max: MAX_SHORT, required: false }),
+    limitedStr(parts.firstName,  'Vorname',      MAX_TITLE, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.lastName,   'Nachname',     MAX_TITLE, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.middleName, 'Zweitname',    MAX_TITLE, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.namePrefix, 'Namenszusatz', MAX_SHORT, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.nameSuffix, 'Namenssuffix', MAX_SHORT, { reason: 'contacts_name_too_long' }),
   ];
+}
+
+/** Ein Geburtstag, den der Server als Datum abweist, benennt seinen Fall (#1909). */
+function birthdayCheck(check) {
+  if (check.error) check.case = { reason: 'contacts_birthday_invalid' };
+  return check;
 }
 
 /** Verwaltbare Kontakt-Kategorien aus der DB (nach sort_order). */
@@ -105,6 +129,19 @@ function validContactCategoryKeys() {
  */
 function selectedCategoryGone(vCat, errors) {
   return vCat?.error && errors.length === 1 ? { reason: 'contacts_selected_category_not_found' } : {};
+}
+
+/**
+ * Der Fall einer abgewiesenen Eingabe (#1909): die geloeschte Kategorie, wenn
+ * sie der einzige Befund ist (selectedCategoryGone), sonst das ERSTE Feld, das
+ * seinen Fall benennt (limitedStr, birthdayCheck). Der Satz dazu nennt dieses
+ * Feld - stimmt also auch, wenn daneben ein zweites scheitert. Ohne benannten
+ * Fall: nichts, und die App sagt ihren allgemeinen Satz.
+ */
+function fieldCase(vCat, checks, errors) {
+  const gone = selectedCategoryGone(vCat, errors);
+  if (gone.reason) return gone;
+  return checks.find((check) => check?.error && check.case)?.case ?? {};
 }
 
 /** Anzahl Kontakte, die eine Kategorie referenzieren (Guard vor dem Löschen). */
@@ -437,18 +474,22 @@ router.post('/', (req, res) => {
   try {
     // Strukturierte Namensteile haben Vorrang vor einem mitgesendeten `name` (#535).
     const nameParts = readNameParts(req.body);
-    const vName    = str(nameParts.displayName ?? req.body.name, 'Name', { max: MAX_TITLE });
+    const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
     const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'Category');
-    const vPhone   = str(req.body.phone,   'Telefon', { max: MAX_SHORT, required: false });
-    const vEmail   = str(req.body.email,   'E-Mail',  { max: MAX_TITLE, required: false });
-    const vAddress = str(req.body.address, 'Adresse', { max: MAX_TEXT,  required: false });
-    const vNotes   = str(req.body.notes,   'Notizen', { max: MAX_TEXT,  required: false });
+    const vPhone   = limitedStr(req.body.phone,   'Telefon', MAX_SHORT, { reason: 'contacts_phone_too_long' });
+    const vEmail   = limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' });
+    const vAddress = limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' });
+    const vNotes   = limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' });
     // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
     // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
-    const vBirthday = date(req.body.birthday, 'Geburtstag', false);
-    const errors   = collectErrors([vName, vCat, vPhone, vEmail, vAddress, vNotes, vBirthday,
-                                    ...namePartChecks(nameParts.parts)]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...selectedCategoryGone(vCat, errors) });
+    // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
+    // Platzhalter, die Anzeige laesst es weg.
+    const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
+    const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'Geburtstag', false));
+    const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
+                      ...namePartChecks(nameParts.parts)];
+    const errors   = collectErrors(checks);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
 
     // Validate multi-value fields if provided
     if (req.body.phones !== undefined) {
@@ -475,11 +516,11 @@ router.post('/', (req, res) => {
     // Insert contact and multi-value fields in a transaction
     const transaction = db.get().transaction(() => {
       const result = db.get().prepare(`
-        INSERT INTO contacts (name, category, phone, email, address, notes, birthday,
+        INSERT INTO contacts (name, category, phone, email, address, notes, birthday, birthday_year_unknown,
                               first_name, last_name, middle_name, name_prefix, name_suffix)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(vName.value, vCat.value || FALLBACK_CATEGORY, vPhone.value, vEmail.value,
-             vAddress.value, vNotes.value, vBirthday.value,
+             vAddress.value, vNotes.value, vBirthday.value, vBirthday.value && vYearUnknown.value ? 1 : 0,
              nameParts.parts.firstName, nameParts.parts.lastName, nameParts.parts.middleName,
              nameParts.parts.namePrefix, nameParts.parts.nameSuffix);
 
@@ -570,16 +611,31 @@ router.put('/:id', (req, res) => {
 
     const checks = [];
     if (nameParts.provided)              checks.push(...namePartChecks(nameParts.parts));
-    if (req.body.name     !== undefined) checks.push(str(req.body.name,     'Name',    { max: MAX_TITLE, required: false }));
+    if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
     const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'Category') : null;
     if (vCat) checks.push(vCat);
-    if (req.body.phone    !== undefined) checks.push(str(req.body.phone,    'Telefon', { max: MAX_SHORT, required: false }));
-    if (req.body.email    !== undefined) checks.push(str(req.body.email,    'E-Mail',  { max: MAX_TITLE, required: false }));
-    if (req.body.address  !== undefined) checks.push(str(req.body.address,  'Adresse', { max: MAX_TEXT,  required: false }));
-    if (req.body.notes    !== undefined) checks.push(str(req.body.notes,    'Notizen', { max: MAX_TEXT,  required: false }));
-    if (req.body.birthday !== undefined) checks.push(date(req.body.birthday, 'Geburtstag', false));
+    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'Telefon', MAX_SHORT, { reason: 'contacts_phone_too_long' }));
+    if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' }));
+    if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
+    if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
+    // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
+    // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
+    // echten Geburtsjahr.
+    const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
+    checks.push(vYearUnknown);
+    const yearUnknown = vYearUnknown.value ?? contact.birthday_year_unknown === 1;
+    let birthday = contact.birthday;
+    if (req.body.birthday !== undefined) {
+      const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, yearUnknown), 'Geburtstag', false));
+      checks.push(vBirthday);
+      birthday = vBirthday.value;
+    } else if (yearUnknown && contact.birthday_year_unknown !== 1 && contact.birthday) {
+      birthday = placeholderBirthDate(contact.birthday);
+    } else if (vYearUnknown.value === false && contact.birthday_year_unknown === 1 && contact.birthday) {
+      checks.push({ value: null, error: 'Birthday with its year is required when birthday_year_unknown is turned off.' });
+    }
     const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...selectedCategoryGone(vCat, errors) });
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
 
     // Validate multi-value fields if provided
     if (req.body.phones !== undefined) {
@@ -656,6 +712,7 @@ router.put('/:id', (req, res) => {
             address     = ?,
             notes       = ?,
             birthday    = ?,
+            birthday_year_unknown = ?,
             first_name  = ?,
             last_name   = ?,
             middle_name = ?,
@@ -669,7 +726,8 @@ router.put('/:id', (req, res) => {
         req.body.email   !== undefined ? (req.body.email?.trim()   || null) : contact.email,
         req.body.address !== undefined ? (req.body.address?.trim() || null) : contact.address,
         req.body.notes   !== undefined ? (req.body.notes?.trim()   || null) : contact.notes,
-        req.body.birthday !== undefined ? (req.body.birthday || null) : contact.birthday,
+        birthday || null,
+        birthday && yearUnknown ? 1 : 0,
         nameParts.provided ? nameParts.parts.firstName  : contact.first_name,
         nameParts.provided ? nameParts.parts.lastName   : contact.last_name,
         nameParts.provided ? nameParts.parts.middleName : contact.middle_name,
@@ -845,7 +903,15 @@ router.get('/:id/vcard', (req, res) => {
     if (contact.email)   lines.push(`EMAIL:${esc(contact.email)}`);
     if (contact.address) lines.push(`ADR;TYPE=HOME:;;${esc(contact.address)};;;;`);
     if (contact.notes)   lines.push(`NOTE:${esc(contact.notes)}`);
-    if (contact.birthday) lines.push(`BDAY:${esc(contact.birthday)}`);
+    // Ohne Jahr in Apples Form (#2095): vCard 3.0 kennt kein `--MMDD`, und
+    // sabre/vobject (Nextcloud, Baikal) schreibt jahrlose Geburtstage in 3.0
+    // genau so. Apple liest die Marke und zeigt kein Jahr; der eigene Import
+    // (Sync und .vcf) erkennt sie ebenfalls.
+    if (contact.birthday && contact.birthday_year_unknown === 1) {
+      lines.push(`BDAY;X-APPLE-OMIT-YEAR=1604:1604${esc(contact.birthday).slice(4, 10)}`);
+    } else if (contact.birthday) {
+      lines.push(`BDAY:${esc(contact.birthday)}`);
+    }
     if (contact.category) lines.push(`CATEGORIES:${esc(contact.category)}`);
     lines.push('END:VCARD');
 

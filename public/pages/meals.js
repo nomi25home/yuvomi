@@ -15,7 +15,7 @@ import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mountMissingShoppingList, mayTransferMealToShopping } from '/utils/kitchen-transfer.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
-import { addLocalDays, startOfLocalWeekKey, todayKey } from '/utils/date.js';
+import { addLocalDays, startOfLocalWeekKey, weekStartIndex, todayKey } from '/utils/date.js';
 import { normalizeRecipeMealTypes, recipeSupportsMealType, recipeAllowsMealType } from '/utils/recipe-meal-types.js';
 import { mountEmptyState, mountLoadError, emptyStateEl } from '/utils/empty-state.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
@@ -61,7 +61,8 @@ const EXCLUDED_MEAL_CATEGORY_NAMES = new Set(['Haushalt', 'Drogerie']);
 // --------------------------------------------------------
 
 let state = {
-  currentWeek:      null,   // YYYY-MM-DD (Montag)
+  currentWeek:      null,   // YYYY-MM-DD (erster Tag der Haushaltswoche)
+  weekStart:        1,      // JS-getDay()-Wert des Haushaltswochenstarts (1 = Mo)
   meals:            [],
   recipes:          [],
   lists:            [],     // Einkaufslisten für Transfer-Dropdown
@@ -118,8 +119,8 @@ const READ_SAFE_ACTIONS = new Set(['meal-details', 'open-recipe', 'open-linked-r
 // Datumshelfer
 // --------------------------------------------------------
 
-function getMondayOf(dateStr) {
-  return startOfLocalWeekKey(dateStr, 1);
+function getWeekStartOf(dateStr) {
+  return startOfLocalWeekKey(dateStr, state.weekStart);
 }
 
 function addDays(dateStr, n) {
@@ -469,7 +470,7 @@ function buildRandomMealAssignments({ weekStart, visibleMealTypes, meals, recipe
 // --------------------------------------------------------
 
 async function loadWeek(week) {
-  const currentWeek = getMondayOf(week);
+  const currentWeek = getWeekStartOf(week);
   state.currentWeek = currentWeek;
   try {
     const res = await api.get(`/meals?week=${currentWeek}`);
@@ -575,6 +576,7 @@ async function loadPreferences() {
   try {
     const res = await api.get('/preferences');
     state.visibleMealTypes = res.data.visible_meal_types ?? state.visibleMealTypes;
+    state.weekStart = weekStartIndex(res.data.week_start);
     primeMealTypeNames(res.data);
   } catch {
     // Default beibehalten
@@ -637,7 +639,7 @@ function weekNavHtml() {
 function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#week-today');
   if (!btn) return;
-  const isCurrent = state.currentWeek === getMondayOf(todayKey());
+  const isCurrent = state.currentWeek === getWeekStartOf(todayKey());
   // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
   syncPeriodReset(root, { reset: '#week-today', isCurrent, prev: '#week-prev', next: '#week-next' });
 
@@ -705,6 +707,16 @@ function mealsLayoutHtml() {
       </button>`}`;
 }
 
+// Lädt Präferenzen, berechnet den korrekten Wochenanfang für `today`,
+// setzt state.currentWeek und syncTodayButton(). Exportiert für Tests.
+async function startWeek(today) {
+  await loadPreferences();
+  const weekBegin = getWeekStartOf(today);
+  state.currentWeek = weekBegin;
+  syncTodayButton();
+  return weekBegin;
+}
+
 export async function render(container, { user }) {
   _container = container;
   _railSettled = false;
@@ -741,19 +753,18 @@ export async function render(container, { user }) {
   renderKitchenTabsBar(container, '/meals');
   installPopoverMenus(container.querySelector('.meals-toolbar'));
 
-  const today  = todayKey();
-  const monday = getMondayOf(today);
-
-  // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.currentWeek`
-  // steht schon (die Seite oeffnet immer auf der aktuellen Woche), also kann
-  // „Heute" seinen Zielzustand VOR dem ersten Bildaufbau bekommen. Sonst
-  // rendert weekNavHtml() ihn sichtbar, der Ladevorgang laeuft, und erst danach
-  // versteckt syncTodayButton() ihn wieder - ein sichtbares Aufblitzen bei
-  // jedem frischen Laden von /meals (PR #1200 Review, Befund 5).
-  state.currentWeek = monday;
+  const today = todayKey();
+  // Standardwochenanfang (Montag) als sofortiger Platzhalter, bevor die
+  // Präferenz geladen ist - verhindert das Aufblitzen des „Heute"-Knopfs
+  // (PR #1200 Review, Befund 5). startWeek() korrigiert beides nach dem Laden.
+  state.currentWeek = getWeekStartOf(today);
   syncTodayButton();
 
-  await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes(), loadMembers()]);
+  // Listenressourcen parallel zu loadPreferences() starten; loadWeek()
+  // wartet, bis startWeek() den korrekten Wochenanfang gesetzt hat.
+  const rest = Promise.all([loadLists(), loadCategories(), loadRecipes(), loadMembers()]);
+  const weekBegin = await startWeek(today);
+  await Promise.all([loadWeek(weekBegin), rest]);
   renderWeekGrid();
   renderRecipeSidebar();
   wireNav();
@@ -1327,12 +1338,12 @@ function wireNav() {
   });
 
   _container.querySelector('#week-today')?.addEventListener('click', async () => {
-    const monday = getMondayOf(todayKey());
-    if (monday === state.currentWeek) return;
+    const weekBegin = getWeekStartOf(todayKey());
+    if (weekBegin === state.currentWeek) return;
     // "Heute" kommt von dort, wo die laufende Woche liegt (Schluessel als Text).
-    const towards = monday < state.currentWeek ? -1 : 1;
+    const towards = weekBegin < state.currentWeek ? -1 : 1;
     setWeekBusy();
-    await loadWeek(monday);
+    await loadWeek(weekBegin);
     swapWeek(towards);
   });
 
@@ -2881,7 +2892,7 @@ export const __test = {
   // „Heute"-Resets sind verhaltensgetrieben gepinnt (test-meals.js).
   weekNavHtml,
   syncTodayButton,
-  getMondayOf,
+  getWeekStartOf,
   formatWeekLabel,
   state,
   // PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Verdrahtungstest
@@ -2941,6 +2952,12 @@ export const __test = {
   cookPickerHtml,
   loadMembers,
   showCookForScope,
+  // #2075: loadPreferences() und loadWeek() werden exportiert, damit der Test
+  // die echte Ladereihenfolge (Präferenz zuerst, dann Wochenberechnung) als
+  // Programm fahren kann.
+  loadPreferences,
+  loadWeek,
+  startWeek,
 };
 
 // --------------------------------------------------------
