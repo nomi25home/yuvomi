@@ -1191,16 +1191,25 @@ test('onNarrowWeekLabelQueryChange() zeichnet die Wochen-Navigation neu, wenn de
 test('render() synchronisiert „Heute" VOR dem ersten await, gegen das Aufblitzen (Befund 5)', () => {
   const renderStart = mealsSource.indexOf('export async function render(container, { user }) {');
   assert(renderStart > -1, 'render() nicht gefunden');
-  // Erster top-level await im render()-Koerper (zwei Leerzeichen Einzug).
-  const firstAwaitIdx = mealsSource.indexOf('\n  await ', renderStart);
+  // Jedes await zaehlt, auch `const weekBegin = await startWeek(today);` -
+  // ein Suchmuster nur fuer Zeilen, die mit `await` beginnen, uebersah es.
+  const renderBody = mealsSource.slice(renderStart);
+  const firstAwaitIdx = renderBody.search(/\bawait\b/);
   assert(firstAwaitIdx > -1, 'Kein await in render() gefunden');
-  const syncIdx = mealsSource.indexOf('syncTodayButton();', renderStart);
+  const syncIdx = renderBody.indexOf('syncTodayButton();');
   assert(syncIdx > -1 && syncIdx < firstAwaitIdx,
     'syncTodayButton() muss VOR dem ersten await in render() aufgerufen werden');
+  // #2075: render() muss den Wochenanfang ueber startWeek() holen, bevor es die
+  // Woche laedt - sonst laedt es wieder die Montagswoche, und der eigene
+  // startWeek()-Test bliebe trotzdem gruen.
+  const startWeekIdx = renderBody.indexOf('await startWeek(today)');
+  const loadWeekIdx = renderBody.indexOf('loadWeek(weekBegin)');
+  assert(startWeekIdx > -1 && loadWeekIdx > -1 && startWeekIdx < loadWeekIdx,
+    'render() muss `await startWeek(today)` VOR `loadWeek(weekBegin)` aufrufen (#2075)');
 });
 
 // #2075: startWeek() laedt die Praeferenzen, berechnet den korrekten
-// Wochenanfang und setzt state.currentWeek + syncTodayButton() — testbar
+// Wochenanfang und setzt state.currentWeek + syncTodayButton() - testbar
 // mit einem /preferences-Stub der die Haushalts-Wochenanfangs-Einstellung
 // setzt, ohne render() als Ganzes auszufuehren.
 const _startWeekResult = await (async () => {

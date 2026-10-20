@@ -755,7 +755,7 @@ export async function render(container, { user }) {
 
   const today = todayKey();
   // Standardwochenanfang (Montag) als sofortiger Platzhalter, bevor die
-  // Präferenz geladen ist — verhindert das Aufblitzen des „Heute"-Knopfs
+  // Präferenz geladen ist - verhindert das Aufblitzen des „Heute"-Knopfs
   // (PR #1200 Review, Befund 5). startWeek() korrigiert beides nach dem Laden.
   state.currentWeek = getWeekStartOf(today);
   syncTodayButton();
