@@ -707,6 +707,16 @@ function mealsLayoutHtml() {
       </button>`}`;
 }
 
+// Lädt Präferenzen, berechnet den korrekten Wochenanfang für `today`,
+// setzt state.currentWeek und syncTodayButton(). Exportiert für Tests.
+async function startWeek(today) {
+  await loadPreferences();
+  const weekBegin = getWeekStartOf(today);
+  state.currentWeek = weekBegin;
+  syncTodayButton();
+  return weekBegin;
+}
+
 export async function render(container, { user }) {
   _container = container;
   _railSettled = false;
@@ -743,26 +753,18 @@ export async function render(container, { user }) {
   renderKitchenTabsBar(container, '/meals');
   installPopoverMenus(container.querySelector('.meals-toolbar'));
 
-  // Präferenz zuerst laden: weekBegin hängt von state.weekStart ab, das
-  // loadPreferences() setzt. Läuft loadPreferences() parallel, steht
-  // state.weekStart beim Aufruf von getWeekStartOf() noch auf dem Standardwert
-  // (Montag), und die erste Wochenanfrage und state.currentWeek landen auf dem
-  // falschen Tag (z.B. Montag statt Sonntag für Sonntag-Haushalte).
-  await loadPreferences();
-
-  const today     = todayKey();
-  const weekBegin = getWeekStartOf(today);
-
-  // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.currentWeek`
-  // steht schon (die Seite oeffnet immer auf der aktuellen Woche), also kann
-  // „Heute" seinen Zielzustand VOR dem ersten Bildaufbau bekommen. Sonst
-  // rendert weekNavHtml() ihn sichtbar, der Ladevorgang laeuft, und erst danach
-  // versteckt syncTodayButton() ihn wieder - ein sichtbares Aufblitzen bei
-  // jedem frischen Laden von /meals (PR #1200 Review, Befund 5).
-  state.currentWeek = weekBegin;
+  const today = todayKey();
+  // Standardwochenanfang (Montag) als sofortiger Platzhalter, bevor die
+  // Präferenz geladen ist — verhindert das Aufblitzen des „Heute"-Knopfs
+  // (PR #1200 Review, Befund 5). startWeek() korrigiert beides nach dem Laden.
+  state.currentWeek = getWeekStartOf(today);
   syncTodayButton();
 
-  await Promise.all([loadWeek(weekBegin), loadLists(), loadCategories(), loadRecipes(), loadMembers()]);
+  // Listenressourcen parallel zu loadPreferences() starten; loadWeek()
+  // wartet, bis startWeek() den korrekten Wochenanfang gesetzt hat.
+  const rest = Promise.all([loadLists(), loadCategories(), loadRecipes(), loadMembers()]);
+  const weekBegin = await startWeek(today);
+  await Promise.all([loadWeek(weekBegin), rest]);
   renderWeekGrid();
   renderRecipeSidebar();
   wireNav();
@@ -2955,6 +2957,7 @@ export const __test = {
   // Programm fahren kann.
   loadPreferences,
   loadWeek,
+  startWeek,
 };
 
 // --------------------------------------------------------

@@ -1188,13 +1188,48 @@ test('onNarrowWeekLabelQueryChange() zeichnet die Wochen-Navigation neu, wenn de
 // .is-current/inert, und ohne diese Gegenmassnahme blitzt er bei jedem
 // frischen Laden von /meals sichtbar auf, bevor renderWeekGrid() ihn nach dem
 // ersten Laden wieder korrekt einstellt.
-test('render() synchronisiert „Heute" VOR dem ersten Laden, gegen das Aufblitzen (Befund 5)', () => {
+test('render() synchronisiert „Heute" VOR dem ersten await, gegen das Aufblitzen (Befund 5)', () => {
   const renderStart = mealsSource.indexOf('export async function render(container, { user }) {');
-  const loadIdx = mealsSource.indexOf('await Promise.all([loadWeek(weekBegin)');
-  assert(renderStart > -1 && loadIdx > -1, 'render()/Promise.all-Aufruf nicht gefunden');
+  assert(renderStart > -1, 'render() nicht gefunden');
+  // Erster top-level await im render()-Koerper (zwei Leerzeichen Einzug).
+  const firstAwaitIdx = mealsSource.indexOf('\n  await ', renderStart);
+  assert(firstAwaitIdx > -1, 'Kein await in render() gefunden');
   const syncIdx = mealsSource.indexOf('syncTodayButton();', renderStart);
-  assert(syncIdx > -1 && syncIdx < loadIdx,
-    'syncTodayButton() muss zwischen dem Beginn von render() und dem ersten Laden aufgerufen werden');
+  assert(syncIdx > -1 && syncIdx < firstAwaitIdx,
+    'syncTodayButton() muss VOR dem ersten await in render() aufgerufen werden');
+});
+
+// #2075: startWeek() laedt die Praeferenzen, berechnet den korrekten
+// Wochenanfang und setzt state.currentWeek + syncTodayButton() — testbar
+// mit einem /preferences-Stub der die Haushalts-Wochenanfangs-Einstellung
+// setzt, ohne render() als Ganzes auszufuehren.
+const _startWeekResult = await (async () => {
+  const zuvorWeekStart = mealsUi.state.weekStart;
+  const zuvorCurrentWeek = mealsUi.state.currentWeek;
+  const fakeBtn = fakeResetButton();
+  const fakeRoot = {
+    querySelector: (sel) => (sel === '#week-today' ? fakeBtn : null),
+    querySelectorAll: () => [],
+  };
+  mealsUi.setContainerForTest(fakeRoot);
+  globalThis.__apiStub = { get: async () => ({ data: { week_start: 'sunday' } }) };
+  try {
+    const weekBegin = await mealsUi.startWeek('2026-10-19'); // Montag in UTC
+    return { weekBegin, currentWeek: mealsUi.state.currentWeek };
+  } finally {
+    delete globalThis.__apiStub;
+    mealsUi.state.weekStart = zuvorWeekStart;
+    mealsUi.state.currentWeek = zuvorCurrentWeek;
+  }
+})();
+
+test('startWeek() laedt /preferences und setzt state.currentWeek auf den richtigen Wochenanfang (#2075)', () => {
+  // 2026-10-19 ist ein Montag; fuer week_start=sunday gehoert er zur Woche
+  // ab Sonntag 2026-10-18.
+  assert(_startWeekResult.weekBegin === '2026-10-18',
+    `startWeek() soll '2026-10-18' zurueckgeben (Sonntag), erhalten: ${_startWeekResult.weekBegin}`);
+  assert(_startWeekResult.currentWeek === '2026-10-18',
+    `state.currentWeek soll '2026-10-18' sein, ist: ${_startWeekResult.currentWeek}`);
 });
 
 // PR #1200 Review, Befund 8: dieser Test berechnete sein Soll bisher mit
