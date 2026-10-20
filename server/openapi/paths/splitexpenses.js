@@ -145,7 +145,7 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Add member to group', description: 'Takes a `user_id`, or a `contact_id` that is turned into a guest user when the contact has none yet. A `contact_id` needs read access to the Contacts module (for API tokens `contacts:read`); without it, and for an unknown contact, the answer is the same 404 and nothing is created. A contact without an account is linked to the new guest and needs write access to Contacts (`contacts:write`); without it the answer is 403 and nothing is written. If that contact carries an address that already belongs to another account (split-expense guests excluded), a caller who is not an admin gets 409 with `reason: "email_in_use"` and nothing is created.', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/member-candidates': {
-      get: op({ summary: 'List users and contacts that can be added to a group', description: 'Phone and email come only with read access to the Contacts module, a member\'s birthday only with read access to the Calendar module (for API tokens `contacts:read` and `calendar:read`); otherwise they are null. Contacts without an account are offered as candidates only with write access to Contacts (`contacts:write`), because adding one links it to the new guest.', tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({ summary: 'List users and contacts that can be added to a group', description: 'Phone and email come only with read access to the Contacts module, a member\'s birthday only with read access to the Calendar module (for API tokens `contacts:read` and `calendar:read`); otherwise they are null. `birth_year_unknown` (boolean) marks a birthday known by day and month only (#2095). Contacts without an account are offered as candidates only with write access to Contacts (`contacts:write`), because adding one links it to the new guest.', tag: 'SplitExpenses', params: [idParam()] }),
     },
     '/api/v1/split-expenses/groups/{id}/members/{userId}': {
       delete: op({ summary: 'Remove member from group', tag: 'SplitExpenses', params: [idParam(), { name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }], stateChanging: true }),
@@ -154,7 +154,22 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Create a guest user and add them to a group', description: 'An `email` that already belongs to another account (split-expense guests excluded) is refused with 409 and `reason: "email_in_use"` unless the caller is an admin; a guest is never linked to SSO through its address.', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/expenses': {
-      get: op({ summary: 'List group expenses', description: `Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`, tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({
+        summary: 'List group expenses',
+        description: `Active expenses, newest first: \`expense_date\`, then \`created_at\`, then \`id\`, each descending - expenses written in the same second keep a fixed order. Page through every expense with the cursor: pass \`before_date\`, \`before_at\` and \`before_id\` from \`pagination.next_cursor\` of the previous page; an expense added or deleted meanwhile shifts nothing. Without a cursor the endpoint behaves as before (\`limit\`, \`offset\`). \`pagination.has_more\` is exact: false when the page holds the last expense, also when exactly \`limit\` remain; \`pagination.next_cursor\` is null then. A partial cursor, or a cursor together with a non-zero \`offset\`, answers 400. Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`,
+        tag: 'SplitExpenses',
+        params: [
+          idParam(),
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 30 }, description: 'Page size. Values above 100 are capped at 100.' },
+          { name: 'before_date', in: 'query', required: false, schema: { type: 'string', maxLength: 64 }, description: 'Cursor, taken from `pagination.next_cursor.before_date`. Only together with `before_at` and `before_id`.' },
+          { name: 'before_at', in: 'query', required: false, schema: { type: 'string', maxLength: 64 }, description: 'Cursor, taken from `pagination.next_cursor.before_at`.' },
+          { name: 'before_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Cursor, taken from `pagination.next_cursor.before_id`, because several expenses can share a second.' },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 }, description: 'Offset paging as before the cursor existed. An expense deleted above the current page while paging makes the next offset page skip one; prefer the cursor.' },
+          { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Matches title or description.' },
+          { name: 'category', in: 'query', required: false, schema: { type: 'string' }, description: 'Only expenses of this category; an unknown category is ignored.' },
+          { name: 'recurring', in: 'query', required: false, schema: { type: 'string', enum: ['1'] }, description: '`1` lists only expenses booked from a recurring expense.' },
+        ],
+      }),
       post: op({ summary: 'Create expense in group (optional `attachment_document_ids`: receipts from the documents module, filtered by document visibility)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/balances': {

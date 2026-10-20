@@ -76,6 +76,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hard-coded Monday as the week start. Both now read the household `week_start` preference
   (monday / sunday / saturday), so a Sunday-first household sees Sun-Sat in the meal plan and
   the shopping-list transfer covers those same seven days.
+- **Overview: the Calendar and Tasks tiles follow their size, so a small tile no longer stretches
+  its row (#2087).** A small (1x1) Calendar tile showed five, eight or twelve appointments and a
+  small Tasks tile five tasks, so their neighbours in the same row grew taller and showed "+N more"
+  above empty space. Both now show three entries like every other small list, followed by a note
+  when more are waiting; on the phone the Tasks tile shows three in every size. In the tall sizes
+  the "How many appointments?" option (5, 8 or 12) now decides how many grid rows the Calendar tile
+  spans (2, 3 or 4), so a longer list makes a taller tile instead of a taller row; your saved size
+  and option stay as they are. Appointments that already ended today take only the rows left over
+  by upcoming ones, at most two, and the rest still fold into "+N earlier today". The wall display
+  keeps its own limit.
+
+- **Kitchen settings: a recipe provider says why its last sync failed, in your language** (#1909).
+  The account card in Settings > Kitchen showed the raw text of the last failed sync or connection
+  test, for example "Mealie request failed (401)", "getaddrinfo ENOTFOUND mealie" or "HTTP 404". It
+  now names the cause in the language of the app: the provider refuses the API token, no provider
+  answers at the server URL, the provider answered with an error status, it did not answer in time,
+  it cannot be reached, its certificate is not trusted, its answer could not be read, or the address
+  points to a private network (with the setting that allows it). Any other failure gets a general
+  sentence that points to the server log. An account whose last failure happened before this update
+  shows the general sentence until its next sync. For API clients: `GET /recipe-providers/status`
+  carries `lastErrorReason` and `lastErrorParams` next to `lastError`, and a failed sync or
+  connection test answers with `reason` and `params` next to `error`; `lastError` and `error` are
+  unchanged.
+- **The demo seed now works on an encrypted database (#2114).** `scripts/seed-demo.js` opened
+  the file without a key and stopped with "file is not a database" on every installation with
+  `DB_ENCRYPTION_KEY` set, which is the installer default. It now opens the database the way the
+  server does: it reads `.env` from the working directory, applies the key, and runs the
+  migrations, so it also fills a database the server has not opened yet. `--db` still wins over
+  `DB_PATH`, and `--locale` is unchanged. A wrong key ends with the same message the server
+  gives instead of a stack trace.
+- **Shared expenses: a group now shows all its expenses, not just the 30 most recent (#2108).**
+  Older expenses could not be opened, edited or deleted. "Load more" under the expense list now
+  loads the next page, like the history below it, and after you edit or delete an expense the
+  list keeps everything you had loaded. Switching to another group starts at the top again.
+  Balances were always complete and are unchanged. **API:** expenses of a group are now ordered by
+  `id` as a last key, so expenses written in the same second keep a fixed place, and they page
+  with a cursor: `pagination.next_cursor` (`before_date`, `before_at`, `before_id`) continues
+  behind the last expense, so one deleted meanwhile no longer makes the next page skip another.
+  `offset` keeps working, and `pagination.has_more` is false when exactly `limit` expenses remain.
+- **Menus no longer all stand open on older browsers (#2107).** On a browser without popover
+  support - Chrome or Edge before 114, Firefox before 125, Safari or iOS before 17, such as a
+  wall frame stuck on an old system WebView - every "more" menu, the account menu and the
+  Overview's New menu were drawn open on top of the page and caught the taps meant for what lay
+  underneath. These menus now stay hidden there, and their buttons do nothing; everything else
+  works as before. Log out is also under Settings > Account. Current browsers are unchanged.
+- **Birthdays without a year from iCloud no longer show the year 1604 and an age of over 400
+  (#2095).** iCloud stores a birthday without a year with the placeholder year 1604 and marks it;
+  the contact sync and the `.vcf` import read the date but not the mark. Both now recognise it, and
+  the `--MM-DD` form other apps write, as a birthday without a year. Birthdays and contacts can now
+  be saved as "Year unknown": the editor offers it as a checkbox under the date, which swaps the
+  date picker for month and day. Such a birthday shows day and month only and no age - in the list,
+  the detail view, the overview tile, the wall and the calendar - while sorting, the next birthday
+  and reminders work as before, 29 February included. Contacts and birthdays already stored with
+  1604 are converted on update, so you do not have to enter them again.
+  The same choice is in your profile and in the member editor under Settings, for a member whose
+  birthday has no year.
+  **API:** birthdays carry `year_unknown`, contacts `birthday_year_unknown` (0 or 1; true/false
+  accepted on create and update) and members `birth_year_unknown`. With it, the date carries the placeholder year 2000 and
+  `next_age` is `null`; calendar reads return `birthday_date: null` for such a birthday. The vCard
+  export writes it as `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD`, the form Apple reads.
 - **Deleting or editing one occurrence of a series affects only that one, also on the night of a
   clock change (#2034).** For a series at 01:30 in Berlin, "only this one" on 25 March 2035 also
   removed the day before. "This and following" on a series in another time zone - say Los Angeles
@@ -211,6 +271,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one that is already gone counts as done. For API clients: those answers carry a `reason` next to
   `error` (`quick_links_link_not_found`, and `quick_links_limit_reached` with `params.limit`), and
   the status codes and texts are unchanged.
+- **Kitchen settings: error messages in your language** (#1909). Adding a recipe provider, changing
+  its link, turning it on or off, syncing or removing it showed the server's own English text when
+  something went wrong, for example "Base URL must start with http(s)://" or "Could not connect to
+  the recipe provider with these credentials.", and so did saving the visible meals or their names.
+  All of them now say the sentence of the app, and a server address in a private network still names
+  the setting that allows it. A recipe provider that another admin removed in the meantime is named
+  as such and the list reloads; removing one that is already gone counts as done. For API clients:
+  those answers carry a `reason` next to `error` (`recipe_providers_account_not_found`,
+  `recipe_providers_url_invalid`, `recipe_providers_external_url_invalid`,
+  `recipe_providers_private_network`, `recipe_providers_connection_failed`,
+  `recipe_providers_account_exists`), and the status codes and texts are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed
