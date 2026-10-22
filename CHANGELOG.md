@@ -134,12 +134,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **API:** `PUT /api/v1/push/wall-mode` with `endpoint` and `active` sets or clears the pause for
   that device.
 
-- **A device showing the wall display gets no personal push notifications** (#1904). Reminders,
-  task-comment mentions, and medication doses are personal and would disturb a tablet mounted in
-  the kitchen. While the wall is up, the device reports its state to the server and delivery is
-  paused for it. The pause expires after 12 hours so a device that was switched off with the wall
-  up heals on its own; a device that comes back alive renews it automatically.
-
 - **Wall display shows today's meals, shopping count, housekeeping status, waste pickups, and
   expiring pantry items** (#1903). Paired wall displays previously showed only the calendar,
   tasks, rewards, and weather sections of the today sheet. The dashboard now delivers the five
