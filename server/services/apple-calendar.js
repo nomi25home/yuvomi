@@ -33,6 +33,7 @@ import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
+import { normalizeCalColor, calendarDisplayName } from '../utils/calendar-meta.js';
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsReading, icsSnapshot, isEcho } from './outbound-echo.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
@@ -64,13 +65,6 @@ function collectLocalOutboundEvents(database, id = null) {
 // --------------------------------------------------------
 // Externe Kalender-Metadaten upserten
 // --------------------------------------------------------
-
-function normalizeCalColor(c) {
-  if (!c) return null;
-  if (/^#[0-9a-fA-F]{8}$/.test(c)) return c.slice(0, 7); // strip alpha
-  if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
-  return null;
-}
 
 function upsertExternalCalendar(source, externalId, name, color) {
   // Provider-Namen können HTML-entity-encoded sein — zu Klartext normalisieren,
@@ -399,7 +393,7 @@ async function runSync({ makeClient } = {}) {
     try {
       calObjects = await client.fetchCalendarObjects({ calendar: cal });
     } catch (err) {
-      log.warn(`Calendar "${cal.displayName || '(unnamed)'}" is not accessible: ${err.message}`);
+      log.warn(`Calendar "${calendarDisplayName(cal.displayName, '(unnamed)')}" is not accessible: ${err.message}`);
       continue;
     }
 
@@ -407,7 +401,7 @@ async function runSync({ makeClient } = {}) {
 
     // Kalender-Metadaten in external_calendars upserten
     const calColor = normalizeCalColor(cal.calendarColor) || APPLE_COLOR;
-    const calName  = cal.displayName || 'Apple Calendar';
+    const calName  = calendarDisplayName(cal.displayName, 'Apple Calendar');
     const calRefId = upsertExternalCalendar('apple', cal.url, calName, calColor);
     // Standard-Zuweisung dieses Kalenders (#459) einmal auflösen, nicht pro Event.
     const calDefaultAssignee = db.get()
@@ -612,9 +606,11 @@ async function runSync({ makeClient } = {}) {
     // Auftrag hat sein Ziel erreicht (#1884). Die Auflistung ist oben als
     // nicht leer befunden.
     outbound.dropDeletionsOfMissingCalendars('apple', { listedUrls: calendars.map((cal) => cal.url) });
-    const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
+    // Ein Stoppsignal für Löschen und Ändern (#1863).
+    const stop = outbound.createRefusalStop();
+    const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls, { stop });
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
-    const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);
+    const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl, { stop });
     if (pushed) log.info(`${pushed} local change(s) pushed to iCloud.`);
   } catch (err) {
     log.error('Outbound changes failed:', err.message);
@@ -652,7 +648,7 @@ async function runSync({ makeClient } = {}) {
       });
 
       const calRefId  = upsertExternalCalendar(
-        'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',
+        'apple', defaultCal.url, calendarDisplayName(defaultCal.displayName, 'Apple Calendar'),
         normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
       );
       // Gebucht wird gegen den Stand NACH dem await (bookEventUpload) - und

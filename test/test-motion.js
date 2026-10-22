@@ -591,6 +591,142 @@ test('swapPage R20: was ausfaehrt, steht vor dem alten Bild am Ende - kein Mehr-
     'settleClosingOverlays beendet die Ausfahrt von Mehr-Blatt und Abdunklung nicht');
 });
 
+// Critique R21 (D1): das neue Bild zeigte das Skelett - 0 von 6 Wechseln mit
+// Inhalt im neuen Bild, der echte Inhalt sprang 45-123 ms (4x CPU 139-245 ms)
+// spaeter mitten in die Blende. Der Callback wartet jetzt auf den Render der
+// Seite, hoechstens FIRST_RENDER_WAIT_MS.
+test('swapPage D1: das neue Bild wartet auf den Render der Seite - hoechstens FIRST_RENDER_WAIT_MS', async () => {
+  const vt = await import('../public/utils/view-transition.js');
+  const { swapPage } = vt;
+  assert.equal(vt.FIRST_RENDER_WAIT_MS, 150, 'D1: die Frist ist 150 ms - laenger stuende das alte Bild wie ein Haenger');
+  const env = stubDocument();
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    // 1. Der Render kommt nach 40 ms: das Bild wartet, und der Kopf, den die
+    //    Seite mit ihren Daten baut, traegt den Namen - nicht der Zwischenstand.
+    const interim = { style: {} };
+    let t0 = Date.now();
+    const first = await swapPage(() => {
+      env.content.current = interim;
+      return new Promise((resolve) => setTimeout(() => { env.content.current = env.toolbarNew; resolve(); }, 40));
+    }, { content: env.content, from: '/tasks', animate: true });
+    assert.ok(Date.now() - t0 >= 35, `das neue Bild wartete nicht auf den Render (${Date.now() - t0} ms)`);
+    assert.equal(env.toolbarNew.style.viewTransitionName, 'page-toolbar', 'der Kopf nach dem Render traegt den Namen');
+    assert.ok(!interim.style.viewTransitionName, 'der Zwischenkopf behielt den Namen - zwei Traeger verwerfen die Transition');
+    env.finish();
+    await first.finished;
+
+    // 2. Ein Render, der nie fertig wird, haelt das alte Bild hoechstens die Frist.
+    t0 = Date.now();
+    const slow = await swapPage(() => new Promise(() => {}), { content: env.content, from: '/', animate: true });
+    const waited = Date.now() - t0;
+    assert.ok(waited >= vt.FIRST_RENDER_WAIT_MS - 10 && waited < vt.FIRST_RENDER_WAIT_MS + 200,
+      `ein haengender Render hielt das alte Bild ${waited} ms (Frist ${vt.FIRST_RENDER_WAIT_MS})`);
+    env.finish();
+    await slow.finished;
+
+    // 3. Ein Fehler der Seite haelt den Wechsel nicht an - er gehoert dem Router.
+    const failing = await swapPage(() => Promise.reject(new Error('Seite kaputt')), { content: env.content, from: '/', animate: true });
+    assert.equal(failing.transition, true);
+    env.finish();
+    await failing.finished;
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+  // Der Router gibt den Render zurueck - samt Scrollstand des Rueckwegs und
+  // nachzueglerndem FAB, die zum ersten Bild gehoeren.
+  const router = stripComments(readFileSync(new URL('../public/router.js', import.meta.url), 'utf8'));
+  const swap = router.match(/const swap = \(\) => \{([\s\S]*?)\n {4}\};/)?.[1] ?? '';
+  assert.ok(swap, 'der Tausch im Router ist nicht mehr zu finden - der Guard liest nichts');
+  assert.match(swap, /return Promise\.resolve\(renderPromise\)\.then\(\(\) => \{[\s\S]*?scrollTarget[\s\S]*?adoptPageFab\(\)/,
+    'der Tausch gibt den Render nicht an swapPage zurueck - das neue Bild zeigt wieder das Skelett');
+});
+
+test('swapPage D1: was laeuft, setzt nach dem Warten dort fort, wo das alte Bild stand', async () => {
+  // Gemessen: die Pille der Kapsel gleitet seit dem Tipp; waehrend des Wartens
+  // zeichnet der Browser nichts, die Zeitleiste steht - und mit dem ersten
+  // Frame danach sprang sie 74px (100 -> 26). `pause()` und `currentTime`
+  // wirkten dort nicht; der Start ruckt um die gewartete Zeit.
+  const { swapPage, holdRunningAnimations } = await import('../public/utils/view-transition.js');
+  const running = { playState: 'running', startTime: 1000 };
+  const paused = { playState: 'paused', startTime: 900 };
+  const replaced = { playState: 'running', startTime: 950 };
+  let clock = 2000;
+  const resume = holdRunningAnimations({ getAnimations: () => [running, paused, replaced] }, () => clock);
+  clock = 2096;
+  replaced.playState = 'idle';
+  resume();
+  assert.equal(running.startTime, 1096, 'die laufende Animation setzt nicht an ihrer Stelle fort');
+  assert.equal(paused.startTime, 900, 'eine pausierte Animation wurde verschoben');
+  assert.equal(replaced.startTime, 950, 'eine ersetzte Animation wurde verschoben');
+  // Eine eben gestartete (Start steht noch aus) - die Kuechen-Kapsel 10 ms vor
+  // dem Wechsel: ihr Start loeste sonst rueckwirkend auf den letzten Frame auf
+  // und sie stand nach dem Warten 33 ms weit (16 -> 64px).
+  const fresh = { playState: 'running', startTime: null, pending: true };
+  const resumeFresh = holdRunningAnimations({ getAnimations: () => [fresh], timeline: { currentTime: 500 } }, () => clock);
+  assert.equal(fresh.startTime, 500, 'der ausstehende Start wird nicht auf den gezeichneten Frame festgelegt');
+  clock += 60;
+  resumeFresh();
+  assert.equal(fresh.startTime, 560, 'die eben gestartete Animation setzt nicht an ihrer Stelle fort');
+
+  // Und swapPage haelt sie wirklich - waehrend des Wartens auf den Render.
+  const env = stubDocument();
+  const pill = { playState: 'running', startTime: 10 };
+  env.doc.getAnimations = () => [pill];
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  globalThis.performance ??= { now: () => Date.now() };
+  try {
+    const done = await swapPage(() => new Promise((r) => setTimeout(r, 40)), { content: env.content, from: '/tasks', animate: true });
+    assert.ok(pill.startTime >= 10 + 35, `die Pille setzte nach dem Warten nicht an ihrer Stelle fort (Start ${pill.startTime})`);
+    env.finish();
+    await done.finished;
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+});
+
+// Critique R21 (D11): zwischen zwei Kuechen-Reitern blendete die Kontextzeile
+// (Wochenschritt <-> Suche) 200ms doppelt belichtet mit der Seite. Sie wechselt
+// jetzt mit dem Tipp, nur der Koerper blendet - ueber den Typ `kitchen`.
+test('swapPage D11: zwischen Kuechen-Reitern blendet nur der Koerper (Typ kitchen)', async () => {
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  for (const supported of [true, false]) {
+    const env = stubDocument();
+    const start = env.doc.startViewTransition;
+    let arg = null;
+    env.doc.startViewTransition = (a) => { arg = a; return start(typeof a === 'function' ? a : a.update); };
+    globalThis.document = env.doc;
+    globalThis.matchMedia = () => ({ matches: false });
+    globalThis.CSS = { supports: (q) => supported && /active-view-transition-type/.test(q) };
+    try {
+      let swapped = false;
+      const { finished } = await swapPage(() => { swapped = true; }, { content: env.content, from: '/meals', animate: true, types: ['kitchen'] });
+      assert.equal(swapped, true, 'der Tausch lief nicht');
+      if (supported) assert.deepEqual(arg?.types, ['kitchen'], 'der Typ erreicht die Transition nicht');
+      else assert.equal(typeof arg, 'function', 'ohne Typen-Unterstuetzung laeuft der Wechsel wie bisher');
+      env.finish();
+      await finished;
+    } finally {
+      delete globalThis.document;
+      delete globalThis.matchMedia;
+      delete globalThis.CSS;
+    }
+  }
+  const rules = [...eachRule(css('layout.css'))].filter((r) => !r.at.length);
+  const body = (sel) => rules.find((r) => r.selector.replace(/\s+/g, '') === sel)?.body ?? '';
+  assert.match(body('html:active-view-transition-type(kitchen)::view-transition-old(page-toolbar)'), /display:\s*none/,
+    'die alte Kontextzeile blendet weiter doppelt belichtet');
+  assert.match(body('html:active-view-transition-type(kitchen)::view-transition-new(page-toolbar)'), /animation:\s*none/,
+    'die neue Kontextzeile steht nicht mit dem Tipp');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /await swapPage\(swap, \{[^}]*types: isKitchenRoute\(previousPath\) && isKitchenRoute\(route\.path\) \? \['kitchen'\] : \[\],/,
+    'der Router setzt den Typ nicht fuer einen Wechsel innerhalb der Kueche');
+});
+
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
   // Zwei Tipps innerhalb der Transition: der Browser verwirft die erste, ihr
   // `finished` loest auf, waehrend die zweite ihr altes Bild noch nicht
@@ -665,6 +801,46 @@ test('View Transition: die Gruppen laufen auf --duration-md/--ease-out, nicht au
   // Namen (Gruppe `animation: none` = 0s) mit sich selbst blenden.
   for (const img of ['::view-transition-old(*)', '::view-transition-new(*)']) {
     assert.ok(bySel(img).every((r) => !/animation-duration/.test(r.body)), `${img}: keine eigene Dauer`);
+  }
+});
+
+// Critique R21 (a1 P2, Frame-Serie): beim Ankommen auf / stand der alte Kopf
+// ("Aufgaben") 5 von 5 Mal einen Frame lang deckend ueber dem Gruss. Die
+// Gruppe `page-toolbar` steht (`animation: none`) - und der Shorthand setzt
+// dabei auch `animation-fill-mode` auf `none`, das die Bilder erben. Das alte
+// Kopfbild war nach 200ms fertig, die Transition lebte noch einen Frame (die
+// Wurzel haelt ihr Ende per `both` aus dem UA-Stylesheet), und ohne Fuellung
+// sprang das Bild dort auf Deckkraft 1 zurueck (gemessen: old(page-toolbar) 1,
+// old(root) 0 im letzten Frame).
+test('View Transition: ein Bild, das unter einer stehenden Gruppe blendet, haelt sein Ende (fill both)', () => {
+  const rules = [...eachRule(css('layout.css'))];
+  const REDUCE = /prefers-reduced-motion:\s*reduce/;
+  const contexts = [
+    { name: 'Basis', applies: (r) => !r.at.length },
+    { name: 'reduce', applies: (r) => !r.at.length || r.at.every((a) => REDUCE.test(a)) },
+  ];
+  const PLAIN = /^::view-transition-(group|old|new)\(([\w-]+|\*)\)$/;
+  for (const { name, applies } of contexts) {
+    const decls = new Map();
+    for (const rule of rules.filter(applies)) {
+      for (const sel of selectorList(rule.selector)) {
+        const m = sel.replace(/\s+/g, '').match(PLAIN);
+        if (!m) continue;
+        const key = `${m[1]}(${m[2]})`;
+        decls.set(key, `${decls.get(key) ?? ''};${rule.body}`);
+      }
+    }
+    const stands = (vtName) => [`group(${vtName})`, 'group(*)'].some((k) => /(^|;)\s*animation:\s*none/.test(decls.get(k) ?? ''));
+    let checked = 0;
+    for (const [key, body] of decls) {
+      const m = key.match(/^(old|new)\(([\w-]+)\)$/);
+      if (!m || !/animation-duration:/.test(body) || /animation:\s*none|display:\s*none/.test(body)) continue;
+      if (!stands(m[2])) continue;
+      checked += 1;
+      assert.match(body, /animation-fill-mode:\s*(both|forwards)/,
+        `${name}: ::view-transition-${key} blendet unter einer stehenden Gruppe ohne Fuellung - im letzten Frame der Transition steht es wieder deckend (Geisterframe)`);
+    }
+    assert.ok(checked >= 2, `${name}: der Guard prueft kein Bild mehr (${checked}) - liest er noch layout.css?`);
   }
 });
 
@@ -771,10 +947,19 @@ test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nic
   // der Large Title der gedeckelten Koepfe); alle anderen stehen bei 0s.
   assert.match(globalRule.body, /--motion-blend:\s*0s/, 'ohne Abmeldung bleibt jede Animation bei 0s');
   assert.match(globalRule.body, /animation-duration:\s*var\(--motion-blend\)\s*!important/, 'Animationen bleiben aus');
+  // Seit R21 meldet sich mit `var(--spin-period)` auch die Statusdrehung ab
+  // (eigener Guard: "Spinner D12") - sie ist keine Blende und steht nicht hier.
   const blendRules = [...eachRule(reset)].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))
-    && /--motion-blend:\s*var\(/.test(r.body));
-  assert.deepEqual(blendRules.map((r) => r.selector.trim()), ['.page-toolbar--capped > .page-toolbar__title'],
+    && /--motion-blend:\s*var\(/.test(r.body) && !/--motion-blend:\s*var\(--spin-period\)/.test(r.body));
+  assert.deepEqual(blendRules.map((r) => r.selector.trim()), ['.page-toolbar--capped > .page-toolbar__title', '.period-swipe-in--fade'],
     'eine neue Abmeldung fuer Animationen: nur fuer Elemente, deren einzige Animation eine Blende ist (hier nachtragen und pruefen)');
+  // R21 (D2): der Zeitraum-Wisch blendet unter reduzierter Bewegung ein - geprueft:
+  // seine einzige Animation ist `period-swipe-fade`, und die aendert nur die Deckkraft.
+  const layoutCss = css('layout.css');
+  const fade = [...eachRule(layoutCss)].find((r) => r.selector.trim() === '.period-swipe-in--fade');
+  assert.match(fade?.body ?? '', /animation:\s*period-swipe-fade var\(--duration-sm\) var\(--ease-out\)/);
+  const frames = layoutCss.match(/@keyframes period-swipe-fade\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.ok(/opacity/.test(frames) && !/transform|translate|scale/.test(frames), `period-swipe-fade bewegt mehr als die Deckkraft: ${frames}`);
   for (const name of ['page-title-settle', 'page-title-settle-back']) {
     const body = keyframesBody(name);
     assert.ok(body, `@keyframes ${name} fehlt`);
@@ -1248,6 +1433,82 @@ test('collapseOut R19: nur transform und opacity - die Nachbarn gleiten per FLIP
   }
 });
 
+/* R21 (Critique 2026-10-21, D3): fiel die Zeile sofort auf null, schrumpfte ihre
+ * Karte im selben Frame, waehrend die Zeilen darunter erst noch heranglitten -
+ * die letzte stand bis zu 64px abgeschnitten unter der Kartenkante, und zwischen
+ * Karte und naechster Gruppe lag ein leeres Band derselben Hoehe (200ms,
+ * Aufgaben und Einkauf). Jetzt: geschlossene Lage messen, Nachbarn DORTHIN
+ * gleiten lassen, die Karte kuerzt ihre Unterkante im selben Takt per
+ * clip-path, und erst am Ende schliesst die Zeile - alles, was sich dann
+ * noch bewegt, steht schon dort. Die Attrappe rechnet Layout wie der Browser:
+ * solange die Zeile geschlossen ist, stehen Nachbarn 48px hoeher und die
+ * Karte ist 48px kuerzer. */
+test('collapseOut R21 (D3): erst gleiten, dann schliessen - die Karte geht mit, kein Clip, kein Leerband', async () => {
+  const saved = { window: globalThis.window, document: globalThis.document, getComputedStyle: globalThis.getComputedStyle, requestAnimationFrame: globalThis.requestAnimationFrame, CSS: globalThis.CSS };
+  const log = [];
+  let closed = 0;
+  const mk = (name, { top = 0, height = 48, styles = {} } = {}) => {
+    const el = {
+      name, style: {}, calls: [], parentElement: null, nextElementSibling: null, isConnected: true, styles,
+      contains: (n) => { for (let x = n; x; x = x.parentElement) if (x === el) return true; return false; },
+      getBoundingClientRect: () => {
+        const shift = closed > 0 && el.movesUp ? 48 : 0;
+        const shrink = closed > 0 && el.shrinks ? 48 : 0;
+        return { left: 0, top: top - shift, width: 300, height: height - shrink };
+      },
+      animate(keyframes, timing) {
+        const anim = { keyframes, timing, playState: 'running', finished: Promise.resolve(), cancel: () => { anim.playState = 'idle'; if (anim.closes) closed -= 1; log.push(`cancel ${name}`); } };
+        if (keyframes.some((k) => k.height === '0px')) { anim.closes = true; closed += 1; }
+        el.calls.push(anim);
+        log.push(`animate ${name} ${Object.keys(keyframes.at(-1)).join(',')}`);
+        return anim;
+      },
+    };
+    return el;
+  };
+  const link = (parent, kids) => { kids.forEach((k, i) => { k.parentElement = parent; k.nextElementSibling = kids[i + 1] ?? null; }); };
+  const scroller = mk('scroller', { styles: { overflowY: 'auto' } });
+  const list = mk('list', { height: 400 });
+  const group = mk('group', { height: 140 });
+  const group2 = mk('group2', { top: 160 });
+  const carrier = mk('carrier', { top: 40, height: 96, styles: { backgroundColor: 'rgb(255, 255, 255)', borderBottomRightRadius: '16px', borderBottomLeftRadius: '16px', boxShadow: 'none' } });
+  const row = mk('row', { top: 40 });
+  const row2 = mk('row2', { top: 88 });
+  link(scroller, [list]); link(list, [group, group2]); link(group, [carrier]); link(carrier, [row, row2]);
+  row2.movesUp = true; group2.movesUp = true; carrier.shrinks = true; group.shrinks = true; list.shrinks = true;
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  globalThis.document = { visibilityState: 'visible', documentElement: {}, body: {} };
+  globalThis.getComputedStyle = (el) => ({ getPropertyValue: () => '', opacity: '1', overflowY: 'visible', backgroundColor: 'rgba(0, 0, 0, 0)', boxShadow: 'none', borderBottomWidth: '0px', ...(el?.styles ?? {}) });
+  globalThis.requestAnimationFrame = () => { throw new Error('rAF darf fuer den Endzustand nicht noetig sein'); };
+  globalThis.CSS = { supports: () => true };
+  try {
+    const { collapseOut } = await import('../public/utils/ux.js');
+    await collapseOut(row, { duration: 10 });
+    const glide = row2.calls.find((c) => c.keyframes.some((k) => 'transform' in k));
+    assert.ok(glide, 'die Zeile darunter gleitet nicht');
+    assert.deepEqual(glide.keyframes, [{ transform: 'none' }, { transform: 'translate(0px, -48px)' }], 'sie gleitet von ihrer Lage in die geschlossene - nicht von unten heran');
+    const glide2 = group2.calls.find((c) => c.keyframes.some((k) => 'transform' in k));
+    assert.deepEqual(glide2?.keyframes.at(-1), { transform: 'translate(0px, -48px)' }, 'die naechste Gruppe folgt mit demselben Weg - kein Leerband');
+    const clip = carrier.calls.find((c) => c.keyframes.some((k) => 'clipPath' in k));
+    assert.ok(clip, 'die Karte kuerzt ihre Unterkante nicht mit - die letzte Zeile wird abgeschnitten');
+    assert.match(clip.keyframes[0].clipPath, /^inset\(-2px -2px 0px -2px round 0px 0px 18px 18px\)$/);
+    assert.match(clip.keyframes.at(-1).clipPath, /^inset\(-2px -2px 48px -2px round 0px 0px 18px 18px\)$/, 'die Karte endet dort, wo sie geschlossen endet');
+    assert.ok(!group.calls.length && !list.calls.length, 'nur was eine Flaeche malt, wird gekappt');
+    // Geschlossen wird ZULETZT: die Zeile geht erst auf null, wenn alles steht.
+    const closeAt = log.lastIndexOf('animate row opacity,height,paddingTop,paddingBottom,marginTop,marginBottom,borderTopWidth,borderBottomWidth');
+    assert.ok(closeAt > log.indexOf('animate row2 transform'), `die Zeile schliesst vor dem Gleiten: ${log.join(' | ')}`);
+    assert.equal(row.calls.at(-1).timing.fill, 'forwards', 'die Zeile bleibt zu, bis die Liste neu gezeichnet ist');
+    assert.equal(row.calls.at(-1).playState, 'running');
+    assert.equal(glide.playState, 'idle', 'die Bewegung ist am Ende abgenommen');
+    assert.equal(row2.style.transform, '', 'kein Inline-Halt bleibt stehen');
+    assert.equal(carrier.style.clipPath, '', 'keine Kappe bleibt an der Karte');
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+    }
+  }
+});
+
 test('collapseRow: klappt die Zeile aus, mit der letzten Zeile die Gruppe - und loest auch ohne finish auf', async () => {
   const restore = motionEnv();
   try {
@@ -1310,7 +1571,9 @@ test('Inhaltswechsel: Reiter, Zeitraeume und Bereiche tauschen ueber swapContent
   const missing = carriers.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, , what]) => `${name}.js: ${what}`);
   assert.deepEqual(missing, [], `Traeger ohne den geteilten Uebergang:\n  ${missing.join('\n  ')}`);
   // Der Wisch im Kalender bringt sein eigenes Hereingleiten mit - kein zweiter Uebergang darueber.
-  assert.match(pageSource('calendar'), /onStep: \(step\) => navigate\(step, \{ swap: false \}\)/);
+  // Seit R21 (D2) ueber stepFromSwipe, das die Uhrzeit des Nachbarn behaelt.
+  assert.match(pageSource('calendar'), /onStep: \(step\) => stepFromSwipe\(bodyEl, step\)/);
+  assert.match(pageSource('calendar'), /async function stepFromSwipe\(bodyEl, step\) \{[\s\S]*?await navigate\(step, \{ swap: false \}\);/);
   // Die zwei Einzelloesungen sind im Helfer aufgegangen.
   for (const file of ['budget.css', 'health.css']) {
     assert.ok(![...eachRule(css(file))].some((r) => /--entering\b/.test(r.selector)), `${file}: eigene Einblend-Klasse`);
@@ -1336,6 +1599,22 @@ test('Listenbewegung: Module, die ihre Zeilen neu bauen, nutzen list-motion bzw.
   const rewards = pageSource('rewards');
   const fn = rewards.slice(rewards.indexOf('async function renderCurrentTab('), rewards.indexOf('async function renderCurrentTab(') + 900);
   assert.match(fn, /if \(first\) \{\s*el\.replaceChildren\(\);\s*el\.insertAdjacentHTML\('beforeend', renderSkeletonList/, 'Skelett nur unter `first`');
+});
+
+/* R21 (Critique 2026-10-21, D3): der Zaehler einer Gruppe zog erst nach dem
+ * Austritt nach - gemessen ~900ms (Aufgaben) bzw. ~1,7s (Einkauf) nach dem
+ * Haken, 400ms nachdem die Zeile zu gehen begann. Der neue Stand steht vor dem
+ * Austritt fest; die Zaehler nehmen ihn im Frame an, in dem die Zeile
+ * ausblendet (gemessen danach: @497 bzw. @1257ms, Blende ab 513 bzw. 1264). */
+test('D3 (R21): der Zaehler wechselt im Frame des Austritts, nicht nach ihm - Aufgaben und Einkauf', () => {
+  const tasks = pageSource('tasks');
+  const reload = tasks.slice(tasks.indexOf('async function reloadWithRowMotion('), tasks.indexOf('function previewGroupCounts('));
+  assert.match(reload, /previewGroupCounts\(container\);\s*await collapseOut\(lastInGroup \? group : row\)/, 'Aufgaben: die Zaehler stehen erst nach dem Austritt');
+  const preview = tasks.slice(tasks.indexOf('function previewGroupCounts('), tasks.indexOf('function patchRowRemoval('));
+  assert.match(preview, /groupBy\(filteredTasks\(\), state\.groupMode\)/, 'Aufgaben: die Vorschau rechnet aus dem neuen Bestand, wie patchRowRemoval');
+  const shopping = pageSource('shopping');
+  const settle = shopping.slice(shopping.indexOf('function settleItemPlacements('), shopping.indexOf('function updateItemRow('));
+  assert.match(settle, /if \(closingRows\.length\) previewGroupCounts\(listEl, first\);\s*const closing = closingRows\.map\(\(row\) => collapseOut\(row\)\);/, 'Einkauf: die Zaehler stehen erst nach dem Umzug');
 });
 
 /* R17, Bewegung: "das System steht, die Abdeckung fehlt". Acht Seiten bauten
@@ -1748,8 +2027,10 @@ const DRILL_DOWN_HOSTS = [
   ['settings/shell.js', /const drill = existingShell && !isSplit\(shell\) && wasLeaf !== Boolean\(activeLeaf\)\s*\? \(activeLeaf \? 1 : -1\)\s*: 0;/, 'Einstellungen: Uebersicht <-> Blatt, nur ohne Seitenleiste'],
   // R19: mit ALTEM Bild (swapRegion) - hinein schiebt sich das Blatt darueber,
   // zurueck schiebt es sich hinaus; der synchrone Teil laeuft im Wechsel.
-  ['settings/shell.js', /await swapRegion\(content, \(\) => \{\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*loading = renderLeafContent\(content, activeLeaf, leafDomain, user, query\);\s*\}, \{ direction: drill \}\);\s*await loading;/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
-  ['settings/shell.js', /if \(drill\) await swapRegion\(content, paintOverview, \{ direction: drill \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
+  // R21: der Wechsel wartet hoechstens FIRST_RENDER_WAIT_MS auf das Blatt
+  // (D1) - gestartet wird er weiter vor dem Laden.
+  ['settings/shell.js', /await swapRegion\(content, \(\) => \{\s*markLeaf\(\);\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*loading = renderLeafContent\(content, activeLeaf, leafDomain, user, query\);\s*return loading;\s*\}, \{ direction: drill, fade: toolbar \}\);\s*await loading;/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
+  ['settings/shell.js', /if \(drill\) \{\s*await swapRegion\(content, \(\) => \{\s*markLeaf\(\);\s*paintOverview\(\);\s*\}, \{ direction: drill, fade: toolbar \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
   ['pages/health.js', /const drill = !narrow \? 0 : id === HEALTH_OVERVIEW_ID \? -1 : previous === HEALTH_OVERVIEW_ID \? 1 : 0;\s*if \(previous && previous !== id\) markAreaEntering\(route, drill\);/, 'Gesundheit: Uebersicht <-> Bereich, nur schmal'],
   ['pages/health.js', /if \(panel\) swapContent\(panel, null, \{ direction \}\);/, 'Gesundheit: ueber den geteilten Helfer'],
 ];
@@ -2334,6 +2615,70 @@ test('tasks: a failing reload after the dialog closed is reported on the page, n
 // Kein toter Keyframe (Critique 2026-10-16, A5): `list-item-in` stand mit
 // einem Kommentar, der einen Nutzer behauptete, den es nicht gab.
 // --------------------------------------------------------
+// Critique R21 (D12): drei Spinner drehten in drei Tempi (Knopf 550ms,
+// Anmeldung 700ms, Dokumentvorschau 800ms), und unter reduzierter Bewegung
+// standen sie - ein laufender Vorgang sah aus wie ein haengender.
+test('Spinner D12: eine Statusdrehung in einem Tempo - und unter reduzierter Bewegung dreht sie weiter', () => {
+  assert.match(css('tokens.css'), /--spin-period:\s*\d+ms;/, 'das Tempo-Token fehlt');
+  // Jede Endlos-Drehung um sich selbst ist ein Spinner - ausser dem Wetter-Dekor.
+  const DECOR = new Set(['weather-rays']);
+  const spins = new Set([...keyframeNames()].filter((name) => {
+    const body = (keyframesBody(name) ?? '').replace(/\s+/g, '');
+    return /^to\{transform:rotate\((360deg|1turn)\);?\}$/.test(body);
+  }));
+  const spinners = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      const m = rule.body.match(/(?:^|;)\s*animation\s*:\s*([^;]+)/);
+      if (!m || !/\binfinite\b/.test(m[1])) continue;
+      const name = m[1].split(/\s+/).find((w) => spins.has(w));
+      if (!name || DECOR.has(name)) continue;
+      assert.equal(name, 'status-spin', `${file}: ${rule.selector} dreht mit einer eigenen Drehung (${name})`);
+      assert.match(m[1], /var\(--spin-period\)/, `${file}: ${rule.selector} dreht in einem eigenen Tempo (${m[1].trim()})`);
+      spinners.push(rule.selector.trim());
+    }
+  }
+  assert.deepEqual(spinners.sort(), ['.auth-spinner', '.btn--loading::after', '.document-viewer__spinner'],
+    'ein neuer Spinner: hier und in der Ausnahme von reset.css eintragen');
+  assert.deepEqual([...spins].filter((n) => !DECOR.has(n)), ['status-spin'], 'mehr als eine Statusdrehung');
+  // Unter reduzierter Bewegung: genau diese drehen weiter, nichts haelt sie an.
+  const reduced = reducedMotionRules();
+  // Ueber die Abmeldung der globalen Sperre (`--motion-blend`), ohne !important.
+  const keep = reduced.find((r) => r.file === 'reset.css' && /--motion-blend:\s*var\(--spin-period\)/.test(r.body));
+  assert.deepEqual(keep?.selectors.slice().sort(), spinners, 'unter reduzierter Bewegung friert ein Spinner ein');
+  for (const r of reduced) {
+    for (const sel of r.selectors) {
+      if (spinners.includes(sel)) assert.doesNotMatch(r.body, /animation(?:-name)?:\s*none/, `${r.file}: ${sel} haelt unter reduzierter Bewegung an`);
+    }
+  }
+});
+
+// Critique R21 (D1): die Glasfeder ist eine Back-Out-Bezier - das Blatt hing
+// gemessen 117ms sichtbar ueber der Ruhelage (Gipfel -2,33px bei +162ms der
+// 300ms). Wo `linear()` gilt, laeuft dieselbe Bewegung als gedaempfte Feder:
+// gleicher Gipfel, gleiche Dauer, frueher in Ruhe (danach 64-67ms, Gipfel
+// -2,16px bei +95-103ms).
+test('Glasfeder D1: linear()-Feder nur als @supports-Verfeinerung, gleicher Gipfel, Endwert 1', () => {
+  const rules = [...eachRule(css('tokens.css'))];
+  const base = rules.find((r) => !r.at.length && /--ease-glass:/.test(r.body));
+  assert.match(base?.body ?? '', /--ease-glass:\s*cubic-bezier\(0\.34, 1\.56, 0\.64, 1\);/, 'der Rueckfall ist nicht mehr die Bezier');
+  const spring = rules.filter((r) => r.at.some((a) => /@supports \(transition-timing-function: linear\(0, 1\)\)/.test(a))
+    && /--ease-glass:/.test(r.body));
+  assert.equal(spring.length, 1, 'die Feder steht nicht (oder nicht nur) im @supports-Rahmen');
+  assert.ok(rules.every((r) => !/--ease-glass:\s*linear\(/.test(r.body) || r.at.some((a) => /@supports/.test(a))),
+    'eine linear()-Feder ohne @supports macht in alten Browsern jede Transition ungueltig');
+  const value = spring[0].body.match(/--ease-glass:\s*linear\(([^)]*)\)/)?.[1] ?? '';
+  const stops = value.split(',').map((s) => parseFloat(s.trim()));
+  assert.equal(stops[0], 0, 'die Feder beginnt nicht bei 0');
+  assert.equal(stops.at(-1), 1, 'die Feder endet nicht bei 1');
+  // Derselbe Gipfel wie die Bezier (1,098): keine neue Bewegung, nur eine andere Zeit.
+  const peak = Math.max(...stops);
+  assert.ok(Math.abs(peak - 1.098) <= 0.01, `Gipfel ${peak} - die Feder schwingt anders weit als --ease-glass`);
+  // Und sie haengt nicht: ab 60 % steht sie innerhalb von 1 %.
+  const late = value.split(',').map((s) => s.trim().split(/\s+/)).filter(([, at]) => parseFloat(at) >= 60).map(([v]) => parseFloat(v));
+  assert.ok(late.length && late.every((v) => Math.abs(v - 1) <= 0.01), 'die Feder steht nach 60 % nicht in Ruhe');
+});
+
 test('jede @keyframes hat einen Nutzer - im Stylesheet oder im Skript', () => {
   const stripCss = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '');
   const sheets = allSheets.map((f) => stripCss(css(f)).replace(/@keyframes\s+[\w-]+/g, ''));
@@ -2457,7 +2802,9 @@ test('R19: das Skelett blendet nach --duration-sm ein und schimmert nur mit tran
 test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () => {
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   assert.match(src, /const fromSkeleton = Boolean\(shell\.querySelector\('\.widget-skeleton'\)\)\s*&& !document\.documentElement\.classList\.contains\('page-swapping'\);/);
-  assert.match(src, /swapContent\(shell, \(\) => setHtml\(shell, `[\s\S]*?`\), \{ animate: fromSkeleton \}\);/);
+  // Seit R21 (D5) misst der Rueckruf nach dem Zeichnen noch das Heute-Blatt
+  // (measurePhoneProgram) - im selben Rueckruf, also unter derselben Blende.
+  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, `[\s\S]*?`\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
 });
 
 /* 12. GERICHTETER WECHSEL EINER REGION (R19, Critique 2026-10-16): der
@@ -2531,6 +2878,52 @@ test('swapRegion: altes Bild per View Transition, Richtung als Typ, Name nur fue
   } finally {
     env.restore();
   }
+});
+
+// Critique R21 (a5, Einstellungs-Drill): der erste Frame zeigte schon den Kopf
+// "< Einstellungen" (die Wurzel zeigt im Regionswechsel nur ihr neues Bild)
+// und die Uebersicht auf zwei Zeilen gekappt - die Gruppe schnitt das alte
+// Bild auf die 124px des Blatt-Geruests. Jetzt wartet der Callback auf die
+// neue Ebene (D1), und ein Kopf blendet auf Wunsch an Ort und Stelle.
+test('swapRegion D1: das neue Bild wartet auf die Ebene, der Kopf blendet an Ort und Stelle', async () => {
+  const env = regionEnv();
+  try {
+    const { swapRegion } = await import('../public/utils/content-swap.js');
+    const head = { style: {}, isConnected: true };
+    let named = null;
+    const t0 = Date.now();
+    const { finished } = await swapRegion(env.host, () => {
+      named = head.style.viewTransitionName;
+      return new Promise((r) => setTimeout(r, 40));
+    }, { direction: 1, fade: head });
+    assert.ok(Date.now() - t0 >= 35, `das neue Bild wartete nicht auf die Ebene (${Date.now() - t0} ms)`);
+    assert.equal(named, 'page-toolbar', 'der Kopf blendet nicht - im ersten Frame stuende schon der neue');
+    env.finish();
+    await finished;
+    assert.equal(head.style.viewTransitionName, '', 'danach ist der Kopfname frei');
+
+    // Ein Laden, das haengt, haelt das alte Bild hoechstens die Frist.
+    const t1 = Date.now();
+    const slow = await swapRegion(env.host, () => new Promise(() => {}), { direction: -1 });
+    assert.ok(Date.now() - t1 < 400, 'ein haengendes Blatt hielt das alte Bild ueber die Frist');
+    env.finish();
+    await slow.finished;
+  } finally {
+    env.restore();
+  }
+  // Die Einstellungen geben ihr Laden zurueck, markieren die Ebene erst im
+  // Wechsel und lassen den Kopf blenden - hinein wie zurueck.
+  const shell = stripComments(readFileSync(new URL('../public/settings/shell.js', import.meta.url), 'utf8'));
+  assert.match(shell, /await swapRegion\(content, \(\) => \{\s*markLeaf\(\);[\s\S]*?loading = renderLeafContent\([^)]*\);\s*return loading;\s*\}, \{ direction: drill, fade: toolbar \}\);/,
+    'der Drill hinein wartet nicht auf das Blatt oder blendet den Kopf nicht');
+  assert.match(shell, /await swapRegion\(content, \(\) => \{\s*markLeaf\(\);\s*paintOverview\(\);\s*\}, \{ direction: drill, fade: toolbar \}\);/,
+    'der Drill zurueck markiert die Ebene nicht im Wechsel oder blendet den Kopf nicht');
+  assert.match(shell, /if \(!drill\) markLeaf\(\);/, 'ohne Drill wird die Ebene nicht mehr markiert');
+  // Laedt das Blatt laenger als die Frist, ist die neue Ebene kurz - die
+  // Gruppe schneidet nur waagerecht, senkrecht laeuft das alte Bild aus.
+  const group = [...eachRule(css('layout.css'))].find((r) => !r.at.length && r.selector.replace(/\s+/g, '') === '::view-transition-group(region-swap)');
+  assert.match(group?.body ?? '', /overflow:\s*clip visible/,
+    'die Gruppe schneidet die alte Ebene auf die Hoehe der neuen - im ersten Frame stuende die Uebersicht gekappt');
 });
 
 /* Review #2049, Runde 2: swapRegion und swapPage teilen `html.page-swapping`.

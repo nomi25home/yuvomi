@@ -110,7 +110,7 @@ const STUBS = {
         ...parts.slice(last + 1).map((part) => part.value),
       ].join('');
     };
-    export const getSupportedLocales = () => ['de', 'en'];
+    export const getSupportedLocales = () => globalThis.__supportedLocales ?? ['de', 'en'];
     export const formatDate = (d) => String(d);
     // Tag+Monat und volles Datum sehen im Stub gleich aus. Wer pruefen will,
     // WELCHES von beiden gerufen wurde (relativeDateLabel), setzt
@@ -233,6 +233,13 @@ const STUBS = {
       }
       return any;
     };
+    // Die Regeln des Markups (components/modal.js, Critique R21): das Original
+    // liest den ValidityState der Felder - die Attrappen-Panels der Suiten
+    // haben keinen, also meldet der Stub nichts. Wer den Weg messen will,
+    // setzt globalThis.__constraintErrors.
+    export const constraintErrors = (...args) => (
+      typeof globalThis.__constraintErrors === 'function' ? globalThis.__constraintErrors(...args) : []
+    );
     export const mountFooter = () => null;
     // Wer sehen will, WOHIN ein Formular sich legt (R19, Bearbeiten in der
     // Detailspalte), setzt globalThis.__dockNextModal.
@@ -247,11 +254,20 @@ const STUBS = {
         : swap()
     );
     export const captureModalContext = () => globalThis.__modalContextId?.() ?? 'test-modal-context';
-    export const isModalContextCurrent = (context) => (
-      globalThis.__modalContextId?.() === undefined
+    // Wie das Original: ein Platz in der Reihe der Oeffnungswuensche, und nur
+    // der neueste gilt (#1997, Codex an #2132). Der Kontext selbst bleibt der
+    // von captureModalContext().
+    let openIntent = 0;
+    export const captureOpenContext = () => ({ openContext: captureModalContext(), intent: ++openIntent });
+    export const isModalContextCurrent = (context) => {
+      if (context && typeof context === 'object' && 'openContext' in context) {
+        if (context.intent !== openIntent) return false;
+        context = context.openContext;
+      }
+      return globalThis.__modalContextId?.() === undefined
         ? true
-        : globalThis.__modalContextId() === context
-    );
+        : globalThis.__modalContextId() === context;
+    };
     // Ob der festgehaltene Dialog noch offen ist (#1997). Ohne Sonde: ja - wer
     // die spaete Antwort messen will, setzt globalThis.__isOwnModalOpen.
     export const isOwnModalOpen = (context) => (
@@ -293,6 +309,8 @@ const STUBS = {
       return { update: () => true, isOpen: () => true };
     };
     export const closeDetailView = () => {};
+    // R21 D7: Sprung aus der Leseansicht in ein anderes Modul - hier nur Merker.
+    export const leaveDetailTo = (url) => { globalThis.__leftDetailTo = url; };
     // Dieselbe Regel wie im Original (R19): Bearbeiten als der eine
     // Primaerknopf am Ende, andere Primaerknoepfe treten zurueck.
     export const withPrimaryEdit = (actions = [], edit = null) => {
@@ -349,6 +367,9 @@ const STUBS = {
     export const drawChartOnce = () => 0;
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
+    // Den Kopf mit der Flaeche falten (Telefon-Monat): ohne Shell-Kopf nichts zu tun.
+    // Wer pruefen will, OB die Seite fragt, setzt globalThis.__headCollapse.
+    export const requestHeadCollapse = (toolbar, collapsed) => { globalThis.__headCollapse?.(toolbar, collapsed); };
     // Reine Pruefung ohne DOM - der Stub rechnet wie das Original.
     export const isImeComposing = (event) => Boolean(event?.isComposing || event?.keyCode === 229);
   `,

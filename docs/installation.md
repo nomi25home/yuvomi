@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22+ on the host. The browser-based wizard is fully localized (26 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 22+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### Option B — CLI Installer (Linux / macOS)
 
@@ -19,7 +19,7 @@ git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 bash install.sh
 ```
 
-The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 26 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
+The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 27 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
 
 Running it again on an existing installation is safe, in two ways:
 
@@ -28,7 +28,7 @@ Running it again on an existing installation is safe, in two ways:
 
 > **Base URL.** The script asks for the absolute origin your household will open (default `http://<host>:<port>`) and writes it as `BASE_URL`. Behind a reverse proxy, enter the public address there — for example `https://yuvomi.example.com`. Without it the server sends no password-reset or invitation emails at all, because it deliberately does not trust the request's `Host` header.
 
-Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil nb`):
+Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh zh-Hant ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil nb`):
 
 ```bash
 bash install.sh --lang de
@@ -251,7 +251,7 @@ node tools/installer/install-server.js
 
 #### 3. Open the Wizard
 
-Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (26 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
+Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (27 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
 
 - Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Account → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`) — on a re-run, keys already present in your `.env` are kept rather than regenerated, so running the wizard again on a live installation cannot lock you out of your encrypted database
@@ -313,9 +313,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.78.0` (exact version), `2.78` (latest patch of that minor), plus a moving `main`
+> `2.79.0` (exact version), `2.79` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.78.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.79.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.78.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.79.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.78.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.79.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -378,7 +378,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.78.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.79.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -1061,6 +1061,7 @@ Pocket ID documents Yuvomi as one of its [client examples](https://pocket-id.org
 | `OIDC_CLIENT_SECRET` | Client secret for the registered application | - | No |
 | `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://yuvomi.example.com/api/v1/auth/oidc/callback`) | - | No |
 | `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` | Set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. It does not cover a provider that sends `email_verified: false` - such an address is never linked, with or without this setting. Only enable for IdPs fully under your control that never issue unverified addresses. | - | No |
+| `OIDC_TOKEN_AUTH_METHOD` | How Yuvomi authenticates at the provider's token endpoint: `client_secret_basic` (HTTP Basic header) or `client_secret_post` (request body). Unset picks automatically: `client_secret_basic`, unless the provider's discovery document offers `client_secret_post` only. Set it only when the sign-in fails with `invalid_client` although client ID and secret are right. Any other value fails the SSO start with a message naming the variable. | automatic | No |
 | `OIDC_ALLOW_SIGNUP` | Set to `false` so an SSO sign-in never provisions a new account. Sign-in and account linking are unaffected, so the admin creates the account and the user signs in with SSO. Use this when your identity provider serves more people than this household. | `true` | No |
 | `AUTH_ALLOW_PASSWORD_LOGIN` | Set to `false` to make SSO the only way in: the login form, password login and password reset are all switched off. Ignored until all four OIDC variables are set **and** at least one administrator account is linked to the provider, so a typo - or a fresh install - can never lock everyone out. | `true` | No |
 

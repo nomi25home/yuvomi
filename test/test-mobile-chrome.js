@@ -153,6 +153,28 @@ test('(1) kein Modul rechnet die Kapselzone ein zweites Mal in sein Bodenpolster
     'die Kapselzone steht schon im Shell-Nachlauf - ein Modul polstert nur sein eigenes Ende (z.B. var(--space-6))');
 });
 
+/* DIE SAFE-AREA STEHT SCHON IN DER ZONE (Critique R21, a1). `--nav-bottom-height`
+ * (tokens.css) traegt `--safe-area-inset-bottom` als Summanden. Der Toast-Stapel
+ * (.shell-bottom-stack) rechnete ihn ein zweites Mal dazu: auf einem Telefon
+ * mit 34px Home-Indikator stand der Toast 58 statt 24px ueber der Kapsel. Keine
+ * Rechnung darf die Zone UND den Inset zugleich enthalten. */
+test('(1) wer mit der Kapselzone rechnet, rechnet den Home-Indikator nicht ein zweites Mal', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const zone = tokens.match(/--nav-bottom-height:\s*([^;]+);/);
+  assert.match(zone?.[1] ?? '', /var\(--safe-area-inset-bottom\)/, 'Vorbedingung: die Zone enthaelt den Inset');
+  const offenders = [];
+  for (const { file, css } of sheets) {
+    for (const r of rules(css)) {
+      for (const d of r.body.split(';')) {
+        if (d.includes('var(--nav-bottom-height)') && d.includes('var(--safe-area-inset-bottom)')) {
+          offenders.push(`${file}: ${r.selector.trim()} { ${d.trim().replace(/\s+/g, ' ')} }`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], '--nav-bottom-height enthaelt --safe-area-inset-bottom schon');
+});
+
 test('(3) nichts im Inhalt klebt mit bottom: 0 an der Unterkante - dort liegt die Kapsel', () => {
   const offenders = [];
   for (const { file, css } of sheets) {
@@ -664,26 +686,47 @@ test('R20: der Gesundheits-Bereichskopf klappt beim Lesen auf eine Zeile ein', (
   assert.equal(decl(back?.body ?? '', 'min-inline-size'), 'var(--target-base)', 'der Rueckweg bleibt ein volles Ziel');
 });
 
-// R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE.
-// Schichtplan, Belohnungen und Haushaltshilfe massen 121/121/129px bei 390px
-// (Large Title ueber den Reitern), jetzt 65px; bei 834px 118-130 -> 69px.
+// R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE - ab
+// 768px. R21 (D7, Critique a2 P2): unter 768px wich der Titel samt Siegel aus
+// dem Bild, und Schichtplan, Belohnungen und Haushaltshilfe zeigten mobil nur
+// noch ihre Reiter - kein Kopf nannte den Ort, die Kapsel sagte "Mehr". Unter
+// 768px steht wieder der Kopf aller Module: Siegel und Name, die Reiter als
+// Bar-Zeile darunter (wie Budget), mit demselben Einklappen beim Scrollen.
 const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js', 'pages/schedule.js'];
-test('R19: Schichtplan, Belohnungen und Haushaltshilfe fuehren ihre Reiter in der Titelzeile', () => {
+test('R19/R21: Reiter in der Titelzeile ab 768px, darunter nennt der Kopf den Ort', () => {
   for (const f of TABS_TITLE_MODULES) {
     assert.match(read(`../public/${f}`), /<header class="page-toolbar [^"]*\bpage-toolbar--tabs-title\b/, `${f}: der Kopf traegt die Variante`);
   }
   const own = rules(layoutCss).filter((r) => r.selector.includes('.page-toolbar--tabs-title'));
-  const at = (r, px) => r.at.some((a) => new RegExp(`max-width:\\s*${px}px`).test(a));
-  const bar = own.find((r) => at(r, 1023) && r.selector.endsWith('> .page-toolbar__bar'));
-  assert.equal(bar && decl(bar.body, 'flex'), '1 1 0', 'die Leiste nimmt den Rest der Titelzeile und scrollt dort');
+  const tabletOnly = (r) => r.at.some((a) => /min-width:\s*768px/.test(a) && /max-width:\s*1023px/.test(a));
+  const bar = own.find((r) => r.selector.endsWith('> .page-toolbar__bar') && decl(r.body, 'flex') === '1 1 0');
+  assert.ok(bar, 'die Leiste nimmt den Rest der Titelzeile');
+  assert.ok(tabletOnly(bar), 'in der Titelzeile nur zwischen 768 und 1023px');
   assert.equal(decl(bar.body, 'block-size'), 'auto', 'so hoch wie ihre Reiter, nicht wie eine eigene Leistenzeile');
-  assert.ok(own.every((r) => at(r, 1023) || at(r, 767)), 'nur unter 1024px - am Desktop bleibt die Bar-Zeile eine eigene Zeile');
-  const title = own.find((r) => at(r, 767) && r.selector.endsWith('> .page-toolbar__title'));
-  assert.equal(title && decl(title.body, 'clip-path'), 'inset(50%)', 'unter 768px weicht der Titel aus dem Bild ...');
-  assert.equal(decl(title.body, 'display'), null, '... nicht aus dem Baum: das <h1> bleibt die Seitenueberschrift');
-  assert.ok(own.some((r) => at(r, 767) && r.selector.endsWith('> .module-seal--head') && decl(r.body, 'display') === 'none'),
-    'das Siegel geht mit (die vier Reiter der Haushaltshilfe brauchen 351 von 358px)');
+  const hides = own.filter((r) => (r.selector.endsWith('> .page-toolbar__title') && decl(r.body, 'clip-path') === 'inset(50%)')
+    || (r.selector.endsWith('> .module-seal--head') && decl(r.body, 'display') === 'none'));
+  assert.deepEqual(hides.map((r) => r.selector), [], 'kein Kopf ohne Ortsangabe: Titel und Siegel bleiben im Bild');
   assert.ok(read('../DESIGN.md').includes('page-toolbar--tabs-title'), 'DESIGN.md nennt die Variante');
+});
+
+// R21 S7 (Leitlinie Ulas: mobil mehr Platz fuer Inhalt): angedockt wurde der
+// Kopf der drei Module nur Reiter-Zeile - 73px Haushaltshilfe (Leiste in
+// Kuechenhoehe 56px um 48px-Reiter), 65px Belohnungen - und nannte den Ort
+// nicht mehr. Unter 768px ist die Leiste jetzt so hoch wie ihre Reiter, und
+// angedockt teilen sich Inline-Titel und Leiste EINE Zeile.
+test('R21 S7: angedockt traegt die Reiter-Zeile den Ort, in der Hoehe ihrer Reiter', () => {
+  const own = rules(layoutCss).filter((r) => r.selector.includes('.page-toolbar--tabs-title')
+    && r.at.some((a) => /max-width:\s*767px/.test(a)));
+  const bar = own.find((r) => r.selector.endsWith('> .page-toolbar__bar'));
+  assert.equal(decl(bar?.body ?? '', 'block-size'), 'auto', 'mobil keine feste Leistenhoehe ueber den Reitern');
+  const dock = own.find((r) => /\.page-toolbar--dock-tabs\.is-docked > \.page-toolbar__dock-title$/.test(r.selector.trim()));
+  assert.ok(dock, 'angedockt steht der Inline-Titel in der Reiter-Zeile');
+  assert.equal(decl(dock.body, 'flex'), '0 1 auto');
+  assert.match(decl(dock.body, 'max-inline-size') ?? '', /%$/, 'der Titel laesst der Leiste den groesseren Teil');
+  const tabs = own.find((r) => /\.is-docked:has\(> \.page-toolbar__dock-title\) > \[role="tablist"\]$/.test(r.selector.trim()));
+  assert.equal(decl(tabs?.body ?? '', 'flex'), '1 1 0', 'die Leiste nimmt den Rest - mit Basis 0 bricht die Zeile nie um');
+  assert.equal(decl(tabs.body, 'min-inline-size'), '0', 'und scrollt, statt den Titel zu verdraengen');
+  assert.match(read('../public/utils/ux.js'), /toolbar\.classList\.toggle\('page-toolbar--dock-tabs', tabRow\)/, 'die Shell markiert den Kopf');
 });
 
 // R20 (E1-Befund, gemessen 2026-10-17): der Nachlauf-Platzhalter hinter dem
@@ -695,4 +738,72 @@ test('R20: der Shell-Nachlauf ist unsichtbar und damit kein Layout-Shift', () =>
   assert.ok(tail, 'Regel des Nachlaufs fehlt');
   assert.equal(decl(tail.body, 'block-size'), 'var(--shell-tail)', 'der Platz bleibt');
   assert.equal(decl(tail.body, 'visibility'), 'hidden');
+});
+
+// R21 (Critique a1, gemessen 390x844): im Aufgaben-Blatt stand die Titelkante
+// bei einzeiligem Titel 25px unter der Blattoberkante, bei zweizeiligem 13px -
+// der Kopf zentrierte senkrecht, und von Aufgabe zu Aufgabe sprang der Titel um
+// 12px. Jetzt steht die erste Zeile mittig neben den Knoepfen (beide Faelle 25px).
+test('R21: die Titelkante im Blatt steht - die erste Zeile mittig neben den Knoepfen', () => {
+  const sel = '.modal-panel__header:has(> .modal-panel__header-actions, > .modal-panel__close)';
+  const [head] = topLevel(layoutCss, sel);
+  assert.equal(head && decl(head.body, 'align-items'), 'flex-start', 'der Kopf zentriert wieder - ein zweizeiliger Titel rutscht 12px hoch');
+  const [title] = topLevel(layoutCss, `${sel} > .modal-panel__title`);
+  assert.ok(title, 'die Regel fuer die erste Titelzeile fehlt');
+  assert.equal(decl(title.body, 'line-height'), 'var(--line-height-tight)');
+  // Dieselben Tokens wie Schriftgroesse und Knopfhoehe: (Knopf - Zeile) / 2.
+  assert.equal(decl(title.body, 'margin-block-start'), 'calc((var(--target-base) - var(--type-section-title) * var(--line-height-tight)) / 2)');
+  const [base] = topLevel(layoutCss, '.modal-panel__title');
+  assert.equal(decl(base.body, 'font-size'), 'var(--type-section-title)', 'die Rechnung nimmt eine andere Schriftgroesse als der Titel');
+  const [close] = topLevel(layoutCss, '.modal-panel__close');
+  assert.equal(decl(close.body, 'height'), 'var(--target-base)', 'die Rechnung nimmt eine andere Hoehe als der Knopf');
+});
+
+// R21 (Critique a6, gemessen 390x844): die Kapsel wurde per `min-height`
+// flacher. Sie steht unten fest, also wanderte ihre Oberkante samt Zone - ein
+// Layout-Shift je Frame (0,0013 je Ein- und Ausfahren), unter reduzierter
+// Bewegung in einem Schritt 0,017 je Wechsel. Jetzt behaelt sie ihre
+// Layout-Hoehe und staucht sich per `scale` von der Unterkante; die Ziele
+// strecken sich zurueck. Gemessen danach: 0,00015 bzw. 0,00003.
+test('R21: minimiert staucht sich die Kapsel per scale, ohne ihre Layout-Hoehe zu aendern', async () => {
+  const { navFlatScale } = await import('../public/utils/ux.js');
+  assert.deepEqual(navFlatScale(64, 56), { scale: 0.875, unscale: 1.1429 });
+  assert.equal(navFlatScale(56, 56), null, 'nichts zu stauchen');
+  assert.equal(navFlatScale(0, 56), null, 'ohne Messung kein Faktor');
+  const all = rules(layoutCss);
+  const supported = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a)) && r.at.some((a) => /@supports \(translate: 0\)/.test(a));
+  const capsule = all.find((r) => supported(r) && r.selector === '.nav-bottom--minimized:not(:focus-within) .nav-bottom__items' && decl(r.body, 'scale'));
+  assert.ok(capsule, 'die Kapsel wird wieder per Hoehe flacher');
+  assert.equal(decl(capsule.body, 'scale'), '1 var(--nav-flat-scale, 1)');
+  assert.equal(decl(capsule.body, 'transform-origin'), '50% 100%', 'die Unterkante steht nicht');
+  assert.equal(decl(capsule.body, 'min-height'), 'var(--nav-height-mobile)', 'die Layout-Hoehe aendert sich - die Zone wandert');
+  const items = all.find((r) => supported(r) && r.selector === '.nav-bottom--minimized:not(:focus-within) .nav-item' && decl(r.body, 'scale'));
+  assert.equal(items && decl(items.body, 'scale'), '1 var(--nav-flat-unscale, 1)', 'die Zeichen werden mitgestaucht');
+  const tr = all.find((r) => r.selector === '.nav-bottom .nav-bottom__items' && decl(r.body, 'transition'));
+  assert.match(decl(tr.body, 'transition'), /scale var\(--duration-md\) var\(--ease-out\)/, 'das Stauchen gleitet nicht');
+  const ux = read('../public/utils/ux.js');
+  assert.match(ux, /nav\.style\.setProperty\('--nav-flat-scale', String\(flat\.scale\)\);/, 'der Faktor wird nicht gemessen');
+  const [probe] = topLevel(layoutCss, '.nav-bottom__probe');
+  assert.equal(probe && decl(probe.body, 'min-height'), 'var(--nav-height-minimized)', 'der Messfuehler loest nicht die minimierte Hoehe auf');
+});
+
+// R21 S7 (D7 "Mehr-Blatt mit festem Fuss"; Detektor nested-cards 3x mobil):
+// Einstellungen, Hilfe, Neuigkeiten und Abmelden lagen am Ende des scrollenden
+// Koerpers (390x844: y 753-802 unter dem Blattende 764; 375x667 ganz
+// ausserhalb), und die Modullisten standen als weisse Karten mit Schatten auf
+// dem weissen Blatt.
+test('R21 S7: das Mehr-Blatt hat einen festen Fuss und gruppierten Grund', () => {
+  const router = read('../public/router.js');
+  const build = router.slice(router.indexOf('function buildMoreSheetBody('), router.indexOf('async function renderPage('));
+  assert.match(build, /foot\.className = 'more-sheet__foot'/, 'die Systemreihe hat einen eigenen Abschnitt');
+  assert.match(build, /foot\.appendChild\(system\)/, 'die Systemreihe steht im Fuss, nicht im Koerper');
+  assert.match(build, /return \[body, foot\];/, 'der Fuss steht neben dem Koerper, nicht in ihm');
+  const all = rules(layoutCss);
+  const foot = all.find((r) => r.selector.trim() === '.more-sheet__foot');
+  assert.equal(decl(foot?.body ?? '', 'flex-shrink'), '0', 'der Fuss schrumpft nie');
+  const sheet = all.find((r) => r.selector.trim() === '.more-sheet' && !r.at.length);
+  assert.equal(decl(sheet?.body ?? '', 'background-color'), 'var(--color-bg)', 'das Blatt traegt den gruppierten Grund');
+  const list = all.find((r) => r.selector.trim() === '.more-sheet__list');
+  assert.ok(list, 'Regel der Modulliste fehlt');
+  assert.equal(decl(list.body, 'box-shadow'), null, 'keine Karte mit Schatten auf dem Blatt');
 });

@@ -307,9 +307,11 @@ const nbsp = (text) => String(text).replace(/\s/g, ' ');
 test('Registrierung: die Kennzahlreihe kennt die geteilten Ausgaben', async () => {
   const __test = await dashboardTest();
   assert.ok(__test.METRIC_TILE_ORDER.includes('split-expenses'));
-  // Direkt hinter dem Budget: Geld zu Geld, und vor den Opt-in-Modulen, damit
-  // eine offene Forderung nicht hinter einem Punktestand verschwindet.
-  assert.equal(__test.METRIC_TILE_ORDER.indexOf('split-expenses'), __test.METRIC_TILE_ORDER.indexOf('budget') + 1);
+  // Vor den Opt-in-Modulen, damit eine offene Forderung nicht hinter einem
+  // Punktestand verschwindet. Der Saldo, hinter dem sie bis R21 stand, ist aus
+  // der Reihe (D5): direkt hinter den Cockpit-Domaenen.
+  assert.ok(!__test.METRIC_TILE_ORDER.includes('budget'));
+  assert.equal(__test.METRIC_TILE_ORDER.indexOf('split-expenses'), __test.METRIC_TILE_ORDER.indexOf('shopping') + 1);
 });
 
 test('Kachel: Netto als Wert, groesste Position plus Rest als Fussnote, Sprung in die Ausgleichs-Ansicht', async () => {
@@ -331,7 +333,10 @@ test('Kachel: Netto als Wert, groesste Position plus Rest als Fussnote, Sprung i
   assert.equal(tile.route, '/budget?tab=split-expenses&group=7');
 });
 
-test('Kachel: wer schuldet, sieht ein Minus in Rot', async () => {
+// D8 (Critique R21): eine offene Ausgleichs-Schuld ist kein Alarm. Die Kachel
+// trug sie rot ("-196,14 €") - wie ein Konto im Minus. Das Minus sagt die
+// Richtung, die Farbe bleibt Textfarbe (DESIGN.md "Rot ist eine Warnung").
+test('Kachel: wer schuldet, sieht ein Minus in Textfarbe (D8)', async () => {
   const __test = await dashboardTest();
   const tile = splitTile(__test.selectMetricTiles({
     ...BASE_DATA,
@@ -341,7 +346,7 @@ test('Kachel: wer schuldet, sieht ein Minus in Rot', async () => {
     },
   }, 'EUR', new Set()));
   assert.equal(nbsp(tile.value), '-13,00 €');
-  assert.equal(tile.tone, 'balance-negative');
+  assert.equal(tile.tone, 'balance-neutral');
   assert.equal(tile.note, 'dashboard.splitYouOwe{"name":"Alex"}', 'eine einzige Position traegt kein „+0"');
 });
 
@@ -440,7 +445,7 @@ test('Kachel: Wert und Position kommen aus der Waehrung, in der wirklich etwas o
   }, 'EUR', new Set()));
   assert.ok(tile, 'das offene USD-Netto bekommt eine Kachel');
   assert.match(nbsp(tile.value), /-20,00/, `der Wert ist das offene Netto, nicht "0": ${nbsp(tile.value)}`);
-  assert.equal(tile.tone, 'balance-negative');
+  assert.equal(tile.tone, 'balance-neutral');
   assert.match(tile.note, /Cleo/, 'die genannte Position gehoert zur Waehrung des Werts');
   assert.equal(tile.route, '/budget?tab=split-expenses&group=9');
 });

@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Tidak ada yang cocok dengan pencarian dan filtermu.",
         "searchReset": "Atur ulang pencarian",
         "passwordMinLength": "Minimal 8 karakter.",
-        "savedReloadFailed": "Perubahan tersimpan, tetapi tampilan tidak dapat diperbarui. Muat ulang halaman jika ada yang hilang."
+        "savedReloadFailed": "Perubahan tersimpan, tetapi tampilan tidak dapat diperbarui. Muat ulang halaman jika ada yang hilang.",
+        "fieldNumber": "Masukkan angka.",
+        "fieldMin": "Minimal {{min}}.",
+        "fieldMax": "Maksimal {{max}}.",
+        "fieldWholeNumber": "Masukkan bilangan bulat.",
+        "fieldStep": "Masukkan nilai dengan kelipatan {{step}}.",
+        "fieldInvalid": "Periksa isian ini.",
+        "errorCheckRolledBack": "\"{{name}}\" terbuka lagi - centang tidak tersimpan. Coba lagi.",
+        "errorUncheckRolledBack": "\"{{name}}\" tercentang lagi - pembatalan tidak tersimpan. Coba lagi."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -169,7 +177,9 @@
         "goTo": "Buka",
         "newSection": "Buat baru",
         "recentLabel": "Baru dibuka",
-        "createTaskNamed": "Buat “{{title}}” sebagai tugas"
+        "createTaskNamed": "Buat “{{title}}” sebagai tugas",
+        "hintMove": "Pilih",
+        "hintOpen": "Buka"
     },
     "dashboard": {
         "title": "Ringkasan",
@@ -1313,6 +1323,9 @@
         "mvLabelPlaceholder": "Label (mis. kantor)",
         "mvRemove": "Hapus entri",
         "birthdayLabel": "Ulang tahun",
+        "showBirthday": "Tampilkan di ulang tahun",
+        "addToBirthdays": "Tambahkan ke ulang tahun",
+        "addedToBirthdays": "Ditambahkan ke ulang tahun.",
         "birthdayHint": "Juga muncul di kalender lewat impor ulang tahun.",
         "phonePlaceholder": "+62 …",
         "phonePreview": "Pratinjau: {{value}}",
@@ -1392,7 +1405,18 @@
         "errorEmailTooLong": "Alamat email paling banyak {{limit}} karakter.",
         "errorAddressTooLong": "Alamat paling banyak {{limit}} karakter.",
         "errorNotesTooLong": "Catatan paling banyak {{limit}} karakter.",
-        "errorBirthdayInvalid": "Tanggal ulang tahun tidak valid."
+        "errorBirthdayInvalid": "Tanggal ulang tahun tidak valid.",
+        "errorPhoneEntryInvalid": "Salah satu nomor telepon tidak lengkap atau tidak valid.",
+        "errorPhonesTooMany": "Kontak ini memiliki terlalu banyak nomor telepon. Maksimal {{limit}}.",
+        "errorPhoneLabelTooLong": "Label nomor telepon paling banyak {{limit}} karakter.",
+        "errorEmailEntryInvalid": "Salah satu alamat email tidak lengkap atau tidak valid.",
+        "errorEmailInvalid": "Sebuah alamat email tidak valid. Formatnya harus nama@contoh.com.",
+        "errorEmailsTooMany": "Kontak ini memiliki terlalu banyak alamat email. Maksimal {{limit}}.",
+        "errorEmailLabelTooLong": "Label alamat email paling banyak {{limit}} karakter.",
+        "errorAddressEntryInvalid": "Salah satu alamat tidak lengkap atau tidak valid.",
+        "errorAddressesTooMany": "Kontak ini memiliki terlalu banyak alamat. Maksimal {{limit}}.",
+        "errorAddressLabelTooLong": "Label alamat paling banyak {{limit}} karakter.",
+        "errorAddressPartTooLong": "Jalan, kota, wilayah, kode pos, dan negara pada alamat masing-masing paling banyak {{limit}} karakter."
     },
     "budget": {
         "title": "Anggaran",
@@ -1539,7 +1563,6 @@
         "metaLoadError": "Kategori anggaran tidak dapat dimuat.",
         "addCategory": "+ Kategori",
         "addSubcategory": "+ Subkategori",
-        "moreDetails": "Detail lainnya",
         "newCategoryPrompt": "Nama kategori baru:",
         "newSubcategoryPrompt": "Nama subkategori baru:",
         "categoryAddedToast": "Kategori ditambahkan.",
@@ -1624,6 +1647,18 @@
         "loanSavedToast": "Pinjaman disimpan",
         "loanDeletedToast": "Pinjaman dihapus",
         "loanPaymentTitle": "Pelunasan pinjaman: {{borrower}}",
+        "typeTransfer": "Transfer",
+        "transferFromAccount": "Dari rekening",
+        "transferToAccount": "Ke rekening",
+        "transferChooseAccounts": "Pilih dua rekening berbeda.",
+        "transferCurrencyMismatch": "Pilih rekening dengan mata uang yang sama. Penukaran mata uang tidak didukung.",
+        "transferAccountArchived": "Pilih rekening aktif untuk transfer.",
+        "accountHasTransfers": "Rekening ini memiliki transfer. Arsipkan alih-alih menghapusnya.",
+        "transferDeleteSeriesConfirm": "Hapus seluruh seri transfer ini?",
+        "catSaving": "Tabungan",
+        "summaryTransfers": "Transfer",
+        "transferDeleteConfirm": "Hapus kedua sisi transfer ini?",
+        "transferDeleteConfirmDetail": "Kedua catatan terkait dihapus dan saldo kedua akun dihitung ulang. Menghapus seluruh rangkaian juga menghapus semua pengulangannya. Tindakan ini tidak dapat dibatalkan.",
         "typeLoan": "Pinjaman",
         "tabsLabel": "Area anggaran",
         "budgetTab": "Ringkasan",
@@ -1837,6 +1872,7 @@
         "healthCycleSaved": "Pengaturan siklus disimpan.",
         "healthCyclePersonalLabel": "Tampilkan siklus",
         "healthCyclePersonalHint": "Hanya berlaku untuk tampilanmu sendiri. Jika kamu mematikannya, siklus tetap terlihat oleh anggota rumah tangga lainnya.",
+        "healthCycleSettingsHint": "Panjang siklus, kontrasepsi, pengingat, dan mode kehamilan diatur di halaman siklus.",
         "healthCyclePersonalHouseholdOff": "Siklus saat ini dimatikan untuk seluruh rumah tangga, jadi tidak muncul untuk siapa pun.",
         "healthCyclePersonalSaved": "Tampilan siklus disimpan.",
         "pageRewardsModule": "Hadiah",
@@ -2169,7 +2205,7 @@
         "familyRoleGrandparent": "Kakek/Nenek",
         "familyRoleRelative": "Kerabat",
         "familyRoleOther": "Anggota keluarga",
-        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”.",
+        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”. Siklus juga disembunyikan; dapat ditampilkan di pengaturan pribadi anak.",
         "systemAdminLabel": "Administrator sistem",
         "systemAdminHint": "Administrator sistem dapat mengelola pengaturan aplikasi, integrasi, token API, dan akun keluarga.",
         "systemAdminBadge": "Administrator sistem",
@@ -2199,7 +2235,8 @@
         "languageTitle": "Bahasa",
         "dataLanguageLabel": "Bahasa entri tersimpan",
         "dataLanguageHint": "Bahasa yang digunakan Yuvomi saat menyimpan entri yang dibuatnya sendiri, misalnya acara ulang tahun. Berlaku untuk API, umpan kalender, dan sinkronisasi, bukan tampilan di sini.",
-        "dataLanguageAuto": "Otomatis ({{language}})",
+        "dataLanguageAuto": "Otomatis",
+        "hintWithCurrent": "Saat ini: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Hanya administrator yang dapat menetapkan bahasa entri tersimpan.",
         "dataLanguageSaved": "Bahasa entri tersimpan diperbarui",
         "sectionMeals": "Rencana Makan",
@@ -2856,6 +2893,28 @@
         "regionTitle": "Wilayah / Format",
         "regionLabel": "Wilayah",
         "regionHint": "Menetapkan mata uang, format angka, tanggal dan waktu sesuai wilayah (mis. Swiss: 1'234.50). Untuk pengaturan individual, pilih „Kustom”.",
+        "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "Uni Emirat Arab",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahama",
+            "DO": "Republik Dominika",
+            "GB": "Inggris Raya",
+            "HK": "Hong Kong",
+            "KN": "Saint Kitts",
+            "MO": "Makau",
+            "PH": "Filipina",
+            "SA": "Arab Saudi",
+            "TT": "Trinidad & Tobago",
+            "US": "Amerika Serikat",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "Norwegia",
+            "ptBR": "Portugis (Brasil)",
+            "zh": "Tionghoa Sederhana",
+            "zhHant": "Tionghoa Trad."
+        },
         "regionAdminOnly": "Hanya administrator yang dapat mengubah wilayah dan mata uang.",
         "formatsHouseholdHint": "Format tanggal dan waktu berlaku untuk seluruh rumah tangga. Setiap anggota dapat mengubahnya.",
         "regionCustom": "Kustom",
@@ -3081,7 +3140,7 @@
         "timezoneTitle": "Zona waktu",
         "timezoneLabel": "Zona waktu rumah tangga",
         "timezoneHint": "Berlaku di mana pun sebuah waktu tidak membawa zonanya sendiri: pengingat, hitung mundur, hari kalender yang disebut \"hari ini\", umpan kalender yang diekspor, dan acara yang dikirim ke Google atau Outlook.",
-        "timezoneAuto": "Otomatis ({{zone}})",
+        "timezoneAuto": "Otomatis",
         "timezoneAdminOnly": "Hanya administrator yang dapat mengubah zona waktu.",
         "timezoneSaved": "Zona waktu disimpan.",
         "timezoneMismatch": "Browser Anda berada di {{browser}}, rumah tangga menghitung dengan {{household}}.",
@@ -3132,6 +3191,7 @@
         "healthPreventionNotifyCaregiversSaved": "Pengaturan notifikasi disimpan.",
         "healthVisibilityTitle": "Visibilitas bawaan",
         "healthVisibilityHint": "Nilai awal untuk entri baru. Kamu masih bisa mengubahnya di tiap entri.",
+        "healthVisibilityCaregivers": "Siapa pun yang boleh mencatat untuk Anda juga melihat entri pribadi Anda, kecuali buku harian siklus. Admin mengaturnya di anggota.",
         "healthVisibilityOther": "Area lain",
         "healthVisibilityApply": "Ubah juga entri yang ada",
         "healthVisibilityApplyHint": "Tersimpan. Ubah juga entri yang ada di {{area}}?",
@@ -3268,10 +3328,12 @@
         "tasksDefaultVisibilityLabel": "Default visibility",
         "tasksDefaultVisibilityHint": "New tasks open with this visibility. You can still change it each time you create one.",
         "tasksDefaultLockedLabel": "Lock editing by default",
-        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."
+        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one.",
+        "backupDropzoneTitleTouch": "Ketuk untuk memilih file cadangan",
+        "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP"
     },
     "login": {
-        "tagline": "Selamat datang kembali di perencana keluarga Anda.",
+        "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
         "usernameLabel": "Nama pengguna",
         "passwordLabel": "Kata sandi",
         "loginButton": "Masuk",
@@ -3340,7 +3402,6 @@
         "unsavedChanges": "Buang perubahan?",
         "unsavedChangesDetail": "Isian kamu di formulir ini akan hilang.",
         "discardChanges": "Buang",
-        "moreSettings": "Pengaturan lain",
         "moreDetails": "Detail lainnya"
     },
     "rrule": {
@@ -3445,6 +3506,7 @@
         "editTitle": "Ubah ulang tahun",
         "nameLabel": "Nama",
         "birthDateLabel": "Tanggal lahir",
+        "showContact": "Tampilkan kontak",
         "nameDay": "Hari nama",
         "celebratesNameDay": "merayakan hari nama",
         "nameDayLabel": "Hari nama (opsional)",
@@ -3562,7 +3624,7 @@
     },
     "onboarding": {
         "step1Title": "Selamat datang di {{name}}",
-        "step1Body": "Perencana keluarga pribadi Anda. Tugas, kalender, belanja, dan lainnya - semua di satu tempat.",
+        "step1Body": "Tugas, kalender, belanja, dan lainnya untuk rumah tangga Anda - entah Anda tinggal sendiri, berdua, atau bersama keluarga. Semua di satu tempat.",
         "step2Title": "Navigasi & Modul",
         "step2Body": "Bilah di bawah membawa Anda langsung ke area terpenting. Semua modul lainnya ada di bawah “Lainnya”.",
         "step3Title": "Mulai dengan cepat",
@@ -3912,7 +3974,10 @@
         "errorDmsAccountGone": "Akun DMS ini sudah tidak ada.",
         "errorDmsDocumentGone": "Dokumen ini sudah tidak ada di DMS.",
         "errorDmsAlreadyLinked": "Dokumen DMS ini sudah ditautkan.",
-        "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS."
+        "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS.",
+        "dropzoneTitleTouch": "Ketuk untuk memilih file",
+        "viewerPrevNamed": "Dokumen sebelumnya: {{name}}",
+        "viewerNextNamed": "Dokumen berikutnya: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",
@@ -4102,7 +4167,8 @@
         "errorVisitGone": "Kunjungan ini sudah tidak ada.",
         "errorTaskGone": "Tugas ini sudah tidak ada.",
         "errorAlreadyCheckedOut": "Asisten rumah tangga ini sudah check-out.",
-        "errorAlreadyCheckedIn": "Asisten rumah tangga ini sudah check-in."
+        "errorAlreadyCheckedIn": "Asisten rumah tangga ini sudah check-in.",
+        "allVisitsInReport": "Semua kunjungan di laporan"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
@@ -4319,7 +4385,7 @@
         "mobileSearch": "Pencarian dibuka lewat kaca pembesar di ringkasan atau melalui „Lainnya\".",
         "mobileSettings": "Pengaturan dapat ditemukan di „Lainnya\".",
         "guideLink": "Panduan pengguna",
-        "guideHint": "Dikelola komunitas, di repositori sendiri - bisa tertinggal dari sebuah rilis."
+        "guideHint": "Dikelola oleh komunitas. Terbuka di tab baru."
     },
     "changelog": {
         "title": "Catatan perubahan",
@@ -4360,8 +4426,9 @@
         "success": "Kata sandi Anda telah diubah. Anda sekarang dapat masuk.",
         "mismatch": "Kata sandi tidak cocok.",
         "tooShort": "Kata sandi harus minimal 8 karakter.",
-        "invalidToken": "Tautan ini tidak valid atau telah kedaluwarsa.",
-        "missingToken": "Tidak ada token yang valid ditemukan."
+        "invalidToken": "Tautan atur ulang ini tidak valid atau sudah kedaluwarsa - minta yang baru.",
+        "missingToken": "Tautan atur ulang ini tidak lengkap - minta yang baru.",
+        "requestNew": "Minta tautan baru"
     },
     "email": {
         "host": "Host SMTP",
@@ -4770,6 +4837,12 @@
             "reminders": {
                 "title": "Pengingat berikutnya",
                 "empty": "Tidak ada minum obat lagi hari ini"
+            },
+            "brief": {
+                "changes": "Sejak pengukuran terakhir: {{list}}.",
+                "latest": "Terakhir dicatat: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} tidak berubah"
             }
         },
         "vitals": {
@@ -5177,7 +5250,7 @@
             "emptyDesc": "Catat menstruasi pertamamu untuk melihat prediksi, kalender, dan statistik.",
             "emptyCta": "Catat menstruasi pertama",
             "personsLabel": "Person",
-            "add": "Catat menstruasi",
+            "add": "Tambahkan menstruasi sebelumnya",
             "loadError": "Data siklus gagal dimuat.",
             "loadErrorDesc": "Silakan coba lagi nanti.",
             "retry": "Coba lagi",
@@ -5387,15 +5460,14 @@
                 "family": "Keluarga"
             },
             "period": {
-                "add": "Catat menstruasi",
+                "add": "Tambahkan menstruasi sebelumnya",
                 "edit": "Edit menstruasi",
                 "warningFuture": "Tanggal mulai berada di masa depan - prediksi hanya didasarkan pada siklus sebelumnya.",
                 "warningOverlap": "Tumpang tindih dengan siklus yang sudah tercatat."
             },
             "dayLog": {
                 "title": "Catat hari",
-                "date": "Tanggal",
-                "more": "Detail lainnya"
+                "date": "Tanggal"
             },
             "export": {
                 "csv": "Ekspor sebagai CSV"
@@ -5413,8 +5485,9 @@
                 "cycleLength": "Panjang siklus rata-rata",
                 "periodLength": "Lama menstruasi rata-rata",
                 "lutealLength": "Panjang fase luteal",
+                "daysUnit": "Hari",
                 "trackFertility": "Tampilkan masa subur",
-                "autoHint": "Kosongkan = dihitung otomatis dari riwayatmu.",
+                "autoHint": "Jika salah satu dari kedua kolom dibiarkan kosong, Yuvomi menghitung nilainya dari menstruasi yang Anda catat.",
                 "remindPeriodDaysBefore": "Pengingat menstruasi",
                 "remindOff": "Nonaktif",
                 "remindSameDay": "Pada hari-H",
@@ -5514,7 +5587,9 @@
                 "emptyError": "Pilih file CSV atau tempel teks.",
                 "error": "Impor gagal."
             },
-            "discoveryHint": "Tips: berlangganan siklus yang diprediksi sebagai feed ICS di <a href=\"/settings/modules/calendar?section=personal-feeds\">Pengaturan → Modul → Kalender</a>, atau tampilkan widget siklus di <a href=\"/\">Ringkasan</a> melalui mode kustomisasi."
+            "feedLink": "Berlangganan siklus yang diperkirakan di kalender",
+            "widgetHint": "Tambahkan petak siklus ke {{overview}} lewat “{{customize}}”.",
+            "endBeforeStart": "Akhir tidak boleh sebelum awal."
         },
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",
@@ -5523,6 +5598,7 @@
             "unitH": "j"
         },
         "careBanner": "Kamu mencatat untuk {{name}}.",
+        "whoSees": "Siapa yang bisa melihat ini?",
         "nutrition": {
             "title": "Gizi",
             "emptyTitle": "Belum ada catatan gizi",
@@ -5665,6 +5741,7 @@
         "weekdaySat": "Sab",
         "weekdaySun": "Min",
         "intervalLabelWeekly": "Setiap N minggu",
+        "intervalLabelMonthly": "Setiap N bulan",
         "anchorDateLabel": "Pengambilan pertama",
         "monthDayLabel": "Tanggal dalam bulan",
         "monthDayLastDay": "Hari terakhir bulan",
@@ -6252,8 +6329,8 @@
         "success": "Akun Anda telah dibuat. Sekarang Anda dapat masuk.",
         "mismatch": "Kata sandi tidak cocok.",
         "tooShort": "Kata sandi harus minimal 8 karakter.",
-        "invalidToken": "Undangan ini tidak valid, kedaluwarsa, atau sudah dipakai.",
-        "missingToken": "Token yang valid tidak ditemukan.",
+        "invalidToken": "Undangan ini tidak valid, kedaluwarsa, atau sudah dipakai - minta tautan baru.",
+        "missingToken": "Tautan undangan ini tidak valid atau sudah kedaluwarsa - minta yang baru.",
         "usernameRequired": "Pilih nama pengguna.",
         "usernameInvalid": "Nama pengguna harus 3 sampai 64 karakter dan hanya boleh berisi huruf, angka, titik, tanda hubung, dan garis bawah.",
         "usernameTaken": "Nama pengguna ini sudah dipakai.",
@@ -6467,9 +6544,8 @@
         "templateWork": "Kerja",
         "templateSchool": "Sekolah",
         "templateUniversity": "Universitas",
-        "overview": "Perbandingan",
+        "overview": "Ringkasan",
         "overviewPeopleLabel": "Bandingkan orang",
-        "overviewClearSelection": "Hapus pilihan",
         "continuesUntil": "…berlanjut hingga {{time}}",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
         "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan.",
@@ -6501,6 +6577,7 @@
         "labelLabel": "Nama perangkat ini (opsional)",
         "labelHint": "Membantu mengenali nanti perangkat mana yang dimaksud.",
         "submit": "Pasangkan",
-        "failed": "Kode pemasangan ini tidak berlaku."
+        "failed": "Kode pemasangan ini tidak berlaku.",
+        "codeRequired": "Masukkan kode pemasangan yang ditampilkan di Pengaturan."
     }
 }

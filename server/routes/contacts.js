@@ -10,8 +10,10 @@ import * as db from '../db.js';
 import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
+import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown } from '../services/birthdays.js';
+import { mayReadModule } from '../permissions.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -197,24 +199,60 @@ function loadMultiValueFields(contactId) {
 }
 
 /**
+ * Die Mehrfachfelder (phones, emails, addresses) benennen jede Absage als Fall
+ * (#1909), wie die Einzelfelder (limitedStr): `case` traegt Grund und, wo es
+ * eine Grenze gibt, die Zahl. Die Antwort reicht ihn als `reason` und
+ * `params.limit` neben dem unveraenderten `error` weiter. Gemeint ist vor allem
+ * das Kontaktformular: es schickt jede Telefonnummer und Adresse als Eintrag,
+ * und eine E-Mail-Adresse ohne @ oder eine zu lange Nummer bekam bis dahin nur
+ * den allgemeinen Satz. Der ERSTE Eintrag, der scheitert, wird
+ * benannt; die Felder nacheinander (phones, emails, addresses), alle erst nach
+ * den Einzelfeldern.
+ *
+ * Was nur ein API-Client falsch schicken kann (keine Liste, kein Objekt, ohne
+ * Bezeichnung oder Wert, kein Text, `isPrimary` kein Boolean), ist EIN Fall je
+ * Feld (`*_entry_invalid`): der Satz dazu sagt "unvollstaendig oder ungueltig",
+ * und das stimmt fuer jede dieser Absagen. Zu lang, zu viele und die E-Mail
+ * ohne gueltige Form haben je einen eigenen Satz, weil der Nutzer daran
+ * etwas aendern kann.
+ */
+const MV_MAX_ENTRIES = 20;
+const MV_MAX_LABEL = 50;
+// Dieselbe Grenze wie das Einzelfeld `phone`: das Formular schickt die erste
+// Nummer in beiden, und zwei Grenzen nannten nacheinander zwei Zahlen.
+const MV_MAX_PHONE = CONTACT_PHONE_MAX_LENGTH;
+const MV_MAX_EMAIL = 255;
+const MV_MAX_ADDRESS_PART = 255;
+
+/** Eine Absage eines Mehrfachfelds mit ihrem Fall (`params.limit` nur, wo der Satz eine Grenze nennt). */
+function refuse(error, refusal) {
+  return { valid: false, error, case: refusal };
+}
+
+/**
  * Validates phones array for multi-value contact fields.
  * @param {Array} phones - Array of { label, value, isPrimary? }
- * @returns {{ valid: boolean, error?: string }}
+ * @returns {{ valid: boolean, error?: string, case?: { reason: string, params?: { limit: number } } }}
  */
 function validatePhones(phones) {
-  if (!Array.isArray(phones)) return { valid: false, error: 'Phones must be an array' };
-  if (phones.length > 20) return { valid: false, error: 'Too many phone entries (max 20)' };
+  const invalid = (error) => refuse(error, { reason: 'contacts_phone_entry_invalid' });
+  if (!Array.isArray(phones)) return invalid('Phones must be an array');
+  if (phones.length > MV_MAX_ENTRIES) {
+    return refuse(`Too many phone entries (max ${MV_MAX_ENTRIES})`, { reason: 'contacts_phones_too_many', params: { limit: MV_MAX_ENTRIES } });
+  }
   for (const p of phones) {
-    if (!p || typeof p !== 'object') return { valid: false, error: 'Phone entry must be an object' };
-    if (!p.label || !p.value) return { valid: false, error: 'Phone requires label and value' };
-    if (typeof p.label !== 'string' || p.label.trim().length === 0 || p.label.length > 50) {
-      return { valid: false, error: 'Phone label invalid or too long' };
+    if (!p || typeof p !== 'object') return invalid('Phone entry must be an object');
+    if (!p.label || !p.value) return invalid('Phone requires label and value');
+    if (typeof p.label !== 'string' || p.label.trim().length === 0) return invalid('Phone label invalid or too long');
+    if (p.label.length > MV_MAX_LABEL) {
+      return refuse('Phone label invalid or too long', { reason: 'contacts_phone_label_too_long', params: { limit: MV_MAX_LABEL } });
     }
-    if (typeof p.value !== 'string' || p.value.trim().length === 0 || p.value.length > 50) {
-      return { valid: false, error: 'Phone value invalid or too long' };
+    if (typeof p.value !== 'string' || p.value.trim().length === 0) return invalid('Phone value invalid or too long');
+    if (p.value.length > MV_MAX_PHONE) {
+      return refuse('Phone value invalid or too long', { reason: 'contacts_phone_too_long', params: { limit: MV_MAX_PHONE } });
     }
     if (p.isPrimary !== undefined && typeof p.isPrimary !== 'boolean') {
-      return { valid: false, error: 'Phone isPrimary must be boolean' };
+      return invalid('Phone isPrimary must be boolean');
     }
   }
   return { valid: true };
@@ -223,61 +261,65 @@ function validatePhones(phones) {
 /**
  * Validates emails array for multi-value contact fields.
  * @param {Array} emails - Array of { label, value, isPrimary? }
- * @returns {{ valid: boolean, error?: string }}
+ * @returns {{ valid: boolean, error?: string, case?: { reason: string, params?: { limit: number } } }}
  */
 function validateEmails(emails) {
-  if (!Array.isArray(emails)) return { valid: false, error: 'Emails must be an array' };
-  if (emails.length > 20) return { valid: false, error: 'Too many email entries (max 20)' };
+  const invalid = (error) => refuse(error, { reason: 'contacts_email_entry_invalid' });
+  if (!Array.isArray(emails)) return invalid('Emails must be an array');
+  if (emails.length > MV_MAX_ENTRIES) {
+    return refuse(`Too many email entries (max ${MV_MAX_ENTRIES})`, { reason: 'contacts_emails_too_many', params: { limit: MV_MAX_ENTRIES } });
+  }
   for (const e of emails) {
-    if (!e || typeof e !== 'object') return { valid: false, error: 'Email entry must be an object' };
-    if (!e.label || !e.value) return { valid: false, error: 'Email requires label and value' };
-    if (typeof e.label !== 'string' || e.label.trim().length === 0 || e.label.length > 50) {
-      return { valid: false, error: 'Email label invalid or too long' };
+    if (!e || typeof e !== 'object') return invalid('Email entry must be an object');
+    if (!e.label || !e.value) return invalid('Email requires label and value');
+    if (typeof e.label !== 'string' || e.label.trim().length === 0) return invalid('Email label invalid or too long');
+    if (e.label.length > MV_MAX_LABEL) {
+      return refuse('Email label invalid or too long', { reason: 'contacts_email_label_too_long', params: { limit: MV_MAX_LABEL } });
     }
-    if (typeof e.value !== 'string' || e.value.trim().length === 0 || e.value.length > 255) {
-      return { valid: false, error: 'Email value invalid or too long' };
+    if (typeof e.value !== 'string' || e.value.trim().length === 0) return invalid('Email value invalid or too long');
+    if (e.value.length > MV_MAX_EMAIL) {
+      return refuse('Email value invalid or too long', { reason: 'contacts_email_too_long', params: { limit: MV_MAX_EMAIL } });
     }
     if (!/^.+@.+$/.test(e.value)) {
-      return { valid: false, error: 'Email value must be a valid email address' };
+      return refuse('Email value must be a valid email address', { reason: 'contacts_email_invalid' });
     }
     if (e.isPrimary !== undefined && typeof e.isPrimary !== 'boolean') {
-      return { valid: false, error: 'Email isPrimary must be boolean' };
+      return invalid('Email isPrimary must be boolean');
     }
   }
   return { valid: true };
 }
 
+/** Die Teile einer Adresse, die je hoechstens MV_MAX_ADDRESS_PART Zeichen tragen. */
+const ADDRESS_PARTS = ['street', 'city', 'state', 'postalCode', 'country'];
+
 /**
  * Validates addresses array for multi-value contact fields.
  * @param {Array} addresses - Array of { label, street?, city?, state?, postalCode?, country?, isPrimary? }
- * @returns {{ valid: boolean, error?: string }}
+ * @returns {{ valid: boolean, error?: string, case?: { reason: string, params?: { limit: number } } }}
  */
 function validateAddresses(addresses) {
-  if (!Array.isArray(addresses)) return { valid: false, error: 'Addresses must be an array' };
-  if (addresses.length > 20) return { valid: false, error: 'Too many address entries (max 20)' };
+  const invalid = (error) => refuse(error, { reason: 'contacts_address_entry_invalid' });
+  if (!Array.isArray(addresses)) return invalid('Addresses must be an array');
+  if (addresses.length > MV_MAX_ENTRIES) {
+    return refuse(`Too many address entries (max ${MV_MAX_ENTRIES})`, { reason: 'contacts_addresses_too_many', params: { limit: MV_MAX_ENTRIES } });
+  }
   for (const a of addresses) {
-    if (!a || typeof a !== 'object') return { valid: false, error: 'Address entry must be an object' };
-    if (!a.label) return { valid: false, error: 'Address requires label' };
-    if (typeof a.label !== 'string' || a.label.trim().length === 0 || a.label.length > 50) {
-      return { valid: false, error: 'Address label invalid or too long' };
+    if (!a || typeof a !== 'object') return invalid('Address entry must be an object');
+    if (!a.label) return invalid('Address requires label');
+    if (typeof a.label !== 'string' || a.label.trim().length === 0) return invalid('Address label invalid or too long');
+    if (a.label.length > MV_MAX_LABEL) {
+      return refuse('Address label invalid or too long', { reason: 'contacts_address_label_too_long', params: { limit: MV_MAX_LABEL } });
     }
-    if (a.street !== undefined && (typeof a.street !== 'string' || a.street.length > 255)) {
-      return { valid: false, error: 'Address street invalid or too long' };
-    }
-    if (a.city !== undefined && (typeof a.city !== 'string' || a.city.length > 255)) {
-      return { valid: false, error: 'Address city invalid or too long' };
-    }
-    if (a.state !== undefined && (typeof a.state !== 'string' || a.state.length > 255)) {
-      return { valid: false, error: 'Address state invalid or too long' };
-    }
-    if (a.postalCode !== undefined && (typeof a.postalCode !== 'string' || a.postalCode.length > 255)) {
-      return { valid: false, error: 'Address postalCode invalid or too long' };
-    }
-    if (a.country !== undefined && (typeof a.country !== 'string' || a.country.length > 255)) {
-      return { valid: false, error: 'Address country invalid or too long' };
+    for (const part of ADDRESS_PARTS) {
+      if (a[part] === undefined) continue;
+      if (typeof a[part] !== 'string') return invalid(`Address ${part} invalid or too long`);
+      if (a[part].length > MV_MAX_ADDRESS_PART) {
+        return refuse(`Address ${part} invalid or too long`, { reason: 'contacts_address_part_too_long', params: { limit: MV_MAX_ADDRESS_PART } });
+      }
     }
     if (a.isPrimary !== undefined && typeof a.isPrimary !== 'boolean') {
-      return { valid: false, error: 'Address isPrimary must be boolean' };
+      return invalid('Address isPrimary must be boolean');
     }
   }
   return { valid: true };
@@ -423,9 +465,26 @@ const CONTACT_SELECT = `
   SELECT contacts.*,
          u.display_name  AS family_display_name,
          u.avatar_color  AS family_avatar_color,
-         u.avatar_data   AS family_avatar_data
+         u.avatar_data   AS family_avatar_data,
+         (SELECT b.id FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_id
     FROM contacts
     LEFT JOIN users u ON u.id = contacts.family_user_id`;
+
+/**
+ * DER WEG ZUM GEBURTSTAG (Critique R21, D7). `birthday_id` ist der Eintrag im
+ * Geburtstagsmodul, den der Import aus diesem Kontakt angelegt hat
+ * (Migration 90, `birthdays.contact_id`, eindeutig je Kontakt). Die
+ * Kontaktseite fuehrt damit einen Link "In Geburtstagen anzeigen".
+ *
+ * Geburtstage gehoeren dem Modul `calendar` (server/permissions.js) - eine
+ * Mischstelle wie der Import in die Gegenrichtung (routes/birthdays.js,
+ * `contactsHidden`). Wer den Kalender nicht lesen darf, bekommt keine id:
+ * sie verriete sonst, wer im Geburtstagsmodul steht.
+ */
+function withBirthdayLink(req, contact) {
+  if (!contact || mayReadModule(req, 'calendar')) return contact;
+  return { ...contact, birthday_id: null };
+}
 
 /**
  * GET /api/v1/contacts
@@ -456,7 +515,7 @@ router.get('/', (req, res) => {
     // `category` sonst mehrdeutig.
     sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
 
-    const contacts = db.get().prepare(sql).all(...params);
+    const contacts = db.get().prepare(sql).all(...params).map((c) => withBirthdayLink(req, c));
     res.json({ data: contacts });
   } catch (err) {
     log.error('', err);
@@ -476,7 +535,7 @@ router.post('/', (req, res) => {
     const nameParts = readNameParts(req.body);
     const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
     const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'Category');
-    const vPhone   = limitedStr(req.body.phone,   'Telefon', MAX_SHORT, { reason: 'contacts_phone_too_long' });
+    const vPhone   = limitedStr(req.body.phone,   'Telefon', CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' });
     const vEmail   = limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' });
     const vAddress = limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' });
     const vNotes   = limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' });
@@ -495,21 +554,21 @@ router.post('/', (req, res) => {
     if (req.body.phones !== undefined) {
       const phonesValidation = validatePhones(req.body.phones);
       if (!phonesValidation.valid) {
-        return res.status(400).json({ error: phonesValidation.error, code: 400 });
+        return res.status(400).json({ error: phonesValidation.error, code: 400, ...phonesValidation.case });
       }
     }
 
     if (req.body.emails !== undefined) {
       const emailsValidation = validateEmails(req.body.emails);
       if (!emailsValidation.valid) {
-        return res.status(400).json({ error: emailsValidation.error, code: 400 });
+        return res.status(400).json({ error: emailsValidation.error, code: 400, ...emailsValidation.case });
       }
     }
 
     if (req.body.addresses !== undefined) {
       const addressesValidation = validateAddresses(req.body.addresses);
       if (!addressesValidation.valid) {
-        return res.status(400).json({ error: addressesValidation.error, code: 400 });
+        return res.status(400).json({ error: addressesValidation.error, code: 400, ...addressesValidation.case });
       }
     }
 
@@ -614,7 +673,7 @@ router.put('/:id', (req, res) => {
     if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
     const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'Category') : null;
     if (vCat) checks.push(vCat);
-    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'Telefon', MAX_SHORT, { reason: 'contacts_phone_too_long' }));
+    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'Telefon', CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' }));
     if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' }));
     if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
     if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
@@ -641,21 +700,21 @@ router.put('/:id', (req, res) => {
     if (req.body.phones !== undefined) {
       const phonesValidation = validatePhones(req.body.phones);
       if (!phonesValidation.valid) {
-        return res.status(400).json({ error: phonesValidation.error, code: 400 });
+        return res.status(400).json({ error: phonesValidation.error, code: 400, ...phonesValidation.case });
       }
     }
 
     if (req.body.emails !== undefined) {
       const emailsValidation = validateEmails(req.body.emails);
       if (!emailsValidation.valid) {
-        return res.status(400).json({ error: emailsValidation.error, code: 400 });
+        return res.status(400).json({ error: emailsValidation.error, code: 400, ...emailsValidation.case });
       }
     }
 
     if (req.body.addresses !== undefined) {
       const addressesValidation = validateAddresses(req.body.addresses);
       if (!addressesValidation.valid) {
-        return res.status(400).json({ error: addressesValidation.error, code: 400 });
+        return res.status(400).json({ error: addressesValidation.error, code: 400, ...addressesValidation.case });
       }
     }
 
@@ -796,7 +855,7 @@ router.put('/:id', (req, res) => {
 
     res.json({
       data: {
-        ...updated,
+        ...withBirthdayLink(req, updated),
         ...multiValueFields
       }
     });
@@ -866,7 +925,7 @@ router.get('/:id', (req, res) => {
 
     res.json({
       data: {
-        ...contact,
+        ...withBirthdayLink(req, contact),
         ...multiValueFields
       }
     });

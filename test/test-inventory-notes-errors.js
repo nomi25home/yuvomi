@@ -267,6 +267,12 @@ const SERVER_REASONS = [
   // misst test:contacts-routes.
   'contacts_name_too_long', 'contacts_phone_too_long', 'contacts_email_too_long',
   'contacts_address_too_long', 'contacts_notes_too_long', 'contacts_birthday_invalid',
+  // Die Mehrfachfelder des Formulars (#1909); die echte Antwort misst
+  // test:contacts-routes je Fall.
+  'contacts_phone_entry_invalid', 'contacts_phones_too_many', 'contacts_phone_label_too_long',
+  'contacts_email_entry_invalid', 'contacts_email_invalid', 'contacts_emails_too_many', 'contacts_email_label_too_long',
+  'contacts_address_entry_invalid', 'contacts_addresses_too_many', 'contacts_address_label_too_long',
+  'contacts_address_part_too_long',
 ];
 
 test('jeder Grund dieser Module hat einen Satz, und jeder "gibt es nicht mehr" ist als solcher bekannt', () => {
@@ -681,6 +687,62 @@ test('Kontakte: speichern - ein verschwundener Kontakt schliesst das Formular un
       assert.deepEqual(contacts.state.contacts.map((c) => c.id), gone ? [6] : [5, 6], `${label}: Stand`);
     });
   }
+});
+
+// #1909: das Formular schickt jede Nummer und E-Mail-Adresse als Eintrag
+// (phones, emails). Eine Adresse ohne @ oder eine zu lange Nummer
+// sagte bis dahin den allgemeinen Satz. Die Absage kommt hier vom ECHTEN
+// Server, der Satz aus der echten Zuordnung - beide Enden in einem Lauf.
+test('Kontakte: speichern - ein abgewiesener Eintrag der Mehrfachfelder sagt seinen Satz, nie den Text des Servers', async () => {
+  const many = (n, make) => Array.from({ length: n }, (_, i) => make(i));
+  for (const [body, expected] of [
+    [{ emails: [{ label: 'other', value: 'ada.example.org' }] }, 'contacts.errorEmailInvalid'],
+    [{ phones: [{ label: 'other', value: '1'.repeat(101) }] }, `contacts.errorPhoneTooLong${JSON.stringify({ limit: 100 })}`],
+    [{ phones: many(21, (i) => ({ label: 'other', value: `0${i}` })) }, `contacts.errorPhonesTooMany${JSON.stringify({ limit: 20 })}`],
+    [{ phones: [{ label: 'other', value: '0800', isPrimary: 'ja' }] }, 'contacts.errorPhoneEntryInvalid'],
+    [{ emails: [{ label: 'L'.repeat(51), value: 'a@x.de' }] }, `contacts.errorEmailLabelTooLong${JSON.stringify({ limit: 50 })}`],
+    [{ addresses: [{ label: 'home', city: 'C'.repeat(256) }] }, `contacts.errorAddressPartTooLong${JSON.stringify({ limit: 255 })}`],
+  ]) {
+    const answer = await call('POST', '/contacts', { name: 'Ada', ...body });
+    assert.equal(answer.status, 400, JSON.stringify(answer.body));
+    const err = Object.assign(new Error(answer.body.error), { name: 'ApiError', status: answer.status, data: answer.body });
+    await mitKontakten(async () => {
+      const panel = formular({ '#cm-first-name': 'Ada', '#cm-last-name': 'Lovelace' });
+      const { closed } = await mit({ post: async () => { throw err; } }, async () => {
+        contacts.buildContactForm({ mode: 'create' }).wire(panel);
+        await panel.querySelector('#cm-save').handlers.click();
+      });
+      const label = answer.body.reason;
+      assert.deepEqual(toasts, [[expected, 'danger']], label);
+      assert.ok(!String(toasts[0][0]).includes(answer.body.error), `${label}: der englische Text des Servers im Toast`);
+      assert.equal(closed.length, 0, `${label}: das Formular bleibt offen`);
+    });
+  }
+});
+
+// #1909: das Formular schickt die erste Nummer als `phone` UND als ersten
+// Eintrag von `phones`. Das Einzelfeld liess 100 Zeichen zu, die Liste 50: 101
+// Zeichen hiessen "hoechstens 100", nach dem Kuerzen auf 60 "hoechstens 50".
+// Hier liest der Test die Grenze aus dem ECHTEN Formular (`maxlength` der
+// Telefonzeile) und schickt sie, wie das Formular sie schickt, an den ECHTEN
+// Server: genau so lang geht durch, ein Zeichen mehr nennt dieselbe Zahl.
+test('Kontakte: die Telefonzeile des Formulars laesst genau so viele Zeichen zu, wie der Server fuer Einzelfeld und Liste annimmt', async () => {
+  const content = contacts.buildContactForm({ mode: 'create' }).content;
+  const tel = content.match(/<input type="tel"[^>]*>/)?.[0];
+  assert.ok(tel, 'die Telefonzeile steht im Formular');
+  const max = Number(tel.match(/\smaxlength="(\d+)"/)?.[1]);
+  assert.ok(Number.isInteger(max) && max > 0, `maxlength der Telefonzeile: ${tel}`);
+  const formBody = (value) => ({ phone: value, phones: [{ label: 'other', value, isPrimary: true }] });
+  const ok = await call('POST', '/contacts', { name: 'Ada', ...formBody('1'.repeat(max)) });
+  assert.equal(ok.status, 201, `${max} Zeichen: ${JSON.stringify(ok.body)}`);
+  const tooLong = await call('POST', '/contacts', { name: 'Ada', ...formBody('1'.repeat(max + 1)) });
+  assert.equal(tooLong.status, 400, JSON.stringify(tooLong.body));
+  assert.equal(tooLong.body.reason, 'contacts_phone_too_long');
+  assert.deepEqual(tooLong.body.params, { limit: max }, 'der Server nennt die Zahl des Formulars');
+  // Die Liste allein (ohne Einzelfeld davor) hat dieselbe Grenze.
+  const listOnly = await call('POST', '/contacts', { name: 'Ada', phones: [{ label: 'other', value: '1'.repeat(max + 1) }] });
+  assert.equal(listOnly.body.reason, 'contacts_phone_too_long');
+  assert.deepEqual(listOnly.body.params, { limit: max }, 'die Liste nennt dieselbe Zahl');
 });
 
 test('Geburtstage: speichern - ein verschwundener Geburtstag schliesst das Formular und faellt aus der Liste', async () => {

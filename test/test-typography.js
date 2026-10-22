@@ -1012,3 +1012,269 @@ test('R19 Gesundheit: keine Schrift unter Caption 2, eine Flag-Sprache, ein Diag
   assert.match(body('.health-lab-badge--warn'), /color:\s*var\(--color-warning-ink\)/);
   assert.doesNotMatch(css, /fasting-week__[a-z]+[^{]*\{[^}]*chart-series/, 'die Fastenwoche laeuft auf fremden Serienfarben');
 });
+
+// R21 (Critique 2026-10-21, D4): DIE METAZEILE IST EINE ROLLE - Footnote 13.
+// Gemessen stand dieselbe Stelle in drei Groessen: Aufgaben 12 (`.due-date`,
+// `.priority-badge`), Budget/Inventar/Kontakte/Agenda 14 (`.list-row__meta`,
+// `.contact-item__meta`, `.agenda-event__meta`), das Dashboard 12 neben seiner
+// eigenen 13er Cockpitzeile. Die Rolle steht in typography.css; ein Modulblatt
+// traegt Farbe und Layout, keine Groesse.
+//
+// Der Guard prueft das SUBJEKT, nicht eine Liste: jede Klasse, die als BEM-
+// Element `__meta` (oder als Block `-meta`) heisst - im Stylesheet ODER im
+// Markup -, ist in der Rolle registriert oder steht als benannte Ausnahme mit
+// Grund darunter. Eine neue Metazeile, die niemand registriert, erbt sonst die
+// Groesse ihres Traegers und faellt hier auf statt in der naechsten Critique.
+test('R21: die Metazeile ist eine Rolle - Footnote 13, kein Modul setzt eine eigene Groesse', () => {
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+  const rolle = typo.find((rule) => !rule.at.length && sels(rule).includes('.list-row__meta'));
+  assert.ok(rolle, 'typography.css registriert die Metazeile (`.list-row__meta`)');
+  assert.match(rolle.body, /font-size:\s*var\(--type-caption\)/, 'die Metazeile ist Footnote 13 (--type-caption)');
+  assert.match(rolle.body, /font-weight:\s*var\(--font-weight-regular\)/);
+  const registriert = sels(rolle);
+  const klassen = new Set(registriert.filter((s) => /^\.[\w-]+$/.test(s)).map((s) => s.slice(1)));
+
+  // Benannte Ausnahmen - jede mit dem Grund, warum sie KEINE Metazeile ist.
+  const AUSNAHMEN = new Map([
+    ['u-meta', 'die Subheadline-Utility (15) fuer Sekundaertext; der Name ist aelter als die Rollen'],
+    ['day-event__meta', 'Mikrotext im Zeitraster: die Zeile lebt in einem Terminblock, dessen Hoehe die Dauer ist'],
+  ]);
+
+  const META = /(?<![\w-])([a-z][a-z0-9_-]*(?:__|-)meta)(?![\w-])/g;
+  const gefunden = new Map();
+  const merke = (cls, wo) => { if (!gefunden.has(cls)) gefunden.set(cls, wo); };
+  for (const name of cssFiles) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      for (const m of rule.selector.matchAll(META)) merke(m[1], name);
+    }
+  }
+  const PUBLIC = new URL('../', STYLES_DIR);
+  const jsFiles = (dir) => readdirSync(new URL(dir, PUBLIC), { withFileTypes: true }).flatMap((e) => {
+    if (e.isDirectory()) return e.name === 'vendor' ? [] : jsFiles(`${dir}${e.name}/`);
+    return e.name.endsWith('.js') ? [`${dir}${e.name}`] : [];
+  });
+  for (const file of jsFiles('')) {
+    const src = readFileSync(new URL(file, PUBLIC), 'utf8');
+    for (const m of src.matchAll(/class(?:Name)?\s*[=:]\s*["'`]([^"'`]*)["'`]/g)) {
+      for (const k of m[1].matchAll(META)) merke(k[1], file);
+    }
+  }
+  assert.ok(gefunden.size >= 40, `nur ${gefunden.size} Meta-Klassen gefunden - liest der Guard noch?`);
+  const offen = [...gefunden].filter(([cls]) => !klassen.has(cls) && !AUSNAHMEN.has(cls)).map(([cls, wo]) => `.${cls} (${wo})`);
+  assert.deepStrictEqual(offen, [], 'Metazeilen ohne Rolle - in typography.css registrieren oder als Ausnahme begruenden');
+
+  // Kein Blatt ausser typography.css setzt am Subjekt einer Metazeile eine
+  // Groesse - auch nicht in einer Media- oder Container-Query. Ein Chip IN der
+  // Zeile (`.x__meta .chip`) ist ein anderes Subjekt und darf Caption 1 tragen.
+  const subjekt = (sel) => sel.split(/\s*[\s>+~]\s*/).pop();
+  const trifft = (sel) => registriert.some((r) => {
+    if (r.includes(' ')) return sel.replace(/\s+/g, ' ') === r;
+    return new RegExp(`${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(subjekt(sel));
+  });
+  const dialekt = [];
+  for (const name of cssFiles.filter((n) => n !== 'typography.css')) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      const fs = rule.body.match(/font-size:\s*([^;]+)/);
+      if (!fs || ['inherit', 'unset', 'revert'].includes(fs[1].trim())) continue;
+      const hit = sels(rule).filter(trifft);
+      if (hit.length) dialekt.push(`${name}: ${hit.join(', ')} { font-size: ${fs[1].trim()} }`);
+    }
+  }
+  assert.deepStrictEqual(dialekt, [], 'eine eigene Groesse an der Metazeile ist ein Dialekt - die Rolle in typography.css ist die Quelle');
+});
+
+// R21 S5 (Critique 2026-10-21, D5): DAS INNENLEBEN DER UEBERSICHT LIEST IN
+// ROLLEN. Nach S4 trugen die Kacheln noch 14 und 12 an Lesetext: Zaehler
+// ("1/2"), Restzeit ("in 22 Tagen", "Noch 2 Tage"), Mengen, das leere Widget,
+// die Beschriftungen der Budget-Kachel und - bei 12 - jede Fussnote
+// "+N weitere". D4: 14 gehoert Bedienelementen, 12 Badges, Avataren und
+// Mikro-Labels. Dieser Guard listet, was in dashboard.css noch 14 oder 12
+// traegt, und jede Stelle steht mit ihrem Grund da - eine neue Lesezeile in
+// diesen Groessen faellt hier auf.
+test('R21 S5: die Uebersicht traegt 14 und 12 nur an Bedienelementen, Badges, Avataren und Mikro-Labels', () => {
+  const ERLAUBT = new Map([
+    ['.widget__badge', 'Badge'], ['.event-time-badge', 'Badge'], ['.shopping-widget-list__count', 'Zaehler-Badge der Liste'],
+    ['.family-member__count', 'Badge am Avatar'], ['.health-widget__next-time', 'Uhrzeit als Pille'],
+    ['.task-item__avatar', 'Avatar-Initialen'], ['.birthday-widget-item__avatar', 'Avatar-Initialen'],
+    ['.family-widget-avatar', 'Avatar-Initialen'], ['.rewards-member__avatar', 'Avatar-Initialen'],
+    ['.schedule-widget-row__avatar', 'Avatar-Initialen'],
+    ['.week-strip__weekday', 'Mikro-Label der Wochenleiste'], ['.week-strip__date', 'Ziffer im Tageskaestchen'],
+    ['.weather-forecast__label', 'Mikro-Label der Vorhersage'], ['.weather-forecast__temps', 'Mikro-Label der Vorhersage'],
+    ['.dashboard-overview__date', 'Mikro-Label ueber dem Gruss (versal)'], ['.quick-link-tile__name', 'Mikro-Label unter dem Symbol'],
+    ['.fab-action__label', 'Bedienelement'], ['.widget-restore-chip', 'Bedienelement'], ['.dashboard-customize-scope', 'Bedienelement'],
+    ['.widget-restore__title', 'Anpassen-Ablage (Bedienflaeche)'], ['.dashboard-customize-footnote', 'Anpassen-Fussnote (Bedienflaeche)'],
+    ['.quick-link-manage-row__host', 'Verwalten-Dialog (Formular)'], ['.quick-link-manage-row__locked', 'Verwalten-Dialog (Formular)'],
+  ]);
+  const css = readFileSync(new URL('dashboard.css', STYLES_DIR), 'utf8');
+  const funde = [];
+  for (const rule of eachRule(css)) {
+    const fs = rule.body.match(/font-size:\s*var\(--text-(sm|xs)\)/);
+    if (!fs) continue;
+    for (const sel of rule.selector.split(',').map((x) => x.trim().replace(/\s+/g, ' '))) {
+      if (!ERLAUBT.has(sel)) funde.push(`${sel} { font-size: var(--text-${fs[1]}) }`);
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'Lesetext der Uebersicht in 14 oder 12 - in die Rolle (typography.css) oder mit Grund hier eintragen');
+  // Und die Fussnote "+N weitere" jeder Listenkachel ist mindestens Footnote 13.
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const rolle = typo.find((r) => !r.at.length && r.selector.split(',').map((x) => x.trim()).includes('.list-row__meta'));
+  for (const sel of ['.widget-list-more', '.countdown-more', '.waste-widget-more', '.pantry-widget-more', '.week-strip__more']) {
+    assert.ok(rolle.selector.split(',').map((x) => x.trim()).includes(sel), `${sel} nimmt die Metazeile (13)`);
+  }
+});
+
+// R21 (D4): SEKUNDAERTEXT IST SUBHEADLINE 15. Die Erklaerung eines Leerzustands,
+// die Beschreibung einer Dokumentkarte, der Untertitel eines Kontaktkopfs
+// standen bei 14 - der Stufe der Bedienelemente. Die Rolle steht in
+// typography.css; kein Blatt setzt an diesen Subjekten eine eigene Groesse.
+// Einzige Variante: der kompakte Leerzustand (Widgets, Seitenspalten) geht
+// eine Stufe TIEFER auf die Footnote, damit kein neuer Umbruch entsteht.
+test('R21: Sekundaertext ist Subheadline 15 - eine Rolle in typography.css', () => {
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+  const rolle = typo.find((rule) => !rule.at.length && sels(rule).includes('.u-meta'));
+  assert.ok(rolle, '.u-meta steht in typography.css');
+  assert.match(rolle.body, /font-size:\s*var\(--type-secondary\)/);
+  // R21 S9b: die Beschreibung einer Einstellungskarte stand noch bei 14.
+  const SEKUNDAER = ['.u-meta', '.empty-state__description', '.document-card__description', '.settings-card-description', '.contact-card__sub', '.task-comments__status'];
+  for (const sel of SEKUNDAER) assert.ok(sels(rolle).includes(sel), `${sel} nimmt die Sekundaerrolle`);
+
+  const VARIANTE = new Map([['.empty-state--compact .empty-state__description', 'var(--type-caption)']]);
+  const funde = [];
+  for (const name of cssFiles.filter((n) => n !== 'typography.css')) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      const fs = rule.body.match(/font-size:\s*([^;]+)/);
+      if (!fs) continue;
+      for (const sel of sels(rule)) {
+        const last = sel.split(/\s*[\s>+~]\s*/).pop();
+        if (!SEKUNDAER.some((s) => new RegExp(`${s.replace('.', '\\.')}(?![\\w-])`).test(last))) continue;
+        if (VARIANTE.get(sel.replace(/\s+/g, ' ')) === fs[1].trim()) continue;
+        funde.push(`${name}: ${sel} { font-size: ${fs[1].trim()} }`);
+      }
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'eine eigene Groesse am Sekundaertext ist ein Dialekt');
+});
+
+// R21 S9b (D4; DESIGN.md "Footnote ... in medium das Label ueber Feldern"):
+// DAS FELD SPRICHT IN FOOTNOTE 13. Gemessen in 10 Anlege-Dialogen und 8
+// Einstellungsblaettern (390/1280): Labels 92x 14/500, Hinweise 46x 14 und 13x
+// 12, Feldgruppen-Legende 14/600 - drei Groessen fuer dieselbe Stelle, keine
+// davon die des Systems. 14 gehoert Bedienelementen, 12 Badges.
+//
+// Der Guard prueft das SUBJEKT: jede Regel, deren letztes Glied ein Feldlabel,
+// ein Feldfehler oder eine Klasse auf `-hint`/`__hint` ist und eine Groesse
+// setzt, setzt Footnote 13 - oder die Klasse steht als benannte Ausnahme mit
+// Grund darunter (Hinweise, die nicht unter einem Feld stehen).
+test('R21 S9b: Label, Hinweis und Fehler am Feld sind Footnote 13', () => {
+  const FELD = /\.(label|form-label|form-field__error|settings-fieldset__legend|[a-z][\w-]*(?:-|__)hint)(?![\w-])/;
+  const AUSNAHMEN = new Map([
+    ['form-label__hint', 'Nebensatz IM Label - eine Stufe leiser als das Label (Caption 1)'],
+    ['empty-state__hint', 'Leerzustand, kein Feld'],
+    ['empty-hint', 'Leerzustand der Fastenhistorie, kein Feld'],
+    ['day-view__empty-hint', 'Leerzustand im Zeitraster, kein Feld'],
+    ['dashboard-grid-hint', 'Hinweisband beim Anpassen der Uebersicht, Sekundaertext'],
+    ['document-dropzone__hint', 'Text IN einer Ablageflaeche, nicht unter einem Feld'],
+    ['document-viewer__unsupported-hint', 'Leerzustand im Dokumentbetrachter'],
+    ['health-results-hint', 'Erklaerung ueber der Befundtabelle, kein Feld'],
+    ['health-overview__export-hint', 'Erklaerung neben dem Export, kein Feld'],
+    ['shopping-transfer__hint', 'Einleitung des Uebertragen-Blatts, Sekundaertext'],
+    ['recipe-sidebar__hint', 'Leerzustand der Rezept-Seitenspalte'],
+    ['rw-own__hint', 'Fortschritt auf der eigenen Karte, Sekundaertext'],
+    ['rw-detail-hint', 'Zeile in der Leseansicht, kein Feld'],
+    ['perm-matrix__hint', 'Einleitung der Rechte-Matrix, Sekundaertext'],
+    ['perm-row__hint', 'Stand einer Rechtezeile (Metazeile der Matrix)'],
+    ['bd-import__without-hint', 'Fussnote der Importliste, kein Feld'],
+  ]);
+  const funde = [];
+  let geprueft = 0;
+  for (const name of cssFiles) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      const fs = rule.body.match(/font-size:\s*([^;]+)/);
+      if (!fs || ['inherit', 'unset', 'revert'].includes(fs[1].trim())) continue;
+      for (const sel of rule.selector.split(',').map((x) => x.trim())) {
+        const m = sel.split(/\s*[\s>+~]\s*/).pop().match(FELD);
+        if (!m || AUSNAHMEN.has(m[1])) continue;
+        geprueft += 1;
+        if (fs[1].trim() !== 'var(--type-caption)') funde.push(`${name}: ${sel} { font-size: ${fs[1].trim()} }`);
+      }
+    }
+  }
+  assert.ok(geprueft >= 15, `nur ${geprueft} Feld-Regeln gefunden - liest der Guard noch?`);
+  assert.deepStrictEqual(funde, [], 'Label, Hinweis oder Fehler am Feld nicht in Footnote 13 - var(--type-caption) oder als Ausnahme begruenden');
+
+  // Die Beschreibung einer Einstellungszeile und die Nebenwerte der mobilen
+  // Kurzzeile stehen UNTER bzw. NEBEN einem Namen: Metazeile (typography.css).
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const rolle = typo.find((r) => !r.at.length && r.selector.split(',').map((x) => x.trim()).includes('.list-row__meta'));
+  for (const sel of ['.settings-setting-row__description', '.budget-glance__flows']) {
+    assert.ok(rolle.selector.split(',').map((x) => x.trim()).includes(sel), `${sel} nimmt die Metazeile (13)`);
+  }
+  // Der Tageskopf der Agenda: Subheadline 15, halbfett (nicht 14/700).
+  const cal = [...eachRule(readFileSync(new URL('calendar.css', STYLES_DIR), 'utf8'))];
+  const body = (sel) => cal.filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
+  for (const sel of ['.agenda-day__header', '.agenda-day__date', '.agenda-day__weekday']) {
+    assert.match(body(sel), /font-size:\s*var\(--type-secondary\)/, `${sel} ist nicht Subheadline 15`);
+  }
+  assert.match(body('.agenda-day__date'), /font-weight:\s*var\(--font-weight-semibold\)/, 'das Datum im Tageskopf ist halbfett, nicht fett');
+});
+
+// R21 (D4): ERHOEHTER KONTRAST HEBT AUCH DEN METATEXT. Unter
+// `prefers-contrast: more` wurden Glas, Kanten und Blur gehaertet, aber die
+// Metazeile blieb gemessen in derselben Farbe (hell #63615B, dunkel #B4AEA5) -
+// gerade die kleinste Schrift des Schirms bekam nichts. Sekundaer- und
+// Tertiaertext stehen dort eine Rampenstufe naeher an der Textfarbe; ueber die
+// Rampe statt als Literal, damit der Wert dem Theme folgt (die Dark-Bloecke
+// setzen nur die private Haelfte, siehe tokens.css).
+test('R21: prefers-contrast: more hebt Sekundaer- und Tertiaertext eine Rampenstufe an', () => {
+  const tokens = readFileSync(new URL('tokens.css', STYLES_DIR), 'utf8');
+  const rules = [...eachRule(tokens)];
+  const kontrast = rules.filter((r) => r.at.some((a) => /prefers-contrast:\s*more/.test(a)) && r.selector.trim() === ':root');
+  assert.ok(kontrast.length, 'tokens.css fuehrt einen :root-Block unter prefers-contrast: more');
+  const body = kontrast.map((r) => r.body).join(';');
+  for (const token of ['--color-text-secondary', '--color-text-tertiary']) {
+    const m = body.match(new RegExp(`${token}:\\s*([^;]+)`));
+    assert.ok(m, `${token} bleibt unter prefers-contrast: more unveraendert`);
+    assert.match(m[1].trim(), /^var\(--neutral-(?:700|800|900)\)$/, `${token} folgt der Rampe (eine Stufe naeher an der Textfarbe), kein Literal`);
+  }
+  const hex = (name) => tokens.match(new RegExp(`${name}:\\s*(#[0-9A-Fa-f]{6})`))?.[1];
+  const lum = (h) => {
+    const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  assert.ok(ratio(hex('--_neutral-700'), '#FFFFFF') >= 7, 'hell: mindestens 7:1 (AAA) auf Weiss');
+});
+
+// R21 (D4, Persona Inge, 834px): die Stellen, an denen Lesetext unter 13 lag.
+// Gemessen: Tab-Labels 11px am Tablet, Kalender-Chips 12px auf im Mittel 12,6
+// sichtbare Zeichen (40 von 51 gekuerzt) in 118x170er Zellen, Budget-Summen,
+// Plan und Veraenderung 12px, Darlehen-Meta 12px, Aufgaben in der Agenda 12px.
+test('R21 Inge: am Tablet keine Lesezeile unter 13, Nav-Label 12, Monatstitel zweizeilig', () => {
+  const rules = (name) => [...eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+
+  const label = rules('layout.css').find((r) => r.at.some((a) => /min-width:\s*640px/.test(a)) && sels(r).includes('.nav-bottom .nav-item__label'));
+  assert.ok(label, 'ab 640px eine eigene Regel fuer das Tab-Label');
+  assert.match(label.body, /font-size:\s*var\(--text-xs\)/, 'am Tablet Caption 1 (12) statt Caption 2 (11)');
+
+  const tablet = (r) => r.at.some((a) => /min-width:\s*640px/.test(a) && /max-width:\s*1023px/.test(a));
+  const cal = rules('calendar.css');
+  const titel = cal.find((r) => tablet(r) && sels(r).includes('.month-day .month-day__event > span:last-child'));
+  assert.ok(titel, 'am Tablet eine Titelregel fuer die Chips der Monatszelle');
+  assert.ok(sels(titel).includes('.month-day .cal-task-chip > span:last-child'), 'Aufgaben-Chips ziehen mit');
+  assert.match(titel.body, /-webkit-line-clamp:\s*2/);
+  assert.match(titel.body, /white-space:\s*normal/);
+  assert.match(titel.body, /hyphens:\s*auto/, 'ein langes Wort trennt an der Silbe (W1)');
+  const chip = cal.find((r) => tablet(r) && sels(r).includes('.month-day .month-day__event'));
+  assert.match(chip?.body ?? '', /white-space:\s*normal/, 'der Chip selbst haelt den Titel nicht mehr einzeilig');
+  const agenda = cal.find((r) => !r.at.length && r.selector.trim() === '.agenda-tasks .cal-task-chip');
+  assert.match(agenda?.body ?? '', /font-size:\s*var\(--type-caption\)/, 'die Aufgabe in der Agenda ist eine Zeile, kein Etikett');
+
+  const budget = rules('budget.css');
+  for (const sel of ['.budget-bar-row__label', '.budget-bar-row__amount']) {
+    const base = budget.find((r) => !r.at.length && r.selector.trim() === sel && /font-size/.test(r.body));
+    assert.match(base?.body ?? '', /font-size:\s*var\(--type-caption\)/, `${sel}: Footnote 13 statt 12`);
+  }
+});

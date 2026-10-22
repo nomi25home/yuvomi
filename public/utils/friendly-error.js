@@ -244,6 +244,22 @@ export const CASE_MESSAGES = new Map([
   ['contacts_address_too_long', 'contacts.errorAddressTooLong'],
   ['contacts_notes_too_long', 'contacts.errorNotesTooLong'],
   ['contacts_birthday_invalid', 'contacts.errorBirthdayInvalid'],
+  // Die Mehrfachfelder des Formulars (phones, emails, addresses): je Fall ein
+  // ganzer Satz, der das Feld selbst nennt - nie ein eingesetztes Nomen. Eine
+  // zu lange Nummer oder Adresse in der Liste ist derselbe Satz wie im
+  // Einzelfeld oben, nur mit der Grenze der Liste. `*_entry_invalid` deckt,
+  // was nur ein API-Client falsch schicken kann (server/routes/contacts.js).
+  ['contacts_phone_entry_invalid', 'contacts.errorPhoneEntryInvalid'],
+  ['contacts_phones_too_many', 'contacts.errorPhonesTooMany'],
+  ['contacts_phone_label_too_long', 'contacts.errorPhoneLabelTooLong'],
+  ['contacts_email_entry_invalid', 'contacts.errorEmailEntryInvalid'],
+  ['contacts_email_invalid', 'contacts.errorEmailInvalid'],
+  ['contacts_emails_too_many', 'contacts.errorEmailsTooMany'],
+  ['contacts_email_label_too_long', 'contacts.errorEmailLabelTooLong'],
+  ['contacts_address_entry_invalid', 'contacts.errorAddressEntryInvalid'],
+  ['contacts_addresses_too_many', 'contacts.errorAddressesTooMany'],
+  ['contacts_address_label_too_long', 'contacts.errorAddressLabelTooLong'],
+  ['contacts_address_part_too_long', 'contacts.errorAddressPartTooLong'],
   // Orte und Kategorien des Inventars (#1909). Den Namen gibt es auf dieser
   // Ebene schon (`category_exists` deckt die Kategorien, oben); ein Ort oder
   // eine Kategorie, die inzwischen geloescht wurde, ist ein "gibt es nicht
@@ -356,6 +372,13 @@ export const CASE_PARAMS = new Map([
   ['contacts_email_too_long', ['limit']],
   ['contacts_address_too_long', ['limit']],
   ['contacts_notes_too_long', ['limit']],
+  ['contacts_phones_too_many', ['limit']],
+  ['contacts_phone_label_too_long', ['limit']],
+  ['contacts_emails_too_many', ['limit']],
+  ['contacts_email_label_too_long', ['limit']],
+  ['contacts_addresses_too_many', ['limit']],
+  ['contacts_address_label_too_long', ['limit']],
+  ['contacts_address_part_too_long', ['limit']],
   ['recipe_providers_sync_http_status', ['status']],
 ]);
 
@@ -546,12 +569,18 @@ function knownSentence(err) {
  * `err.message`) kommt hier nie heraus; aus der Antwort stammen hoechstens die
  * Zahlen, die CASE_PARAMS fuer den Fall freigibt.
  *
+ * DER SATZ DER STELLE DARF SEIN OBJEKT NENNEN (Critique R21, D15): ein
+ * zurueckgerollter Haken sagte nur "Ein Fehler ist aufgetreten." - weder welcher
+ * Artikel noch dass er wieder offen steht noch was jetzt zu tun ist. `params`
+ * setzt t() in den Satz der Stelle ein ("„Milch" ist wieder offen ...").
+ *
  * @param {unknown} err
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ * @param {Record<string, unknown>} [params] - Werte fuer den Satz der Stelle
  * @returns {string} uebersetzter Satz
  */
-export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
-  return knownSentence(err) ?? t(fallbackKey);
+export function errorSentence(err, fallbackKey = 'common.errorGeneric', params = undefined) {
+  return knownSentence(err) ?? (params ? t(fallbackKey, params) : t(fallbackKey));
 }
 
 /**

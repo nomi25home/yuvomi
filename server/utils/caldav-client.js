@@ -206,9 +206,11 @@ const NETWORK_ERROR_NAMES = new Set(['AbortError', 'TimeoutError', 'FetchError']
 /**
  * Ist der Fehler einer der Verbindung? Das `fetch` von Node meldet ihn als
  * `TypeError: fetch failed` und hängt den Systemfehler als `cause` an;
- * node-fetch trägt den Code am Fehler selbst.
+ * node-fetch trägt den Code am Fehler selbst - so auch der googleapis-Client
+ * (gaxios), dessen Netzfehler etwa `code: 'ECONNREFUSED'` ohne `status` trägt
+ * (`googleFailureAction`, calendar-outbound.js, #2136).
  */
-function isNetworkFailure(err) {
+export function isNetworkFailure(err) {
   for (let current = err, depth = 0; current && depth < 4; current = current.cause, depth++) {
     if (NETWORK_ERROR_NAMES.has(current.name)) return true;
     // Nicht jede Ursache trägt einen Code (gesperrter Port, abgerissener Body).
@@ -222,6 +224,25 @@ export function isCollectionRefusal(err) {
   const status = err?.status;
   if (typeof status !== 'number') return isNetworkFailure(err);
   return !OBJECT_LEVEL_STATUS.has(status);
+}
+
+/**
+ * Sagt die Absage etwas über das Konto oder den Server als Ganzes statt über
+ * den einen Eintrag (#1863)? Daran hängt, ob sie einen der fünf Versuche
+ * eines wartenden Löschens oder Änderns verbraucht (`davFailureAction`,
+ * calendar-outbound.js).
+ *
+ * Bewusst eine Positivliste und nicht das Gegenstück zu `isCollectionRefusal`:
+ * dort kostet ein verkannter Status nur einen Upload je Lauf, hier hiesse er
+ * "wartet für immer". Ein 423 (gesperrt) oder ein anderer unbekannter Status
+ * hängt dann am Eintrag und läuft wie bisher in die fünf Versuche.
+ *   401 Anmeldung abgelehnt, 403 Konto oder Kalender ohne Schreibrecht,
+ *   429 Ratenlimit, 5xx Server; ohne Status ein ERKANNTER Netzfehler.
+ */
+export function isAccountWideRefusal(err) {
+  const status = err?.status;
+  if (typeof status !== 'number') return isNetworkFailure(err);
+  return status === 401 || status === 403 || status === 429 || (status >= 500 && status <= 599);
 }
 
 /**

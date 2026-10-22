@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -183,10 +183,6 @@ export async function render(container, { user, embedded = false, onAddableChang
   setHtml(container, `
     <div class="split-page app-page app-page--split" data-composition="split">
       ${head}
-      <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
-           klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
-      <div id="split-glance"></div>
-      <section class="metric-grid budget-glance-details" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
           <!-- SCHMAL IST DIE GRUPPENWAHL EINE ZEILE (R16, Critique 2026-10-05):
@@ -241,7 +237,20 @@ export async function render(container, { user, embedded = false, onAddableChang
         ${/* KEIN ZWEITES <main> (R20, axe landmark-*): der Ausgleich steht als
              Reiter im Budget, und dessen Seite liegt schon in #main-content der
              Shell - ein <main> darin war ein zweiter Hauptbereich. */ ''}
-        <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+        ${/* GRUPPENWAHL ZUERST, DIE KENNZAHL BEI IHRER GRUPPE (R21 S7, D9). Die
+              Kennzahlen der gewaehlten Gruppe standen ueber der ganzen Seite:
+              mobil "Du schuldest 24,14 €" vor der Gruppenwahl, die erst sagt,
+              wessen Schuld das ist, und breit eine eigene Kartenreihe ueber
+              Gruppenliste und Gruppe (41px Luft unter den Reitern statt 25).
+              Jetzt stehen sie in der Spalte der Gruppe, direkt ueber ihrem
+              Kopf - die Gruppenliste beginnt oben, wie jede Liste daneben. */ ''}
+        <div class="split-main-column">
+          <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
+               klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
+          <div id="split-glance"></div>
+          <section class="metric-grid budget-glance-details" id="split-summary"></section>
+          <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+        </div>
       </div>${fab}
     </div>
   `);
@@ -702,7 +711,9 @@ function renderSummary() {
       label: t('splitExpenses.youAreOwed'),
       value: owedText,
       tone: owed.length ? 'positive' : 'neutral',
-      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: owing.length ? 'negative' : '' }],
+      // Eine offene Schuld in der Gruppe ist Alltag, kein Alarm (Critique R21,
+      // D8): Textfarbe. „Du bekommst" darf gruen bleiben wie eine Einnahme.
+      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: '' }],
     }));
     wireMetricGlance(glance, 'split-glance-more');
   }
@@ -715,7 +726,7 @@ function renderSummary() {
       <div class="metric-card__label">${esc(owedLabel)}</div>
       <div class="metric-card__value">${owedText}</div>
     </div>
-    <div class="metric-card${owing.length ? ' metric-card--negative' : ''}">
+    <div class="metric-card">
       <div class="metric-card__label">${esc(owingLabel)}</div>
       <div class="metric-card__value">${owingText}</div>
     </div>
@@ -1989,11 +2000,15 @@ async function openGroupModal(group = null) {
   if (readOnly()) return;
   const currency = state.meta?.default_currency || 'EUR';
   const isEdit = Boolean(group);
+  // Kommen die Kandidaten erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   const candidates = isEdit ? await loadMemberCandidates() : [];
+  if (!isModalContextCurrent(context)) return;
   openSharedModal({
     title: isEdit ? t('splitExpenses.editGroup') : t('splitExpenses.addGroup'),
     content: `
-      <form id="split-group-form" class="split-form">
+      <form id="split-group-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.name')}${REQUIRED_MARK}</span><input class="form-input" name="name" required maxlength="200" value="${esc(group?.name || '')}"></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.description')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(group?.description || '')}</textarea></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.type')}</span><select class="form-input" name="type">${state.meta.group_types.map((type) => `<option value="${type}" ${type === group?.type ? 'selected' : ''}>${t(`splitExpenses.groupType.${type}`)}</option>`).join('')}</select></label>
@@ -2014,20 +2029,27 @@ async function openGroupModal(group = null) {
       panel.querySelector('#split-group-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const form = panel.querySelector('#split-group-form');
         const data = Object.fromEntries(new FormData(form));
         collectGroupDefaults(form, data);
+        const dialog = captureModalContext();
         if (isEdit) await api.patch(`/split-expenses/groups/${group.id}`, data);
         else await api.post('/split-expenses/groups', data);
         if (isEdit) await syncEditedGroupMembers(group, form);
         // Neue Gruppen sind aktiv - aus dem Archiv heraus angelegt bliebe die
         // Liste sonst leer, obwohl die Gruppe existiert.
         if (!isEdit) state.groupStatus = 'active';
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await loadGroups();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2111,9 +2133,10 @@ function openExpenseModal(expense = null, prefill = null) {
   const today = todayKey();
   const methodOption = (value, label) => `<option value="${value}" ${value === method ? 'selected' : ''}>${label}</option>`;
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('splitExpenses.editExpense') : t('splitExpenses.addExpense'),
     content: `
-      <form id="split-expense-form" class="split-form">
+      <form id="split-expense-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
         <div class="split-form-row">
           <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(expense?.amount || '', expense?.currency || group.default_currency))}"></label>
@@ -2185,6 +2208,9 @@ function openExpenseModal(expense = null, prefill = null) {
       panel.querySelector('#split-expense-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         if (!validateSplitForm(panel)) return;
         const form = panel.querySelector('#split-expense-form');
         const data = Object.fromEntries(new FormData(form));
@@ -2194,16 +2220,20 @@ function openExpenseModal(expense = null, prefill = null) {
           { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
         const { participants, splits } = collectSplitPayload(form);
         const payload = { ...data, participants, splits };
+        const dialog = captureModalContext();
         // commit() lädt wartende Dateien erst jetzt hoch: ein abgebrochenes
         // Formular hinterlässt keine verwaiste Datei im Dokumente-Modul.
         if (receipts) payload.attachment_document_ids = await receipts.commit();
         if (isEdit) await api.put(`/split-expenses/expenses/${expense.id}`, payload);
         else await api.post(`/split-expenses/groups/${state.activeGroupId}/expenses`, payload);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await refreshDashboard();
         await loadGroupData();
         renderAll({ motion: true });
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2357,7 +2387,7 @@ function openRecurringModal(recurring = null) {
   openSharedModal({
     title: isEdit ? t('splitExpenses.recurring.edit') : t('splitExpenses.recurring.add'),
     content: `
-      <form id="split-recurring-form" class="split-form">
+      <form id="split-recurring-form" class="split-form" novalidate>
         ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="circle-pause" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
         <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
         <div class="split-form-row">
@@ -2433,6 +2463,9 @@ function openRecurringModal(recurring = null) {
         e.preventDefault();
         if (readOnly()) return;
         if (!mayStillAct() || busy) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(form))) return;
         if (!validateSplitForm(panel)) return;
         const chosenCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, chosenCurrency,
@@ -2446,6 +2479,7 @@ function openRecurringModal(recurring = null) {
           return;
         }
         const payload = isEdit ? changedRecurringFields(shown, now, recurring) : now;
+        const dialog = captureModalContext();
         busy = true;
         try {
           // Nichts geaendert: kein Aufruf, kein Verlaufseintrag "bearbeitet".
@@ -2465,10 +2499,13 @@ function openRecurringModal(recurring = null) {
         } finally {
           busy = false;
         }
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await loadGroupData();
         renderAll({ motion: true });
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2541,7 +2578,7 @@ function openSettlementModal() {
   openSharedModal({
     title: t('splitExpenses.registerPayment'),
     content: `
-      <form id="split-settlement-form" class="split-form">
+      <form id="split-settlement-form" class="split-form" novalidate>
         <div class="split-form-row">
           <label class="form-field"><span class="form-label">${t('splitExpenses.payer')}</span><select class="form-input" name="payer_id">${memberOptions(debt?.from_user_id ?? state.user?.id)}</select></label>
           <label class="form-field"><span class="form-label">${t('splitExpenses.payee')}</span><select class="form-input" name="payee_id">${memberOptions(debt?.to_user_id)}</select></label>
@@ -2609,19 +2646,26 @@ function openSettlementModal() {
         e.preventDefault();
         if (readOnly()) return;
         if (samePerson()) { syncSameHint(); payeeSel.focus(); return; }
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(form))) return;
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
         if (rejectSplitAmount(form.querySelector('[name="amount"]'),
           form.querySelector('[name="currency"]')?.value || group.default_currency,
           { original: debt?.amount ?? null, originalCurrency: debt?.currency ?? null, required: true })) return;
+        const dialog = captureModalContext();
         const proofIds = proof ? await proof.commit() : [];
         if (proofIds.length) data.proof_document_id = proofIds[0];
         await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await refreshDashboard();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2629,11 +2673,15 @@ function openSettlementModal() {
 
 async function openMemberModal() {
   if (readOnly()) return;
+  // Kommen die Kandidaten erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   const candidates = await loadMemberCandidates();
+  if (!isModalContextCurrent(context)) return;
   openSharedModal({
     title: t('splitExpenses.addMember'),
     content: `
-      <form id="split-member-form" class="split-form">
+      <form id="split-member-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.member')}</span><select class="form-input" name="member_ref">${memberCandidateOptions(candidates)}</select></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.role')}</span><select class="form-input" name="role"><option value="guest">${t('splitExpenses.roleGuest')}</option><option value="admin">${t('splitExpenses.roleAdmin')}</option></select></label>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -2651,17 +2699,24 @@ async function openMemberModal() {
       panel.querySelector('#split-member-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const data = Object.fromEntries(new FormData(panel.querySelector('#split-member-form')));
         const [source, id] = String(data.member_ref || '').split(':');
         delete data.member_ref;
         if (source === 'contact') data.contact_id = Number(id);
         else data.user_id = Number(id);
+        const dialog = captureModalContext();
         await api.post(`/split-expenses/groups/${state.activeGroupId}/members`, data);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await loadGroups();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2672,7 +2727,7 @@ function openGuestModal() {
   openSharedModal({
     title: t('splitExpenses.createGuest'),
     content: `
-      <form id="split-guest-form" class="split-form">
+      <form id="split-guest-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.displayName')}${REQUIRED_MARK}</span><input class="form-input" name="display_name" required maxlength="128"></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.usernameOptional')}</span><input class="form-input" name="username" autocomplete="off" maxlength="64"></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.temporaryPassword')}${REQUIRED_MARK}</span><input class="form-input" name="password" type="password" minlength="8" required autocomplete="new-password"></label>
@@ -2697,13 +2752,20 @@ function openGuestModal() {
       panel.querySelector('#split-guest-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const form = panel.querySelector('#split-guest-form');
         const birthDateRaw = form.querySelector('[name="birth_date"]')?.value || '';
         if (!isDateInputValid(birthDateRaw)) return;
         const data = Object.fromEntries(new FormData(form));
         data.birth_date = parseDateInput(birthDateRaw) || null;
+        const dialog = captureModalContext();
         await api.post(`/split-expenses/groups/${state.activeGroupId}/guests`, data);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         const [members, groupMembers] = await Promise.all([
           api.get('/family/members'),
           api.get(`/split-expenses/groups/${state.activeGroupId}/members`),
@@ -2713,7 +2775,7 @@ function openGuestModal() {
         await loadGroups();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2740,4 +2802,8 @@ export const __test = {
   renderSummaryForTest(container) { _container = container; renderSummary(); },
   // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
   ownGroupBalance, groupToolsTriggerHtml,
+  // #1997: Mitglied und Gast speichern schliessen nur ihren eigenen Dialog
+  // (test-split-amount-input.js).
+  openMemberModal, openGuestModal,
+  setContainerForTest(container) { _container = container; },
 };

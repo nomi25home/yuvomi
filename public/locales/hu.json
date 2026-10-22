@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Semmi sem felel meg a keresésnek és a szűrőknek.",
         "searchReset": "Keresés visszaállítása",
         "passwordMinLength": "Legalább 8 karakter.",
-        "savedReloadFailed": "A módosítás mentve, de a nézetet nem sikerült frissíteni. Ha valami hiányzik, töltsd újra az oldalt."
+        "savedReloadFailed": "A módosítás mentve, de a nézetet nem sikerült frissíteni. Ha valami hiányzik, töltsd újra az oldalt.",
+        "fieldNumber": "Adjon meg egy számot.",
+        "fieldMin": "Legalább {{min}}.",
+        "fieldMax": "Legfeljebb {{max}}.",
+        "fieldWholeNumber": "Adjon meg egy egész számot.",
+        "fieldStep": "Adjon meg egy értéket {{step}} lépésközzel.",
+        "fieldInvalid": "Ellenőrizze ezt a bejegyzést.",
+        "errorCheckRolledBack": "„{{name}}” ismét nyitott - a kipipálás nem sikerült. Próbálja újra.",
+        "errorUncheckRolledBack": "„{{name}}” ismét ki van pipálva - a visszavétel nem sikerült. Próbálja újra."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -1296,6 +1304,9 @@
         "mvLabelPlaceholder": "Címke (pl. munka)",
         "mvRemove": "Bejegyzés eltávolítása",
         "birthdayLabel": "Születésnap",
+        "showBirthday": "Megjelenítés a születésnapoknál",
+        "addToBirthdays": "Hozzáadás a születésnapokhoz",
+        "addedToBirthdays": "Hozzáadva a születésnapokhoz.",
         "birthdayHint": "A születésnap-importtal a naptárban is megjelenik.",
         "phonePlaceholder": "+36 …",
         "phonePreview": "Előnézet: {{value}}",
@@ -1376,7 +1387,18 @@
         "errorEmailTooLong": "Az e-mail-cím legfeljebb {{limit}} karakter lehet.",
         "errorAddressTooLong": "A cím legfeljebb {{limit}} karakter lehet.",
         "errorNotesTooLong": "A jegyzetek legfeljebb {{limit}} karakter hosszúak lehetnek.",
-        "errorBirthdayInvalid": "A születésnap nem érvényes dátum."
+        "errorBirthdayInvalid": "A születésnap nem érvényes dátum.",
+        "errorPhoneEntryInvalid": "Az egyik telefonszám hiányos vagy érvénytelen.",
+        "errorPhonesTooMany": "Ennek a névjegynek túl sok telefonszáma van. Legfeljebb ennyi lehet: {{limit}}.",
+        "errorPhoneLabelTooLong": "Egy telefonszám címkéje legfeljebb {{limit}} karakter lehet.",
+        "errorEmailEntryInvalid": "Az egyik e-mail-cím hiányos vagy érvénytelen.",
+        "errorEmailInvalid": "Egy e-mail-cím érvénytelen. A formája ilyen legyen: nev@pelda.hu.",
+        "errorEmailsTooMany": "Ennek a névjegynek túl sok e-mail-címe van. Legfeljebb ennyi lehet: {{limit}}.",
+        "errorEmailLabelTooLong": "Egy e-mail-cím címkéje legfeljebb {{limit}} karakter lehet.",
+        "errorAddressEntryInvalid": "Az egyik cím hiányos vagy érvénytelen.",
+        "errorAddressesTooMany": "Ennek a névjegynek túl sok címe van. Legfeljebb ennyi lehet: {{limit}}.",
+        "errorAddressLabelTooLong": "Egy cím címkéje legfeljebb {{limit}} karakter lehet.",
+        "errorAddressPartTooLong": "Egy cím utcája, települése, régiója, irányítószáma és országa egyenként legfeljebb {{limit}} karakter lehet."
     },
     "budget": {
         "title": "Költségvetés",
@@ -1522,7 +1544,6 @@
         "metaLoadError": "A költségvetési kategóriák betöltése sikertelen.",
         "addCategory": "+ kategória",
         "addSubcategory": "+ alkategória",
-        "moreDetails": "További adatok",
         "newCategoryPrompt": "Új kategória neve:",
         "newSubcategoryPrompt": "Új alkategória neve:",
         "categoryAddedToast": "Kategória hozzáadva.",
@@ -1608,6 +1629,18 @@
         "loanSavedToast": "Hitel mentve",
         "loanDeletedToast": "Hitel törölve",
         "loanPaymentTitle": "Hitel visszafizetés: {{borrower}}",
+        "typeTransfer": "Átutalás",
+        "transferFromAccount": "Forrásszámla",
+        "transferToAccount": "Célszámla",
+        "transferChooseAccounts": "Válassz két különböző számlát.",
+        "transferCurrencyMismatch": "Válassz azonos pénznemű számlákat. A valutaváltás nem támogatott.",
+        "transferAccountArchived": "Válassz aktív számlákat az átvezetéshez.",
+        "accountHasTransfers": "Ez a számla átvezetéseket tartalmaz. Törlés helyett archiváld.",
+        "transferDeleteSeriesConfirm": "Törlöd ezt a teljes átvezetési sorozatot?",
+        "catSaving": "Megtakarítás",
+        "summaryTransfers": "Átutalások",
+        "transferDeleteConfirm": "Törlöd az átutalás mindkét oldalát?",
+        "transferDeleteConfirmDetail": "Mindkét összekapcsolt tétel törlődik, és mindkét számla egyenlege újraszámolódik. A teljes sorozat törlésével annak összes előfordulása is törlődik. Ez nem vonható vissza.",
         "typeLoan": "Hitel",
         "tabsLabel": "Költségvetési szakaszok",
         "budgetTab": "Áttekintés",
@@ -1821,6 +1854,7 @@
         "healthCycleSaved": "Ciklusbeállítás mentve.",
         "healthCyclePersonalLabel": "Ciklus megjelenítése",
         "healthCyclePersonalHint": "Csak a saját nézetedre vonatkozik. Ha kikapcsolod, a ciklus a háztartás többi tagjánál látható marad.",
+        "healthCycleSettingsHint": "A ciklus hosszát, a fogamzásgátlást, az emlékeztetőket és a terhességi módot a ciklus oldalán állíthatja be.",
         "healthCyclePersonalHouseholdOff": "A ciklus jelenleg az egész háztartásban ki van kapcsolva, ezért senkinél sem jelenik meg.",
         "healthCyclePersonalSaved": "Ciklusnézet mentve.",
         "pageRewardsModule": "Jutalmak",
@@ -2126,7 +2160,7 @@
         "familyRoleGrandparent": "Nagyszülő",
         "familyRoleRelative": "Rokon",
         "familyRoleOther": "Családtag",
-        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod.",
+        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod. A ciklus is rejtve van; a gyerek saját beállításaiban jeleníthető meg.",
         "systemAdminLabel": "Rendszergazda",
         "systemAdminHint": "A rendszergazdák kezelhetik az alkalmazás beállításait, integrációit, API tokenjeit és családi fiókjait.",
         "systemAdminBadge": "Rendszergazda",
@@ -2156,7 +2190,8 @@
         "languageTitle": "Nyelv",
         "dataLanguageLabel": "Mentett bejegyzések nyelve",
         "dataLanguageHint": "Az a nyelv, amelyen a Yuvomi az általa létrehozott bejegyzéseket menti, például a születésnapi eseményeket. Az API-ra, a naptárcsatornára és a szinkronizálásra hat, az itteni megjelenítésre nem.",
-        "dataLanguageAuto": "Automatikus ({{language}})",
+        "dataLanguageAuto": "Automatikus",
+        "hintWithCurrent": "Jelenleg: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "A mentett bejegyzések nyelvét csak rendszergazdák állíthatják be.",
         "dataLanguageSaved": "A mentett bejegyzések nyelve frissítve",
         "sectionMeals": "Étkezési terv",
@@ -2840,6 +2875,28 @@
         "regionTitle": "Régió / Formátum",
         "regionLabel": "Régió",
         "regionHint": "Beállítja a pénznemet, a szám-, dátum- és időformátumot a régióhoz igazítva (pl. Svájc: 1'234.50). Válassza az „Egyéni” lehetőséget az egyéni konfiguráláshoz.",
+        "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "EAE",
+            "AG": "Antigua és Barbuda",
+            "BS": "Bahama-szigetek",
+            "DO": "Dominikai Közt.",
+            "GB": "Egyesült Királyság",
+            "HK": "Hongkong",
+            "KN": "Saint Kitts",
+            "MO": "Makaó",
+            "PH": "Fülöp-szk.",
+            "SA": "Szaúd-Arábia",
+            "TT": "Trinidad és Tobago",
+            "US": "Egyesült Államok",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "norvég",
+            "ptBR": "brazíliai portugál",
+            "zh": "egysz. kínai",
+            "zhHant": "hagyományos kínai"
+        },
         "regionAdminOnly": "A régiót és a pénznemet csak rendszergazdák módosíthatják.",
         "formatsHouseholdHint": "A dátum- és időformátum az egész háztartásra érvényes. Minden tag módosíthatja.",
         "regionCustom": "Egyéni",
@@ -3065,7 +3122,7 @@
         "timezoneTitle": "Időzóna",
         "timezoneLabel": "A háztartás időzónája",
         "timezoneHint": "Mindenütt érvényes, ahol egy időpont nem hordozza a saját zónáját: emlékeztetők, visszaszámlálások, a „ma” néven ismert naptári nap, az exportált naptár-hírcsatorna, valamint a Google-be vagy az Outlookba küldött események.",
-        "timezoneAuto": "Automatikus ({{zone}})",
+        "timezoneAuto": "Automatikus",
         "timezoneAdminOnly": "Az időzónát csak rendszergazdák módosíthatják.",
         "timezoneSaved": "Időzóna elmentve.",
         "timezoneMismatch": "A böngésződ a(z) {{browser}} zónában van, a háztartás a(z) {{household}} szerint számol.",
@@ -3116,6 +3173,7 @@
         "healthPreventionNotifyCaregiversSaved": "Az értesítési beállítás mentve.",
         "healthVisibilityTitle": "Alapértelmezett láthatóság",
         "healthVisibilityHint": "Milyen értékkel indulnak az új bejegyzések. Minden bejegyzésnél módosíthatod.",
+        "healthVisibilityCaregivers": "Aki rögzíthet Ön helyett, az a privát bejegyzéseit is látja, a ciklusnapló kivételével. Ezt egy adminisztrátor állítja be a tagoknál.",
         "healthVisibilityOther": "További területek",
         "healthVisibilityApply": "A meglévő bejegyzések is változzanak",
         "healthVisibilityApplyHint": "Mentve. A(z) {{area}} meglévő bejegyzései is változzanak?",
@@ -3252,10 +3310,12 @@
         "tasksDefaultVisibilityLabel": "Default visibility",
         "tasksDefaultVisibilityHint": "New tasks open with this visibility. You can still change it each time you create one.",
         "tasksDefaultLockedLabel": "Lock editing by default",
-        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."
+        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one.",
+        "backupDropzoneTitleTouch": "Koppintson egy biztonsági mentés kiválasztásához",
+        "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához"
     },
     "login": {
-        "tagline": "Üdv újra a családi tervezőben.",
+        "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
         "usernameLabel": "Felhasználónév",
         "passwordLabel": "Jelszó",
         "loginButton": "Bejelentkezés",
@@ -3324,7 +3384,6 @@
         "unsavedChanges": "Módosítások elvetése?",
         "unsavedChangesDetail": "Az űrlapon megadott adataid elvesznek.",
         "discardChanges": "Elvetés",
-        "moreSettings": "További beállítások",
         "moreDetails": "További adatok"
     },
     "rrule": {
@@ -3429,6 +3488,7 @@
         "editTitle": "Születésnap szerkesztése",
         "nameLabel": "Név",
         "birthDateLabel": "Születési dátum",
+        "showContact": "Névjegy megjelenítése",
         "nameDay": "Névnap",
         "celebratesNameDay": "névnapját ünnepli",
         "nameDayLabel": "Névnap (nem kötelező)",
@@ -3558,11 +3618,13 @@
         "goTo": "Ugrás ide",
         "newSection": "Új létrehozása",
         "recentLabel": "Legutóbb megnyitott",
-        "createTaskNamed": "„{{title}}” létrehozása feladatként"
+        "createTaskNamed": "„{{title}}” létrehozása feladatként",
+        "hintMove": "Kijelölés",
+        "hintOpen": "Megnyitás"
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",
-        "step1Body": "Az Ön személyes családi tervezője. Feladatok, naptár, bevásárlólista és még sok más - mind egy helyen.",
+        "step1Body": "Feladatok, naptár, bevásárlólista és még sok más a háztartásához - akár egyedül él, párban vagy családban. Mind egy helyen.",
         "step2Title": "Navigáció és modulok",
         "step2Body": "Az alsó sáv közvetlenül a legfontosabb területekre visz. A többi modult a „Több” alatt találja.",
         "step3Title": "Gyors kezdés",
@@ -3912,7 +3974,10 @@
         "errorDmsAccountGone": "Ez a DMS-fiók már nem létezik.",
         "errorDmsDocumentGone": "Ez a dokumentum már nem létezik a DMS-ben.",
         "errorDmsAlreadyLinked": "Ez a DMS-dokumentum már össze van kapcsolva.",
-        "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva."
+        "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva.",
+        "dropzoneTitleTouch": "Koppintson egy fájl kiválasztásához",
+        "viewerPrevNamed": "Előző dokumentum: {{name}}",
+        "viewerNextNamed": "Következő dokumentum: {{name}}"
     },
     "housekeeping": {
         "title": "Háztartás",
@@ -4098,7 +4163,8 @@
         "errorVisitGone": "Ez a látogatás már nem létezik.",
         "errorTaskGone": "Ez a feladat már nem létezik.",
         "errorAlreadyCheckedOut": "Ez a háztartási alkalmazott már kijelentkezett.",
-        "errorAlreadyCheckedIn": "Ez a háztartási alkalmazott már bejelentkezett."
+        "errorAlreadyCheckedIn": "Ez a háztartási alkalmazott már bejelentkezett.",
+        "allVisitsInReport": "Minden látogatás a jelentésben"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",
@@ -4319,7 +4385,7 @@
         "mobileSearch": "A keresést az áttekintés nagyítójával vagy a „Több” menüből nyithatod meg.",
         "mobileSettings": "A beállítások a „Több” menü alatt találhatók.",
         "guideLink": "Felhasználói kézikönyv",
-        "guideHint": "A közösség tartja karban, saját tárolóban - lemaradhat egy kiadás mögött."
+        "guideHint": "A közösség gondozza. Új lapon nyílik meg."
     },
     "changelog": {
         "title": "Változások",
@@ -4360,8 +4426,9 @@
         "success": "A jelszava megváltozott. Most már be tud jelentkezni.",
         "mismatch": "A jelszavak nem egyeznek.",
         "tooShort": "A jelszónak legalább 8 karakter hosszúnak kell lennie.",
-        "invalidToken": "Ez a link érvénytelen vagy lejárt.",
-        "missingToken": "Nem található érvényes token."
+        "invalidToken": "Ez a visszaállító link érvénytelen vagy lejárt - kérjen egy újat.",
+        "missingToken": "Ez a visszaállító link hiányos - kérjen egy újat.",
+        "requestNew": "Új link kérése"
     },
     "email": {
         "host": "SMTP-kiszolgáló",
@@ -4770,6 +4837,12 @@
             "reminders": {
                 "title": "Következő emlékeztetők",
                 "empty": "Ma nincs több bevétel"
+            },
+            "brief": {
+                "changes": "Az utolsó mérés óta: {{list}}.",
+                "latest": "Utoljára rögzítve: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} változatlan"
             }
         },
         "vitals": {
@@ -5177,7 +5250,7 @@
             "emptyDesc": "Rögzítsd az első menstruációdat, hogy lásd az előrejelzéseket, a naptárat és a statisztikát.",
             "emptyCta": "Első menstruáció rögzítése",
             "personsLabel": "Person",
-            "add": "Menstruáció rögzítése",
+            "add": "Korábbi menstruáció rögzítése",
             "loadError": "A ciklusadatok betöltése nem sikerült.",
             "loadErrorDesc": "Kérjük, próbáld újra később.",
             "retry": "Újra",
@@ -5387,15 +5460,14 @@
                 "family": "Család"
             },
             "period": {
-                "add": "Menstruáció rögzítése",
+                "add": "Korábbi menstruáció rögzítése",
                 "edit": "Menstruáció szerkesztése",
                 "warningFuture": "A kezdő dátum a jövőben van - az előrejelzések csak a korábbi ciklusokon alapulnak.",
                 "warningOverlap": "Átfedésben van egy már rögzített ciklussal."
             },
             "dayLog": {
                 "title": "Nap rögzítése",
-                "date": "Dátum",
-                "more": "További adatok"
+                "date": "Dátum"
             },
             "export": {
                 "csv": "Exportálás CSV-ként"
@@ -5413,8 +5485,9 @@
                 "cycleLength": "Átlagos ciklushossz",
                 "periodLength": "Átlagos menstruációhossz",
                 "lutealLength": "Luteális fázis hossza",
+                "daysUnit": "nap",
                 "trackFertility": "Termékeny időszak megjelenítése",
-                "autoHint": "Hagyd üresen = automatikusan az előzményeidből számolódik.",
+                "autoHint": "Ha a két mező egyikét üresen hagyja, a Yuvomi a rögzített menstruációkból számolja ki az értéket.",
                 "remindPeriodDaysBefore": "Menstruáció-emlékeztető",
                 "remindOff": "Ki",
                 "remindSameDay": "Aznap",
@@ -5514,7 +5587,9 @@
                 "emptyError": "Válassz egy CSV-fájlt, vagy illessz be szöveget.",
                 "error": "Az importálás nem sikerült."
             },
-            "discoveryHint": "Tipp: a becsült ciklusra ICS-hírcsatornaként iratkozhatsz fel a <a href=\"/settings/modules/calendar?section=personal-feeds\">Beállítások → Modulok → Naptár</a> alatt, vagy megjelenítheted a ciklus-widgetet az <a href=\"/\">Áttekintésen</a> a testreszabás módban."
+            "feedLink": "Az előre jelzett ciklus feliratkozása a naptárban",
+            "widgetHint": "A ciklus csempét a(z) {{overview}} oldalon a „{{customize}}” alatt adhatja hozzá.",
+            "endBeforeStart": "A vége nem lehet a kezdete előtt."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",
@@ -5523,6 +5598,7 @@
             "unitH": "ó"
         },
         "careBanner": "{{name}} nevében rögzítesz.",
+        "whoSees": "Ki látja ezt?",
         "nutrition": {
             "title": "Tápérték",
             "emptyTitle": "Még nincs rögzített tápérték",
@@ -5665,6 +5741,7 @@
         "weekdaySat": "Szo",
         "weekdaySun": "V",
         "intervalLabelWeekly": "Minden N. héten",
+        "intervalLabelMonthly": "Minden N. hónapban",
         "anchorDateLabel": "Első elszállítás",
         "monthDayLabel": "A hónap napja",
         "monthDayLastDay": "A hónap utolsó napja",
@@ -6252,8 +6329,8 @@
         "success": "A fiókod elkészült. Most már bejelentkezhetsz.",
         "mismatch": "A jelszavak nem egyeznek.",
         "tooShort": "A jelszónak legalább 8 karakter hosszúnak kell lennie.",
-        "invalidToken": "Ez a meghívó érvénytelen, lejárt vagy már felhasználták.",
-        "missingToken": "Nem található érvényes token.",
+        "invalidToken": "Ez a meghívó érvénytelen, lejárt vagy már felhasználták - kérjen új linket.",
+        "missingToken": "Ez a meghívólink érvénytelen vagy lejárt - kérjen egy újat.",
         "usernameRequired": "Válassz felhasználónevet.",
         "usernameInvalid": "A felhasználónév 3 és 64 karakter közötti lehet, és csak betűket, számokat, pontot, kötőjelet és aláhúzást tartalmazhat.",
         "usernameTaken": "Ez a felhasználónév már foglalt.",
@@ -6467,9 +6544,8 @@
         "templateWork": "Munka",
         "templateSchool": "Iskola",
         "templateUniversity": "Egyetem",
-        "overview": "Összehasonlítás",
+        "overview": "Áttekintés",
         "overviewPeopleLabel": "Személyek összehasonlítása",
-        "overviewClearSelection": "Kijelölés törlése",
         "continuesUntil": "…eddig tart: {{time}}",
         "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",
         "overviewEmptyDescription": "Válassz fent legalább egy háztartástagot, hogy a heti beosztásokat egymás mellett lásd.",
@@ -6501,6 +6577,7 @@
         "labelLabel": "Ennek az eszköznek a neve (nem kötelező)",
         "labelHint": "Segít később felismerni, melyik eszközről van szó.",
         "submit": "Párosítás",
-        "failed": "Ez a párosítókód nem érvényes."
+        "failed": "Ez a párosítókód nem érvényes.",
+        "codeRequired": "Add meg a beállításokban látható párosítási kódot."
     }
 }

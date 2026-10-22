@@ -46,7 +46,7 @@
 
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { outboundFailureAction, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
+import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
 import {
   createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
@@ -492,10 +492,10 @@ export function dropDeletionsOfMissingLists(accountId, listedUrls) {
   return dropped;
 }
 
-function failDeletion(id, err) {
+function failDeletion(id, err, { counts = true } = {}) {
   db.get().prepare(
-    'UPDATE caldav_todo_pending_deletions SET attempts = attempts + 1, last_error = ? WHERE id = ?'
-  ).run(String(err?.message || err).slice(0, 500), id);
+    'UPDATE caldav_todo_pending_deletions SET attempts = attempts + ?, last_error = ? WHERE id = ?'
+  ).run(counts ? 1 : 0, String(err?.message || err).slice(0, 500), id);
 }
 
 // --------------------------------------------------------
@@ -1972,9 +1972,14 @@ export async function processPendingShoppingMoves(client, accountId, targets, li
  * oder das Konto gelöscht wird. Führt der Abruf das Objekt inzwischen in einer
  * EINGESCHALTETEN Liste (auf einem anderen Gerät verschoben), wird es dort
  * gelöscht.
+ *
+ * `stop` (#1863): das Stoppsignal des Durchgangs (`createRefusalStop`). Nach
+ * einer kontoweiten Absage geht keine weitere Anfrage an das Konto, die
+ * Aufträge bleiben ohne Versuch. Der Aufrufer teilt es mit
+ * `processPendingUpdates` und über die Module hinweg.
  * @returns {Promise<number>} erledigte Tombstones
  */
-export async function processPendingDeletions(client, accountId, module, objectIndex, complete = false) {
+export async function processPendingDeletions(client, accountId, module, objectIndex, complete = false, { stop = createRefusalStop() } = {}) {
   const rows = pendingDeletions(accountId, module);
   if (rows.length === 0) return 0;
 
@@ -1998,6 +2003,9 @@ export async function processPendingDeletions(client, accountId, module, objectI
       continue;
     }
 
+    // Nach einer kontoweiten Absage in diesem Durchgang: nichts senden (#1863).
+    if (stop.blocks(collectionUrlOf(url))) continue;
+
     try {
       await client.deleteCalendarObject({ calendarObject: { url, etag: known?.etag } });
       dropDeletion(row.id);
@@ -2016,10 +2024,17 @@ export async function processPendingDeletions(client, accountId, module, objectI
         }
         continue;
       }
-      const action = outboundFailureAction(err, row.attempts);
+      // Eine kontoweite Absage verbraucht keinen Versuch (#1863).
+      const action = davFailureAction(err, row.attempts);
       if (action === 'settled') {
         dropDeletion(row.id);
         done++;
+        continue;
+      }
+      if (action === 'wait') {
+        stop.trip(err, collectionUrlOf(url));
+        failDeletion(row.id, err, { counts: false });
+        log.warn(`Remote deletion of VTODO ${row.uid} was refused for the whole account, it waits without using up an attempt:`, err.message);
         continue;
       }
       failDeletion(row.id, err);
@@ -2044,7 +2059,7 @@ export async function processPendingDeletions(client, accountId, module, objectI
  *
  * @returns {Promise<number>} erfolgreich verarbeitete Einträge
  */
-export async function processPendingUpdates(client, accountId, module, objectIndex) {
+export async function processPendingUpdates(client, accountId, module, objectIndex, { stop = createRefusalStop() } = {}) {
   const def  = moduleDef(module);
   const rows = pendingUpdates(accountId, module);
   if (rows.length === 0) return 0;
@@ -2077,6 +2092,8 @@ export async function processPendingUpdates(client, accountId, module, objectInd
       continue;
     }
 
+    if (stop.blocks(collectionUrlOf(url))) continue;
+
     try {
       await client.updateCalendarObject({ calendarObject: { url, etag: known.etag, data: patched } });
       // Erledigt ist nur, was hinausging (#1862).
@@ -2089,10 +2106,15 @@ export async function processPendingUpdates(client, accountId, module, objectInd
         log.warn(`The stored address of VTODO ${row.external_uid} is not on the server of its account, its update waits.`);
         continue;
       }
-      const action = outboundFailureAction(err, row.outbound_attempts);
+      const action = davFailureAction(err, row.outbound_attempts);
       if (action === 'settled') {
         log.warn(`VTODO ${row.external_uid} no longer exists on the server, dropping its update.`);
         clearOutbound(module, row.id);
+        continue;
+      }
+      if (action === 'wait') {
+        stop.trip(err, collectionUrlOf(url));
+        log.warn(`Outbound update of "${def.labelOf(row)}" was refused for the whole account, it waits without using up an attempt:`, err.message);
         continue;
       }
       if (action === 'give-up') {
@@ -2277,6 +2299,8 @@ async function runFlushOutbound({ createClient } = {}) {
       // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.
       await releaseLeftoverTodoUploads(client, accountId, { clientFor });
 
+      // Ein Stoppsignal für Löschen und Ändern aller Module dieses Kontos (#1863).
+      const stop = createRefusalStop();
       for (const module of modules) {
         const wanted = [
           ...pendingDeletions(accountId, module)
@@ -2292,8 +2316,8 @@ async function runFlushOutbound({ createClient } = {}) {
         // complete = false: ohne vollen Listenabruf ist "der Server führt das
         // Objekt nicht mehr" nicht belegbar; ein Tombstone ohne bekannte URL
         // bleibt für den Sync liegen.
-        total.deleted += await processPendingDeletions(client, accountId, module, objectIndex, false);
-        total.updated += await processPendingUpdates(client, accountId, module, objectIndex);
+        total.deleted += await processPendingDeletions(client, accountId, module, objectIndex, false, { stop });
+        total.updated += await processPendingUpdates(client, accountId, module, objectIndex, { stop });
 
         // Uploads brauchen die Collection selbst, nicht einzelne Objekte - und
         // damit den einzigen Listenabruf in diesem Pfad. Er läuft deshalb nur,

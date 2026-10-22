@@ -12,7 +12,7 @@ import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
-import { promptModal, openModal, closeModal, captureModalContext, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { promptModal, openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
@@ -784,7 +784,17 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false, e
       }
       renderTabs(container);
     }
-    reportError(err, container);
+    // ZURUECKGEROLLT HEISST: DIESER ARTIKEL, DIESER STAND, NOCH EINMAL (Critique
+    // R21, D15). Wo die eigene Absicht zurueckgenommen wurde, nennt der Satz
+    // den Artikel und wie er jetzt wieder steht. Hat jemand anderes dasselbe
+    // getan (die Absicht ist erfuellt, die Zeile steht richtig), stimmt "wieder
+    // offen" nicht - dort bleibt der allgemeine Satz.
+    const name = state.items.find((i) => i.id === id)?.name;
+    if (intent && name) {
+      reportError(err, container, newVal ? 'common.errorCheckRolledBack' : 'common.errorUncheckRolledBack', { name });
+    } else {
+      reportError(err, container);
+    }
   }
   return undefined;
 }
@@ -1048,6 +1058,9 @@ async function openSendListDialog(container) {
     return;
   }
 
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   let members = [];
   try {
     // Nicht `/family/members`: der zeigt dieselben Haushaltsmitglieder, prueft
@@ -1072,6 +1085,7 @@ async function openSendListDialog(container) {
   // Bildschirm die neue steht. Bei etwas, das sich nicht zuruecknehmen laesst,
   // ist das der teuerste Fehler dieser Funktion.
   if (state.activeListId !== listId) return;
+  if (!isModalContextCurrent(context)) return;
 
   if (!members.length) {
     window.yuvomi.showToast(t('shopping.sendListNoRecipients'), 'warning');
@@ -1576,7 +1590,23 @@ function renderItem(item) {
              vorher hingen die zwei Buttons als direkte Flex-Kinder in der Zeile,
              wodurch die Bedienzone in jedem Tab anders zusammengesetzt war. -->
         <div class="list-row__actions">
-          ${ro ? renderReadActions(item) : `<!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
+          ${ro ? renderReadActions(item) : `${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
+               utils/row-action.js): Stift und Papierkorb standen in jeder der
+               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
+               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
+               widerrufbar (Undo-Toast) und per Wischen erreichbar.
+               MEHR VOR DEM GRIFF (R21, D10 Zeilen-Endzone): der Griff steht
+               in jeder sortierbaren Liste ganz rechts, wie in den Aufgaben -
+               hier stand er als einziges Modul vor dem Mehr-Knopf. */ ''}
+          ${rowMenuHtml({
+            id: `shopping-item-menu-${item.id}`,
+            label: t('common.moreActionsNamed', { name: item.name }),
+            items: [
+              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
+              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+            ],
+          })}
+          <!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
                wie im Kategorie-Manager: dort steht daneben ein Auf/Ab-Paar als
                Tastaturpfad, hier trägt der Griff ihn selbst (Pfeiltasten bei
                Fokus). Die Einkaufszeile hat schon Abhaken, Details, Löschen und
@@ -1587,19 +1617,7 @@ function renderItem(item) {
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
           </button>
-${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
-               utils/row-action.js): Stift und Papierkorb standen in jeder der
-               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
-               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
-               widerrufbar (Undo-Toast) und per Wischen erreichbar. */ ''}
-          ${rowMenuHtml({
-            id: `shopping-item-menu-${item.id}`,
-            label: t('common.moreActionsNamed', { name: item.name }),
-            items: [
-              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
-              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
-            ],
-          })}`}
+`}
         </div>
       </div>
     </div>`;
@@ -2377,6 +2395,26 @@ function syncGroupChrome(listEl) {
   });
 }
 
+/**
+ * DIE ZAEHLER, WIE SIE NACH DEM UMZUG STEHEN (Critique R21, D3). Sie zogen erst
+ * mit `syncGroupChrome` nach dem Austritt nach - gemessen ~1,7s nach dem Haken,
+ * 400ms nachdem die Zeile zu gehen begann. Jetzt nehmen sie den Stand im
+ * selben Frame an, in dem die Zeilen ausblenden: was bleibt, plus was
+ * ankommt. Nur die Zahl - ob eine Gruppe verschwindet, entscheidet weiter
+ * `syncGroupChrome` nach dem Umzug.
+ */
+function previewGroupCounts(listEl, moves) {
+  const leaving = new Set(moves.map((m) => m.row));
+  listEl.querySelectorAll('.list-group').forEach((groupEl) => {
+    const countEl = groupEl.querySelector('.list-group__count');
+    if (!countEl) return;
+    const stay = Array.from(groupEl.querySelectorAll('.row-carrier > .swipe-row')).filter((r) => !leaving.has(r)).length;
+    const arrive = moves.filter((m) => groupEl.contains(m.to)).length;
+    const text = String(stay + arrive);
+    if (countEl.textContent !== text) countEl.textContent = text;
+  });
+}
+
 /** Steht das Element im Bild - weder selbst noch ueber einen Vorfahren `hidden`? */
 function shown(el) {
   return Boolean(el) && !el.closest('[hidden]');
@@ -2486,7 +2524,10 @@ function settleItemPlacements(container, ids, { animate = true } = {}) {
   };
 
   // Aus einem zugeklappten Traeger gibt es nichts zusammenzuklappen.
-  const closing = animate ? leaving.filter((row) => !row.parentElement.hidden).map((row) => collapseOut(row)) : [];
+  const closingRows = animate ? leaving.filter((row) => !row.parentElement.hidden) : [];
+  // Die Zaehler wechseln im Moment des Austritts, nicht nach ihm (D3).
+  if (closingRows.length) previewGroupCounts(listEl, first);
+  const closing = closingRows.map((row) => collapseOut(row));
   if (closing.length) Promise.all(closing).then(move);
   else move();
 }
@@ -3018,6 +3059,9 @@ async function openPantryTransfer(container) {
   const checked = state.items.filter((i) => checkedOf(i));
   if (!checked.length) return;
 
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   let locations = [];
   try {
     const res = await api.get('/pantry/locations');
@@ -3029,6 +3073,7 @@ async function openPantryTransfer(container) {
 
   const { PANTRY_UNITS } = await import('/utils/pantry-units.js');
   const { locationLabel } = await import('/utils/pantry-locations.js');
+  if (!isModalContextCurrent(context)) return;
 
   const unitOptions = (selected) => PANTRY_UNITS
     .map((u) => `<option value="${esc(u)}" ${u === selected ? 'selected' : ''}>${esc(t(`pantry.units.${u}`))}</option>`)
@@ -3909,9 +3954,10 @@ function wireLiveUpdates(container, routeSignal) {
  * @param {unknown} err
  * @param {Element} container
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ * @param {Record<string, unknown>} [params] - Werte fuer diesen Satz
  */
-function reportError(err, container, fallbackKey) {
-  window.yuvomi.showToast(errorSentence(err, fallbackKey), 'danger');
+function reportError(err, container, fallbackKey, params) {
+  window.yuvomi.showToast(errorSentence(err, fallbackKey, params), 'danger');
   if (isGone(err)) reloadAfterGone(container);
 }
 
@@ -4387,7 +4433,9 @@ function openStoreManager(container) {
 async function openCategoryManager(container, { fromDeepLink = false } = {}) {
   // Regel 7: der Aufrufer versteckt den Ausloeser, die Komponente fragt nicht.
   if (readOnly()) return;
-  const { openModal } = await import('/components/modal.js');
+  // Kein `await import('/components/modal.js')` mehr: das Modul ist oben schon
+  // geladen, und das Warten darauf war nur ein Fenster, in dem der Nutzer einen
+  // anderen Dialog oeffnen konnte, den dieser dann verdraengte (#1997).
 
   // Die geteilte Komponente (Audit F-15) dispatcht ohne Detail — der lokale
   // State wird nach jeder Mutation frisch vom Server geladen.

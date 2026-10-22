@@ -92,11 +92,27 @@ img, svg, video {
   max-width: 100%;
 }
 
-/* `display: block` oben ist eine Autorenregel und schlaegt das UA-`[hidden]` -
- * jedes `<img hidden>` der App stand damit sichtbar da, etwa das noch nicht
- * geladene Dokument-Thumbnail ueber seinem Glyph (#1340, test:hidden-cascade). */
-img[hidden], svg[hidden], video[hidden] {
-  display: none;
+/* `hidden` HEISST WEG - UEBERALL (D13, Critique R21).
+ *
+ * Das UA-Blatt traegt `[hidden] { display: none }` auf der untersten Ebene,
+ * und JEDE Autorenregel mit `display` schlaegt es. Bis hier hielt das eine
+ * Rettungsregel je Klasse zusammen (`.x[hidden] { display: none }`, rund 60
+ * Stueck, test:hidden-cascade) - und die naechste Klasse ohne Rettung stand
+ * wieder sichtbar da: zuletzt der Glyph der Dokument-Vorschau als
+ * 3x32-px-Splitter neben jedem Bild, weil `.document-thumb__glyph` ein
+ * `inline-flex` traegt und die Stelle das Attribut per `setAttribute` setzt.
+ *
+ * `!important` ist hier der Sinn der Regel und kein Notbehelf: nur so gewinnt
+ * sie gegen jede Klasse, gleich welcher Spezifitaet und Reihenfolge. Was sie
+ * schlagen koennte - ein `display` ungleich `none` mit `!important` - verbietet
+ * test:hidden-cascade. Ausgenommen ist `hidden="until-found"`: das Element
+ * bleibt fuer die Seitensuche im Fluss (content-visibility), dafuer ist es da.
+ * Die einzelnen Rettungsregeln der Modulblaetter (55, dazu die fuer img, svg
+ * und video) sind seit R21 S9a entfernt - sie doppelten diese Regel nur; eine
+ * neue haelt test:hidden-cascade auf, die mit `!important` die Sperrklinke in
+ * test:frontend-audit. */
+[hidden]:not([hidden="until-found"]) {
+  display: none !important;
 }
 
 /* OHNE POPOVER-API BLEIBT EIN POPOVER ZU (#2107).
@@ -226,6 +242,44 @@ h1, h2, h3, h4, h5, h6 {
    * Animation des Elements. */
   .page-toolbar--capped > .page-toolbar__title {
     --motion-blend: var(--duration-sm);
+  }
+
+  /* Der Zeitraum-Wisch (R21, D2): kein Zug, aber der neue Zeitraum blendet ein
+   * (`period-swipe-fade`, layout.css) - reine Deckkraft, keine Wegstrecke. */
+  .period-swipe-in--fade {
+    --motion-blend: var(--duration-sm);
+  }
+
+  /* STATUSBEWEGUNG BLEIBT (Critique R21, D12). Ein Spinner sagt "es laeuft
+   * noch"; stand er still, sah ein laufender Vorgang wie ein haengender aus -
+   * die Sperre oben setzte ihn auf 0s. Er dreht auf der Stelle, ohne
+   * Wegstrecke, und behaelt deshalb sein Tempo - ueber dieselbe Abmeldung wie
+   * die Blenden oben, nur mit dem Tempo der Drehung. Nur reine
+   * Statusdrehungen (`status-spin`) stehen hier. */
+  .btn--loading::after,
+  .auth-spinner,
+  .document-viewer__spinner {
+    --motion-blend: var(--spin-period);
+  }
+}
+
+/* WAS DER ZEIGER TUT, TUT DER FINGER ANDERS (Critique R21, a4). "Datei hier
+ * ablegen" stand auch auf dem Telefon, wo nichts abzulegen ist - dort tippt
+ * man. Zwei Fassungen desselben Satzes, die eine fuer Zeigergeraete, die andere
+ * fuer Touch; das Kriterium ist `hover: none` wie bei den Zielgroessen, nicht
+ * die Breite. `display: none` nimmt die jeweils andere auch aus dem
+ * Barrierebaum, gelesen wird nur die, die zu sehen ist. */
+.u-touch-only {
+  display: none;
+}
+
+@media (hover: none) {
+  .u-pointer-only {
+    display: none;
+  }
+
+  .u-touch-only {
+    display: inline;
   }
 }
 

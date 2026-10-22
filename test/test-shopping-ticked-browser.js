@@ -27,6 +27,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { launchBrowser } from './chrome-executable.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUB = join(ROOT, 'public');
@@ -59,8 +60,13 @@ const api = { log: [], patch: 'ok' };
 const pageErrors = [];
 
 before(async () => {
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  browser = await launchBrowser(puppeteer, { headless: true, args: ['--no-sandbox'] });
   page = await browser.newPage();
+  // Die Sprache steht fest, bevor ein Skript der App laeuft: ohne gespeicherte
+  // Wahl faellt i18n.js auf navigator.languages zurueck, und das headless
+  // Chrome erbt die vom Rechner - auf einem englischen waren drei Sonden rot,
+  // die deutsche Texte erwarten (derselbe Weg wie #2147).
+  await page.evaluateOnNewDocument(() => localStorage.setItem('yuvomi-locale', 'de'));
   await page.setViewport({ width: 390, height: 844 });
   await page.setRequestInterception(true);
   page.on('request', async (req) => {
@@ -125,6 +131,15 @@ async function setup(items, { tickedOpen = false, pause = PAUSE, reducedMotion =
     s.updateItemsList(c);
     s.wireListContentEvents(c);
   }, items, tickedOpen, pause);
+  /* GEMESSEN WIRD, WAS GEZEICHNET IST: erst nach dem naechsten Bild.
+   * Ab der zweiten Gruppe traegt die Liste `content-visibility: auto`
+   * (shopping.css, Critique R21 S8). Bis der Browser nach einem Neuaufbau das
+   * erste Bild rechnet, ueberspringt er ihren Inhalt beim Treffertest:
+   * elementFromPoint fand in derselben Aufgabe die Gruppe statt ihres Kopfes,
+   * zwei Bilder spaeter den Kopf (gemessen 2026-10-22, je 5 von 5). Ein Finger
+   * trifft nur, was auf dem Schirm steht; ohne das Warten hing die Sonde daran,
+   * ob zwischen zwei CDP-Aufrufen zufaellig ein Bild lag (2 von 6 Laeufen rot). */
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -341,9 +356,11 @@ test('Lehnt der Server nach dem Umzug ab, kommt die Zeile zurueck', async () => 
   const end = await until((st) => rows(st, 'Obst').join() === '1,2', 400 + 2 * EXIT_BUDGET);
   assert.deepEqual(rows(end, 'Obst'), [1, 2], 'zurueck an ihrem Rang');
   assert.equal(group(end, 'ABGEHAKT').shown, false);
-  // Der Hinweis ist der Satz der App, nicht der des Servers (#1909): eine Antwort
-  // ohne `reason` zeigt den allgemeinen, das "Nein." des Stubs darf nie ankommen.
-  assert.deepEqual(await page.evaluate(() => window.toasts), [['Ein Fehler ist aufgetreten.', 'danger']]);
+  // Der Hinweis ist der Satz der App, nicht der des Servers (#1909): das "Nein."
+  // des Stubs darf nie ankommen. Seit Critique R21 (D15) nennt er den Artikel,
+  // seinen Stand und den naechsten Schritt statt "Ein Fehler ist aufgetreten.".
+  assert.deepEqual(await page.evaluate(() => window.toasts),
+    [['„Apfel“ ist wieder offen - das Abhaken hat nicht geklappt. Versuch es noch einmal.', 'danger']]);
 });
 
 test('Umsortieren in der Pause nennt auch die Zeile, die noch im Abschnitt wartet', async () => {

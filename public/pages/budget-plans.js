@@ -10,7 +10,7 @@ import { openModal, closeModal, captureModalContext, reportFieldError, refocusAf
 import { vibrate, isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -103,7 +103,12 @@ function renderBody(body) {
       <p class="budget-plan__historic-note">
         <i data-lucide="info" class="icon-md" aria-hidden="true"></i>${t('budget.planHistoricNote')}
       </p>`}
-    ${renderSavingsCard(d.savings)}
+    ${/* DER PLAN BEGINNT MIT DEM PLAN (R21 S7, Critique a4). Ohne Sparziel
+          stand mobil zuerst die Aufforderung, eines zu setzen - eine 117px-
+          Karte vor dem ersten Kategorie-Budget. Ein gesetztes Ziel ist Zustand
+          und steht vorn; die Aufforderung steht hinter den Kategorien. Breit
+          setzt das Raster sie ohnehin in die Seitenspalte (`dense`). */ ''}
+    ${d.savings ? renderSavingsCard(d.savings) : ''}
     <div class="budget-plan__section">
       <!-- KEIN ZWEITES „+ BUDGET FESTLEGEN" IM KOERPER (Re-Critique
            2026-09-27, A5 / R10 L11): der Budget-FAB nennt auf diesem Reiter
@@ -114,6 +119,7 @@ function renderBody(body) {
       </div>
       <div id="budget-plan-rows" class="row-carrier">${renderRows(d.plans)}</div>
     </div>
+    ${d.savings ? '' : renderSavingsCard(d.savings)}
   `);
   if (window.lucide) lucide.createIcons({ el: body });
   wire(body);
@@ -257,6 +263,7 @@ export function openAddPlan() {
   const optHtml = options.map((c) =>
     `<option value="${view.ctx.esc(c.key)}">${view.ctx.esc(view.ctx.categoryLabel(c))}</option>`).join('');
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: t('budget.planAddBudget'),
     content: `
       <div class="form-group">
@@ -324,7 +331,7 @@ function amountFieldHtml(value) {
       <label class="form-label" for="plan-amount">${t('budget.planMonthlyAmount')}</label>
       <input id="plan-amount" class="form-input" type="number" inputmode="decimal" min="0"
              step="${amountStep(view.ctx.currency, value)}"
-             value="${value === '' ? '' : String(value)}" placeholder="${amountPlaceholder(view.ctx.currency)}" />
+             value="${amountFieldValue(value, view.ctx.currency)}" placeholder="${amountPlaceholder(view.ctx.currency)}" />
     </div>`;
 }
 

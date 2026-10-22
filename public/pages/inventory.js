@@ -20,6 +20,8 @@ import {
   confirmModal,
   refocusAfterRender,
   captureModalContext,
+  captureOpenContext,
+  isModalContextCurrent,
 } from '/components/modal.js';
 import { errorSentence, isGone, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -102,7 +104,11 @@ function categoryTracksOdometer(categoryKey) {
 // --------------------------------------------------------
 async function openLocationManager() {
   if (readOnly()) return;
+  // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
+  const context = captureOpenContext();
   await import('/components/category-manager.js');
+  if (!isModalContextCurrent(context)) return;
 
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
   // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
@@ -165,7 +171,11 @@ async function openLocationManager() {
 // --------------------------------------------------------
 async function openCategoryManager() {
   if (readOnly()) return;
+  // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
+  const context = captureOpenContext();
   await import('/components/category-manager.js');
+  if (!isModalContextCurrent(context)) return;
 
   // Wie bei den Orten: das Ereignis traegt die Auffrischung, nicht das
   // Schliessen (siehe `_notifyChanged` in components/category-manager.js).
@@ -2192,7 +2202,8 @@ function openItemModal(mode, item = null) {
   // „Bearbeiten" aus der Detailspalte.
   if (readOnly()) return;
   const form = buildItemForm({ mode, item });
-  openSharedModal({ title: form.title, size: 'md', content: form.content, onSave: form.wire });
+  // Anlegen: Buehne zuerst, Felder nach dem ersten Bild (modal.js `staged`, R21 a6).
+  openSharedModal({ title: form.title, size: 'md', content: form.content, onSave: form.wire, staged: mode === 'create' });
 }
 
 async function saveItem(panel, mode, item, attachments, pickedBooking, photoData) {

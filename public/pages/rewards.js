@@ -11,9 +11,9 @@ import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -1132,6 +1132,7 @@ async function decideRedemption(id, action, btn) {
     if (!ok) return;
   }
   if (btn) btn.disabled = true;
+  const context = captureModalContext();
   try {
     await api.patch(`/rewards/redemptions/${id}`, { action });
     const msg = action === 'fulfill' ? t('rewards.toastApproved')
@@ -1156,9 +1157,14 @@ async function decideRedemption(id, action, btn) {
     // Reicht das Guthaben bei der Freigabe nicht mehr, bleibt die Anfrage
     // offen (#1734) - gebucht ist nichts, neu zu laden gibt es nichts.
     const ohneDeckung = err?.data?.reason === 'insufficient_funds';
-    await confirmModal(vergriffen ? t('rewards.outOfStock')
-      : ohneDeckung ? t('rewards.money.insufficientOnApprove') : rewardsErrorSentence(err),
-    { confirmLabel: t('rewards.gotIt') });
+    const meldung = vergriffen ? t('rewards.outOfStock')
+      : ohneDeckung ? t('rewards.money.insufficientOnApprove') : rewardsErrorSentence(err);
+    // Als Dialog nur im Kontext von VOR der Anfrage (#2134): confirmModal geht
+    // durch openModal und verdraengte sonst den Dialog, den der Nutzer
+    // inzwischen geoeffnet hat, oder ginge auf der naechsten Seite auf. Dann
+    // geht derselbe Satz als Toast hinaus.
+    if (isModalContextCurrent(context)) await confirmModal(meldung, { confirmLabel: t('rewards.gotIt') });
+    else toast(meldung, 'danger');
     // Auch ohne Deckung neu laden: das Guthaben neben der Anfrage ist der
     // Stand von vor der Absage - also genau der, der sie nicht mehr erklaert.
     // Ebenso, wenn die Anfrage inzwischen weg, schon entschieden oder mit dem
@@ -1178,6 +1184,7 @@ function openBonusModal() {
   const members = enrolledMembers();
   if (!members.length) { confirmModal(t('rewards.emptyOverviewAdmin'), { confirmLabel: t('rewards.gotIt') }); return; }
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: t('rewards.grantBonus'),
     content: `
       <form id="rw-bonus-form" novalidate>
@@ -1235,6 +1242,7 @@ function openRewardModal(item) {
   if (readOnly()) return;
   const isEdit = !!item;
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('rewards.editReward') : t('rewards.addReward'),
     content: `
       <form id="rw-reward-form" novalidate>
@@ -1336,14 +1344,20 @@ function openRewardModal(item) {
 
 async function openParticipantsModal() {
   if (readOnly()) return;
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   let members = [];
   try {
     const res = await api.get('/rewards/participants');
     members = res.data || [];
   } catch (err) {
-    await confirmModal(rewardsErrorSentence(err, 'rewards.loadError'), { confirmLabel: t('rewards.gotIt') });
+    // Der Ladefehler gehoert zu einem Dialog, der dann ohnehin nicht mehr
+    // aufginge: ist der Nutzer weiter, entfaellt er (#2134).
+    if (isModalContextCurrent(context)) await confirmModal(rewardsErrorSentence(err, 'rewards.loadError'), { confirmLabel: t('rewards.gotIt') });
     return;
   }
+  if (!isModalContextCurrent(context)) return;
   openModal({
     title: t('rewards.manageParticipants'),
     // Ein ANSICHTSBLATT: jeder Haken speichert sofort (PUT je Person), es gibt
@@ -1394,11 +1408,15 @@ async function openParticipantsModal() {
 async function openMemberDetail(memberId) {
   const member = balances().find((b) => b.id === memberId);
   if (!member) return;
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   let ledger = [];
   try {
     const res = await api.get(`/rewards/ledger?user_id=${memberId}&limit=12`);
     ledger = res.data || [];
   } catch { /* Historie optional */ }
+  if (!isModalContextCurrent(context)) return;
   const hint = nextRewardHint(member.balance);
   const rows = ledger.length ? ledger.map((row) => {
     const positive = row.delta > 0;
@@ -1552,10 +1570,23 @@ function renderMoneyRow(account) {
           <button class="btn btn--secondary btn--sm" type="button" data-money-book="${account.id}">
             <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.book'))}
           </button>
-          ${rowActionHtml({ icon: 'calendar-clock', label: `${t('rewards.money.planTitle')}: ${account.display_name}`, attrs: { 'data-money-plan': account.id } })}
-          ${/* Schliessen nur, wo der Server sagt, dass nichts mehr daran haengt
-                (kein Plan, Saldo null, nichts offen) - sonst wiese er es ab. */ ''}
-          ${account.closable ? rowActionHtml({ icon: 'x', label: `${t('rewards.money.closeAccount')}: ${account.display_name}`, attrs: { 'data-money-close': account.id } }) : ''}
+          ${/* PLAN UND SCHLIESSEN IM MEHR-KNOPF (R21, D10 Zeilen-Endzone:
+                EINE sichtbare Handlung, dahinter der Mehr-Knopf). Hier standen
+                Buchen, ein Plan-Zeichen und ein Schliessen-Kreuz nebeneinander -
+                drei Knoepfe, zwei davon ohne Wort. Die Eintraege tragen dieselben
+                Haken wie die Knoepfe vorher (wireMoney). Schliessen nur, wo der
+                Server sagt, dass nichts mehr daran haengt (kein Plan, Saldo
+                null, nichts offen) - sonst wiese er es ab. */ ''}
+          ${rowMenuHtml({
+            id: `rw-money-menu-${account.id}`,
+            label: t('common.moreActionsNamed', { name: account.display_name }),
+            items: [
+              { action: 'money-plan', icon: 'calendar-clock', label: t('rewards.money.planTitle'), attrs: { 'data-money-plan': account.id } },
+              account.closable
+                ? { action: 'money-close', icon: 'x', label: t('rewards.money.closeAccount'), danger: true, attrs: { 'data-money-close': account.id } }
+                : null,
+            ],
+          })}
         </div>`
     : (mine && !account.former && !readOnly()) ? `
         <div class="rw-standing__actions">
@@ -1563,9 +1594,15 @@ function renderMoneyRow(account) {
                   ${account.balance_minor > 0 ? '' : 'disabled'}>
             <i data-lucide="arrow-up-from-line" aria-hidden="true"></i>${esc(t('rewards.money.withdraw'))}
           </button>
-          <button class="btn btn--ghost btn--sm" type="button" data-money-request="deposit" data-member="${account.id}">
-            <i data-lucide="arrow-down-to-line" aria-hidden="true"></i>${esc(t('rewards.money.deposit'))}
-          </button>
+          ${/* Einzahlen ist die seltenere Anfrage: Eintrag im Mehr-Knopf
+                (R21, D10), Abheben bleibt die eine sichtbare Handlung. */ ''}
+          ${rowMenuHtml({
+            id: `rw-money-menu-${account.id}`,
+            label: t('common.moreActionsNamed', { name: account.display_name }),
+            items: [
+              { action: 'money-deposit', icon: 'arrow-down-to-line', label: t('rewards.money.deposit'), attrs: { 'data-money-request': 'deposit', 'data-member': account.id } },
+            ],
+          })}
         </div>` : '';
   return `
     <li class="list-row rw-standing rw-money">
@@ -1970,11 +2007,14 @@ async function closeMoneyAccount(account) {
   const ok = await confirmModal(t('rewards.money.confirmCloseAccount', { name: account.display_name }),
     { confirmLabel: t('rewards.money.closeAccount'), detail: t('rewards.money.closeAccountDetail') });
   if (!ok) return;
+  const context = captureModalContext();
   try {
     await deleteUnlessGone(`/rewards/money/accounts/${account.id}`, 'rewards_money_account_not_found');
     toast(t('rewards.toastSaved'), 'default');
   } catch (err) {
-    await confirmModal(rewardsErrorSentence(err), { confirmLabel: t('rewards.gotIt') });
+    // Als Dialog nur im Kontext von vor der Anfrage, sonst als Toast (#2134).
+    if (isModalContextCurrent(context)) await confirmModal(rewardsErrorSentence(err), { confirmLabel: t('rewards.gotIt') });
+    else toast(rewardsErrorSentence(err), 'danger');
   }
   await refreshActiveTab();
   refocusAfterRender();
@@ -1987,11 +2027,14 @@ async function closeMoneyAccount(account) {
  * Meldung kommt als Dialog wie bei den Nachbarn, und die Liste wird in beiden
  * Faellen neu geladen: sie zeigt, was jetzt gilt. */
 async function removeMoneyPlan(account) {
+  const context = captureModalContext();
   try {
     await deleteUnlessGone(`/rewards/money/plans/${account.id}`, 'rewards_money_plan_not_found');
     toast(t('rewards.toastSaved'), 'default');
   } catch (err) {
-    await confirmModal(rewardsErrorSentence(err), { confirmLabel: t('rewards.gotIt') });
+    // Als Dialog nur im Kontext von vor der Anfrage, sonst als Toast (#2134).
+    if (isModalContextCurrent(context)) await confirmModal(rewardsErrorSentence(err), { confirmLabel: t('rewards.gotIt') });
+    else toast(rewardsErrorSentence(err), 'danger');
   }
   await refreshActiveTab();
   refocusAfterRender();
@@ -2036,10 +2079,14 @@ function moneyLedgerRowHtml(row) {
 async function openMoneyDetail(memberId) {
   const account = moneyAccount(memberId);
   if (!account) return;
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureOpenContext();
   let ledger = [];
   try {
     ledger = (await api.get(`/rewards/money/ledger?user_id=${memberId}&limit=20`)).data || [];
   } catch { /* Historie optional */ }
+  if (!isModalContextCurrent(context)) return;
   const rows = ledger.length
     ? ledger.map(moneyLedgerRowHtml).join('')
     : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerTitle'))}</p></li>`;
@@ -2083,6 +2130,8 @@ export const __test = {
   renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
   minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal, openMoneyBookModal,
   openMoneyAccountModal, closeMoneyAccount,
+  // #1997: Dialoge, die erst nach dem Laden aufgehen (test-late-modal-open.js).
+  openParticipantsModal, openMemberDetail, openMoneyDetail,
 };
 
 export async function render(container, { user } = {}) {

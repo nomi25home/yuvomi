@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
+import { globalHiddenRule } from './css-rules.js';
 
 const birthdays = await import('../public/pages/birthdays.js');
 const { __test: calendar } = await import('../public/pages/calendar.js');
@@ -157,8 +158,9 @@ test('the remove-photo button exists only while there is a photo', () => {
   assert.match(renderPreview, /removePhoto\.hidden = !photoData/, 'follows the photo state after crop and removal');
   const onRemove = modal.slice(modal.indexOf("removePhoto.addEventListener('click'"));
   assert.match(onRemove.slice(0, 400), /photoEdit\?*\.focus\(\)/, 'removing hides the focused button - focus moves to the edit button');
-  const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
-  assert.match(css, /\.birthday-modal__photo-action\[hidden\]\s*\{\s*display:\s*none;?\s*\}/, 'display: inline-flex would beat the UA [hidden]');
+  // display: inline-flex would beat the UA [hidden] - since R21 S9a the one
+  // global rule in reset.css (D13) holds it, not one rule per class.
+  assert.ok(globalHiddenRule(), 'display: inline-flex would beat the UA [hidden]');
 });
 
 // ── R10 L5: Geburtstage als Liste + Detail ────────────────────────────────
@@ -215,21 +217,27 @@ test('Liste + Detail: Seite, Markup, Klickweg und die klebende Spalte', () => {
   const block = css.slice(css.indexOf('@container module-surface (min-width: 65rem)'));
   assert.ok(block.length > 0, 'die Spalte gilt ab der Schwelle aus tokens.css');
   assert.match(block, /position: sticky;/);
-  assert.match(block, /height: calc\(var\(--viewport-height\) - var\(--birthdays-detail-top/,
-    'die Hoehe rechnet ab der gemessenen Oberkante - sonst ragt sie in Ruhe unter den Falz');
+  // R21 S7 (D9): HOECHSTENS bis zur Luft ueber dem Fensterrand, nicht immer -
+  // die Spalte endet unter ihrem Inhalt (1920: 528px leer ueber dem Fuss).
+  assert.match(block, /max-height: calc\(var\(--viewport-height\) - var\(--birthdays-detail-top/,
+    'die Obergrenze rechnet ab der gemessenen Oberkante - sonst ragt sie in Ruhe unter den Falz');
+  assert.doesNotMatch(block, /(?:^|[;\s])height: calc\(var\(--viewport-height\)/, 'keine feste Hoehe: die Spalte folgt dem Inhalt');
 });
 
 // R19 (Critique 2026-10-16): Monatsgruppen in der Liste, und der naechste
-// Geburtstag fuehrt im Modulton.
+// Geburtstag fuehrt im Modulton. R21 S9b (Critique a3, "7 Monatskoepfe fuer 8
+// Eintraege"): die Koepfe stehen erst, wenn im Mittel zwei auf einen Monat kommen.
 test('R19: die Liste gruppiert nach Monat und hebt den naechsten hervor', async () => {
   const { installMiniDom } = await import('./mini-dom.js');
   const restore = installMiniDom();
   try {
     const row = (id, next) => ({ id, name: `P${id}`, next_birthday: next, days_until: id * 10, next_age: 30, birth_date: '1990-01-01' });
-    const html = birthdays.__test.birthdayListHtml([row(1, '2026-11-02'), row(2, '2026-11-20'), row(3, '2027-02-08')]);
-    const heads = [...html.matchAll(/<h2 class="list-group__title birthdays-month">([^<]*)<\/h2>/g)].map((m) => m[1]);
-    assert.equal(heads.length, 2, `ein Kopf je Monat: ${heads.join(', ')}`);
-    assert.ok(html.indexOf(heads[1]) > html.indexOf('data-id="2"'), 'der zweite Kopf steht vor dem Februar, nach beiden Novembern');
+    const heads = (h) => [...h.matchAll(/<h2 class="list-group__title birthdays-month">([^<]*)<\/h2>/g)].map((m) => m[1]);
+    const duenn = birthdays.__test.birthdayListHtml([row(1, '2026-11-02'), row(2, '2026-11-20'), row(3, '2027-02-08')]);
+    assert.deepEqual(heads(duenn), [], 'drei Geburtstage in zwei Monaten: kein Register - jeder Kopf wiederholte nur ein Datum');
+    const html = birthdays.__test.birthdayListHtml([row(1, '2026-11-02'), row(2, '2026-11-20'), row(3, '2027-02-08'), row(4, '2027-02-19')]);
+    assert.equal(heads(html).length, 2, `ein Kopf je Monat: ${heads(html).join(', ')}`);
+    assert.ok(html.indexOf(heads(html)[1]) > html.indexOf('data-id="2"'), 'der zweite Kopf steht vor dem Februar, nach beiden Novembern');
     assert.equal((html.match(/birthday-item--next/g) ?? []).length, 1, 'genau einer ist der naechste');
     assert.ok(html.indexOf('birthday-item--next') < html.indexOf('data-id="2"'), 'und zwar der erste');
   } finally { restore(); }
@@ -317,4 +325,18 @@ test('Mitglied ohne Geburtsjahr: Liste ohne 2000, Editoren mit "Jahr unbekannt"'
     assert.match(src, /birthDateControlHtml\(\{[\s\S]{0,200}yearUnknown: (user\?|member)\.birth_year_unknown/, `${page} reicht die Marke an den Editor`);
     assert.match(src, /birth_year_unknown: birth\.yearUnknown/, `${page} schickt die Marke mit`);
   }
+});
+
+/* D7 (Critique R21): DER GEBURTSTAG FUEHRT ZU SEINEM KONTAKT. Ein importierter
+ * Eintrag traegt `contact_id` (Migration 90) - die Leseansicht bietet an der
+ * Datumszeile "Kontakt anzeigen" an, wie Apples Kalender am Geburtstag. Ohne
+ * Verknuepfung bleibt die Zeile reiner Text. */
+test('R21 D7: ein importierter Geburtstag fuehrt zu seinem Kontakt', () => {
+  const rows = birthdays.__test.birthdayPaneSections({ id: 1, name: 'Tante', birth_date: '1970-05-04', year_unknown: 0, contact_id: 9 });
+  const row = rows.find((r) => r.icon === 'cake');
+  assert.ok(row?.action, 'die Datumszeile traegt eine Folgeaktion');
+  assert.equal(row.action.label, 'birthdays.showContact');
+  assert.equal(birthdays.__test.contactHref(9), '/contacts?open=9');
+  const own = birthdays.__test.birthdayPaneSections({ id: 2, name: 'Lose', birth_date: '1970-05-04', year_unknown: 0, contact_id: null });
+  assert.equal(own.find((r) => r.icon === 'cake')?.action ?? null, null);
 });

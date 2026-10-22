@@ -15,7 +15,7 @@ import {
   dialogSegments, submitOutsideFooter, footerWithoutCancel, saveBranchPartners,
   fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
 } from './dialog-grammar.js';
-import { lateModalCloses } from './late-modal-close.js';
+import { lateModalCalls } from './late-modal-close.js';
 import { reloadsAfterWrite } from './reload-after-write.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
@@ -299,72 +299,175 @@ test('kein HTML-Kommentar im Markup enthält ein Backtick', () => {
   );
 });
 
-// #1997: eine spaete Antwort schliesst nur ihren EIGENEN Dialog. Die Regel steht
-// in components/modal.js (`closeModal({ force, context })`); hier zaehlt der
-// Bestand der Stellen, die nach einem `await` noch ohne Kontext schliessen
-// (Scanner und seine Grenzen: late-modal-close.js). Die Zahl je Datei darf nur
-// SINKEN - wer eine Stelle umstellt, senkt sie hier mit; eine neue Datei steht
-// bei 0.
-const LATE_MODAL_CLOSE_BESTAND = {
-  'components/quick-links-manager.js': 0,
-  'pages/birthdays.js': 0,
-  'pages/budget-plans.js': 0,
-  'pages/budget.js': 0,
-  'pages/calendar.js': 2,
-  'pages/contacts.js': 0,
-  'pages/health.js': 0,
-  'pages/housekeeping.js': 0,
-  'pages/inventory.js': 0,
-  'pages/meals.js': 4,
-  'pages/pantry.js': 1,
-  'pages/rewards.js': 0,
-  'pages/schedule.js': 0,
-  'pages/shopping.js': 0,
-  'pages/split-expenses.js': 6,
-  'pages/tasks.js': 0,
-  'pages/waste.js': 0,
-  'settings/pages/admin-family.js': 0,
-  'settings/pages/modules-health.js': 0,
-  'settings/pages/modules-kitchen.js': 0,
-  'settings/pages/personal-calendar-subscriptions.js': 0,
-  'settings/pages/sync-calendar.js': 0,
-  'settings/pages/sync-contacts.js': 0,
+// #1997: eine spaete Antwort trifft nur ihren EIGENEN Dialog. Die Regel steht
+// in components/modal.js (`closeModal({ force, context })`, fuer das Oeffnen
+// `isModalContextCurrent(context)`); hier zaehlt der Bestand der Stellen, die
+// erst mit einer Antwort schliessen oder oeffnen - hinter einem `await` oder in
+// einem `.then()` - und dabei nicht pruefen, ob der Dialog von vorher noch der
+// offene ist (Scanner und seine Grenzen: late-modal-close.js). Die Zahl je
+// Datei und Art darf nur SINKEN - wer eine Stelle umstellt, senkt sie hier
+// mit; eine neue Datei steht bei 0.
+const LATE_MODAL_BESTAND = {
+  close: {
+    'components/quick-links-manager.js': 0,
+    'pages/birthdays.js': 0,
+    'pages/budget-plans.js': 0,
+    'pages/budget.js': 0,
+    'pages/calendar.js': 0,
+    'pages/contacts.js': 0,
+    'pages/health.js': 0,
+    'pages/housekeeping.js': 0,
+    'pages/inventory.js': 0,
+    'pages/meals.js': 0,
+    'pages/pantry.js': 0,
+    'pages/rewards.js': 0,
+    'pages/schedule.js': 0,
+    'pages/shopping.js': 0,
+    'pages/split-expenses.js': 0,
+    'pages/tasks.js': 0,
+    'pages/waste.js': 0,
+    'settings/pages/admin-family.js': 0,
+    'settings/pages/modules-health.js': 0,
+    'settings/pages/modules-kitchen.js': 0,
+    'settings/pages/personal-calendar-subscriptions.js': 0,
+    'settings/pages/sync-calendar.js': 0,
+    'settings/pages/sync-contacts.js': 0,
+  },
+  open: {
+    'components/budget-transfer-dialog.js': 0,
+    'components/quick-links-manager.js': 0,
+    'pages/birthdays.js': 0,
+    'pages/calendar.js': 0,
+    'pages/contacts.js': 0,
+    'pages/inventory.js': 0,
+    'pages/pantry.js': 0,
+    'pages/recipes.js': 0,
+    'pages/rewards.js': 0,
+    'pages/shopping.js': 0,
+    'pages/split-expenses.js': 0,
+    'pages/waste.js': 0,
+    'settings/pages/admin-family.js': 0,
+  },
+  // #2134: confirmModal() geht durch openModal() und verdraengt genauso, was
+  // im Slot liegt - als Fehlermeldung nach einer gescheiterten Anfrage oder
+  // als Frage, die aus einer Antwort entsteht.
+  confirm: {
+    'pages/documents.js': 0,
+    'pages/rewards.js': 0,
+    'settings/pages/modules-install.js': 0,
+    'settings/pages/modules-rewards.js': 0,
+    'settings/pages/sync-calendar.js': 0,
+  },
 };
 
-test('kein neues closeModal() nach einem await ohne den Kontext des eigenen Dialogs (#1997, Ratsche)', () => {
-  const ist = {};
+const LATE_MODAL_RAT = {
+  close: 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben',
+  open: 'den Kontext VOR der Anfrage festhalten (captureOpenContext() - der neueste Oeffnungswunsch gilt) und nach der Antwort '
+    + '`if (!isModalContextCurrent(context)) return;` vor openModal()',
+  confirm: 'den Kontext VOR der Anfrage festhalten und confirmModal() nur rufen, solange isModalContextCurrent(context) gilt - '
+    + 'eine Fehlermeldung geht sonst als Toast, eine Frage entfaellt (captureModalContext(), fuer eine Frage aus der Antwort captureOpenContext())',
+};
+
+test('kein neues closeModal()/openModal()/confirmModal() mit einer Antwort ohne den Kontext des eigenen Dialogs (#1997, #2134, Ratsche)', () => {
+  const ist = { close: {}, open: {}, confirm: {} };
+  let gescannt = 0;
   for (const path of walkJsFiles('../public/')) {
     if (path.includes('/vendor/') || path.endsWith('/components/modal.js')) continue;
-    const offen = lateModalCloses(read(path)).filter((call) => !call.guarded);
-    if (offen.length) ist[path.slice('../public/'.length)] = offen.map((call) => call.line);
+    gescannt += 1;
+    for (const call of lateModalCalls(read(path))) {
+      if (call.guarded) continue;
+      (ist[call.kind][path.slice('../public/'.length)] ??= []).push(call.line);
+    }
   }
-  const files = new Set([...Object.keys(ist), ...Object.keys(LATE_MODAL_CLOSE_BESTAND)]);
-  for (const file of [...files].sort()) {
-    const lines = ist[file] ?? [];
-    const erlaubt = LATE_MODAL_CLOSE_BESTAND[file] ?? 0;
-    assert.ok(lines.length <= erlaubt,
-      `${file}: ${lines.length} closeModal() nach einem await ohne context (erlaubt ${erlaubt}), Zeilen ${lines.join(', ')} - `
-      + 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben');
-    assert.equal(lines.length, erlaubt,
-      `${file}: nur noch ${lines.length} statt ${erlaubt} - die Zahl in LATE_MODAL_CLOSE_BESTAND mitsenken`);
+  assert.ok(gescannt >= 100, `nur ${gescannt} Frontend-Dateien gescannt - der Scan greift nicht mehr`);
+  for (const kind of ['close', 'open', 'confirm']) {
+    const name = `${kind}Modal()`;
+    const files = new Set([...Object.keys(ist[kind]), ...Object.keys(LATE_MODAL_BESTAND[kind])]);
+    for (const file of [...files].sort()) {
+      const lines = ist[kind][file] ?? [];
+      const erlaubt = LATE_MODAL_BESTAND[kind][file] ?? 0;
+      assert.ok(lines.length <= erlaubt,
+        `${file}: ${lines.length} ${name} mit einer Antwort ohne Kontext (erlaubt ${erlaubt}), Zeilen ${lines.join(', ')} - `
+        + LATE_MODAL_RAT[kind]);
+      assert.equal(lines.length, erlaubt,
+        `${file}: nur noch ${lines.length} statt ${erlaubt} ${name} - die Zahl in LATE_MODAL_BESTAND.${kind} mitsenken`);
+    }
   }
 });
 
-test('der Spaet-Schliessen-Scanner erkennt das Muster, das er zaehlt', () => {
-  const zaehle = (src) => lateModalCloses(src).map((call) => call.guarded);
+test('der Spaet-Dialog-Scanner erkennt das Muster, das er zaehlt', () => {
+  const zaehle = (src) => lateModalCalls(src).map((call) => `${call.kind}/${call.via}/${call.guarded ? 'geschuetzt' : 'offen'}`);
   // Ungeschuetzt: Speichern, dann schliessen.
-  assert.deepEqual(zaehle('async function s() { await api.put(1); closeModal({ force: true }); }'), [false]);
+  assert.deepEqual(zaehle('async function s() { await api.put(1); closeModal({ force: true }); }'), ['close/await/offen']);
   // Alias aus dem Import, Pfeilfunktion als Handler, await in einem try-Block davor.
   assert.deepEqual(zaehle(`import { closeModal as closeSharedModal } from '/components/modal.js';
-    btn.addEventListener('click', async () => { try { await api.post(2); closeSharedModal({ force: true }); } catch {} });`), [false]);
+    btn.addEventListener('click', async () => { try { await api.post(2); closeSharedModal({ force: true }); } catch {} });`), ['close/await/offen']);
   // Geschuetzt: mit Kontext, oder hinter isModalContextCurrent seit dem letzten await.
-  assert.deepEqual(zaehle('async function s() { const d = captureModalContext(); await api.put(1); closeModal({ force: true, context: d }); }'), [true]);
-  assert.deepEqual(zaehle('async function s() { await api.put(1); if (isModalContextCurrent(d)) await closeModal({ force: true }); }'), [true]);
+  assert.deepEqual(zaehle('async function s() { const d = captureModalContext(); await api.put(1); closeModal({ force: true, context: d }); }'), ['close/await/geschuetzt']);
+  assert.deepEqual(zaehle('async function s() { await api.put(1); if (isModalContextCurrent(d)) await closeModal({ force: true }); }'), ['close/await/geschuetzt']);
   // Nicht spaet: kein await davor, das await auf das Schliessen selbst, ein
   // await nur in einer verschachtelten Funktion, ein Kommentar.
   assert.deepEqual(zaehle('async function s() { if (x) return; await closeModal({ force: true }); }'), []);
   assert.deepEqual(zaehle('function s() { const f = async () => { await api.put(1); }; closeModal({ force: true }); }'), []);
   assert.deepEqual(zaehle('async function s() { await api.put(1); // closeModal({ force: true })\n}'), []);
+
+  // Form 1: der Rueckruf eines Versprechens laeuft immer erst mit der Antwort -
+  // als Ausdruck, als Block, als function, als blosser Name, als zweites
+  // Argument, in .catch und .finally.
+  assert.deepEqual(zaehle('function s() { api.put(1).then(() => closeModal({ force: true })); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(async (r) => { closeModal({ force: true }); }); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(function () { closeModal({ force: true }); }); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(closeModal); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(ok, () => closeModal()); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).catch((e) => { report(e); closeModal({ force: true }); }); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).finally(() => closeModal({ force: true, context: d })); }'), ['close/then/geschuetzt']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(() => openModal({})); }'), ['open/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(() => { if (isModalContextCurrent(d)) openModal({}); }); }'), ['open/then/geschuetzt']);
+  // Kein Rueckruf: das Schliessen selbst startet die Kette, ein Klick-Handler.
+  assert.deepEqual(zaehle('function s() { closeModal({ force: true }).then(() => reload()); }'), []);
+  assert.deepEqual(zaehle("function s() { btn.addEventListener('click', () => closeModal()); }"), []);
+
+  // Form 2: ein Dialog, der erst nach dem Laden aufgeht, ersetzt den, der
+  // inzwischen offen ist. Geschuetzt nur hinter isModalContextCurrent - das
+  // Oeffnen nimmt keinen Kontext.
+  assert.deepEqual(zaehle('async function s() { const r = await api.get(1); openModal({ content: r }); }'), ['open/await/offen']);
+  assert.deepEqual(zaehle(`import { openModal as openSharedModal } from '/components/modal.js';
+    async function s() { await api.get(1); openSharedModal({}); }`), ['open/await/offen']);
+  assert.deepEqual(zaehle('async function s() { if (x) { await api.get(1); } openModal({}); }'), ['open/await/offen']);
+  assert.deepEqual(zaehle(`async function s() { const d = captureModalContext(); const r = await api.get(1);
+    if (!isModalContextCurrent(d)) return; openModal({ content: r }); }`), ['open/await/geschuetzt']);
+  assert.deepEqual(zaehle('async function s() { await api.get(1); openModal({ onSave() { const context = 1; } }); }'), ['open/await/offen'],
+    'ein `context` in den Optionen des Oeffnens ist kein Schutz');
+  // Ein await, das nie zum Aufruf fuehrt: der Block davor endet mit return.
+  assert.deepEqual(zaehle('async function s() { if (!x) { await confirmModal("a"); return; } openModal({}); }'), []);
+  assert.deepEqual(zaehle('async function s() { try { r = await api.get(1); } catch (e) { await confirmModal("a"); return; } openModal({}); }'),
+    ['open/await/offen', 'confirm/await/offen'],
+    'das await im try fuehrt weiter, nur das im catch nicht - und die Meldung im catch kommt selbst erst mit der Antwort');
+
+  // #2134: confirmModal() oeffnet ueber openModal() - als Meldung nach einem
+  // Fehlschlag und als Frage aus einer Antwort, auch unter einem Alias.
+  assert.deepEqual(zaehle('async function s() { try { await api.del(1); } catch (e) { await confirmModal(e.message); } }'), ['confirm/await/offen']);
+  assert.deepEqual(zaehle(`import { confirmModal as ask } from '/components/modal.js';
+    async function s() { const r = await api.get(1); if (await ask("a")) go(); }`), ['confirm/await/offen']);
+  assert.deepEqual(zaehle(`async function s() { const d = captureModalContext(); try { await api.del(1); }
+    catch (e) { if (isModalContextCurrent(d)) await confirmModal(e.message); else toast(e.message); } }`), ['confirm/await/geschuetzt']);
+  // Die Antwort auf eine Rueckfrage gibt der Nutzer im offenen Dialog: eine
+  // zweite Frage danach ist keine spaete - wohl aber, wenn davor eine Anfrage lief.
+  assert.deepEqual(zaehle('async function s() { if (!(await confirmModal("a"))) return; await confirmModal("b"); }'), []);
+  assert.deepEqual(zaehle('async function s() { await api.get(1); if (!(await confirmModal("a"))) return; await confirmModal("b"); }'),
+    ['confirm/await/offen', 'confirm/await/offen']);
+  // Ein anderer Zweig derselben Weiche erreicht den Aufruf nie; ein Zweig mit
+  // demselben Wert oder einer anderen Bedingung schon.
+  assert.deepEqual(zaehle(`async function s(a) { if (a.x === 'test') { await api.post(1); }
+    if (a.x === 'delete') { await confirmModal("a"); } }`), []);
+  assert.deepEqual(zaehle(`async function s(a) { if (a.x === 'test') { await api.post(1); }
+    if (a.y === 'delete') { await confirmModal("a"); } }`), ['confirm/await/offen']);
+  assert.deepEqual(zaehle(`async function s(a) { if (a.x === 'test') { await api.post(1); }
+    if (a.x === 'test') { await confirmModal("a"); } }`), ['confirm/await/offen']);
+  // Ein frueherer Zweig derselben if/else-Kette ebenso - hinter der Kette nicht.
+  assert.deepEqual(zaehle('async function s() { if (a) { await api.get(1); } else { await confirmModal("a"); } }'), []);
+  assert.deepEqual(zaehle('async function s() { if (a) { await api.get(1); } else if (b) { x(); } else { await confirmModal("a"); } }'), []);
+  assert.deepEqual(zaehle('async function s() { if (a) { await api.get(1); } else { y(); } await confirmModal("a"); }'), ['confirm/await/offen']);
 });
 
 // #2069: ist das Schreiben angekommen, gilt der Eintrag als gespeichert. Ein
@@ -2891,8 +2994,31 @@ test('Strich der Modulzeichen liegt in der Mitte der Lucide-Spanne von --icon-md
   assert.ok(Math.abs(Number(stroke[1]) - mid) <= 0.05,
     `--icon-stroke ${stroke[1]} liegt nicht in der Mitte der Lucide-Spanne (${mid.toFixed(2)})`);
   const layout = read('../public/styles/layout.css');
-  assert.match(layout, /\.module-glyph,\s*\.nav-item__icon,\s*\.more-item__icon\s*\{\s*stroke-width:\s*var\(--icon-stroke\);\s*vector-effect:\s*non-scaling-stroke;/,
-    'die Modulzeichen tragen --icon-stroke als feste gerenderte Breite');
+  const rules = [...eachRule(layout)].filter((r) => !r.at.length);
+  const parts = (r) => r.selector.split(',').map((s) => s.trim());
+
+  // R21 (Critique 2026-10-21, D4): EIN STRICH FUER JEDES ZEICHEN, nicht nur
+  // fuer die Modulzeichen. Gemessen standen 9 (mobil) bis 12 (Laptop)
+  // gerenderte Strichstaerken zwischen 1,0 und 4,7px nebeneinander.
+  const HAENDE = ['lucide', 'module-glyph', 'nav-item__icon', 'more-item__icon', 'event-icon--custom'];
+  const breite = rules.find((r) => /stroke-width:\s*var\(--icon-stroke\)/.test(r.body)
+    && HAENDE.every((cls) => parts(r).includes(`.${cls}`)));
+  assert.ok(breite, `eine Regel gibt ${HAENDE.map((c) => `.${c}`).join(', ')} --icon-stroke`);
+
+  // DIE EIGENSCHAFT ERBT NICHT. `vector-effect` stand bis R21 am <svg> selbst
+  // und wirkte dort nie: sie gilt fuer die Grafikelemente (path, line, circle),
+  // nicht fuer ihren Behaelter, und sie wird nicht vererbt (gemessen in Chrome:
+  // am Wurzelelement `none` auf jedem Pfad). Die Modulzeichen zeichneten also
+  // die ganze Zeit skaliert - 1.5 auf viewBox 24 sind bei 16px 1,0px, nicht 1,5.
+  // Der Guard verlangt die Eigenschaft an den Kindern, und keine Regel darf sie
+  // nur an die Wurzel schreiben, wo sie gruen aussieht und nichts tut.
+  const nonScaling = rules.filter((r) => /vector-effect:\s*non-scaling-stroke/.test(r.body));
+  for (const cls of HAENDE) {
+    assert.ok(nonScaling.some((r) => parts(r).includes(`.${cls} *`)),
+      `.${cls} * traegt vector-effect: non-scaling-stroke (an den Strichen, nicht am <svg>)`);
+  }
+  const amBehaelter = nonScaling.flatMap(parts).filter((s) => !/\s\*$/.test(s));
+  assert.deepEqual(amBehaelter, [], 'vector-effect am Behaelter wirkt nicht - es gehoert an die Striche');
 });
 
 test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht vom ersten Eintrag herein', () => {
@@ -3858,10 +3984,11 @@ test('die Küchen-Listen teilen eine Zeilen-Grammatik', () => {
   // zeigte - und ein Prüfskript, das nur die DOM-Property `hidden` liest, sieht
   // das nicht. Vorgänger: .page-fab/.btn/.form-group, dann .page-toolbar.
   const recipesCssForHidden = read('../public/styles/recipes.css');
-  const layoutCss = read('../public/styles/layout.css');
+  // Seit D13 (Critique R21) holt EINE Regel in reset.css jedes `[hidden]`
+  // zurueck; die Liste in layout.css ist gegangen. Verlangt wird diese Regel.
   if (/\.recipe-detail\s*\{[^}]*display:/.test(recipesCssForHidden)) {
-    assert.match(layoutCss, /\.recipe-detail\[hidden\],/,
-      '.recipe-detail setzt display und muss deshalb in der [hidden]-Durchsetzungsliste in layout.css stehen');
+    assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/,
+      '.recipe-detail setzt display - die globale [hidden]-Regel in reset.css muss es zurueckholen');
   }
 
   // Die Content-Spalte darf pro Ahnenkette genau einmal gesetzt werden.
@@ -6081,9 +6208,11 @@ test('die Küchen-Tab-Leiste trägt den Zustand des Kreislaufs', () => {
     'die Zahl ist redundant, sobald das Label sie nennt');
   // `display: inline-flex` schlägt das UA-`[hidden]`: der aktive Tab trug ohne diese
   // Regel ein 16 x 0px breites totes Innenmaß. Fünfte Fundstelle dieser Falle.
+  // Seit R21 S9a haelt das die EINE globale Regel in reset.css (D13), nicht
+  // mehr eine Rettung je Klasse.
   const subCss = read('../public/styles/sub-tabs.css');
-  assert.match(subCss, /\.sub-tab__badge\[hidden\]\s*\{\s*display:\s*none/,
-    'ohne diese Regel bleibt das leere Badge 16px breit stehen');
+  assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/,
+    'ohne die globale [hidden]-Regel bliebe das leere Badge 16px breit stehen');
   // Getönter Grund plus currentColor ergab auf inaktiven Tabs 4.02:1 bei 12px/600,
   // unter der AA-Schwelle 4.5. Gemessen nach dem Fix: 11.0 hell, 16.43 dunkel.
   assert.match(subCss, /\.sub-tab__badge\s*\{[\s\S]*?color:\s*var\(--color-text-primary\)/,
@@ -6476,15 +6605,15 @@ test('der Zeilenname bricht in Wörtern, nicht in Zeichen', () => {
   assert.match(recipesJs, /installPopoverMenus\(page\)/, 'das Menü muss an der stabilen Seitenwurzel verdrahtet sein');
 
   assert.match(recipes, /@container list-rows \(max-width: 30rem\)/,
-    'die Umschaltung hängt an der ZEILENbreite, wie beim Vorrats-Stepper');
-  // Die Quellreihenfolge entscheidet: `@container` erhöht die Spezifität nicht.
-  const inlineBase = recipes.indexOf('.recipe-row__inline-actions {');
+    'die Stapelung haengt an der ZEILENbreite, wie beim Vorrats-Stepper');
   const query = recipes.indexOf('@container list-rows');
-  assert.ok(inlineBase !== -1 && inlineBase < query,
-    'der Basiszustand muss VOR der Container-Query stehen, sonst gewinnt er gegen sie');
   const compact = recipes.slice(query);
-  assert.match(compact, /\.recipe-row__inline-actions\s*\{\s*display:\s*none/,
-    'die drei Inline-Aktionen müssen in der schmalen Zeile weichen');
+  // R21 (Zeilen-Endzone D10): die drei Aktionen stehen auf JEDER Breite im
+  // Ueberlaufmenue - ab 30rem standen sie sichtbar, samt Papierkorb.
+  assert.doesNotMatch(recipesJs, /recipe-row__inline-actions/, 'keine Inline-Aktionen in der Zeile');
+  assert.doesNotMatch(recipes, /recipe-row__inline-actions/, 'und keine Regel mehr fuer sie');
+  assert.match(recipes.slice(0, query), /\.recipe-row__more\s*\{\s*display:\s*flex/,
+    'der Mehr-Knopf steht im Basiszustand, nicht erst in der schmalen Zeile');
   // Die Zutatenzahl steht seit R4 im Slot `.recipe-row__sub` (zusammen mit
   // "Diese Woche geplant"); das Flex-Kind der Zeile ist damit der Slot, und ER
   // muss schmal die volle zweite Zeile nehmen.
@@ -6591,7 +6720,8 @@ test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)"
 
   // [hidden] muss gegen display:flex/inline-flex gewinnen, sonst bleiben die im
   // Verlauf ausgeblendeten Controls (Suche, Filterknopf) sichtbar.
-  assert.match(tasksCss, /\.tasks-toolbar \[hidden\]\s*\{[\s\S]*display:\s*none/);
+  // Ausgeblendetes im Kopf haelt die globale [hidden]-Regel (reset.css, D13; R21 S9a).
+  assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/);
 });
 
 test('Notes follow the mobile header rule: chips inside the port, category management in the menu', () => {
@@ -7624,10 +7754,11 @@ test('R19: die Pfeile jedes Zeitraum-Steppers stehen neutral, kein Modul faerbt 
 });
 
 test('calendar attachment removal control honors its hidden state', () => {
-  const calendarCss = read('../public/styles/calendar.css');
+  // Since R21 S9a the one global rule in reset.css (D13) keeps it hidden.
+  const resetCss = read('../public/styles/reset.css');
   assert.match(
-    calendarCss,
-    /#modal-remove-attachment\[hidden\]\s*\{\s*display:\s*none;/,
+    resetCss,
+    /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/,
     'the remove-attachment button must stay hidden for events without an attachment'
   );
 });
@@ -8376,6 +8507,9 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
   // hier - mit dem Grund, warum sie kein Eingabefeld ist.
   const FIELD_WORD = /search|input|field|select|textarea/i;
   const NOT_A_FIELD = new Map([
+    // R21 S9a: die Fusszeile der Tastenhinweise unter der Palette; ihre
+    // Haarlinie trennt sie von den Treffern, sie ist kein Feld.
+    ['.search-overlay__hints', 'Tastenhinweise der Palette (R21); Trennlinie ueber der Fusszeile, kein Feld'],
     // `.more-sheet__search` stand hier bis 2026-09-26: seit dem Komponenten-
     // Kanon traegt der Knopf die gefuellte Kapsel des EINEN Suchfelds, in Ruhe
     // ohne Kante und im Hover mit --color-border-control - keine Kartenkante mehr.
@@ -8386,6 +8520,9 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // Feld darin traegt weder Kante noch Grund. Mit Fokus wird sie wieder Feld.
     ['.page-toolbar .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kopfsuche; ein Knopf in der Kopf-Icon-Haut, kein Feld (ausser --field, R19)'],
     ['.section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Abschnittssuche; derselbe Knopf'],
+    // R21 S7 (D9): die kompakte eine Kopfzeile des Kalenders ab 1024px nimmt
+    // dieselbe Icon-Form (calendar.css, `cal-toolbar--compact`).
+    ['.page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kalendersuche in der kompakten Kopfzeile; derselbe Knopf'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
     // `.search-overlay__panel` stand hier bis R18 (2026-10-07): die Palette traegt
     // seither die Glaskante der schwebenden Flaechen (--glass-border), keine
@@ -11819,8 +11956,9 @@ test('Rechtevergabe ist auf dem Telefon beschriftet und mit dem Finger bedienbar
   assert.match(mobile, /\.perm-row \{[^}]*flex-direction: column;/s);
   assert.match(mobile, /\.perm-seg \{[^}]*grid-template-columns: repeat\(var\(--seg-count, 3\), 1fr\);/s);
 
-  // Am Zeiger bleibt es kompakt: das Label ist dort ausgeblendet.
-  assert.match(css, /\.perm-seg__label \{ display: none; \}/);
+  // Seit R21 traegt das Segment sein Wort auch am Zeiger (neben dem Icon) -
+  // die kompakte Icon-Fassung mit Legende ist gegangen (test:permissions).
+  assert.doesNotMatch(css, /\.perm-seg__label \{ display: none; \}/);
 });
 
 // "Automatische Backups" mit Titel, Hinweis und leerem Inhalt liest sich als
@@ -11848,9 +11986,11 @@ test('admin-backup sagt bei Ladefehlern, dass der Stand unbekannt ist', () => {
   // ... und `hidden` muss auf der Settings-Flaeche auch wirken: `.settings-form`
   // setzt display:flex mit derselben Spezifitaet wie das UA-`[hidden]` und
   // stand spaeter im Stylesheet, also blieb das Formular sichtbar.
+  // Seit D13 (Critique R21) fuer die ganze App in reset.css, nicht mehr nur
+  // fuer die Settings-Flaeche.
   assert.match(
-    read('../public/styles/settings.css'),
-    /\.settings-page \[hidden\] \{ display: none !important; \}/,
+    read('../public/styles/reset.css'),
+    /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/,
   );
 });
 
@@ -13819,6 +13959,39 @@ test('die Groesse des Icon-Knopfs gehoert der Shell', () => {
     + 'auf eine Shell-Frage. Genau so entstanden die 40px in Kalender/Kontakten '
     + 'neben den 44px in Aufgaben/Dokumenten. Farbe und Abstand darf ein Modul '
     + 'setzen, die Zielgroesse nicht.');
+});
+
+/**
+ * REGEL (2026-10-22): Auch der Textknopf schaltet seine Hoehe nach der
+ * ZEIGERFAEHIGKEIT, nicht nach der Breite.
+ *
+ * `.btn` stand ab `@media (min-width: 1024px)` auf `--target-md` - derselbe
+ * Fehler, den der Guard darueber fuer `.btn--icon` schon festhaelt. Ein Tablet
+ * im Querformat (1180px, `hover: none`) bekam damit 40px statt `--target-lg`,
+ * jeder Knopf im Kopf und der angedockte Primaerknopf ("+ Nomen") mit ihm
+ * (gemessen in test:page-fab-docked-browser). Die 40px am Zeiger bleiben: die
+ * Regel bekommt die Zeigerfaehigkeit als zweite Bedingung, die Breite allein
+ * schaltet nichts mehr.
+ */
+test('die Hoehe des Textknopfs schaltet nach der Zeigerfaehigkeit', () => {
+  const rules = [...eachRule(read('../public/styles/layout.css'))]
+    .filter((rule) => rule.selector.split(',').some((s) => s.trim() === '.btn'))
+    .filter((rule) => /(?:^|;)\s*min-height\s*:/.test(rule.body));
+
+  const base = rules.find((rule) => rule.at.length === 0);
+  assert.ok(base, '.btn braucht eine Basisregel mit min-height in layout.css.');
+  assert.match(base.body, /min-height:\s*var\(--target-lg\)/,
+    'Die Basis ist die Fingergroesse: was nicht weiss, dass ein Zeiger da ist, bekommt 48px.');
+
+  const bare = rules
+    .filter((rule) => rule.at.length > 0)
+    .filter((rule) => !rule.at.some((at) => /\(\s*hover\s*:\s*hover\s*\)|\(\s*pointer\s*:\s*fine\s*\)/.test(at)))
+    .map((rule) => rule.at.join(' | '));
+  assert.deepEqual(bare, [],
+    'Ein Block, der die Hoehe von .btn nur nach der Breite umschaltet, gibt einem '
+    + 'Touch-Tablet ab 1024px die Zeigergroesse (40px statt 48px).');
+  assert.ok(rules.some((rule) => rule.at.length > 0 && /min-height:\s*var\(--target-md\)/.test(rule.body)),
+    'Am Zeiger bleibt .btn bei --target-md - der Guard misst nur, solange es die Stufe gibt.');
 });
 
 /**
@@ -17447,7 +17620,8 @@ test('die Zaehler-Meldung haengt am Schreiben, nicht am Rendern (#868)', () => {
   assert.ok(fn, 'notifyCountedMutation ist nicht mehr auffindbar');
   assert.match(fn[0], /invalidateModuleCounts/,
     'die Meldung erreicht den Zaehlstand nicht');
-  assert.match(api, /if \(stateChanging\) notifyCountedMutation\(path\);/,
+  // Seit R21 im Block neben der Schreib-Meldung (`notifyWrite`).
+  assert.match(api, /if \(stateChanging\) \{[^}]*notifyCountedMutation\(path\);[^}]*\}/,
     'sie haengt nicht mehr am schreibenden Request');
 
   // Und die Render-Pfade melden NICHT mehr.
@@ -19087,7 +19261,7 @@ test('dashboard: Timer und Listener haengen am Signal des eigenen Aufbaus, nicht
   // Zwischen Kopf und Pruefung duerfen nur Zeilenkommentare stehen.
   assert.match(rebuild, /function rebuildDashboard\(cfg\) \{\n(?:\s*\/\/[^\n]*\n)*\s*if \(signal\.aborted\) return;/,
     'rebuildDashboard() prueft als Erstes, ob dieser Aufbau noch gilt');
-  for (const fn of ['async function refreshDashboardData()', 'const doAutoRefresh = async () =>', 'const doWeatherRefresh = async () =>']) {
+  for (const fn of ['async function refreshDashboardData(', 'const doAutoRefresh = async () =>', 'const doWeatherRefresh = async () =>']) {
     const at = render.indexOf(fn);
     assert.ok(at > 0, `${fn} nicht gefunden`);
     const body = render.slice(at, at + 1200);
@@ -21033,8 +21207,8 @@ test('R17 E6: die Zwei-Felder-Zeile steht einmal in layout.css, kein Modulblatt 
   const layout = [...eachRule(read('../public/styles/layout.css'))];
   const pair = layout.find((r) => r.selector.trim() === '.form-pair' && !r.at.length);
   assert.match(pair?.body ?? '', /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(/, '.form-pair ist das auto-fit-Raster');
-  assert.ok(layout.some((r) => r.selector.trim() === '.form-pair[hidden]' && /display:\s*none/.test(r.body)),
-    '`hidden` muss gegen `display: grid` gewinnen (Kilometerstand im Inventar)');
+  assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/,
+    '`hidden` muss gegen `display: grid` gewinnen (Kilometerstand im Inventar) - die globale Regel, R21 S9a');
   assert.match(read('../public/index.html'), /styles\/layout\.css/, 'layout.css laedt auf jeder Seite');
 
   const copies = [];
@@ -22134,10 +22308,10 @@ test('D8: ein Listen-Gruppenkopf - Versal-Mikro-Label ohne Icon in Kontakten und
   assert.doesNotMatch(notes, /notes-group__title u-section-title/);
   // Der Tageskopf der Agenda ist die begruendete eigene Stufe (Zeitachse,
   // calendar.css) - aber sein Kasten traegt die Groesse seiner Schrift, nicht
-  // die 24px der h2-Rolle.
+  // die 24px der h2-Rolle. Seit R21 S9b ist das Subheadline 15 (D4).
   const agenda = [...eachRule(read('../public/styles/calendar.css'))]
     .find(({ selector, at }) => selector.trim() === '.agenda-day__header' && at.length === 0);
-  assert.match(agenda?.body ?? '', /font-size\s*:\s*var\(--text-sm\)/);
+  assert.match(agenda?.body ?? '', /font-size\s*:\s*var\(--type-secondary\)/);
 });
 
 test('D3: die Reiter der Haushaltshilfe sind Text-Reiter ohne Icon', () => {
@@ -22382,7 +22556,14 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
 // `@media`/`@supports`/`@container` zaehlen mit, `@keyframes` nicht (dort
 // ignoriert der Browser `!important` ohnehin). vendor/ liegt nicht unter
 // public/styles. Stand 2026-10-18: 34. Wer eins entfernt, senkt die Zahl.
-const IMPORTANT_CEILING = 34;
+// Stand 2026-10-21 (D13, Critique R21): 28 - die globale `[hidden]`-Regel in
+// reset.css kam dazu, sieben Rettungsregeln mit `!important` gingen.
+// Stand 2026-10-22 (#2150): 15 - die 13 Spezifitaets-Umgehungen sind weg
+// (Rueckmelde-Zustaende der Knoepfe ueber `button.` + eigenes `:hover`, die
+// Liquid-Leiste, der Nur-lesen-FAB und das Rechte-Zeilen-Icon gewannen schon
+// ohne). Uebrig sind nur gewollte: reduzierte Bewegung, Druck, die globale
+// `[hidden]`-Regel und Glas aus.
+const IMPORTANT_CEILING = 15;
 test('!important-Sperrklinke: echte !important-Deklarationen in public/styles werden nicht mehr', () => {
   const dir = new URL('../public/styles/', import.meta.url);
   const found = [];
@@ -22393,7 +22574,7 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
       }
     }
   }
-  assert.ok(found.length > 20, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
+  assert.ok(found.length > 10, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
   assert.ok(found.length <= IMPORTANT_CEILING,
     `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
 });
@@ -22813,4 +22994,77 @@ test('long contact and recipe lists skip rendering rows out of view', () => {
       `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
   }
   assert.ok(![...eachRule(read('../public/styles/notes.css'))].some((r) => /content-visibility/.test(r.body)), 'Notizen bleiben ohne (Masonry-Spalten)');
+});
+
+/**
+ * R21 S8: KEIN `:has()` VOR EINEM UNIVERSALSELEKTOR ODER `::placeholder`.
+ * Chrome fuehrt die Reste aller Regeln, in denen `:has()` nicht im Subjekt
+ * steht, in EINER Invalidierungsmenge. Steht in einem dieser Reste `*` oder ein
+ * `::placeholder`, wird daraus "der ganze Teilbaum": jedes Einfuegen unter
+ * <html>, das ein `:has()`-Argument beruehren koennte (ein Dialog, ein Feld, ein
+ * Toast), rechnete den Stil des GANZEN Dokuments neu. Gemessen /tasks 1x, ein
+ * Overlay mit Feld einfuegen + Stil: 2,7 -> 1,3 ms; beim Anlegen-Blatt (4x)
+ * zweimal je Oeffnen. Ein Rest mit Klassen bleibt gezielt.
+ */
+function hasTailViolations(file) {
+  const out = [];
+  for (const rule of eachRule(read(file))) {
+    for (const sel of rule.selector.split(/,(?![^(]*\))/)) {
+      const s = sel.trim();
+      const at = s.lastIndexOf(':has(');
+      if (at < 0) continue;
+      // Ende des Compounds mit dem letzten :has(): erste Stelle auf Klammertiefe 0
+      // mit Kombinator oder Leerraum.
+      let depth = 0;
+      for (let i = 0; i < at; i += 1) { if (s[i] === '(') depth += 1; else if (s[i] === ')') depth -= 1; }
+      let end = s.length;
+      for (let i = at; i < s.length; i += 1) {
+        if (s[i] === '(') depth += 1;
+        else if (s[i] === ')') depth -= 1;
+        else if (depth === 0 && /[\s>+~]/.test(s[i])) { end = i; break; }
+      }
+      const tail = s.slice(end).trim();
+      if (!tail) continue; // :has() im Subjekt - invalidiert nur sich selbst
+      if (/(^|[\s>+~])\*\s*$/.test(tail) || /::placeholder/.test(tail)) out.push(`${file.split('/').pop()}: ${s}`);
+    }
+  }
+  return out;
+}
+
+test('R21 S8: kein :has() vor einem Universalselektor oder ::placeholder (ganzer Teilbaum je Einfuegen)', () => {
+  const files = readdirSync(new URL('../public/styles/', import.meta.url)).filter((f) => f.endsWith('.css'));
+  const bad = files.flatMap((f) => hasTailViolations(`../public/styles/${f}`));
+  assert.deepEqual(bad, [], `Ganzer-Teilbaum-Rest hinter :has():\n${bad.join('\n')}`);
+});
+
+/**
+ * R21 S8 (Critique a6 "lange Listen"): DIESELBE REGEL UEBER AUFGABEN HINAUS.
+ * Die Agenda ist die laengste Liste der App (Seed: 26 Tage, ~800 Knoten unter
+ * der Falz); jeder Dialog berechnete ihren Stil mit (Inertheit des
+ * Hintergrunds). Gruppen ab der zweiten (die erste steht in der Falz), Zeilen
+ * des Budgets je Zeile wie Kontakte. `overflow-clip-margin` haelt Schatten und
+ * Fokusring des Traegers, die die Paint-Containment sonst an der Gruppenkante
+ * abschnitte. Einkauf nur in der einen Spalte: ab 60rem verteilen Spalten bzw.
+ * Masonry die Kategorien nach Hoehe (wie bei den Notizen).
+ */
+test('R21 S8: Agenda, Vorrat, Inventar, Budget und Einkauf rechnen nur, was in Sicht ist', () => {
+  const expect = [
+    ['../public/styles/calendar.css', '.agenda-day + .agenda-day'],
+    ['../public/styles/pantry.css', '.pantry-group + .pantry-group'],
+    ['../public/styles/inventory.css', '.inventory-list > .list-group + .list-group'],
+    ['../public/styles/budget.css', '.budget-list > .list-row, .budget-ledger-section__rows > .list-row'],
+    ['../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group + .list-group'],
+  ];
+  for (const [file, selector] of expect) {
+    const rule = [...eachRule(read(file))].find((r) => r.selector.replace(/\s+/g, ' ').trim() === selector
+      && r.at.some((at) => /@supports \(content-visibility: auto\)/.test(at)));
+    assert.ok(rule, `${file}: ${selector} ohne content-visibility unter @supports`);
+    assert.match(rule.body, /content-visibility:\s*auto/);
+    assert.match(rule.body, /contain-intrinsic-size:\s*auto none auto \d+px/, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+    assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')), `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
+    assert.match(rule.body, /overflow-clip-margin:\s*var\(--space-\d\)/, `${selector}: Schatten und Fokusring des Traegers wuerden an der Kante abgeschnitten`);
+  }
+  const shop = [...eachRule(read('../public/styles/shopping.css'))].find((r) => /content-visibility/.test(r.body));
+  assert.ok(shop.at.some((at) => /@container shopping-surface \(width < 60rem\)/.test(at)),
+    'Einkauf: in Spalten/Masonry wechselten Gruppen mit Platzhalterhoehe beim Scrollen die Spalte');
 });

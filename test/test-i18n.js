@@ -539,11 +539,13 @@ test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
 //  - zh: "——" ist der chinesische Gedankenstrich (破折号), ein eigenes
 //    Satzzeichen; ein Bindestrich ist im chinesischen Fliesstext kein Ersatz.
 //    Erlaubt ist nur die Doppelform, ein einzelner Strich bleibt ein Befund.
+//    Dasselbe gilt fuer zh-Hant (破折號, Taiwans Interpunktionsnorm fuehrt ihn).
 //  - ru/uk tasks.subtaskDeleteDetail: der Strich steht fuer das ausgelassene
 //    Praedikat ("это — нет" = "das hier [laesst sich] nicht"); die Grammatik
 //    verlangt ihn dort, ein Bindestrich waere ein Fehler.
 const DASH_EXCEPTIONS = {
   zh: { allLocale: /——/g },
+  'zh-Hant': { allLocale: /——/g },
   ru: { keys: new Set(['tasks.subtaskDeleteDetail']) },
   uk: { keys: new Set(['tasks.subtaskDeleteDetail']) },
 };
@@ -665,5 +667,51 @@ test('timeSuffix: kein Stunden-Zaehlwort hinter einer Uhrzeit mit Doppelpunkt', 
     const suffix = JSON.parse(readFileSync(new URL(locale, LOCALES_DIR), 'utf8')).calendar.timeSuffix;
     assert.equal(typeof suffix, 'string', `${locale}: calendar.timeSuffix fehlt`);
     assert.doesNotMatch(suffix.trim(), HOUR_COUNTERS, `${locale}: "18:00 ${suffix}" mischt zwei Schreibweisen`);
+  }
+});
+
+// D15 (Critique R21): die deutsche Oberflaeche spricht durchgehend "du". Zwei
+// Saetze im Fasten (Datumsfeld, Sicherheitsdialog) siezten, mitten zwischen
+// lauter du-Saetzen. "Sie" am Satzanfang kann "sie" (Dritte) sein - geprueft
+// werden deshalb die Anredeformen, nicht das Wort.
+test('de spricht durchgehend du (Critique R21, D15)', () => {
+  const formal = /\b(?:können|koennen|möchten|müssen|sollten|dürfen|haben|sind|werden|finden) Sie\b|\b(?:Holen|Geben|Wählen|Klicken|Tippen|Bitte|Prüfen|Melden) Sie\b|\bIhnen\b/;
+  const hits = [...reference].filter(([, v]) => typeof v === 'string' && formal.test(v)).map(([k]) => k);
+  assert.deepEqual(hits, []);
+});
+
+// D15 (Critique R21): Anmeldung und Rundgang sprachen von "deinem
+// Familienplaner" - wer allein oder zu zweit wohnt, war darin nicht gemeint.
+// Der Satz nennt das Zuhause (Leitsatz "Ein Zuhause statt vieler Abos").
+test('Anmeldung und Rundgang sprechen vom Zuhause, nicht vom Familienplaner (Critique R21, D15)', () => {
+  const words = { de: /familienplaner/i, en: /family planner/i };
+  for (const [locale, word] of Object.entries(words)) {
+    const values = flatten(JSON.parse(readLocale(locale)));
+    for (const key of ['login.tagline', 'onboarding.step1Body']) {
+      assert.doesNotMatch(values.get(key), word, `${locale}: ${key}`);
+    }
+  }
+});
+
+// D15 (Critique R21, a4): der Aufklapper fuer seltene Felder hiess im
+// Aufgabenblatt "Weitere Einstellungen" und im Buchungsdialog "Weitere
+// Angaben" - zwei Woerter fuer denselben Baustein (advancedSection, modal.js).
+// Es gibt EINEN Schluessel, und kein Modul fuehrt einen eigenen mit.
+test('der Aufklapper fuer weitere Felder heisst ueberall gleich (Critique R21, D15)', () => {
+  for (const key of ['modal.moreSettings', 'budget.moreDetails', 'health.cycle.dayLog.more']) {
+    assert.equal(reference.has(key), false, `${key} ist ein zweites Wort fuer "Weitere Angaben"`);
+  }
+  assert.equal(reference.get('modal.moreDetails'), 'Weitere Angaben');
+  const modal = readFileSync(new URL('../public/components/modal.js', import.meta.url), 'utf8');
+  assert.match(modal, /label \?\? t\('modal\.moreDetails'\)/, 'der Baustein nennt sich selbst "Weitere Angaben"');
+});
+
+// Clarify (Critique R21): die Fussnote unter den Tastenkombinationen
+// entschuldigte sich ("kann hinter einem Release zurueckliegen"). Sie sagt
+// jetzt, wer das Handbuch pflegt und was der Klick tut.
+test('der Hinweis zum Nutzerhandbuch entschuldigt sich nicht (Critique R21)', () => {
+  for (const locale of ['de', 'en']) {
+    const hint = flatten(JSON.parse(readLocale(locale))).get('help.guideHint');
+    assert.doesNotMatch(hint, /zurückliegen|lag behind|veraltet|out of date/i, `${locale}: ${hint}`);
   }
 });

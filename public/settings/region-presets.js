@@ -77,6 +77,14 @@ export const REGION_PRESETS = {
   'be-BY': { currency: 'BYN', date_format: 'dmy', time_format: '24h' },
   'tr-TR': { currency: 'TRY', date_format: 'dmy', time_format: '24h' },
   'zh-CN': { currency: 'CNY', date_format: 'ymd', time_format: '24h' },
+  // Taiwan schreibt 2026/11/05 und rechnet in 12h (上午/下午) - beides CLDR
+  // zh-Hant-TW. Mit Schrift-Subtag, damit regionLocale() auf zh-Hant faellt.
+  'zh-Hant-TW': { currency: 'TWD', date_format: 'ymd_slash', time_format: '12h' },
+  // Hongkong und Macau schreiben 5/11/2026 und rechnen in 12h - CLDR zh-Hant-HK
+  // und zh-Hant-MO. Ohne diese beiden bekaeme ein Haushalt dort die Sprache,
+  // aber nicht seine Waehrung (dieselbe Luecke wie VND vor #297).
+  'zh-Hant-HK': { currency: 'HKD', date_format: 'dmy_slash', time_format: '12h' },
+  'zh-Hant-MO': { currency: 'MOP', date_format: 'dmy_slash', time_format: '12h' },
   'ja-JP': { currency: 'JPY', date_format: 'ymd', time_format: '24h' },
   'hi-IN': { currency: 'INR', date_format: 'dmy_slash', time_format: '12h' },
   'pt-PT': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
@@ -164,13 +172,150 @@ export function numberLocaleFor(prefs = {}) {
   return REGION_CODES.includes(region) ? region : '';
 }
 
-// Lokalisierter Anzeigename eines Regions-Codes (z. B. "de-DE" → "Deutsch (Deutschland)").
-// Fällt auf den Code zurück, wenn Intl.DisplayNames nicht verfügbar ist.
-export function regionLabel(code, locale) {
+// Laender, deren Voreinstellung die Sprache im Namen behaelt, obwohl es nur
+// EINE gibt: dort haengt das Format an der Sprache, nicht am Land (de-CH
+// schreibt 1'234.50, fr-CH 1 234,50). "Schweiz" allein verspraeche jedem dort
+// das deutschschweizer Format. Laender mit mehreren Voreinstellungen (Kanada,
+// Philippinen) brauchen keinen Eintrag - sie zaehlt `regionKeepsLanguage()`.
+const LANGUAGE_BOUND_COUNTRIES = ['CH'];
+
+function countryOf(code) {
+  return code.slice(code.lastIndexOf('-') + 1);
+}
+
+/**
+ * Traegt der Name dieser Region ihre Sprache? Ja, wenn das Land mehr als eine
+ * Voreinstellung hat (sonst waeren "Kanada" und "Kanada" nicht unterscheidbar)
+ * oder seine Sprache das Format bestimmt (LANGUAGE_BOUND_COUNTRIES).
+ */
+export function regionKeepsLanguage(code) {
+  const country = countryOf(code);
+  return LANGUAGE_BOUND_COUNTRIES.includes(country)
+    || REGION_CODES.filter((other) => countryOf(other) === country).length > 1;
+}
+
+/**
+ * Lokalisierter Anzeigename eines Regions-Codes: das LAND ("de-DE" →
+ * "Deutschland"), bei mehrsprachigen Regionen mit Sprache ("de-CH" →
+ * "Schweiz (Deutsch)").
+ *
+ * KURZ, WEIL DER WERT IN DER ZEILE STEHT (R21, Critique 2026-10-21): mobil hat
+ * die geschlossene Auswahl rund 180 px, und "Deutsch (Deutschland)" endete dort
+ * als "Deutsch (Deutsch…". Wer seine Region sucht, sucht sein Land - die
+ * Sprache sagt nur dort etwas, wo das Land allein es nicht tut.
+ *
+ * `withLanguage(region, language)` setzt die Langform, damit sie der Seite
+ * folgt (t('settings.regionWithLanguage')); ohne sie gilt "Land (Sprache)".
+ * Fällt auf den Code zurück, wenn Intl.DisplayNames nicht verfügbar ist.
+ */
+export function regionLabel(code, locale, withLanguage = (region, language) => `${region} (${language})`) {
   try {
-    const names = new Intl.DisplayNames([locale], { type: 'language' });
-    return names.of(code) || code;
+    const region = new Intl.DisplayNames([locale], { type: 'region' }).of(countryOf(code)) || code;
+    if (!regionKeepsLanguage(code)) return region;
+    const language = new Intl.DisplayNames([locale], { type: 'language' }).of(code.slice(0, code.indexOf('-')));
+    return language ? withLanguage(region, language) : region;
   } catch {
     return code;
+  }
+}
+
+/**
+ * Laender, deren CLDR-Name in mindestens einer Sprache nicht in die
+ * geschlossene Auswahl passt (#2151). Ihre Kurzform steht je Sprache unter
+ * `settings.regionShort.<Land>` - in Sprachen, in denen der volle Name passt,
+ * steht dort der volle Name. test:settings-navigation haelt die Liste: jeder
+ * Name, der das Zeichenbudget reisst, braucht hier einen Eintrag.
+ */
+export const SHORT_NAME_COUNTRIES = ['AE', 'AG', 'BS', 'DO', 'GB', 'HK', 'KN', 'MO', 'PH', 'SA', 'TT', 'US', 'VC'];
+
+/**
+ * Kurzer Anzeigename einer Region - das, was in der Auswahl steht (#2151).
+ * Der volle Name (`regionLabel`) steht in der Hinweiszeile, sobald er sich
+ * von diesem unterscheidet.
+ *
+ * WARUM DER WERT SELBST KURZ IST: die geschlossene Auswahl zeigt den Text der
+ * gewaehlten Option, und der ist derselbe wie in der Liste. Einen kuerzeren
+ * Wert nur fuer den geschlossenen Zustand gibt es nativ erst mit
+ * `appearance: base-select` (kein Firefox, Safari erst ab 27) - ohne es waere
+ * der Wert dort wieder gekappt. Mobil hat die Auswahl rund 145 px Text
+ * (R17: Bedienspalte 50cqi), und "Vereinigte Arabische Emirate" endete dort
+ * als "Vereinigte Arabisc…".
+ *
+ * - Land: `countryName(Land)` (die Seite liest `settings.regionShort.*`),
+ *   sonst der CLDR-Name.
+ * - Mehrsprachige Regionen tragen statt der Sprache ihr Kuerzel ("Kanada
+ *   (FR)") - die Form der Sprachwahl auf Seiten in Kanada und der Schweiz,
+ *   und in jeder Sprache gleich kurz. Mit ausgeschriebener Sprache ("Kanada
+ *   (Französisch)", "Philippinen (Englisch)") war mindestens eine dieser
+ *   Regionen in 13 von 26 Sprachen gekappt.
+ *
+ * @param {string} code Regions-Code wie "fr-CA"
+ * @param {string} locale UI-Sprache
+ * @param {object} [opts]
+ * @param {(country: string) => (string|null)} [opts.countryName]
+ * @param {(region: string, language: string) => string} [opts.withLanguage]
+ */
+export function regionShortLabel(code, locale, {
+  countryName = () => null,
+  withLanguage = (region, language) => `${region} (${language})`,
+} = {}) {
+  try {
+    const country = countryOf(code);
+    const region = countryName(country) || new Intl.DisplayNames([locale], { type: 'region' }).of(country) || code;
+    if (!regionKeepsLanguage(code)) return region;
+    return withLanguage(region, code.slice(0, code.indexOf('-')).toUpperCase());
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * UI-Sprachen, deren CLDR-Name in mindestens einer Sprache nicht in die
+ * geschlossene Auswahl passt (#2151): "Portugiesisch (Brasilien)",
+ * "Norwegisch (Bokmål)". Kurzform je Sprache unter
+ * `settings.languageShort.<Tag ohne Bindestrich>` ("Portugiesisch (BR)",
+ * "Norwegisch" - Bokmål ist das einzige Norwegisch der App). Die beiden
+ * Chinesisch stehen hier, weil ihre vollen Namen ("Chinesisch (vereinfacht)",
+ * "Chinesisch (traditionell)") in den meisten Sprachen das Budget reissen.
+ */
+export const SHORT_NAME_LANGUAGES = ['nb', 'pt-BR', 'zh', 'zh-Hant'];
+
+/**
+ * Unter welchem Tag eine UI-Sprache ihren NAMEN sucht, wenn der Code allein
+ * zu wenig sagt (D#1320). `zh` ist Vereinfacht, heisst im CLDR aber nur
+ * "Chinesisch" - neben "Chinesisch (traditionell)" las sich der unmarkierte
+ * Eintrag wie der Standard fuer alle Chinesisch Lesenden. Nur der Name folgt
+ * `zh-Hans`; Code, Datei und gespeicherter Wert bleiben `zh`.
+ */
+const LANGUAGE_LABEL_TAGS = Object.freeze({ zh: 'zh-Hans' });
+
+/** Voller Name einer UI-Sprache in `locale` (CLDR), oder der Code. */
+export function languageLabel(tag, locale) {
+  try {
+    const labelTag = Object.prototype.hasOwnProperty.call(LANGUAGE_LABEL_TAGS, tag) ? LANGUAGE_LABEL_TAGS[tag] : tag;
+    return new Intl.DisplayNames([locale], { type: 'language' }).of(labelTag) || tag;
+  } catch {
+    return tag;
+  }
+}
+
+/** Schluessel der Kurzform einer UI-Sprache unter `settings.languageShort`. */
+export const languageShortKey = (tag) => tag.replace('-', '');
+
+/**
+ * Kurzer Name einer UI-Sprache fuer die Sprachwahlen (#2151), aus demselben
+ * Grund kurz wie `regionShortLabel`. Der volle Name (CLDR) steht in der
+ * Hinweiszeile der Datensprache.
+ *
+ * @param {string} tag Sprach-Tag wie "pt-BR"
+ * @param {string} locale UI-Sprache
+ * @param {(tag: string) => (string|null)} [shortName] die Seite liest
+ *        `settings.languageShort.*`
+ */
+export function languageShortLabel(tag, locale, shortName = () => null) {
+  try {
+    return shortName(tag) || languageLabel(tag, locale);
+  } catch {
+    return tag;
   }
 }

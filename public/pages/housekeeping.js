@@ -8,12 +8,12 @@ import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { esc } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -21,7 +21,7 @@ import { wireScrollFade, vibrate, acknowledgeCheck, scheduleUndoableDelete } fro
 import { swapContent } from '/utils/content-swap.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { isNavModuleReadOnly, canSeeHousekeepingAmounts } from '/permissions.js';
@@ -787,6 +787,16 @@ function renderDashboard(content) {
       <div class="housekeeping-staff-log-list">
         ${recentRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisits'))}</p>`}
       </div>
+      ${/* DIE LETZTEN BESUCHE SIND DER ANFANG DES BERICHTS (R21 S9b, Critique
+            a2 "Besuche = Berichte"): dieselben Zeilen standen auf beiden
+            Reitern, ohne dass einer den anderen nannte. Die Uebersicht zeigt
+            die fuenf juengsten und fuehrt, wenn es mehr gibt, mit einer Zeile
+            zum vollstaendigen Monatsbericht - wie "Alle anzeigen" bei Apple. */ ''}
+      ${(state.recentVisits || []).length > recentVisits.length ? `
+      <button type="button" class="housekeeping-visits-more" data-show-reports>
+        <span>${esc(t('housekeeping.allVisitsInReport'))}</span>
+        <i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>
+      </button>` : ''}
       </div>
     </section>
     ${amountsHidden(data.monthly_payments) ? '' : `<section class="housekeeping-section">
@@ -808,6 +818,9 @@ function renderDashboard(content) {
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
   wireMetricGlance(content, 'housekeeping-glance-more', (expanded) => { _metricsExpanded = expanded; });
+  content.querySelector('[data-show-reports]')?.addEventListener('click', () => {
+    (content.closest('.housekeeping-page') || document).querySelector('.housekeeping-tab[data-tab-id="reports"]')?.click();
+  });
   // `if (!readOnly())` statt `return`: die lesende Verdrahtung (Bericht
   // oeffnen) steht dahinter und muss bleiben - dieselbe Form wie in health.js.
   if (!readOnly()) {
@@ -943,6 +956,7 @@ function openTaskCreateModal(content) {
             <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
           </button>`)).join('');
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: t('housekeeping.addTask'),
     size: 'md',
     content: `
@@ -953,7 +967,7 @@ function openTaskCreateModal(content) {
           <div class="housekeeping-template-list">${templateButtons}
           </div>
         </section>` : ''}
-        <form id="housekeeping-task-form" class="housekeeping-task-form" aria-labelledby="housekeeping-custom-title">
+        <form id="housekeeping-task-form" class="housekeeping-task-form" novalidate aria-labelledby="housekeeping-custom-title">
           <h3 class="housekeeping-create__heading" id="housekeeping-custom-title">${esc(t('housekeeping.addCustomTask'))}</h3>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.taskName'))}</span>
@@ -1006,6 +1020,9 @@ function openTaskCreateModal(content) {
       panel.querySelector('[data-create-cancel]')?.addEventListener('click', () => closeModal());
       panel.querySelector('#housekeeping-task-form')?.addEventListener('submit', (event) => {
         event.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const fields = event.currentTarget.elements;
         const frequencyDays = Number(fields.frequency_days.value);
         if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
@@ -1483,10 +1500,11 @@ function applyVisitReport(data) {
  * Knopfbreite, sobald man den laufenden Monat verliess. */
 function reportMonthNavHtml(shownMonth, isCurrentMonth) {
   // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  const keys = periodArrowKeys();
   return periodStepperHtml({
-    prev: { id: 'housekeeping-report-prev', label: t('housekeeping.prevMonth'), attrs: { 'aria-describedby': 'housekeeping-report-month' } },
+    prev: { id: 'housekeeping-report-prev', label: t('housekeeping.prevMonth'), keys: keys.prev, attrs: { 'aria-describedby': 'housekeeping-report-month' } },
     value: { id: 'housekeeping-report-month', className: `housekeeping-month-nav__label${isCurrentMonth ? '' : ' period-stepper__value--away'}`, text: formatMonthLabel(shownMonth) },
-    next: { id: 'housekeeping-report-next', label: t('housekeeping.nextMonth'), attrs: { 'aria-describedby': 'housekeeping-report-month' } },
+    next: { id: 'housekeeping-report-next', label: t('housekeeping.nextMonth'), keys: keys.next, attrs: { 'aria-describedby': 'housekeeping-report-month' } },
     reset: { id: 'housekeeping-report-current', className: 'housekeeping-month-nav__current', label: t('housekeeping.currentMonth'), current: isCurrentMonth },
   });
 }
@@ -1570,6 +1588,8 @@ function syncReportPeriod(content) {
     slot.querySelector('#housekeeping-report-current')?.addEventListener('click', () => (
       showReportMonth(content, currentMonthKey(), 'housekeeping-report-current')
     ));
+    // Links/Rechts blaettern am Stepper (utils/period-stepper.js, Critique R21).
+    wirePeriodArrowKeys(slot);
     if (window.lucide) window.lucide.createIcons({ el: slot });
   }
   slot.hidden = false;
@@ -2000,7 +2020,7 @@ function openTaskEditModal(task, content) {
     title: t('housekeeping.editTask'),
     size: 'md',
     content: `
-      <form id="housekeeping-task-edit-form" class="housekeeping-worker-form">
+      <form id="housekeeping-task-edit-form" class="housekeeping-worker-form" novalidate>
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.taskName'))}</span>
           <input name="name" required maxlength="200" value="${esc(task.name)}">
@@ -2044,6 +2064,9 @@ function openTaskEditModal(task, content) {
         // Der Dialog kann vor einem Rechtewechsel aufgegangen sein: dann
         // unterbleibt der Schreibvorgang, statt am 403 zu enden.
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const fields = event.currentTarget.elements;
         const frequencyDays = Number(fields.frequency_days.value);
         if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
@@ -2130,7 +2153,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
     title: t('housekeeping.editVisit'),
     size: 'md',
     content: `
-      <form id="housekeeping-visit-form" class="housekeeping-worker-form">
+      <form id="housekeeping-visit-form" class="housekeeping-worker-form" novalidate>
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.visitDate'))}</span>
           <yuvomi-datepicker name="date" type="date" value="${esc(visitDay)}"></yuvomi-datepicker>
@@ -2149,13 +2172,13 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
             <label class="housekeeping-field">
               <span>${esc(t('housekeeping.dailyRate'))}</span>
               <input name="daily_rate" type="number" min="0" step="${amountStep(state.currency, visit.daily_rate ?? 0)}"
-                     placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(visit.daily_rate ?? 0)}">
+                     placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(visit.daily_rate ?? 0, state.currency))}">
             </label>
           `}
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.extras'))}</span>
             <input name="extras" type="number" min="0" step="${amountStep(state.currency, visit.extras ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(visit.extras ?? 0)}">
+                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(visit.extras ?? 0, state.currency))}">
           </label>
         </div>
         ${receiptFieldHtml(visit)}
@@ -2169,6 +2192,9 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
       panel.querySelector('#housekeeping-visit-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const form = event.currentTarget;
         const fields = form.elements;
         const dateValue = fields.date.value;
@@ -2348,7 +2374,7 @@ function openStaffModal(worker, content, options = {}) {
     title: item.id ? t('housekeeping.editWorker') : t('housekeeping.addWorker'),
     size: 'lg',
     content: `
-      <form id="housekeeping-worker-form" class="housekeeping-worker-form">
+      <form id="housekeeping-worker-form" class="housekeeping-worker-form" novalidate>
         <input type="hidden" name="id" value="${esc(item.id || '')}">
         <div class="housekeeping-profile-editor">
           <button class="housekeeping-avatar housekeeping-avatar--lg" type="button" id="housekeeping-avatar-btn"
@@ -2395,12 +2421,12 @@ function openStaffModal(worker, content, options = {}) {
           <label class="housekeeping-field" id="housekeeping-field-daily-rate">
             <span>${esc(t('housekeeping.dailyRate'))}</span>
             <input name="daily_rate" type="number" min="0" step="${amountStep(state.currency, item.daily_rate ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(item.daily_rate ?? 0)}">
+                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(item.daily_rate ?? 0, state.currency))}">
           </label>
           <label class="housekeeping-field" id="housekeeping-field-hourly-rate"${(!item.rate_type || item.rate_type === 'daily') ? ' hidden' : ''}>
             <span>${esc(t('housekeeping.hourlyRate'))}</span>
             <input name="hourly_rate" type="number" min="0" step="${amountStep(state.currency, item.hourly_rate ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(item.hourly_rate ?? 0)}">
+                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(item.hourly_rate ?? 0, state.currency))}">
           </label>
           <label class="housekeeping-field housekeeping-field--color">
             <span>${esc(t('housekeeping.calendarColor'))}</span>
@@ -2437,6 +2463,9 @@ function openStaffModal(worker, content, options = {}) {
       panel.querySelector('#housekeeping-worker-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!mayManageWorkers()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const form = event.currentTarget;
         const fields = form.elements;
         // Bei einem Bestandssatz neben dem Raster liefert amountStep "any" -

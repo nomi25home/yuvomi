@@ -101,7 +101,15 @@
         "searchNoResultsFilteredDescription": "لا شيء يطابق بحثك وعوامل التصفية.",
         "searchReset": "إعادة تعيين البحث",
         "passwordMinLength": "8 أحرف على الأقل.",
-        "savedReloadFailed": "تم حفظ التغيير، لكن تعذّر تحديث العرض. أعد تحميل الصفحة إذا كان هناك شيء مفقود."
+        "savedReloadFailed": "تم حفظ التغيير، لكن تعذّر تحديث العرض. أعد تحميل الصفحة إذا كان هناك شيء مفقود.",
+        "fieldNumber": "أدخل رقمًا.",
+        "fieldMin": "على الأقل {{min}}.",
+        "fieldMax": "على الأكثر {{max}}.",
+        "fieldWholeNumber": "أدخل عددًا صحيحًا.",
+        "fieldStep": "أدخل قيمة بخطوات قدرها {{step}}.",
+        "fieldInvalid": "تحقق من هذا الإدخال.",
+        "errorCheckRolledBack": "«{{name}}» مفتوح مجددًا - لم يتم وضع العلامة. حاول مرة أخرى.",
+        "errorUncheckRolledBack": "«{{name}}» عليه علامة مجددًا - لم تتم إعادته. حاول مرة أخرى."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -1516,6 +1524,9 @@
         "mvLabelPlaceholder": "تسمية (مثل العمل)",
         "mvRemove": "إزالة الإدخال",
         "birthdayLabel": "عيد الميلاد",
+        "showBirthday": "عرض في أعياد الميلاد",
+        "addToBirthdays": "إضافة إلى أعياد الميلاد",
+        "addedToBirthdays": "تمت الإضافة إلى أعياد الميلاد.",
         "birthdayHint": "يظهر أيضًا في التقويم عبر استيراد أعياد الميلاد.",
         "phonePlaceholder": "+966 …",
         "phonePreview": "معاينة: {{value}}",
@@ -1599,7 +1610,18 @@
         "errorEmailTooLong": "يمكن أن يتكون عنوان البريد الإلكتروني من {{limit}} حرف كحد أقصى.",
         "errorAddressTooLong": "يمكن أن يتكون العنوان من {{limit}} حرف كحد أقصى.",
         "errorNotesTooLong": "يمكن أن تتكون الملاحظات من {{limit}} حرف كحد أقصى.",
-        "errorBirthdayInvalid": "تاريخ عيد الميلاد غير صالح."
+        "errorBirthdayInvalid": "تاريخ عيد الميلاد غير صالح.",
+        "errorPhoneEntryInvalid": "أحد أرقام الهاتف غير مكتمل أو غير صالح.",
+        "errorPhonesTooMany": "لدى جهة الاتصال هذه أرقام هاتف كثيرة جدًا. الحد الأقصى هو {{limit}}.",
+        "errorPhoneLabelTooLong": "يمكن أن تتكون تسمية رقم الهاتف من {{limit}} حرف كحد أقصى.",
+        "errorEmailEntryInvalid": "أحد عناوين البريد الإلكتروني غير مكتمل أو غير صالح.",
+        "errorEmailInvalid": "عنوان البريد الإلكتروني غير صالح. يجب أن يكون بالشكل name@example.com.",
+        "errorEmailsTooMany": "لدى جهة الاتصال هذه عناوين بريد إلكتروني كثيرة جدًا. الحد الأقصى هو {{limit}}.",
+        "errorEmailLabelTooLong": "يمكن أن تتكون تسمية عنوان البريد الإلكتروني من {{limit}} حرف كحد أقصى.",
+        "errorAddressEntryInvalid": "أحد العناوين غير مكتمل أو غير صالح.",
+        "errorAddressesTooMany": "لدى جهة الاتصال هذه عناوين كثيرة جدًا. الحد الأقصى هو {{limit}}.",
+        "errorAddressLabelTooLong": "يمكن أن تتكون تسمية العنوان من {{limit}} حرف كحد أقصى.",
+        "errorAddressPartTooLong": "يمكن أن يتكون كل من الشارع والمدينة والمنطقة والرمز البريدي والبلد في العنوان من {{limit}} حرف كحد أقصى."
     },
     "budget": {
         "title": "الميزانية",
@@ -1754,7 +1776,6 @@
         "metaLoadError": "تعذر تحميل فئات الميزانية.",
         "addCategory": "+ فئة",
         "addSubcategory": "+ فئة فرعية",
-        "moreDetails": "تفاصيل إضافية",
         "newCategoryPrompt": "اسم الفئة الجديدة:",
         "newSubcategoryPrompt": "اسم الفئة الفرعية الجديدة:",
         "categoryAddedToast": "تمت إضافة الفئة.",
@@ -1840,6 +1861,18 @@
         "loanSavedToast": "تم حفظ القرض",
         "loanDeletedToast": "تم حذف القرض",
         "loanPaymentTitle": "سداد القرض: {{borrower}}",
+        "typeTransfer": "تحويل",
+        "transferFromAccount": "من الحساب",
+        "transferToAccount": "إلى الحساب",
+        "transferChooseAccounts": "اختر حسابين مختلفين.",
+        "transferCurrencyMismatch": "اختر حسابات بالعملة نفسها. تحويل العملات غير مدعوم.",
+        "transferAccountArchived": "اختر حسابات نشطة للتحويل.",
+        "accountHasTransfers": "يحتوي هذا الحساب على تحويلات. أرشفه بدلاً من حذفه.",
+        "transferDeleteSeriesConfirm": "هل تريد حذف سلسلة التحويلات هذه بالكامل؟",
+        "catSaving": "ادخار",
+        "summaryTransfers": "التحويلات",
+        "transferDeleteConfirm": "حذف طرفي هذا التحويل؟",
+        "transferDeleteConfirmDetail": "يتم حذف القيدين المرتبطين وإعادة حساب رصيدي الحسابين. يؤدي حذف السلسلة بأكملها أيضًا إلى حذف جميع تكراراتها. لا يمكن التراجع عن هذا الإجراء.",
         "typeLoan": "قرض",
         "tabsLabel": "أقسام الميزانية",
         "budgetTab": "نظرة عامة",
@@ -2056,6 +2089,7 @@
         "healthCycleSaved": "تم حفظ إعداد الدورة.",
         "healthCyclePersonalLabel": "إظهار الدورة",
         "healthCyclePersonalHint": "ينطبق على عرضك فقط. إذا أوقفته، تبقى الدورة ظاهرة لبقية أفراد الأسرة.",
+        "healthCycleSettingsHint": "طول الدورة ووسيلة منع الحمل والتذكيرات ووضع الحمل تضبطينها في صفحة الدورة.",
         "healthCyclePersonalHouseholdOff": "الدورة متوقفة حاليًا للأسرة كلها، لذلك لا تظهر لأي أحد.",
         "healthCyclePersonalSaved": "تم حفظ عرض الدورة.",
         "pageRewardsModule": "المكافآت",
@@ -2256,7 +2290,7 @@
         "familyRoleGrandparent": "جد/جدة",
         "familyRoleRelative": "قريب",
         "familyRoleOther": "فرد من العائلة",
-        "childStartHint": "تبدأ حسابات الأطفال الجديدة بدون الميزانية والصيام، وترى المساعدة المنزلية للقراءة فقط دون الأجور والمدفوعات. يمكنك تغيير ذلك لاحقًا ضمن «الأدوار والأذونات».",
+        "childStartHint": "تبدأ حسابات الأطفال الجديدة بدون الميزانية والصيام، وترى المساعدة المنزلية للقراءة فقط دون الأجور والمدفوعات. يمكنك تغيير ذلك لاحقًا ضمن «الأدوار والأذونات». الدورة مخفية أيضًا؛ يمكن إظهارها من الإعدادات الشخصية للطفل.",
         "systemAdminLabel": "مسؤول النظام",
         "systemAdminHint": "يمكن لمسؤولي النظام إدارة الإعدادات والتكاملات ورموز API وحسابات العائلة.",
         "systemAdminBadge": "مسؤول النظام",
@@ -2286,7 +2320,8 @@
         "languageTitle": "اللغة",
         "dataLanguageLabel": "لغة الإدخالات المحفوظة",
         "dataLanguageHint": "اللغة التي يحفظ بها Yuvomi الإدخالات التي ينشئها بنفسه، مثل مواعيد أعياد الميلاد. تؤثر على واجهة البرمجة وتغذية التقويم والمزامنة، وليس على العرض هنا.",
-        "dataLanguageAuto": "تلقائي ({{language}})",
+        "dataLanguageAuto": "تلقائي",
+        "hintWithCurrent": "حاليًا: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "يمكن للمسؤولين فقط تحديد لغة الإدخالات المحفوظة.",
         "dataLanguageSaved": "تم تحديث لغة الإدخالات المحفوظة",
         "sectionMeals": "خطة الوجبات",
@@ -3120,6 +3155,28 @@
         "regionTitle": "المنطقة / التنسيق",
         "regionLabel": "المنطقة",
         "regionHint": "يضبط العملة وتنسيق الأرقام والتاريخ والوقت بما يتناسب مع المنطقة (مثال، سويسرا: 1'234.50). اختر «مخصص» لضبطها بشكل فردي.",
+        "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "الإمارات",
+            "AG": "أنتيغوا وبربودا",
+            "BS": "جزر البهاما",
+            "DO": "جمهورية الدومينيكان",
+            "GB": "المملكة المتحدة",
+            "HK": "هونغ كونغ",
+            "KN": "سانت كيتس ونيفيس",
+            "MO": "ماكاو",
+            "PH": "الفلبين",
+            "SA": "السعودية",
+            "TT": "ترينيداد وتوباغو",
+            "US": "الولايات المتحدة",
+            "VC": "سانت فنسنت"
+        },
+        "languageShort": {
+            "nb": "النرويجية",
+            "ptBR": "البرتغالية البرازيلية",
+            "zh": "الصينية المبسطة",
+            "zhHant": "الصينية التقليدية"
+        },
         "regionAdminOnly": "يمكن للمسؤولين فقط تغيير المنطقة والعملة.",
         "formatsHouseholdHint": "تنطبق صيغة التاريخ والوقت على المنزل بأكمله. يمكن لأي عضو تغييرها.",
         "regionCustom": "مخصص",
@@ -3354,7 +3411,7 @@
         "timezoneTitle": "المنطقة الزمنية",
         "timezoneLabel": "المنطقة الزمنية للأسرة",
         "timezoneHint": "تنطبق في كل موضع لا يحمل فيه الوقت منطقة خاصة به: التذكيرات والعد التنازلي واليوم التقويمي «اليوم» وتغذية التقويم المصدَّرة والمواعيد المرسلة إلى Google أو Outlook.",
-        "timezoneAuto": "تلقائي ({{zone}})",
+        "timezoneAuto": "تلقائي",
         "timezoneAdminOnly": "يمكن للمسؤولين فقط تغيير المنطقة الزمنية.",
         "timezoneSaved": "تم حفظ المنطقة الزمنية.",
         "timezoneMismatch": "متصفحك في المنطقة الزمنية {{browser}}، بينما تعتمد الأسرة {{household}}.",
@@ -3408,6 +3465,7 @@
         "healthPreventionNotifyCaregiversSaved": "تم حفظ إعداد الإشعارات.",
         "healthVisibilityTitle": "الظهور الافتراضي",
         "healthVisibilityHint": "القيمة التي تبدأ بها الإدخالات الجديدة. يمكنك تغييرها مع كل إدخال.",
+        "healthVisibilityCaregivers": "من يُسمح له بالتسجيل نيابةً عنك يرى أيضًا إدخالاتك الخاصة، باستثناء يوميات الدورة. يحدد ذلك مسؤول عند الأعضاء.",
         "healthVisibilityOther": "مجالات أخرى",
         "healthVisibilityApply": "غيّر الإدخالات الموجودة أيضاً",
         "healthVisibilityApplyHint": "تم الحفظ. هل تُغيَّر أيضاً الإدخالات الموجودة في {{area}}؟",
@@ -3556,10 +3614,12 @@
         "tasksDefaultVisibilityLabel": "Default visibility",
         "tasksDefaultVisibilityHint": "New tasks open with this visibility. You can still change it each time you create one.",
         "tasksDefaultLockedLabel": "Lock editing by default",
-        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."
+        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one.",
+        "backupDropzoneTitleTouch": "اضغط لاختيار ملف نسخة احتياطية",
+        "installModuleDropzoneTitleTouch": "اضغط لاختيار ملف ZIP"
     },
     "login": {
-        "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",
+        "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
         "usernameLabel": "اسم المستخدم",
         "passwordLabel": "كلمة المرور",
         "loginButton": "تسجيل الدخول",
@@ -3628,7 +3688,6 @@
         "unsavedChanges": "تجاهل التغييرات؟",
         "unsavedChangesDetail": "ستفقد إدخالاتك في هذا النموذج.",
         "discardChanges": "تجاهل",
-        "moreSettings": "المزيد من الإعدادات",
         "moreDetails": "تفاصيل إضافية"
     },
     "rrule": {
@@ -3762,7 +3821,9 @@
         "goTo": "انتقل إلى",
         "newSection": "إنشاء جديد",
         "recentLabel": "فُتح مؤخرًا",
-        "createTaskNamed": "إنشاء „{{title}}“ كمهمة"
+        "createTaskNamed": "إنشاء „{{title}}“ كمهمة",
+        "hintMove": "تحديد",
+        "hintOpen": "فتح"
     },
     "birthdays": {
         "inDays_one": "خلال {{count}} يوم",
@@ -3784,6 +3845,7 @@
         "editTitle": "تعديل عيد الميلاد",
         "nameLabel": "الاسم",
         "birthDateLabel": "تاريخ الميلاد",
+        "showContact": "عرض جهة الاتصال",
         "nameDay": "يوم الاسم",
         "celebratesNameDay": "يحتفل بيوم الاسم",
         "nameDayLabel": "يوم الاسم (اختياري)",
@@ -3878,7 +3940,7 @@
     },
     "onboarding": {
         "step1Title": "مرحبًا بك في {{name}}",
-        "step1Body": "مخطط عائلتك الشخصي. المهام والتقويم والتسوق والمزيد - كل ذلك في مكان واحد.",
+        "step1Body": "المهام والتقويم والتسوق والمزيد لمنزلك - سواء كنت تعيش وحدك أو مع شريك أو مع عائلتك. كل ذلك في مكان واحد.",
         "step2Title": "التنقل والوحدات",
         "step2Body": "الشريط السفلي يأخذك مباشرة إلى أهم الأقسام. تجد بقية الوحدات تحت «المزيد».",
         "step3Title": "ابدأ بسرعة",
@@ -4191,7 +4253,10 @@
         "errorDmsAccountGone": "حساب نظام إدارة المستندات هذا لم يعد موجودًا.",
         "errorDmsDocumentGone": "هذا المستند لم يعد موجودًا في نظام إدارة المستندات.",
         "errorDmsAlreadyLinked": "مستند نظام إدارة المستندات هذا مرتبط بالفعل.",
-        "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات."
+        "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات.",
+        "dropzoneTitleTouch": "اضغط لاختيار ملف",
+        "viewerPrevNamed": "المستند السابق: {{name}}",
+        "viewerNextNamed": "المستند التالي: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "المطبخ",
@@ -4441,7 +4506,8 @@
         "errorVisitGone": "هذه الزيارة لم تعد موجودة.",
         "errorTaskGone": "هذه المهمة لم تعد موجودة.",
         "errorAlreadyCheckedOut": "تم تسجيل خروج عامل التدبير المنزلي هذا بالفعل.",
-        "errorAlreadyCheckedIn": "تم تسجيل دخول عامل التدبير المنزلي هذا بالفعل."
+        "errorAlreadyCheckedIn": "تم تسجيل دخول عامل التدبير المنزلي هذا بالفعل.",
+        "allVisitsInReport": "كل الزيارات في التقرير"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
@@ -4671,7 +4737,7 @@
         "mobileSearch": "افتح البحث عبر العدسة في النظرة العامة أو عبر «المزيد».",
         "mobileSettings": "تجد الإعدادات ضمن «المزيد».",
         "guideLink": "دليل المستخدم",
-        "guideHint": "تتولاه المجتمع في مستودع خاص به، وقد يتأخر عن أحد الإصدارات."
+        "guideHint": "يحافظ عليه المجتمع. يُفتح في علامة تبويب جديدة."
     },
     "changelog": {
         "title": "سجل التغييرات",
@@ -4715,8 +4781,9 @@
         "success": "تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.",
         "mismatch": "كلمتا المرور غير متطابقتين.",
         "tooShort": "يجب ألا تقل كلمة المرور عن 8 أحرف.",
-        "invalidToken": "هذا الرابط غير صالح أو منتهي الصلاحية.",
-        "missingToken": "لم يتم العثور على رمز صالح."
+        "invalidToken": "رابط إعادة التعيين هذا غير صالح أو منتهي الصلاحية - اطلب رابطًا جديدًا.",
+        "missingToken": "رابط إعادة التعيين هذا غير مكتمل - اطلب رابطًا جديدًا.",
+        "requestNew": "طلب رابط جديد"
     },
     "email": {
         "host": "خادم SMTP",
@@ -5140,6 +5207,12 @@
             "reminders": {
                 "title": "التذكيرات التالية",
                 "empty": "لا مزيد من الجرعات اليوم"
+            },
+            "brief": {
+                "changes": "منذ آخر قياس: {{list}}.",
+                "latest": "آخر تسجيل: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} دون تغيير"
             }
         },
         "vitals": {
@@ -5553,7 +5626,7 @@
             "emptyDesc": "سجّلي أول دورة شهرية لك لعرض التوقعات والتقويم والإحصاءات.",
             "emptyCta": "تسجيل أول دورة",
             "personsLabel": "Person",
-            "add": "تسجيل الدورة",
+            "add": "إضافة دورة سابقة",
             "loadError": "تعذّر تحميل بيانات الدورة.",
             "loadErrorDesc": "يرجى المحاولة لاحقًا.",
             "retry": "أعد المحاولة",
@@ -5772,15 +5845,14 @@
                 "family": "عائلة"
             },
             "period": {
-                "add": "تسجيل الدورة",
+                "add": "إضافة دورة سابقة",
                 "edit": "تعديل الدورة",
                 "warningFuture": "تاريخ البدء في المستقبل - تعتمد التوقعات فقط على الدورات السابقة.",
                 "warningOverlap": "يتداخل مع دورة مسجَّلة مسبقًا."
             },
             "dayLog": {
                 "title": "تسجيل اليوم",
-                "date": "التاريخ",
-                "more": "تفاصيل إضافية"
+                "date": "التاريخ"
             },
             "export": {
                 "csv": "تصدير كملف CSV"
@@ -5798,8 +5870,9 @@
                 "cycleLength": "متوسط طول الدورة",
                 "periodLength": "متوسط مدة الدورة",
                 "lutealLength": "مدة الطور الأصفري",
+                "daysUnit": "أيام",
                 "trackFertility": "عرض نافذة الخصوبة",
-                "autoHint": "اتركيه فارغًا = يُحسب تلقائيًا من سجلّك.",
+                "autoHint": "إذا تركتِ أحد الحقلين فارغًا، يحسب Yuvomi القيمة من الدورات التي سجّلتِها.",
                 "remindPeriodDaysBefore": "تذكير بالدورة",
                 "remindOff": "إيقاف",
                 "remindSameDay": "في نفس اليوم",
@@ -5902,7 +5975,9 @@
                 "emptyError": "يرجى اختيار ملف CSV أو لصق نص.",
                 "error": "فشل الاستيراد."
             },
-            "discoveryHint": "نصيحة: يمكنك الاشتراك في الدورة المتوقعة كخلاصة ICS ضمن <a href=\"/settings/modules/calendar?section=personal-feeds\">الإعدادات ← الوحدات ← التقويم</a>، أو إظهار أداة الدورة في <a href=\"/\">لوحة التحكم</a> عبر وضع التخصيص."
+            "feedLink": "الاشتراك في الدورة المتوقعة في التقويم",
+            "widgetHint": "تضيفين بطاقة الدورة إلى {{overview}} عبر „{{customize}}“.",
+            "endBeforeStart": "لا يمكن أن تكون النهاية قبل البداية."
         },
         "duration": {
             "hm": "{{hours}} س {{minutes}} د",
@@ -5911,6 +5986,7 @@
             "unitH": "س"
         },
         "careBanner": "أنت تسجّل نيابةً عن {{name}}.",
+        "whoSees": "من يرى هذا؟",
         "nutrition": {
             "title": "القيم الغذائية",
             "emptyTitle": "لم تُسجَّل قيم غذائية بعد",
@@ -6056,6 +6132,7 @@
         "weekdaySat": "السبت",
         "weekdaySun": "الأحد",
         "intervalLabelWeekly": "كل N أسابيع",
+        "intervalLabelMonthly": "كل N أشهر",
         "anchorDateLabel": "أول عملية جمع",
         "monthDayLabel": "يوم الشهر",
         "monthDayLastDay": "آخر يوم في الشهر",
@@ -6712,8 +6789,8 @@
         "success": "تم إنشاء حسابك. يمكنك تسجيل الدخول الآن.",
         "mismatch": "كلمتا المرور غير متطابقتين.",
         "tooShort": "يجب ألا تقل كلمة المرور عن 8 أحرف.",
-        "invalidToken": "هذه الدعوة غير صالحة أو منتهية أو تم استخدامها بالفعل.",
-        "missingToken": "لم يتم العثور على رمز صالح.",
+        "invalidToken": "هذه الدعوة غير صالحة أو منتهية أو تم استخدامها بالفعل - اطلب رابطًا جديدًا.",
+        "missingToken": "رابط الدعوة هذا غير صالح أو منتهي الصلاحية - اطلب رابطًا جديدًا.",
         "usernameRequired": "اختر اسم مستخدم.",
         "usernameInvalid": "يجب أن يتكون اسم المستخدم من 3 إلى 64 حرفًا وألا يحتوي إلا على حروف وأرقام ونقاط وشرطات وشرطات سفلية.",
         "usernameTaken": "اسم المستخدم هذا مستخدم بالفعل.",
@@ -6939,9 +7016,8 @@
         "templateWork": "العمل",
         "templateSchool": "المدرسة",
         "templateUniversity": "الجامعة",
-        "overview": "مقارنة",
+        "overview": "نظرة عامة",
         "overviewPeopleLabel": "مقارنة الأشخاص",
-        "overviewClearSelection": "مسح التحديد",
         "continuesUntil": "…يستمر حتى {{time}}",
         "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
         "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب.",
@@ -6973,6 +7049,7 @@
         "labelLabel": "اسم هذا الجهاز (اختياري)",
         "labelHint": "يساعد لاحقًا على معرفة الجهاز المقصود.",
         "submit": "اقتران",
-        "failed": "رمز الاقتران هذا غير صالح."
+        "failed": "رمز الاقتران هذا غير صالح.",
+        "codeRequired": "أدخل رمز الاقتران المعروض في الإعدادات."
     }
 }

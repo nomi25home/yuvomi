@@ -41,7 +41,7 @@ import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans, columnFillSpans,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
   fetchPendingReminders, childDefaultWidgetConfig,
 } from '/utils/dashboard-widgets.js';
@@ -154,6 +154,54 @@ function staleOnReturn({ loadedAt, loadedDay }, { now, today }) {
   if (!loadedAt) return true;
   if (loadedDay !== today) return true;
   return now.getTime() - loadedAt.getTime() >= RETURN_REFRESH_MIN_MS;
+}
+
+/* DER RUECKWEG ZEICHNET DEN EBEN GELADENEN STAND SOFORT (Critique R21, a1 P2).
+ *
+ * Zurueck auf der Uebersicht stand zuerst das Skelett ohne Gruss, die Blende
+ * lief hinein, und ein paar hundert Millisekunden spaeter schnitt der Inhalt
+ * hart darueber - auch wenn derselbe Stand Sekunden vorher schon dagewesen
+ * war. Ist der letzte volle Stand frisch (dieselbe Regel wie beim Zurueckkehren
+ * in den Tab, `staleOnReturn`), dasselbe Mitglied, dieselbe Sprache, und hat
+ * seitdem nichts geschrieben (api.js meldet jeden Schreibvorgang als
+ * `yuvomi:write`), zeichnet die Seite ihn sofort und fragt danach still nach
+ * (stale-while-revalidate). Gebaut wird nur neu, wenn die Antwort anders ist.
+ * Die Wand nimmt nie einen gemerkten Stand: sie fragt als Haushalt. */
+let _overviewMemo = null;
+let _overviewMemoWatched = false;
+
+function overviewMemoKey(user) {
+  return `${user?.id ?? ''}|${getLocale()}`;
+}
+
+/** Der gemerkte Stand, wenn er fuer diesen Aufbau taugt - sonst null. */
+function usableOverviewMemo(memo, { key, now, today }) {
+  if (!memo || memo.key !== key) return null;
+  if (staleOnReturn({ loadedAt: memo.at, loadedDay: memo.day }, { now, today })) return null;
+  return memo;
+}
+
+/** Ein Schreibvorgang irgendwo macht den gemerkten Stand ungueltig. Einmal je Sitzung. */
+function watchOverviewWrites() {
+  if (_overviewMemoWatched || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  _overviewMemoWatched = true;
+  // Der Name steht in api.js (WRITE_EVENT) - ausgeschrieben, weil der
+  // Test-Loader api.js stubt.
+  window.addEventListener('yuvomi:write', () => { _overviewMemo = null; });
+}
+
+/** Vergleichbarer Abdruck eines Stands; null, wenn er sich nicht fassen laesst. */
+function overviewSignature(value) {
+  if (!value || typeof value !== 'object') return null;
+  try {
+    // Oben nach Schluessel sortiert: die Slices haengen je nach Weg in anderer
+    // Reihenfolge an (Erstaufbau vs. Nachfrage), der Inhalt ist derselbe.
+    const sorted = {};
+    for (const key of Object.keys(value).sort()) sorted[key] = value[key];
+    return JSON.stringify(sorted);
+  } catch {
+    return null;
+  }
 }
 
 /* DER TAG EINES TERMINS IST DER TAG DER HAUSHALTSZONE, nicht der des Browsers.
@@ -2384,7 +2432,11 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
           <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}">
             ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="" loading="lazy">` : esc(initials(u.display_name))}
           </span>
-          ${open > 0 ? `<span class="family-member__count" aria-hidden="true">${esc(getNumberFormat().format(open))}</span>` : ''}
+          ${/* DIE MARKE NENNT IHRE EINHEIT (Critique R21, clarify): eine nackte
+                "1" am Gesicht las sich wie eine Benachrichtigung. Das Zeichen der
+                Aufgaben (wie in der Leiste) steht davor und sagt, was gezaehlt
+                ist; Name und Satz im Baum sagen es Screenreadern. */ ''}
+          ${open > 0 ? `<span class="family-member__count" aria-hidden="true"><i data-lucide="${MODULE_ICON.tasks}" class="family-member__count-icon"></i>${esc(getNumberFormat().format(open))}</span>` : ''}
         </span>
         <span class="family-member__short" aria-hidden="true">${esc(firstName)}</span>
         <span class="family-member__body">
@@ -2612,7 +2664,14 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
  * Art Zahl, fuer die diese Reihe da ist. Vor den Opt-in-Modulen, weil eine
  * Schuld eine Handlung verlangt und ein Punktestand nicht. Ausgeglichen gibt es
  * keine Kachel (siehe metricTileFor). */
-const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
+/* KEIN SALDO IN DER REIHE (R21, Critique 2026-10-21, D5). Seit das
+ * Budget-Widget in der Vorgabe aus ist (DEFAULT_HIDDEN_WIDGETS), waere sein
+ * Kontostand hier nachgerueckt - die Regel oben holt ja genau das, was kein
+ * eigenes Widget zeigt. Ein Kontostand ist aber keine Kennzahl fuer den
+ * Morgen, sondern eine Auskunft, die man sich holt: er steht im Budget-Widget,
+ * wer es einblendet. Die offene Forderung der geteilten Ausgaben bleibt - sie
+ * verlangt eine Handlung, wie eine ueberfaellige Aufgabe. */
+const METRIC_TILE_ORDER = ['tasks', 'shopping', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
 const METRIC_TILE_COUNT = 4;
 
 /**
@@ -2632,7 +2691,7 @@ function shoppingSoleListRoute(data) {
 }
 
 function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
-  const route = { tasks: '/tasks', shopping: '/shopping', budget: BUDGET_MONTH_ROUTE, birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
+  const route = { tasks: '/tasks', shopping: '/shopping', birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
   switch (id) {
     case 'tasks': {
       const open = data.openTaskCount;
@@ -2653,24 +2712,6 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
         id, route, icon: widgetIcon('shopping'), label: t('nav.shopping'),
         value: t('dashboard.metricItems', { count: items }),
         note: items === 0 ? t('dashboard.metricAllBought') : t('dashboard.metricOnLists', { count: lists }),
-      };
-    }
-    case 'budget': {
-      const budget = data.budget ?? {};
-      if (!(budget.entryCount > 0)) return null;
-      const balance = budget.balance || 0;
-      // DIE VORZEICHENREGEL IST NICHT NEU - sie ist die des Budget-Widgets,
-      // Zeichen fuer Zeichen. Ein Minus allein wird bei 20px auf dem Handy
-      // ueberlesen, deshalb traegt die Farbe den zweiten Kanal; und der
-      // Sonderfall aus #504 kommt mit: wer nur Ausgaben erfasst, hat einen
-      // rechnerisch negativen Saldo, der nichts ueber seine Lage sagt, und
-      // bekommt Label-Farbe statt Rot.
-      const neutral = (budget.income || 0) === 0 && balance < 0;
-      return {
-        id, route, icon: widgetIcon('budget'), label: t('nav.budget'),
-        value: formatCurrency(balance, currency),
-        note: t('dashboard.monthlyBalance'),
-        tone: neutral ? 'balance-neutral' : balance >= 0 ? 'balance-positive' : 'balance-negative',
       };
     }
     case 'split-expenses': {
@@ -2822,8 +2863,10 @@ function formatLedgerAmount(amount, currency) {
  * stehe ich insgesamt", die Zeile darunter „bei wem" - mit „+N" fuer die
  * uebrigen Positionen, statt eine Liste in eine Kachel zu zwaengen. Das Netto
  * gehoert zur Waehrung der genannten Position; Betraege verschiedener
- * Waehrungen addiert niemand. Vorzeichen und Farbe nach der Rolle `balance`
- * (utils/money.js): Minus nur, wer schuldet.
+ * Waehrungen addiert niemand. Das Vorzeichen sagt die Richtung (Minus nur,
+ * wer schuldet); ROT TRAEGT DIE SCHULD NICHT (Critique R21, D8) - eine offene
+ * Position in einer geteilten Gruppe ist kein Konto im Minus. Gruen bleibt
+ * fuer das, was man bekommt, wie bei einer Einnahme.
  *
  * AUSGEGLICHEN GIBT ES KEINE KACHEL, auch wenn sich zwei Gruppen nur
  * gegenseitig aufheben. „Alles ausgeglichen" waere wahr, verlangt
@@ -2862,7 +2905,7 @@ function splitBalanceTile(balance) {
     label: t('splitExpenses.title'),
     value: formatLedgerAmount(net.amount, net.currency),
     note,
-    tone: netMinor > 0 ? 'balance-positive' : netMinor < 0 ? 'balance-negative' : 'balance-neutral',
+    tone: netMinor > 0 ? 'balance-positive' : 'balance-neutral',
   };
 }
 
@@ -3845,14 +3888,148 @@ function renderTodayStateRow({ title, sub, icon, route }) {
 // sondern eine zweite Aufgabenliste. Der Überlauf spricht als stille Fußzeile.
 const PROGRAM_ROW_CAP = 6;
 
-/* AUF DEM TELEFON ZWEI ZEILEN (R14, A7 P2-2). Sechs Zeilen zu je 64px plus
- * Kopf und Einkauf machten das Blatt 591px hoch; das erste Widget begann bei
- * y760 von 844, hinter der Kapsel. Zwei Zeilen beantworten „was steht an?",
- * der Rest steht eine Geste entfernt hinter „+N weitere" - dort auch die
- * Einkaufszeile (renderTodayCockpit). Unter dem Deckel bleibt zuerst, was
- * offen ist (composeTodaySheet), und die Sammelzeile der Ueberfaelligen ist
- * eine davon. Gemessen danach: erstes Widget y~400 statt y760. */
+/* AUF DEM TELEFON SO VIELE ZEILEN, WIE IN DEN ERSTEN SCHIRM PASSEN (R21,
+ * Critique 2026-10-21, D5 "Uebersicht als Briefing").
+ *
+ * Hier stand ein fester Deckel von ZWEI Zeilen (R14, A7 P2-2): sechs Zeilen
+ * plus Einkauf schoben damals das erste Widget hinter die Kapsel, und das
+ * Widget galt als das, was man sehen muss. Die Critique hat die Rangfolge
+ * umgedreht: die Uebersicht ist ein Briefing, das Programm des Tages ist ihr
+ * Inhalt, die Kacheln stehen darunter. Gemessen bei 390x844 zeigte das Blatt
+ * 2 von 9 Punkten, darunter 370px Familie und Budget im ersten Schirm.
+ *
+ * Wie viele Zeilen passen, weiss erst das Layout: Gruss und Wetterzeile
+ * brechen je nach Sprache und Name um. Der erste Aufbau rechnet deshalb mit
+ * dem letzten gemessenen Wert (sonst mit dem Mindestwert), `fitPhoneProgram`
+ * misst danach im selben Task - vor dem naechsten Bild - und zeichnet nur das
+ * Blatt neu, wenn die Zahl nicht stimmt. Der Rest steht wie bisher hinter
+ * "+N weitere" (mit der Einkaufszeile); zuerst bleibt, was offen ist
+ * (composeTodaySheet), und die Sammelzeile der Ueberfaelligen ist EINE Zeile.
+ * Zwei Zeilen bleiben die Untergrenze, auch auf einem sehr kleinen Schirm. */
 const PROGRAM_ROW_CAP_PHONE = 2;
+
+/** Zuletzt gemessene Zeilenzahl je Fensterhoehe (fitPhoneProgram). */
+let phoneProgramFit = null;
+
+function phoneProgramCap() {
+  const height = globalThis.window?.innerHeight;
+  return phoneProgramFit && phoneProgramFit.height === height ? phoneProgramFit.cap : PROGRAM_ROW_CAP_PHONE;
+}
+
+/**
+ * Wie viele Programmzeilen in den ersten Schirm passen - rein, ohne DOM.
+ * @param {{ fold: number, rowsTop: number, rowHeight: number, trailing: number, total: number }} geometry
+ *   fold      Oberkante dessen, was den Schirm unten abdeckt (Kapsel), in Inhaltskoordinaten
+ *   rowsTop   Oberkante der ersten Zeile, in denselben Koordinaten
+ *   rowHeight Hoehe einer Zeile
+ *   trailing  was unter den Zeilen steht, solange es einen Ueberlauf gibt ("+N weitere")
+ *   total     Zeilen des ganzen Tages (nach der Sammelzeile)
+ *   rest      was unter den Zeilen steht, wenn ALLE stehen (Einkaufszeile, Coda)
+ * @returns {number}
+ */
+/* ALLES PASST NUR, WENN AUCH DER REST PASST (R21 S7, Handoff 5). Die Rechnung
+ * verglich nur die Zeilen mit dem Platz: bei 390x844 passten alle acht (Unterkante
+ * 744 von 764), und die Einkaufszeile darunter stand bei 744-809 halb hinter der
+ * Kapsel. Was ohne Ueberlauf unter den Zeilen bleibt, zaehlt jetzt mit; passt es
+ * nicht, faltet die Einkaufszeile mit der letzten Zeile in "+N weitere". */
+function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total, rest = 0 }) {
+  if (!(rowHeight > 0) || !(total > 0)) return PROGRAM_ROW_CAP_PHONE;
+  const room = fold - rowsTop;
+  if (total * rowHeight + rest <= room) return total;
+  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total - 1, Math.floor((room - trailing) / rowHeight)));
+}
+
+/**
+ * Misst das gezeichnete Blatt auf dem Telefon und meldet die passende
+ * Zeilenzahl, wenn sie von der gezeichneten abweicht - sonst `null`.
+ * `shrinkOnly`: der zweite Blick nach einem Neuzeichnen meldet nur ein
+ * Weniger. Der Rest unter den Zeilen wechselt mit dem Deckel (Einkaufszeile
+ * gegen "+N weitere"); ein Mehr an dieser Stelle hiesse Pendeln.
+ * @param {Element} shell
+ * @param {{ shrinkOnly?: boolean }} [opts]
+ * @returns {number|null}
+ */
+function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
+  const section = shell?.querySelector?.('.today-cockpit[data-program-cap]');
+  if (!section || !onPhoneStage()) return null;
+  const rows = section.querySelector('.today-cockpit__rows:not(.today-cockpit__rows--more)');
+  const first = rows?.querySelector(':scope > .today-cockpit-card');
+  if (!rows || !first) return null;
+  const scroller = section.closest('.app-content');
+  const scrollTop = scroller?.scrollTop ?? 0;
+  const capsule = document.querySelector('.nav-bottom__items');
+  const capsuleTop = capsule?.getBoundingClientRect().top;
+  // Ohne sichtbare Kapsel (Anzeige, Querformat ohne Leiste) ist der Falz die Fensterkante.
+  const foldViewport = capsuleTop > 0 ? capsuleTop : window.innerHeight;
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-2')) || 8;
+  const rowsRect = rows.getBoundingClientRect();
+  const sectionRect = section.getBoundingClientRect();
+  const rowHeight = first.getBoundingClientRect().height;
+  const trailing = Math.max(0, sectionRect.bottom - rowsRect.bottom);
+  const shown = Number(section.dataset.programCap) || 0;
+  const total = Number(section.dataset.programTotal) || 0;
+  // Was unter den Zeilen bleibt, wenn alle stehen: gezeichnet ohne Ueberlauf
+  // ist es gemessen, sonst steckt die Einkaufszeile im Ueberlauf und zaehlt
+  // als eine Zeile (gleiche Karte), die Coda mit ihrer Hoehe.
+  const coda = section.querySelector('.today-cockpit__coda')?.getBoundingClientRect().height ?? 0;
+  const rest = shown >= total
+    ? trailing
+    : (section.dataset.programShopping === '1' ? rowHeight : 0) + coda;
+  const geometry = {
+    fold: foldViewport + scrollTop - gap,
+    rowsTop: rowsRect.top + scrollTop,
+    rowHeight,
+    trailing,
+    total,
+    rest,
+  };
+  // Ein leerer Tag hat eine Zustandszeile und nichts zu deckeln.
+  if (!geometry.total) return null;
+  const height = window.innerHeight;
+  const fit = programRowsThatFit(geometry);
+  // Musste der zweite Blick zuruecknehmen (mit einer Zeile weniger im Ueberlauf
+  // fuehrt "+N weitere" in eine Ansicht, und die Einkaufszeile bleibt stehen),
+  // gilt das als Decke fuer diese Fensterhoehe - sonst zeichnete jeder
+  // Neuaufbau erst die hoehere Zahl und nahm sie dann zurueck.
+  if (shrinkOnly) {
+    if (fit >= shown) return null;
+    phoneProgramFit = { height, cap: fit, ceiling: fit };
+    return fit;
+  }
+  const ceiling = phoneProgramFit?.height === height ? phoneProgramFit.ceiling ?? Infinity : Infinity;
+  const cap = Math.min(fit, ceiling);
+  phoneProgramFit = { height, cap, ceiling };
+  return cap === shown ? null : cap;
+}
+
+/** Tauscht das Heute-Blatt gegen eine neu gezeichnete Fassung (gleicher Platz). */
+function replaceProgramSheet(shell, html) {
+  shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', html);
+  shell.querySelector('.today-cockpit')?.remove();
+}
+
+/* DAS BLATT PASST SICH DEM SCHIRM AN, NICHT NUR DEM AUFBAU (R21 S7, Handoff 5).
+ * `measurePhoneProgram` lief nur beim Neuaufbau: nach einer Drehung oder wenn
+ * die Browserleiste die Fensterhoehe aendert, blieb die Zeilenzahl der alten
+ * Hoehe stehen - gemessen 390x844 -> 390x664: acht Zeilen, die letzten fuenf
+ * hinter der Kapsel. Hier wird bei jeder Groessenaenderung (ein Bild spaeter,
+ * gebuendelt) nachgemessen, und nur wenn die Zahl nicht mehr stimmt oder die
+ * Buehne zwischen Telefon und breit wechselt, baut die Uebersicht neu. */
+function createPhoneProgramFit(win, signal, rebuild) {
+  let frame = 0;
+  let phone = onPhoneStage();
+  win.addEventListener('resize', () => {
+    if (frame) return;
+    frame = win.requestAnimationFrame(() => {
+      frame = 0;
+      const now = onPhoneStage();
+      const crossed = now !== phone;
+      phone = now;
+      rebuild(crossed);
+    });
+  }, { signal, passive: true });
+  signal.addEventListener('abort', () => win.cancelAnimationFrame(frame), { once: true });
+}
 
 /* AB ZWEI UEBERFAELLIGEN EINE SAMMELZEILE (R14, A7 P2-2). Fuenfmal rotes
  * „Ueberfaellig" untereinander ist am Morgen kein Programm, sondern ein
@@ -3935,7 +4112,7 @@ function todaySheetSpeaks(data, cfg, now = new Date()) {
 }
 
 function buildTodayCockpitModel(data, cfg = [], {
-  cap = onPhoneStage() ? PROGRAM_ROW_CAP_PHONE : PROGRAM_ROW_CAP,
+  cap = onPhoneStage() ? phoneProgramCap() : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
   isDisplay = false,
@@ -4181,8 +4358,8 @@ function wireTodayMore(root) {
   });
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen } = {}) {
-  const model = buildTodayCockpitModel(data, cfg, { now });
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, cap } = {}) {
+  const model = buildTodayCockpitModel(data, cfg, { now, ...(cap ? { cap } : {}) });
 
   /* DIE BREITE BUEHNE TRAEGT ZWEI SPALTEN ZEILEN (Critique 23.09.2026). Am
    * Desktop ist das Blatt 1140px breit, und eine Zeile nutzte davon ~200px
@@ -4251,8 +4428,13 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   // Mobil klappt das Band im Anpassen-Modus auf diese Kopfzeile zusammen
   // (dashboard.css, `.today-cockpit--editing`): angeordnet wird dort nichts,
   // und sein Inhalt schob das erste Rasterwidget bis an den Bildschirmrand.
+  // Zeilenzahl und Tagesumfang stehen am Blatt, damit `measurePhoneProgram`
+  // nach dem Zeichnen nachrechnen kann, ohne das Modell ein zweites Mal zu bauen.
+  const fit = onPhoneStage() && !editing
+    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}`
+    : '';
   return `
-    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title">
+    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title"${fit}>
       <div class="today-cockpit__header">
         <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
         ${hideBtn}
@@ -6905,9 +7087,14 @@ function applyRowFill(grid, { editing = false } = {}) {
   // Nur, was im Raster steht: ein verborgenes Kind belegt keine Zelle.
   const tiles = [...grid.children].filter((el) => getComputedStyle(el).display !== 'none');
   for (const el of grid.children) {
-    if (!('rowFill' in el.dataset)) continue;
-    delete el.dataset.rowFill;
-    el.style.removeProperty('--widget-fill-span');
+    if ('rowFill' in el.dataset) {
+      delete el.dataset.rowFill;
+      el.style.removeProperty('--widget-fill-span');
+    }
+    if ('colFill' in el.dataset) {
+      delete el.dataset.colFill;
+      el.style.removeProperty('--widget-fill-rows');
+    }
   }
   if (editing) return;
   const columns = gridColumnCount(grid);
@@ -6919,6 +7106,22 @@ function applyRowFill(grid, { editing = false } = {}) {
     if (!span) continue;
     item.el.dataset.rowFill = '';
     item.el.style.setProperty('--widget-fill-span', String(span));
+  }
+  /* UND WAS VON LINKS NIEMAND ERREICHT, FUELLT DIE KACHEL DARUEBER (R21, D5):
+   * `columnFillSpans`, utils/dashboard-widgets.js. Eine Kachel, die so hoch ist
+   * wie ihr Inhalt (`align-self: start`, die Kennzahlreihe), waechst nicht -
+   * gestreckt stuende die Leere nur in ihr. */
+  const widened = items.map((item) => ({
+    ...item,
+    cols: grown.get(item.id) ?? item.cols,
+    grow: getComputedStyle(item.el).alignSelf !== 'start',
+  }));
+  const taller = columnFillSpans(widened, columns);
+  for (const item of widened) {
+    const rows = taller.get(item.id);
+    if (!rows) continue;
+    item.el.dataset.colFill = '';
+    item.el.style.setProperty('--widget-fill-rows', String(rows));
   }
 }
 
@@ -6987,11 +7190,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Router bereits an der Wurzel vermerkt (utils/wall-mode.js).
   const wallMode = isWallActive();
 
+  // Ein frischer Stand von eben zeichnet sofort (`_overviewMemo`, oben) - dann
+  // gibt es kein Skelett: der Inhalt steht, bevor der Browser ein Bild malt.
+  watchOverviewWrites();
+  const memo = wallMode ? null : usableOverviewMemo(_overviewMemo, {
+    key: overviewMemoKey(user),
+    now: new Date(),
+    today: householdToday(),
+  });
+
   setHtml(container, `
     <div class="dashboard app-page app-page--dashboard${wallMode ? ' dashboard--wall' : ''}" data-composition="dashboard">
       <h1 class="sr-only">${t('dashboard.title')}</h1>
       <div class="dashboard-shell" id="dashboard-shell">
-        ${wallMode ? renderWallSurface(null, null, { loading: true }) : renderDashboardSkeleton()}
+        ${wallMode ? renderWallSurface(null, null, { loading: true }) : memo ? '' : renderDashboardSkeleton()}
       </div>
     </div>
     ${wallMode ? '' : renderFab()}
@@ -7093,15 +7305,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
   const markLoaded = (day, { partial = false } = {}) => { lastLoadedAt = new Date(); if (!partial) { freshAt = lastLoadedAt; freshDay = day; } };
   try {
     const requestDay = householdToday();
-    const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
-      api.get(overviewRequest(layoutHintQuery('/dashboard'))),
-      api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
-      // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
-      // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
-      // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
-      (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
-      loadPendingReminders(overviewRequest),
-    ]);
+    // Aus dem gemerkten Stand dieselben vier Antworten - samt der Slices, die
+    // er schon traegt (die ensure*-Aufrufe unten fragen dann nichts; die
+    // stille Nachfrage danach holt sie neu, siehe refreshDashboardData).
+    const [dashRes, weatherRes, prefsRes, remindersRes] = memo
+      ? [memo.data, memo.weatherRes, { data: memo.prefs }, memo.data.pendingReminders]
+      : await Promise.all([
+        api.get(overviewRequest(layoutHintQuery('/dashboard'))),
+        api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
+        // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
+        // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
+        // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
+        (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
+        loadPendingReminders(overviewRequest),
+      ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):
     // dieser Aufbau gehoert niemandem mehr und faesst die Flaeche nicht an.
     if (signal.aborted) return;
@@ -7115,13 +7332,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * der Kalender-Kachel (`events_limit`, #1680) ist kein Filter: sie aendert
      * keine Zahl, und mit ihr als „gefiltert" holte der Router die Antwort bei
      * jedem Kaltstart ein zweites Mal (`dashboardQueryFiltersCounts`). */
-    window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
+    if (!memo) window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
       filtered: dashboardQueryFiltersCounts(overviewRequest(layoutHintQuery('/dashboard'))),
     });
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
-    // übersetzen (Issue #524).
-    localizeEventLists(data);
+    // übersetzen (Issue #524). Ein gemerkter Stand ist schon uebersetzt.
+    if (!memo) localizeEventLists(data);
     setCountdownAvailability(data?.countdowns);
     weather      = weatherRes.data ?? null;
     weatherPrefs = prefsRes.data ?? null;
@@ -7144,7 +7361,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * saehe man kurz Termine, die man ausgeblendet hat. Die Alternative - erst
      * Praeferenzen, dann Uebersicht - kostete JEDEN Aufruf eine Rundreise, auch
      * die ohne Optionen. */
-    if (dashboardQuery(widgetConfig) !== layoutHintQuery('/dashboard')) {
+    if (!memo && dashboardQuery(widgetConfig) !== layoutHintQuery('/dashboard')) {
       try {
         const filtered = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
         if (signal.aborted) return;
@@ -7162,7 +7379,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
-    markLoaded(requestDay);
+    // Ein gemerkter Stand behaelt seine Zeit: er ist nicht frischer, weil er
+    // noch einmal gezeichnet wird.
+    if (memo) {
+      lastLoadedAt = memo.lastLoadedAt;
+      freshAt = memo.at;
+      freshDay = memo.day;
+    } else {
+      markLoaded(requestDay);
+    }
   } catch (err) {
     console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
     loadFailed = true;
@@ -7170,8 +7395,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   // Zyklus-Slice strikt owner-only nachladen: Zyklusdaten sind privat und dürfen
-  // nicht in den familienweiten /dashboard-Payload. Genau einmal (data.cycle bleibt
-  // sonst undefined = „noch nie geladen"). Ein Fehler lässt die Kachel auf ihren
+  // nicht in den familienweiten /dashboard-Payload. Einmal je Stand (data.cycle
+  // bleibt sonst undefined = „noch nie geladen"; der stille Refresh setzt ihn
+  // zurueck und holt neu). Ein Fehler lässt die Kachel auf ihren
   // Onboarding-Empty fallen, statt das Dashboard zu kippen.
   async function ensureCycleSlice() {
     if (data.cycle !== undefined) return;
@@ -7247,6 +7473,22 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Auch die Nachlade-Runden koennen von einem Verlassen oder Neuaufbau
   // ueberholt worden sein (#977).
   if (signal.aborted) return;
+
+  // Den vollen Stand fuer den Rueckweg merken (`_overviewMemo`, oben): mit den
+  // Slices, damit ein Aufbau daraus nichts mehr fragen muss.
+  const rememberOverview = () => {
+    if (wallMode || loadFailed || !freshAt) return;
+    _overviewMemo = {
+      key: overviewMemoKey(user),
+      at: freshAt,
+      day: freshDay,
+      lastLoadedAt,
+      data,
+      weatherRes: { data: weather },
+      prefs: weatherPrefs,
+    };
+  };
+  rememberOverview();
 
 
   // Einziger Persist-Pfad für Inline- UND Modal-Speichern. Legt vor dem Schreiben
@@ -7783,6 +8025,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
   signal.addEventListener('abort', () => disposeNoteCategories(), { once: true });
   // Das Einpassen der Wand auf Aufbau und Fenstergroesse (#1817).
   const wallFit = createWallFit(window, signal);
+  // Das Heute-Blatt folgt Drehung und Fensterhoehe (createPhoneProgramFit).
+  createPhoneProgramFit(window, signal, (crossed) => {
+    if (signal.aborted || wallMode || loadFailed || isCustomizing) return;
+    if (crossed || measurePhoneProgram(container.querySelector('#dashboard-shell'))) rebuildDashboard(widgetConfig);
+  });
   function rebuildDashboard(cfg) {
     // Der eine Engpass fuer jeden verspaeteten Neuaufbau (#977): eine Antwort,
     // die nach dem Verlassen der Seite oder nach dem naechsten render()
@@ -7850,14 +8097,25 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // still, und unter der Seitenblende ist die Blende schon das Einblenden.
     const fromSkeleton = Boolean(shell.querySelector('.widget-skeleton'))
       && !document.documentElement.classList.contains('page-swapping');
-    swapContent(shell, () => setHtml(shell, `
+    swapContent(shell, () => {
+      setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
         ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
         ${cockpitHtml}
       </section>
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
-    `), { animate: fromSkeleton });
+    `);
+      // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
+      // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
+      const fitted = measurePhoneProgram(shell);
+      if (fitted) {
+        replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        // Zweiter Blick, nur nach unten: der Rest unter den Zeilen hat gewechselt.
+        const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
+        if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
+      }
+    }, { animate: fromSkeleton });
     wireLinks(container, rerender, { editing: isCustomizing, user });
     disposeFastingClock = wireFastingWidget(container, rerender, refreshDashboardData, data.fasting, signal);
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
@@ -7987,38 +8245,56 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Fehlern, wie der Wetter-Timer. Während „Anpassen" wird nicht neu gebaut -
   // ein Rebuild würde den Bearbeitungszustand wegwerfen.
   let refreshInFlight = false;
-  async function refreshDashboardData() {
+  // `onlyIfChanged`: die stille Nachfrage nach einem Aufbau aus dem gemerkten
+  // Stand (`_overviewMemo`) - gleiche Antwort, kein Neuaufbau.
+  async function refreshDashboardData({ onlyIfChanged = false } = {}) {
     if (isCustomizing || loadFailed || refreshInFlight) return;
     refreshInFlight = true;
+    const before = onlyIfChanged ? overviewSignature(data) : null;
     try {
       const requestDay = householdToday();
       const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       if (signal.aborted) return;
       localizeEventLists(fresh);
-      // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard
-      // liefert ihn nie, ein Refresh darf ihn nicht auf „nie geladen"
-      // zurückwerfen.
-      fresh.cycle = data.cycle;
-      // Schedule hat anders als Cycle keinen Privatsphaere-Grund, den alten
-      // Stand einfach mitzuschleppen (M-6a): "wer heute Dienst hat" blieb
-      // sonst bis zu 15 Minuten stehen und ueberlebte sogar einen
-      // Mitternachts-Wechsel auf dem Wandtablet. Vor der Uebernahme
-      // zuruecksetzen und mit frisch berechnetem Tag neu laden - derselbe
+      // DIE EIGENEN SLICES WERDEN NEU GEHOLT, NICHT WEITERGEREICHT. /dashboard
+      // liefert Zyklus (owner-only), Dienstplan und Abfuhr nie mit, und ein
+      // Refresh darf sie nicht auf „nie geladen" zurueckwerfen - nur
+      // mitschleppen darf er sie auch nicht: "wer heute Dienst hat" blieb sonst
+      // bis zu 15 Minuten stehen und ueberlebte sogar einen Mitternachts-
+      // Wechsel auf dem Wandtablet (M-6a). Seit dem gemerkten Stand (R21,
+      // `_overviewMemo`) fragt ein Aufbau daraus die Slices gar nicht, und
+      // diese Nachfrage stempelt ihn neu - ein Weiterreichen hielte einen alten
+      // Abholtermin oder einen auf einem anderen Geraet geaenderten Zyklus
+      // unbegrenzt, solange man unter einer Minute wiederkommt (Review zu
+      // R21). Also vor der Uebernahme zuruecksetzen und neu laden - derselbe
       // Weg, den ein frisch eingeblendetes Widget in persistWidgetConfig()
       // schon nimmt. Das heilt nebenbei auch einen zuvor gescheiterten Slice
       // (M-6b) beim naechsten stillen Takt, statt auf den Retry-Knopf zu warten.
+      if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
+        data.cycle = undefined;
+        await ensureCycleSlice();
+        if (signal.aborted) return;
+      }
+      fresh.cycle = data.cycle;
       if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
         data.schedule = undefined;
         await ensureScheduleSlice();
         if (signal.aborted) return;
       }
       fresh.schedule = data.schedule;
+      if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+        data.waste = undefined;
+        await ensureWasteSlice();
+        if (signal.aborted) return;
+      }
       fresh.waste = data.waste;
       fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;
+      const unchanged = before !== null && overviewSignature(fresh) === before;
       data = fresh;
       markLoaded(requestDay);
-      rebuildDashboard(widgetConfig);
+      rememberOverview();
+      if (!unchanged) rebuildDashboard(widgetConfig);
     } catch { /* Hintergrund-Refresh: bewusst still */ }
     finally { refreshInFlight = false; }
   }
@@ -8050,6 +8326,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // alter Stand (staleOnReturn, oben).
     if (staleOnReturn({ loadedAt: freshAt, loadedDay: freshDay }, { now: new Date(), today: householdToday() })) refreshDashboardData();
   }, { signal: signal });
+
+  // Aus dem gemerkten Stand gezeichnet: still nachfragen, und nur neu bauen,
+  // wenn sich etwas geaendert hat (ein anderes Geraet, ein anderes Mitglied).
+  if (memo) refreshDashboardData({ onlyIfChanged: true });
 
   // Der Minutentakt der Uhr traegt die Nachtabsenkung mit: um 22:00 und um
   // 06:00 muss die Flaeche umschalten, wenn es so weit ist - nicht erst beim
@@ -8183,7 +8463,11 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = {
+  usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
+  getOverviewMemo: () => _overviewMemo,
+  setOverviewMemo: (memo) => { _overviewMemo = memo; },
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

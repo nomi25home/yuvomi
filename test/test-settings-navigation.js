@@ -969,7 +969,12 @@ function guardFakes() {
   };
   const form = {
     isConnected: true,
-    querySelector: (sel) => (/type="submit"/.test(sel) ? {} : null),
+    invalid: false,
+    querySelector(sel) {
+      if (/type="submit"/.test(sel)) return {};
+      if (/aria-invalid="true"/.test(sel)) return this.invalid ? {} : null;
+      return null;
+    },
   };
   const field = (instant = false) => ({
     closest: (sel) => (sel === 'form' ? form : (sel === '[data-instant-save]' && instant ? {} : null)),
@@ -982,14 +987,22 @@ function guardFakes() {
 
 async function withGuardEnv(fn) {
   const prev = { window: globalThis.window, confirm: globalThis.__confirmModal };
-  globalThis.window = { ...(prev.window ?? {}), addEventListener() {}, removeEventListener() {} };
+  // Ein eigenes window je Lauf, das seine Zuhoerer kennt: der Guard gibt ein
+  // abgeschicktes Formular erst mit `yuvomi:write` frei (Critique R21).
+  const zuhoerer = {};
+  globalThis.window = {
+    ...(prev.window ?? {}),
+    addEventListener(type, fn) { (zuhoerer[type] ??= []).push(fn); },
+    removeEventListener() {},
+  };
+  const geschrieben = () => { for (const fn of zuhoerer['yuvomi:write'] ?? []) fn({ type: 'yuvomi:write' }); };
   const gefragt = [];
   let antwort = false;
   globalThis.__confirmModal = async (title, options) => { gefragt.push({ title, options }); return antwort; };
   const guard = await import('/settings/dirty-guard.js');
   const leave = await import('/utils/leave-guard.js');
   try {
-    await fn({ guard, leave, gefragt, antworte: (a) => { antwort = a; } });
+    await fn({ guard, leave, gefragt, geschrieben, antworte: (a) => { antwort = a; } });
   } finally {
     guard.clearLeafEdits?.();
     globalThis.window = prev.window;
@@ -998,7 +1011,7 @@ async function withGuardEnv(fn) {
 }
 
 test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Router - nur solange etwas offen ist (R15 A7 P1-1)', async () => {
-  await withGuardEnv(async ({ guard, leave, gefragt, antworte }) => {
+  await withGuardEnv(async ({ guard, leave, gefragt, geschrieben, antworte }) => {
     const { container, form, field, fire } = guardFakes();
     guard.watchLeafForms(container);
     assert.equal(leave.hasLeaveGuard(), false, 'sauberes Blatt: kein Waechter, die Navigation bleibt ohne await');
@@ -1023,6 +1036,8 @@ test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Rout
     fire('change', field());
     assert.equal(leave.hasLeaveGuard(), true);
     fire('submit', field());
+    assert.equal(leave.hasLeaveGuard(), true, 'abgeschickt ist noch nicht gespeichert (Critique R21)');
+    geschrieben();
     assert.equal(leave.hasLeaveGuard(), false, 'gespeichert = sauber, der Waechter geht');
 
     fire('change', field());
@@ -1030,6 +1045,54 @@ test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Rout
     const vorher = gefragt.length;
     assert.equal(await leave.mayLeave('/tasks'), true, 'ein abgehaengtes Formular haelt niemanden');
     assert.equal(gefragt.length, vorher, 'und fragt auch nicht');
+  });
+});
+
+/* ABGESCHICKT IST NICHT GESPEICHERT (Critique R21, a5). Der Guard gab ein
+ * Formular schon beim `submit` frei - in der Capture-Phase, VOR dem Handler
+ * des Blatts. Scheiterte dessen Pruefung am Feld oder lehnte der Server ab,
+ * fragte der naechste Wechsel nicht mehr, und die Eingabe war weg
+ * (nachgestellt im Konto-Blatt). Frei wird es jetzt erst mit einem
+ * geglueckten Schreibvorgang (api.js meldet nur Erfolge als `yuvomi:write`). */
+test('Einstellungen: ein gescheitertes Speichern laesst das Formular offen - frei erst nach dem Erfolg (Critique R21)', async () => {
+  await withGuardEnv(async ({ guard, leave, gefragt, geschrieben, antworte }) => {
+    const { container, form, field, fire } = guardFakes();
+    guard.watchLeafForms(container);
+
+    // 1. Der Server lehnt ab: kein `yuvomi:write`, das Blatt bleibt offen.
+    fire('input', field());
+    fire('submit', field());
+    assert.equal(leave.hasLeaveGuard(), true, 'abgeschickt, aber nicht gespeichert: der Waechter bleibt');
+    antworte(false);
+    assert.equal(await leave.mayLeave('/tasks'), false, 'und der Wechsel fragt nach');
+    assert.equal(gefragt.length, 1);
+
+    // 2. Die Pruefung am Feld scheitert, danach glueckt ein ANDERER
+    //    Schreibvorgang (ein Sofort-Schalter): das Formular bleibt offen.
+    form.invalid = true;
+    fire('submit', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), true, 'ein Feldfehler heisst: dieses Absenden hat nichts geschrieben');
+
+    // 3. Korrigiert und gespeichert: jetzt ist es sauber.
+    form.invalid = false;
+    fire('input', field());
+    fire('submit', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), false, 'geglueckt gespeichert: der Waechter geht');
+
+    // 4. Nach dem Absenden weitergetippt: der spaete Erfolg gilt dem alten Stand.
+    fire('input', field());
+    fire('submit', field());
+    fire('input', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), true, 'was nach dem Absenden getippt wurde, ist nicht gespeichert');
+
+    // 5. Ein Erfolg ohne vorheriges Absenden gibt nichts frei.
+    guard.clearLeafEdits();
+    fire('input', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), true, 'ein Schreibvorgang ohne Absenden gehoert nicht diesem Formular');
   });
 });
 
@@ -4081,7 +4144,9 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   // Ein Textfeld in der Zeile fuellt die Bedienspalte (gemessen: E-Mail am
   // Desktop 201px in einer 680px-Zeile).
   const wide = [...eachRule(css)].find((r) => !r.at.length && /\.settings-group \.settings-setting-row__control > input\.form-input:only-child:is\(/.test(r.selector));
-  assert.match(wide?.body ?? '', /inline-size:\s*50cqi/, 'Textfelder nehmen die halbe Zeile');
+  // Seit R21 S7 hoechstens --layout-field-max, damit die Felder einer Seite an
+  // EINER Kante beginnen (Test "R21 S7" unten).
+  assert.match(wide?.body ?? '', /inline-size:\s*min\(50cqi, var\(--layout-field-max\)\)/, 'Textfelder nehmen die halbe Zeile, hoechstens die Feldbreite');
   assert.match(wide?.selector ?? '', /\[type="email"\]/, 'auch E-Mail');
 
   // Schritt 5b (B7 abgeschlossen): die uebrigen Blaetter mit Feldern unter
@@ -4113,8 +4178,11 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   // verborgen werden, und Schalterzeilen fluchten in der Karte.
   assert.doesNotMatch(css, /\.settings-webdav-toggle-row/, 'die eigene Schalterleiste ist entfallen');
   assert.match(css, /\.settings-card \.settings-group > \.settings-setting-row--switch > \.toggle-row,/, 'Schalterzeile fluchtet in der Karte');
+  // Seit D13 (Critique R21) haelt EINE Regel in reset.css jedes `[hidden]`,
+  // auch `.form-row` und `.row-carrier` - die Liste in layout.css ist gegangen.
   const layout = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
-  assert.match(layout, /\.form-row\[hidden\],\s*\.row-carrier\[hidden\],/, 'eine verborgene Zeile bleibt verborgen');
+  const reset = await readFile(new URL('../public/styles/reset.css', import.meta.url), 'utf8');
+  assert.match(reset, /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/, 'eine verborgene Zeile bleibt verborgen');
 
   // Re-Kritik 2026-10-17: in der Gesundheit sprach nur der Messwert-Dialog
   // Zeilen; Aktivitaet und Naehrwerte stapelten Felder in Rastern, die
@@ -4944,4 +5012,349 @@ test('#1997: Synchronisation, Kalender-Abo und Schnellzugriff schliessen nur mit
     globalThis.window = vorher.window;
     globalThis.document = vorher.document;
   }
+});
+
+/* SPRUNGMARKEN SIND LINKS, KEINE AUSWAHL (Critique R21, a5 P3; clarify). Die
+ * Marken am Blattanfang trugen die Optik der Filter-Chips - im Kalender-Blatt
+ * standen sie direkt ueber den Erinnerungs-Chips, die etwas AUSWAEHLEN, und
+ * sahen genauso aus. Eine Marke springt; sie steht jetzt als Textlink im
+ * App-Akzent, ohne Kapsel, mit Unterstreichung bei Zeiger und Fokus. */
+test('R21: die Sprungmarken sind Textlinks, nicht in der Optik der Auswahl-Chips', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const jump = shell.slice(shell.indexOf('function createSheetJump('), shell.indexOf('function syncJumpLabels('));
+  assert.match(jump, /link\.className = 'settings-sheet-jump__link';/, 'die Marke traegt nur ihre eigene Klasse');
+  assert.doesNotMatch(jump, /filter-chip/, 'keine Chip-Klassen an einem Link');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const link = [...eachRule(css)].filter((r) => r.selector.trim() === '.settings-sheet-jump__link' && !r.at.length).map((r) => r.body).join(';');
+  assert.match(link, /color:\s*var\(--color-accent\)/, 'die Farbe der Handlung');
+  assert.match(link, /font-size:\s*var\(--type-secondary\)/, 'Sekundaertext, nicht die Chip-Schrift');
+  assert.doesNotMatch(link, /border|background/, 'keine Kapsel');
+});
+
+/* D7 (Critique R21, a5 P2): ZYKLUSVORGABEN SIND IN DER SUCHE. "zyklus" fand
+ * drei Schalter, aber nicht die Zyklus-Einstellungen selbst (Laenge,
+ * Verhuetung, Erinnerungen, Schwangerschaft) - die stehen im Dialog der
+ * Zyklusseite, eine zweite Heimat ohne Weg dorthin. Das Gesundheitsblatt
+ * fuehrt jetzt "Zyklus-Einstellungen" als Link in die Zyklusseite, die den
+ * Dialog oeffnet, und die Suche findet ihn ueber jede seiner Vorgaben. */
+test('R21 D7: die Suche findet die Zyklusvorgaben, das Blatt fuehrt in den Dialog', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  const hit = (query) => searchSettings(query, { user: member, translate })
+    .options.find((h) => h.key === 'health.cycle.settings.title');
+  for (const q of ['Zyklus', 'Zykluslänge', 'Verhütung', 'Schwangerschaft', 'Erinnerungen']) {
+    assert.ok(hit(q), `"${q}" findet die Zyklus-Einstellungen`);
+    assert.equal(hit(q).section.id, 'personal-health');
+  }
+  const page = await readFile(new URL('../public/settings/pages/personal-health.js', import.meta.url), 'utf8');
+  assert.match(page, /const CYCLE_SETTINGS_HREF = '\/health\/cycle\?open=settings';/, 'der Link oeffnet den Dialog auf der Zyklusseite');
+  assert.match(page, /<a href="\$\{CYCLE_SETTINGS_HREF\}" id="health-cycle-settings-link">/);
+  assert.match(page, /\$\{esc\(t\('health\.cycle\.settings\.title'\)\)\}/, 'er heisst wie der Dialog (Beschriftung = Suchschluessel)');
+});
+
+// R21 S7 (Critique a5): die Felder der Konto-Seite begannen bei 1280 an drei
+// Kanten (972 / 922 / 999px) - die Bedienspalte ist die halbe Zeile, und
+// Profil, Kontaktdaten und Datum haben verschieden breite Zeilen.
+test('R21 S7: Textfelder und Datumsfeld einer Einstellungsseite teilen eine Kante', async () => {
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const tokens = await readFile(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.includes('.settings-setting-row__control > .birth-date-field')
+    && r.selector.includes('input.form-input:only-child'));
+  assert.ok(rule, 'Textfeld und Datumsfeld stehen in derselben Breitenregel');
+  assert.match(rule.body, /inline-size:\s*min\(50cqi, var\(--layout-field-max\)\)/, 'halbe Zeile, hoechstens die Feldbreite');
+  assert.match(tokens, /--layout-field-max:\s*16rem;/, 'die Feldbreite ist ein Token');
+});
+
+// R21 S9c (Critique 2026-10-21, Entscheidung Ulas: Option 3): bei 390 px waren
+// auf "Darstellung" 3 von 5 Auswahlwerten gekappt - "Automatisch (Engl…",
+// "Deutsch (Deutsch…", "Automatisch (Eur…". Die geschlossene Auswahl hat dort
+// 179 px (davon rund 22 Polster und Pfeil), und das Abgeschnittene war genau
+// das Detail, das sagt, was gilt. Jetzt ist der Wert kurz ("Automatisch",
+// "Deutschland") und das Detail steht vorn in der Hinweiszeile ("Gerade
+// Englisch."). Die R17-Zeile (zweispaltig, Bedienspalte 50cqi) bleibt, wie sie
+// ist - geloest wird es im Text, nicht im Raster.
+const APPEARANCE_PREFS = {
+  currency: 'EUR', date_format: 'dmy', time_format: '24h', region: 'de-DE',
+  language: null, language_auto: 'en', timezone: null, timezone_effective: 'Europe/Berlin',
+};
+
+/** Rendert das Blatt Darstellung mit diesen Preferences und liefert das Markup. */
+async function renderAppearance(preferences, role = 'admin') {
+  const { render } = await import('/settings/pages/personal-appearance.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const prev = { window: globalThis.window, document: globalThis.document, api: globalThis.__apiStub };
+  globalThis.window = { yuvomi: { showToast() {} }, addEventListener() {}, localStorage: { getItem: () => null, setItem() {}, removeItem() {} } };
+  globalThis.document = fakeDocument();
+  globalThis.__apiStub = { get: async () => ({ data: preferences }) };
+  resetPreferencesCache();
+  const host = sheetProbeContainer();
+  try {
+    await render(host, { user: { id: 1, role } });
+  } finally {
+    globalThis.window = prev.window;
+    globalThis.document = prev.document;
+    globalThis.__apiStub = prev.api;
+    resetPreferencesCache();
+  }
+  return stripHtmlComments(host.html);
+}
+
+const unescapeHtml = (text) => text.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+/** Text der gewaehlten Option der Auswahl `id` (das, was die geschlossene Auswahl zeigt). */
+function selectedOptionText(html, id) {
+  const select = html.match(new RegExp(`<select\\b[^>]*\\bid="${id}"[^>]*>([\\s\\S]*?)</select>`));
+  assert.ok(select, `#${id} fehlt im Markup`);
+  const option = select[1].match(/<option\b[^>]*\bselected[^>]*>([^<]*)<\/option>/);
+  assert.ok(option, `#${id}: keine gewaehlte Option`);
+  return unescapeHtml(option[1]);
+}
+/** Text eines Elements per id (Hinweiszeile, Wert-Span). */
+function textById(html, id, tag = 'p') {
+  const m = html.match(new RegExp(`<${tag}\\b[^>]*\\bid="${id}"[^>]*>([^<]*)</${tag}>`));
+  assert.ok(m, `#${id} fehlt im Markup`);
+  return unescapeHtml(m[1]);
+}
+// Der Stub von t() haengt die Werte als JSON an den Schluessel: ein Wert ohne
+// Anhang ist der kurze, ein Hinweis mit Anhang traegt das Detail.
+const withValues = (key, values) => key + JSON.stringify(values);
+
+test('R21 S9c: Darstellung - der Auswahlwert ist kurz, das Detail steht vorn in der Hinweiszeile', async () => {
+  const html = await renderAppearance(APPEARANCE_PREFS);
+  assert.equal(selectedOptionText(html, 'data-language-select'), 'settings.dataLanguageAuto',
+    'der Wert sagt nur "Automatisch" - die Sprache in Klammern wurde mobil gekappt');
+  assert.equal(selectedOptionText(html, 'timezone-select'), 'settings.timezoneAuto', 'ebenso die Zone');
+  assert.equal(selectedOptionText(html, 'region-select'), new Intl.DisplayNames(['de'], { type: 'region' }).of('DE'),
+    'die Region heisst nach ihrem Land ("Deutschland", nicht "Deutsch (Deutschland)")');
+
+  const english = new Intl.DisplayNames(['de'], { type: 'language' }).of('en');
+  assert.equal(textById(html, 'data-language-hint'),
+    withValues('settings.hintWithCurrent', { value: english, hint: 'settings.dataLanguageHint' }),
+    'die Hinweiszeile beginnt mit der Sprache, die gerade gilt');
+  assert.equal(textById(html, 'timezone-hint'),
+    withValues('settings.hintWithCurrent', { value: 'Europe/Berlin', hint: 'settings.timezoneHint' }),
+    'und mit der Zone, die gerade gilt');
+
+  // Ausdruecklich gewaehlt: der Wert steht vollstaendig in der Auswahl, die
+  // Hinweiszeile wiederholt ihn nicht.
+  const chosen = await renderAppearance({ ...APPEARANCE_PREFS, language: 'en', timezone: 'Europe/Paris' });
+  assert.equal(selectedOptionText(chosen, 'data-language-select'), english);
+  assert.equal(selectedOptionText(chosen, 'timezone-select'), 'Paris');
+  assert.equal(textById(chosen, 'data-language-hint'), 'settings.dataLanguageHint');
+  assert.equal(textById(chosen, 'timezone-hint'), 'settings.timezoneHint');
+
+  // Ein Mitglied sieht die Zone als Wert: dieselbe Aufteilung - und eine
+  // gesetzte Zone heisst nicht mehr "Automatisch (...)".
+  const member = await renderAppearance(APPEARANCE_PREFS, 'member');
+  assert.match(member, /<span class="settings-setting-row__value">settings\.timezoneAuto<\/span>/);
+  assert.match(member, /<p class="settings-setting-row__description form-row__description">settings\.hintWithCurrent\{&quot;value&quot;:&quot;Europe\/Berlin&quot;,&quot;hint&quot;:&quot;settings\.timezoneAdminOnly&quot;\}<\/p>/);
+  const memberSet = await renderAppearance({ ...APPEARANCE_PREFS, timezone: 'America/New_York' }, 'member');
+  assert.match(memberSet, /<span class="settings-setting-row__value">America\/New York<\/span>/);
+  assert.match(memberSet, /<p class="settings-setting-row__description form-row__description">settings\.timezoneAdminOnly<\/p>/);
+});
+
+test('R21 S9c: die Hinweiszeile folgt der Auswahl und der Automatik', async () => {
+  const { refreshDataLanguageOptions, refreshTimezone } = await import('/settings/pages/personal-appearance.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const el = () => ({ html: '', textContent: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } });
+  const nodes = { '#data-language-select': el(), '#data-language-hint': el(), '#timezone-select': el(), '#timezone-hint': el() };
+  const container = { querySelector: (sel) => nodes[sel] ?? null };
+  const prevApi = globalThis.__apiStub;
+  const names = new Intl.DisplayNames(['de'], { type: 'language' });
+  try {
+    // Regionswechsel: die Automatik ergibt jetzt Deutsch - der Wert bleibt
+    // "Automatisch", die Hinweiszeile nennt die neue Sprache.
+    globalThis.__apiStub = { get: async () => ({ data: { ...APPEARANCE_PREFS, region: 'de-CH', language_auto: 'de' } }) };
+    resetPreferencesCache();
+    await refreshDataLanguageOptions(container);
+    assert.match(nodes['#data-language-select'].html, /<option value="" selected>settings\.dataLanguageAuto<\/option>/);
+    assert.equal(nodes['#data-language-hint'].textContent,
+      withValues('settings.hintWithCurrent', { value: names.of('de'), hint: 'settings.dataLanguageHint' }));
+    // Ausdruecklich gewaehlt: der Vorsatz faellt.
+    globalThis.__apiStub = { get: async () => ({ data: { ...APPEARANCE_PREFS, language: 'en' } }) };
+    resetPreferencesCache();
+    await refreshDataLanguageOptions(container);
+    assert.equal(nodes['#data-language-hint'].textContent, 'settings.dataLanguageHint');
+
+    // Zone: gesetzt (PUT-Antwort oder "Uebernehmen") ohne Vorsatz, zurueck auf
+    // Automatisch mit der Zone, die dann gilt.
+    refreshTimezone(container, { timezone: 'Europe/Paris', timezone_effective: 'Europe/Paris' });
+    assert.match(nodes['#timezone-select'].html, /<option value="Europe\/Paris" selected>Paris<\/option>/);
+    assert.equal(nodes['#timezone-hint'].textContent, 'settings.timezoneHint');
+    refreshTimezone(container, { timezone: null, timezone_effective: 'Asia/Tokyo' });
+    assert.match(nodes['#timezone-select'].html, /<option value="" selected>settings\.timezoneAuto<\/option>/);
+    assert.equal(nodes['#timezone-hint'].textContent,
+      withValues('settings.hintWithCurrent', { value: 'Asia/Tokyo', hint: 'settings.timezoneHint' }));
+  } finally {
+    globalThis.__apiStub = prevApi;
+    resetPreferencesCache();
+  }
+  // Der echte Aufrufer: "Uebernehmen" im Zonen-Hinweis zieht Auswahl und Hinweis nach.
+  const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
+  assert.match(page, /const result = await adoptZone\([\s\S]{0,400}if \(result\.timezone\) refreshTimezone\(container, \{ timezone: result\.timezone/,
+    'nach dem Uebernehmen zeigte die Auswahl bis R21 weiter "Automatisch"');
+  assert.match(page, /const saved = await savePreferences\(\{ timezone: timezoneSelect\.value \|\| null \}\);\s*(?:\/\/[^\n]*\n\s*)*refreshTimezone\(container, saved\?\.data\);/);
+});
+
+test('R21 S9c: in jeder Sprache ist "Automatisch" ein Wort, das in die Zeile passt, und das Detail steht vorn', async () => {
+  // 179 px Auswahl bei 390, davon rund 157 px Text bei 17 px Schrift; die
+  // breiteste gemessene Schrift (Kyrillisch) braucht rund 10 px je Zeichen.
+  const MAX_CHARS = 15;
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = (await readdir(dir)).filter((f) => f.endsWith('.json'));
+  assert.ok(files.length >= 20, 'die Locales sind da');
+  const offenders = [];
+  for (const file of files) {
+    const { settings } = JSON.parse(await readFile(new URL(file, dir), 'utf8'));
+    for (const key of ['dataLanguageAuto', 'timezoneAuto']) {
+      const value = settings[key];
+      if (/\{\{/.test(value)) offenders.push(`${file} ${key}: traegt wieder ein Detail ("${value}")`);
+      if ([...value].length > MAX_CHARS) offenders.push(`${file} ${key}: "${value}" ist laenger als ${MAX_CHARS} Zeichen`);
+    }
+    const hint = settings.hintWithCurrent ?? '';
+    const v = hint.indexOf('{{value}}');
+    const h = hint.indexOf('{{hint}}');
+    if (v < 0 || h < 0 || v > h) offenders.push(`${file} hintWithCurrent: das Detail steht nicht vor dem Hinweis ("${hint}")`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('R21 S9c: Regionen heissen nach ihrem Land, mehrsprachige mit Sprache - und keine zwei gleich', async () => {
+  const { REGION_CODES, regionLabel, regionKeepsLanguage } = await import('../public/settings/region-presets.js');
+  const keeps = REGION_CODES.filter(regionKeepsLanguage).sort();
+  assert.deepEqual(keeps, ['de-CH', 'en-CA', 'en-PH', 'fil-PH', 'fr-CA'],
+    'Laender mit mehreren Voreinstellungen und die Schweiz behalten ihre Sprache');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const locales = (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
+  for (const locale of locales) {
+    const labels = REGION_CODES.map((code) => regionLabel(code, locale));
+    assert.equal(new Set(labels).size, labels.length, `${locale}: zwei Regionen heissen gleich`);
+    const country = new Intl.DisplayNames([locale], { type: 'region' }).of('DE');
+    assert.equal(regionLabel('de-DE', locale), country, `${locale}: Deutschland heisst nach dem Land`);
+  }
+  const withLanguage = (region, language) => `${region} / ${language}`;
+  assert.equal(regionLabel('de-CH', 'de', withLanguage), 'Schweiz / Deutsch', 'die Langform setzt die Seite (t())');
+  assert.equal(regionLabel('fr-CA', 'de'), 'Kanada (Französisch)');
+});
+
+// #2151 (Rest aus R21): auch nach S9c waren am Telefon Werte gekappt - eine
+// ausdruecklich gewaehlte Region mit langem Landesnamen ("Vereinigte Arabis…",
+// 9 von 72 in de, 4 in en, 8 in uk) und die Datensprachen Portugiesisch
+// (Brasilien) und Norwegisch (Bokmål). Dasselbe Muster wie S9c: der Wert ist
+// kurz ("VAE", "Kanada (FR)", "Portugiesisch (BR)", "Norwegisch"), der volle
+// Name steht vorn in der Hinweiszeile. Die R17-Zeile bleibt, wie sie ist.
+//
+// Das Budget ist eine Messung, kein Wunsch: bei 390 px hat die gedeckelte
+// Auswahl (50cqi = 179 px) 145 px Text. Gemessen in Chrome an allen 26
+// Sprachen, 2839 Regions- und Sprachnamen vor und nach #2151: in
+// Lateinschrift kappte nichts bis 18 Zeichen ("Švýcarsko (němčina)", 19, war
+// gekappt), in Kyrillisch/Griechisch bis 16 ("Саудовская Аравия", 17), in
+// Arabisch/Devanagari bis 22. In Japanisch, Chinesisch und Koreanisch zaehlt
+// ein breites Zeichen voll und ein lateinisches halb - "カナダ（フランス語）"
+// (10) war gekappt, "フィリピン（FIL）" (8,5) nicht. Mit diesen Grenzen rutschte
+// kein gekappter Name durch; einige passende fallen darueber und tragen
+// deshalb ebenfalls eine Kurzform ("Тринідад").
+const WIDE_CHAR = /[ᄀ-ᇿ⺀-鿿가-힯豈-﫿＀-￯]/;
+function selectBudget(text) {
+  if (WIDE_CHAR.test(text)) return 8.5;
+  if (/\p{Script=Cyrillic}|\p{Script=Greek}/u.test(text)) return 16;
+  if (/\p{Script=Arabic}|\p{Script=Devanagari}/u.test(text)) return 22;
+  return 18;
+}
+function selectUnits(text) {
+  if (!WIDE_CHAR.test(text)) return [...text].length;
+  return [...text].reduce((sum, c) => sum + (WIDE_CHAR.test(c) ? 1 : 0.5), 0);
+}
+const fillPlaceholders = (template, values) => template.replace(/\{\{(\w+)\}\}/g, (m, name) => values[name] ?? m);
+
+test('#2151: jede Region und jede Sprache passt in jeder Sprache in die geschlossene Auswahl - und keine zwei heissen gleich', async () => {
+  const {
+    REGION_CODES, SHORT_NAME_COUNTRIES, SHORT_NAME_LANGUAGES, regionShortLabel, languageShortLabel, languageShortKey,
+  } = await import('../public/settings/region-presets.js');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = (await readdir(dir)).filter((f) => f.endsWith('.json'));
+  const locales = files.map((f) => f.replace(/\.json$/, ''));
+  assert.ok(locales.length >= 20, 'die Locales sind da');
+  const offenders = [];
+  for (const locale of locales) {
+    const { settings } = JSON.parse(await readFile(new URL(`${locale}.json`, dir), 'utf8'));
+    for (const country of SHORT_NAME_COUNTRIES) {
+      const value = settings.regionShort?.[country];
+      if (typeof value !== 'string' || !value.trim()) offenders.push(`${locale}: settings.regionShort.${country} fehlt`);
+    }
+    for (const tag of SHORT_NAME_LANGUAGES) {
+      const value = settings.languageShort?.[languageShortKey(tag)];
+      if (typeof value !== 'string' || !value.trim()) offenders.push(`${locale}: settings.languageShort.${languageShortKey(tag)} fehlt`);
+    }
+    const regions = REGION_CODES.map((code) => regionShortLabel(code, locale, {
+      countryName: (country) => (SHORT_NAME_COUNTRIES.includes(country) ? settings.regionShort?.[country] : null),
+      withLanguage: (region, language) => fillPlaceholders(settings.regionWithLanguage, { region, language }),
+    }));
+    const languages = locales.map((tag) => languageShortLabel(tag, locale,
+      (t) => (SHORT_NAME_LANGUAGES.includes(t) ? settings.languageShort?.[languageShortKey(t)] : null)));
+    for (const label of [...regions, ...languages]) {
+      if (selectUnits(label) > selectBudget(label)) offenders.push(`${locale}: "${label}" hat ${selectUnits(label)} Zeichen, Budget ${selectBudget(label)}`);
+    }
+    if (new Set(regions).size !== regions.length) offenders.push(`${locale}: zwei Regionen heissen gleich (${regions.filter((r, i) => regions.indexOf(r) !== i).join(', ')})`);
+    if (new Set(languages).size !== languages.length) offenders.push(`${locale}: zwei Sprachen heissen gleich`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
+// D#1320: `zh` ist Vereinfacht, heisst im CLDR aber nur "Chinesisch". Neben
+// "Chinesisch (traditionell)" las sich der unmarkierte Eintrag wie der Standard.
+// Der volle Name (Hinweiszeile) nennt die Schrift, und in jeder Sprache heissen
+// die beiden Chinesisch voll wie kurz verschieden.
+test('D#1320: beide Chinesisch nennen ihre Schrift, voll und kurz, in jeder Sprache', async () => {
+  const { languageLabel, languageShortLabel, languageShortKey } = await import('../public/settings/region-presets.js');
+  assert.equal(languageLabel('zh', 'en'), 'Simplified Chinese');
+  assert.equal(languageLabel('zh-Hant', 'en'), 'Traditional Chinese');
+  assert.equal(languageLabel('zh', 'de'), 'Chinesisch (vereinfacht)');
+  assert.equal(languageLabel('de', 'en'), 'German', 'andere Sprachen bleiben beim CLDR-Namen ihres Codes');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const locales = (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
+  const offenders = [];
+  for (const locale of locales) {
+    const { settings } = JSON.parse(await readFile(new URL(`${locale}.json`, dir), 'utf8'));
+    const short = (tag) => languageShortLabel(tag, locale, (x) => settings.languageShort?.[languageShortKey(x)] ?? null);
+    if (languageLabel('zh', locale) === languageLabel('zh-Hant', locale)) offenders.push(`${locale}: voll gleich`);
+    if (short('zh') === short('zh-Hant')) offenders.push(`${locale}: kurz gleich ("${short('zh')}")`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('#2151: Darstellung - Region und Datensprache stehen kurz in der Auswahl, voll vorn in der Hinweiszeile', async (t) => {
+  const de = (type, code) => new Intl.DisplayNames(['de'], { type }).of(code);
+  globalThis.__supportedLocales = ['de', 'en', 'nb', 'pt', 'pt-BR'];
+  t.after(() => { delete globalThis.__supportedLocales; });
+  const emirates = await renderAppearance({
+    ...APPEARANCE_PREFS, currency: 'AED', date_format: 'dmy_slash', time_format: '12h', region: 'ar-AE', language: 'pt-BR',
+  });
+  assert.equal(selectedOptionText(emirates, 'region-select'), 'settings.regionShort.AE', 'die Region steht in ihrer Kurzform');
+  assert.equal(textById(emirates, 'region-hint'),
+    withValues('settings.hintWithCurrent', { value: de('region', 'AE'), hint: 'settings.regionHint' }),
+    'der volle Name steht vorn in der Hinweiszeile');
+  assert.equal(selectedOptionText(emirates, 'data-language-select'), 'settings.languageShort.ptBR',
+    'Portugiesisch (Brasilien) steht in der Kurzform');
+  assert.equal(textById(emirates, 'data-language-hint'),
+    withValues('settings.hintWithCurrent', { value: de('language', 'pt-BR'), hint: 'settings.dataLanguageHint' }));
+
+  const canada = await renderAppearance({ ...APPEARANCE_PREFS, currency: 'CAD', date_format: 'ymd', time_format: '24h', region: 'fr-CA', language: 'nb' });
+  assert.equal(selectedOptionText(canada, 'region-select'),
+    withValues('settings.regionWithLanguage', { region: de('region', 'CA'), language: 'FR' }), 'die Sprache einer Region steht als Kuerzel');
+  assert.equal(textById(canada, 'region-hint'), withValues('settings.hintWithCurrent', {
+    value: withValues('settings.regionWithLanguage', { region: de('region', 'CA'), language: de('language', 'fr') }), hint: 'settings.regionHint',
+  }));
+  assert.equal(selectedOptionText(canada, 'data-language-select'), 'settings.languageShort.nb', 'Bokmål in der Kurzform');
+  assert.equal(textById(canada, 'data-language-hint'),
+    withValues('settings.hintWithCurrent', { value: de('language', 'nb'), hint: 'settings.dataLanguageHint' }));
+
+  // Passt der Name, wiederholt der Hinweis ihn nicht.
+  const germany = await renderAppearance(APPEARANCE_PREFS);
+  assert.equal(textById(germany, 'region-hint'), 'settings.regionHint');
+
+  // Die Hinweiszeile folgt der Auswahl: beim Wechsel sofort und wenn die
+  // Region aus den Einzelfeldern hergeleitet wird.
+  const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
+  assert.match(page, /regionSelect\?\.addEventListener\('change', async \(\) => \{\s*(?:\/\/[^\n]*\n\s*)*setHint\(container, 'region-hint', regionHintText\(regionSelect\.value\)\);/);
+  assert.match(page, /function syncRegionSelect\([\s\S]{0,700}setHint\(container, 'region-hint', regionHintText\(regionSelect\.value\)\);/);
 });

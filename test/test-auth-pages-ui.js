@@ -279,3 +279,59 @@ test('Befund 15: die Eingabe in ein markiertes Feld blendet die Meldung aus', as
   assert.equal(errorEl.hidden, true, 'die Meldung blieb nach der Korrektur stehen');
   assert.equal(attrs.has('aria-invalid'), false);
 });
+
+/* KEINE SACKGASSE AUF /join (Critique R21, a1; D15). Ohne gueltige Einladung
+ * stand "Es wurde kein gueltiger Token gefunden." - ein Wort aus der Technik,
+ * kein naechster Schritt, und der Weg zur Anmeldung als unscheinbare Zeile.
+ * Jetzt sagt der Satz, was zu tun ist (um einen neuen Link bitten), und die
+ * Anmeldung steht betont wie nach falschen Zugangsdaten (login.js). */
+test('/join ohne gueltige Einladung: der Satz nennt den naechsten Schritt, die Anmeldung steht betont (Critique R21)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const join = read('../public/pages/join.js');
+  assert.match(join, /<p class="auth-form__forgot" id="join-login"><a href="\/login" data-link>/, 'der Weg zur Anmeldung hat einen Namen');
+  const dead = join.slice(join.indexOf('const dead = '), join.indexOf("if (!token)"));
+  assert.match(dead, /querySelector\('#join-login'\)\?\.classList\.add\('auth-form__forgot--emphasis'\)/,
+    'eine tote Einladung betont die Anmeldung');
+  assert.match(css, /\.auth-form__forgot--emphasis a \{/, 'die Betonung hat ihre Regel');
+
+  const de = JSON.parse(read('../public/locales/de.json')).join;
+  for (const key of ['missingToken', 'invalidToken']) {
+    assert.match(de[key], /bitte um einen neuen/, `join.${key} nennt den naechsten Schritt`);
+  }
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const { join: j } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    assert.doesNotMatch(j.missingToken, /token/i, `${file}: kein "Token" in der Meldung`);
+  }
+});
+
+/* KEINE SACKGASSE AUF /reset-password (Critique R21, Persona Inge; D15).
+ * Ohne Token stand "Es wurde kein gueltiger Token gefunden." unter einem
+ * gesperrten Formular - ein Wort aus der Technik und kein Weg hinaus. Jetzt
+ * nennt der Satz den Link und den naechsten Schritt, das Formular weicht, und
+ * "Neuen Link anfordern" fuehrt zu /forgot-password. */
+test('/reset-password ohne gueltigen Link: Satz mit naechstem Schritt und Weg zu einem neuen Link (Critique R21)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const page = read('../public/pages/reset-password.js');
+  assert.match(page, /<a href="\/forgot-password" data-link>\$\{esc\(t\('resetPassword\.requestNew'\)\)\}<\/a>/, 'der Weg zu einem neuen Link steht auf der Seite');
+  const dead = page.slice(page.indexOf('const dead = '), page.indexOf('if (!token)'));
+  assert.match(dead, /form\.hidden = true/, 'ein toter Link nimmt das Formular weg');
+  // Ein 400 gilt als toter Link - das stimmt nur, wenn das Formular die Laenge
+  // so zaehlt wie der Server (NFC, server/auth.js /reset-password).
+  assert.match(page, /if \(password\.normalize\('NFC'\)\.length < 8\)/,
+    'die Laengenpruefung zaehlt NFC wie der Server, sonst wird ein gueltiger Link fuer tot erklaert');
+  assert.match(read('../server/auth.js'), /if \(normalizePassword\(password\)\.length < 8\)/, 'und der Server zaehlt NFC');
+  assert.match(dead, /reset-request-new/, 'und betont den Weg zu einem neuen Link');
+  const de = JSON.parse(read('../public/locales/de.json')).resetPassword;
+  for (const key of ['missingToken', 'invalidToken']) {
+    assert.match(de[key], /fordere einen neuen an/, `resetPassword.${key} nennt den naechsten Schritt`);
+  }
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const { resetPassword: r } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    for (const key of ['missingToken', 'invalidToken', 'requestNew']) {
+      assert.doesNotMatch(r[key] ?? '', /token/i, `${file}: kein "Token" in resetPassword.${key}`);
+      assert.ok(r[key], `${file}: resetPassword.${key} fehlt`);
+    }
+  }
+});

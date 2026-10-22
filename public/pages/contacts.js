@@ -5,9 +5,9 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, leaveDetailTo } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
@@ -19,6 +19,7 @@ import { parseVCards } from '/utils/vcard.js';
 import { birthDateText, birthDateFieldHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
+import { CONTACT_PHONE_MAX_LENGTH } from '/utils/contact-limits.js';
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
 import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { splitViewDetailHtml, mountMasterDetail, setSelectionBulk } from '/utils/master-detail.js';
@@ -26,7 +27,7 @@ import { redrawList, collapseRow } from '/utils/list-motion.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
-import { mayWritePath } from '/utils/module-access.js';
+import { mayWritePath, pathAccess } from '/utils/module-access.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -760,15 +761,19 @@ async function enhancePhones(root) {
   for (const el of els) {
     const raw = el.dataset.phoneRaw;
     if (el.tagName === 'A') {
-      // href aktualisieren; textContent (Icon) bleibt unangetastet.
+      // href aktualisieren. Ein Aktionslink ("Anrufen", Icon) behaelt sein Wort.
       el.href = fmt.tel(raw, country);
-    } else {
-      const display = fmt.display(raw, country);
-      // Nummer ist immer LTR - in RTL-Locales (ar/fa) sonst Bidi-Umbruch bei '+'.
-      el.setAttribute('dir', 'ltr');
-      // Nur den ANZEIGETEXT setzen - der Rohwert lebt weiter in data-phone-raw.
-      if (display !== raw) el.textContent = display;
+      // TRAEGT DER LINK DIE NUMMER SELBST (Zeile der Detailansicht), bekommt er
+      // dieselbe Anzeige wie die Listenzeile (Critique R21, a3): vorher stand
+      // in der Liste "+49 231 4452210", im Detail derselbe Kontakt als
+      // "+49 231 445 2210" - der Zweig hier setzte nur das Ziel.
+      if (el.textContent.trim() !== raw.trim()) continue;
     }
+    const display = fmt.display(raw, country);
+    // Nummer ist immer LTR - in RTL-Locales (ar/fa) sonst Bidi-Umbruch bei '+'.
+    el.setAttribute('dir', 'ltr');
+    // Nur den ANZEIGETEXT setzen - der Rohwert lebt weiter in data-phone-raw.
+    if (display !== raw) el.textContent = display;
   }
 }
 
@@ -1047,7 +1052,7 @@ const mvSubLabel = (label) => (!label || label === 'other' ? '' : label);
  * hatten in der App bislang überhaupt keine Anzeige - das Formular führt sie
  * nicht. Sie stehen hier als reine Leseinformation.
  */
-function renderContactDetail(contact) {
+function renderContactDetail(contact, { onBirthdayLinked = null } = {}) {
   // Solange der Einzelabruf läuft, speist der Legacy-Einzelwert die Gruppe -
   // besser eine Nummer sofort als drei nach dem Roundtrip.
   const phones = contact.phones?.length
@@ -1099,6 +1104,10 @@ function renderContactDetail(contact) {
       icon: 'cake',
       label: t('contacts.birthdayLabel'),
       value: birthDateText(contact.birthday, contact.birthday_year_unknown),
+      // DER WEG ZUM GEBURTSTAG (Critique R21, D7; #2149): verknuepft fuehrt
+      // die Zeile dorthin, unverknuepft legt sie den Eintrag an - in derselben
+      // Folgeaktion, siehe birthdayRowAction().
+      action: birthdayRowAction(contact, onBirthdayLinked),
     },
     {
       icon: 'globe',
@@ -1141,9 +1150,19 @@ function openContactDetail(contact, { inPane = null } = {}) {
   // damit die Reihenfolge nicht stillschweigend zur Voraussetzung wird.
   let view = null;
   let card = null;
-  const ready = fetchFullContact(contact).then((loaded) => {
+  // #2149: ist der Geburtstag angelegt, zeigt dieselbe Zeile "Anzeigen" und
+  // bekommt den Fokus, den der ersetzte Knopf mitnahm.
+  const detailOptions = {
+    onBirthdayLinked: (loaded) => {
+      if (!refresh(loaded)) return;
+      const root = inPane ?? document;
+      root.querySelector?.('#contact-detail-birthday')?.focus();
+    },
+  };
+  const ready = fetchFullContact(contact).then((loaded) => { refresh(loaded); });
+  function refresh(loaded) {
     full = loaded;
-    if (!view?.update(renderContactDetail(full))) return;
+    if (!view?.update(renderContactDetail(full, detailOptions))) return false;
     // Organisation und Zweitnummern kennt erst der Einzelabruf. In der Spalte
     // steht die Karte ausserhalb der Zeilen und wird getauscht; im Blatt lag
     // sie in dem Bereich, den update() gerade neu gefuellt hat, und kommt neu.
@@ -1156,7 +1175,8 @@ function openContactDetail(contact, { inPane = null } = {}) {
       card = mountContactCard(full, null);
     }
     enhanceDetailPhones(inPane);
-  });
+    return true;
+  }
 
   const actions = [{
     id: 'contact-detail-export',
@@ -1205,7 +1225,7 @@ function openContactDetail(contact, { inPane = null } = {}) {
     key: `contact:${contact.id}`,
     size: 'md',
     pane: inPane ?? undefined,
-    sections: renderContactDetail(full),
+    sections: renderContactDetail(full, detailOptions),
     actions,
     // OHNE SCHREIBRECHT KEIN „BEARBEITEN" IM KOPF. `openDetailView` setzt die
     // Kopf-Aktion genau dann, wenn dieser Schluessel steht (detail-view.js) -
@@ -1367,9 +1387,14 @@ async function fetchFullContact(contact) {
 
 async function openContactModal({ mode, contact = null }) {
   if (readOnly()) return;
+  // Kommt der volle Kontakt erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht das Formular nicht mehr auf (#1997).
+  const context = captureOpenContext();
   if (mode === 'edit') contact = await fetchFullContact(contact);
+  if (!isModalContextCurrent(context)) return;
   const form = buildContactForm({ mode, contact });
-  openSharedModal({ title: form.title, content: form.content, size: 'md', onSave: form.wire });
+  // Anlegen: Buehne zuerst, Felder nach dem ersten Bild (modal.js `staged`, R21 a6).
+  openSharedModal({ title: form.title, content: form.content, size: 'md', onSave: form.wire, staged: mode === 'create' });
 }
 
 /**
@@ -1403,7 +1428,7 @@ function buildContactForm({ mode, contact = null }) {
   const mvRow = (kind, row, isFirst) => `
     <div class="contact-mv-row" data-mv-row>
       <input type="${kind === 'phone' ? 'tel' : 'email'}" class="form-input" data-mv-value
-             ${isFirst ? `id="cm-${kind}"` : ''} value="${esc(row.value)}"
+             ${isFirst ? `id="cm-${kind}"` : ''} value="${esc(row.value)}"${kind === 'phone' ? ` maxlength="${CONTACT_PHONE_MAX_LENGTH}"` : ''}
              placeholder="${t(kind === 'phone' ? 'contacts.phonePlaceholder' : 'contacts.emailPlaceholder')}"
              autocomplete="${kind === 'phone' ? 'tel' : 'email'}"${mvLocked(kind) ? ' readonly aria-describedby="cm-email-locked"' : ''}>
       <input type="text" class="form-input contact-mv-row__label" data-mv-label maxlength="50"
@@ -2028,6 +2053,85 @@ function openImportSelectionModal(named, skipped) {
   });
 }
 
+/** Die Adresse eines Geburtstags: dieselbe wie aus der Suche (`?open=`). */
+function birthdayHref(id) {
+  return `/birthdays?open=${encodeURIComponent(String(id))}`;
+}
+
+/**
+ * Die Folgeaktion der Geburtstagszeile (Critique R21 D7, #2149): EIN Platz,
+ * zwei Zustaende. Verknuepft fuehrt sie zum Eintrag, unverknuepft legt sie
+ * ihn an - genau den, den der Import aus diesem Kontakt anlegen wuerde
+ * (`POST /birthdays/import` mit einer id, server/services/birthdays.js). Nach
+ * dem Anlegen wird aus "Hinzufuegen" an derselben Stelle "Anzeigen"; eine
+ * zweite Stelle (Fuss, Karte) haette zwei Wege fuer einen Wert gebaut.
+ *
+ * Ohne Geburtsdatum gibt es keine Zeile (detailRowEl wirft sie weg) und
+ * nichts zu importieren. Angeboten wird nur, was der Server annimmt: die
+ * Frage stellt `mayOpenBirthdayImport()` mit dem Pfad, den der Knopf
+ * schreibt (`calendar: write`, Modul nicht abgeschaltet). Kontakte-Leserecht
+ * verlangt der Import auch - wer diese Ansicht sieht, hat es.
+ *
+ * @param {object} contact
+ * @param {((loaded: object) => void)|null} onLinked  bekommt den neu geladenen Kontakt
+ */
+function birthdayRowAction(contact, onLinked = null) {
+  if (contact.birthday_id) {
+    return mayOpenBirthdays() ? {
+      id: 'contact-detail-birthday',
+      label: t('contacts.showBirthday'),
+      icon: 'cake',
+      onClick: () => leaveDetailTo(birthdayHref(contact.birthday_id)),
+    } : null;
+  }
+  if (!contact.birthday || !mayOpenBirthdayImport()) return null;
+  return {
+    id: 'contact-detail-birthday-add',
+    label: t('contacts.addToBirthdays'),
+    icon: 'calendar-plus',
+    onClick: ({ button } = {}) => addContactToBirthdays(contact, { button, onLinked }),
+  };
+}
+
+/**
+ * Legt den verknuepften Geburtstag an und laedt den Kontakt neu.
+ *
+ * Gelesen wird danach der KONTAKT, nicht die Antwort des Imports: die meldet
+ * nur Zahlen, und ein `skipped` heisst auch "jemand war schneller" - dann
+ * traegt der Kontakt die `birthday_id` trotzdem, und das ist ein Erfolg. Nur
+ * ein Kontakt, der danach immer noch keinen Eintrag hat, ist ein Fehlschlag.
+ *
+ * @returns {Promise<object|null>} der neu geladene Kontakt, oder null
+ */
+async function addContactToBirthdays(contact, { button = null, onLinked = null } = {}) {
+  if (!mayOpenBirthdayImport()) return null;
+  if (button) button.disabled = true;
+  try {
+    await api.post('/birthdays/import', { contact_ids: [contact.id] });
+    const loaded = (await api.get(`/contacts/${contact.id}`)).data;
+    if (!loaded?.birthday_id) throw new Error('birthday not linked');
+    const i = state.contacts.findIndex((c) => c.id === contact.id);
+    if (i !== -1) state.contacts[i] = { ...state.contacts[i], birthday_id: loaded.birthday_id };
+    window.yuvomi?.showToast(t('contacts.addedToBirthdays'), 'success');
+    onLinked?.(loaded);
+    return loaded;
+  } catch (err) {
+    if (button?.isConnected) button.disabled = false;
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
+    return null;
+  }
+}
+
+/**
+ * Darf die Leseansicht zum Geburtstag springen? (Critique R21, D7) Dieselbe
+ * Paarung wie beim Import unten: `/birthdays` gehoert `calendar`, und ein
+ * haushaltweit abgeschaltetes Modul leitet der Router um - beides waere eine
+ * Sackgasse hinter dem Knopf.
+ */
+function mayOpenBirthdays() {
+  return !globalThis.window?.yuvomi?.isModuleDisabled?.('birthdays') && pathAccess('/birthdays') !== 'none';
+}
+
 /**
  * Darf der Import-Toast in den Geburtstags-Import springen? (#1348)
  *
@@ -2161,6 +2265,10 @@ export const __test = {
   // R8 H14: der Auswahlkreis als Programm.
   toggleContactSelection,
   openContactDetail, readOnly, state, buildContactForm,
+  // R21 D7: der Weg zum Geburtstag (die Zeilen stehen unten).
+  birthdayHref,
+  // #2149: unverknuepft legt dieselbe Zeile den Geburtstag an.
+  addContactToBirthdays,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.
   showImportResult, openBirthdayImport,
@@ -2177,4 +2285,6 @@ export const __test = {
   // #1997: der vCard-Import schliesst nur seinen eigenen Dialog.
   openImportSelectionModal,
   setContainerForTest(container) { _container = container; },
+  // R21 S9b: Liste und Detail zeigen eine Nummer gleich.
+  enhancePhones,
 };

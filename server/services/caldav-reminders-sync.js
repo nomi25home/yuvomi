@@ -18,7 +18,9 @@ import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { setItemTags, setTags } from '../utils/task-tags.js';
 import { syncTaskCompletion, recordCompletion, revokeCompletion } from './task-completions.js';
 import * as todoOutbound from './caldav-todo-outbound.js';
+import { createRefusalStop } from './calendar-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
+import { calendarDisplayName } from '../utils/calendar-meta.js';
 
 // --------------------------------------------------------
 // Pure Mapping Helpers
@@ -158,7 +160,7 @@ async function getReminderLists(accountId, { refresh = false, createClient: make
 
   const result = [];
   for (const cal of lists) {
-    const name     = cal.displayName || 'Reminders';
+    const name     = calendarDisplayName(cal.displayName, 'Reminders');
     const existing = db.get().prepare(
       'SELECT target_module, enabled FROM caldav_reminder_selection WHERE account_id = ? AND list_url = ?'
     ).get(accountId, cal.url);
@@ -853,14 +855,16 @@ async function runSync({ createClient: makeClient } = {}) {
       // `complete` heißt: jede Liste dieses Moduls wurde abgerufen. Nur dann ist
       // ein Tombstone ohne auffindbares Objekt wirklich erledigt statt bloß
       // unerreichbar - dieselbe Vorsicht wie beim Prune (#508).
+      // Ein Stoppsignal für Löschen und Ändern aller Module dieses Kontos (#1863).
+      const stop = createRefusalStop();
       for (const module of ['tasks', 'shopping']) {
         const complete = !incompleteModules.has(module);
         try {
           const removed = await todoOutbound.processPendingDeletions(
-            client, account.id, module, objectsByModule[module], complete
+            client, account.id, module, objectsByModule[module], complete, { stop }
           );
           const pushed = await todoOutbound.processPendingUpdates(
-            client, account.id, module, objectsByModule[module]
+            client, account.id, module, objectsByModule[module], { stop }
           );
           totalPushed += pushed;
           if (removed) log.info(`${removed} pending VTODO deletion(s) applied on the server.`);

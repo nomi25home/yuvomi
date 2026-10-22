@@ -1254,20 +1254,27 @@ test('#1607: jeder Weg aus der Budget-Kachel nennt den Reiter der Monatsuebersic
   assert.deepEqual([...new Set(gefuellt)], ['/budget?tab=budget']);
 });
 
-test('#1607: die Kennzahl-Kachel „Monatssaldo" nennt denselben Reiter', () => {
+test('#1607 + R21: der Monatssaldo steht nur im Budget-Widget, und dessen Kopf nennt denselben Reiter', async () => {
+  const { readFileSync } = await import('node:fs');
   const prevWindow = global.window;
   global.window = { yuvomi: { isModuleDisabled: () => false } };
   try {
-    // Zwei Kacheln, sonst ist es keine Reihe (selectMetricTiles).
-    const tile = __test.selectMetricTiles({
+    // R21 (D5): die Kennzahlreihe fuehrt keinen Kontostand mehr - auch wenn
+    // das Budget-Widget fehlt, was seit R21 die Vorgabe ist.
+    const tiles = __test.selectMetricTiles({
       budget: { income: 100, expenses: 40, balance: 60, entryCount: 2 },
       housekeeping: { configured: true, present: false, visitsThisMonth: 4 },
-    }, 'EUR').find((entry) => entry.id === 'budget');
-    assert.ok(tile, 'Reichweite: die Budget-Kachel steht in der Reihe');
-    assert.equal(tile.route, '/budget?tab=budget');
+      birthdays: [{ name: 'Oma', days_until: 3 }],
+    }, 'EUR');
+    assert.ok(tiles.length >= 2, 'Reichweite: die Reihe steht');
+    assert.ok(!tiles.some((entry) => entry.id === 'budget'), 'kein Saldo in der Reihe');
   } finally {
     global.window = prevWindow;
   }
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  assert.match(src, /const BUDGET_MONTH_ROUTE = '\/budget\?tab=budget';/);
+  assert.match(src, /widgetHeader\('budget', t\('nav\.budget'\), null, BUDGET_MONTH_ROUTE\)/,
+    'der Widget-Kopf fuehrt in den Monatsreiter');
 });
 
 test('#1607: der Reiter aus der Kachel ist einer, den das Budget kennt', async () => {
@@ -1460,11 +1467,18 @@ test('die Uebersicht polstert am Desktop mit --page-inline-pad und kennt kein ei
  * Masthead auch neben der Karte, der Wand-Modus im Anpassen-Menue. */
 test('R19 mobil: die Familie ist eine Avatar-Reihe mit Zaehler, Name und Satz bleiben im Baum', async () => {
   const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   const html = __test.renderFamilyWidget([ALEX, LEO, LINDA], { memberTodayTasks: [{ user_id: 1, open_count: 2 }] });
-  assert.match(html, /<span class="family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true">2<\/span>/,
-    'die Zahl offener Aufgaben steht als Marke am Gesicht');
-  assert.equal((html.match(/family-member__count/g) || []).length, 1, 'nur wer offene Aufgaben hat, traegt eine Marke');
+  // DIE MARKE NENNT IHRE EINHEIT (Critique R21, clarify): eine nackte "1" am
+  // Gesicht las sich wie eine Benachrichtigung - eins wovon? Vor der Zahl
+  // steht das Zeichen der Aufgaben (MODULE_ICON.tasks), dasselbe wie in der
+  // Leiste; die Zahl allein sagte nichts.
+  assert.match(html, /<span class="family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true"><i data-lucide="check-square" class="family-member__count-icon"><\/i>2<\/span>/,
+    'die Zahl offener Aufgaben steht als Marke am Gesicht, mit dem Aufgaben-Zeichen als Einheit');
+  const badge = [...eachRule(css)].filter((r) => r.selector.trim() === '.family-member__count-icon');
+  assert.ok(badge.some((r) => /inline-size:\s*var\(--icon-sm\)/.test(r.body)), 'das Zeichen hat die Groesse eines Inline-Markers');
+  assert.equal((html.match(/family-member__count"/g) || []).length, 1, 'nur wer offene Aufgaben hat, traegt eine Marke');
   assert.match(html, /<span class="family-member__short" aria-hidden="true">Alex<\/span>/, 'der Vorname unter dem Gesicht');
   assert.match(html, /<span class="family-member__name">Alex<\/span>/, 'der volle Name bleibt der Name fuer Screenreader');
   const phone = css.slice(css.indexOf('MOBIL IST DIE FAMILIE EINE AVATAR-REIHE'));
@@ -1475,6 +1489,29 @@ test('R19 mobil: die Familie ist eine Avatar-Reihe mit Zaehler, Name und Satz bl
   assert.doesNotMatch(block, /\.family-member__body \{[^}]*display:\s*none/);
   assert.match(block, /\.family-member--shared \{[^}]*order:\s*1;[^}]*flex:\s*1 0 100%/, 'der gemeinsame Termin als Zeile unter der Reihe');
   assert.match(block, /\.family-widget__footer \{\s*display:\s*none/, 'die Tagesbilanz steht in den Marken');
+});
+
+test('R21 S7 mobil: ab sechs Gesichtern liegt keine Marke auf dem Nachbarn, der gemeinsame Termin bleibt lesbar', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  // Gemessen 390px mit sechs Personen: Zelle 52px, die 33px-Marke ragte 25px
+  // hinaus und lag dreimal 7x16px auf dem naechsten Gesicht.
+  const cell = rules.find((r) => /\.family-member:not\(\.family-member--more, \.family-member--shared\)/.test(r.selector)
+    && r.at.some((a) => /max-width:\s*639px/.test(a)));
+  assert.ok(cell && /container:\s*family-member \/ inline-size/.test(cell.body), 'jede Person ist ihr eigener Container');
+  const narrow = rules.find((r) => r.selector.trim() === '.family-member__count' && r.at.some((a) => /@container family-member \(max-width: \d+px\)/.test(a)));
+  assert.ok(narrow, 'in der engen Zelle eine eigene Lage fuer die Marke');
+  assert.match(narrow.body, /inset-inline-start:\s*auto/, 'eng haengt sie nicht ueber die Kante hinaus');
+  assert.match(narrow.body, /inset-inline-end:\s*calc\(-1 \* var\(--space-1\)\)/);
+  // Teilt nur ein Teil der Familie den Termin, stehen die Namen statt "Alle":
+  // sie kuerzen, der Termin nicht.
+  const name = rules.find((r) => r.selector.trim() === '.family-member--shared .family-member__name');
+  assert.match(name.body, /flex:\s*0 1 auto/, 'die Namensliste darf schrumpfen');
+  assert.match(name.body, /min-inline-size:\s*0/);
+  const status = rules.find((r) => r.selector.trim() === '.family-member--shared .family-member__status');
+  assert.ok(status && /flex:\s*0 0 auto/.test(status.body), 'der Termin behaelt seine Breite');
 });
 
 test('R19 mobil: die Wetterzeile steht im Masthead auch neben der Karte, breit schliessen sich beide aus', async () => {
@@ -1504,4 +1541,99 @@ test('R19 mobil: der Wand-Modus steht im Anpassen-Menue, je Breite ein Weg', asy
   assert.match(css, /@media \(max-width: 767px\) \{\s*\.dashboard-tools-btn \{\s*display: inline-flex;\s*\}\s*\.dashboard-overview__tools:has\(> \.dashboard-tools-btn\) > #dashboard-wall-enter,\s*\.dashboard-overview__tools:has\(> \.dashboard-tools-btn\) > #dashboard-customize-btn \{\s*display: none;/,
     'schmal ersetzt das Menue die zwei Knoepfe');
   assert.match(src, /if \(action === 'dashboard-wall'\) container\.querySelector\('#dashboard-wall-enter'\)\?\.click\(\);/);
+});
+
+// --------------------------------------------------------
+// R21: der Rueckweg zeichnet den eben geladenen Stand sofort
+// --------------------------------------------------------
+// Zurueck auf der Uebersicht stand das Skelett ohne Gruss im neuen Bild der
+// Seitenblende, der Inhalt schnitt danach hart darueber - auch wenn derselbe
+// Stand Sekunden vorher schon dagewesen war. Gemessen mobil: neues Bild bei
+// +108 ms (4x: +141) aus dem Netz, aus dem gemerkten Stand bei +26-32 ms
+// (4x: +84-87), ohne Neubau danach, wenn die Nachfrage dasselbe liefert.
+test('R21 Rueckweg: ein frischer Stand desselben Mitglieds taugt, ein alter, fremder oder gestriger nicht', () => {
+  const at = new RealDate('2026-10-21T08:00:00Z');
+  const memo = { key: '7|de', at, day: '2026-10-21' };
+  const use = (overrides = {}) => __test.usableOverviewMemo(memo, {
+    key: '7|de', now: new RealDate(at.getTime() + 5_000), today: '2026-10-21', ...overrides,
+  });
+  assert.equal(use(), memo, 'fuenf Sekunden alt, dasselbe Mitglied: sofort zeichnen');
+  assert.equal(use({ key: '8|de' }), null, 'ein anderes Mitglied bekommt nie den Stand eines anderen');
+  assert.equal(use({ key: '7|en' }), null, 'eine andere Sprache uebersetzt neu');
+  assert.equal(use({ now: new RealDate(at.getTime() + 61_000) }), null, 'aelter als eine Minute: neu laden');
+  assert.equal(use({ today: '2026-10-22' }), null, 'ein neuer Haushaltstag: "Heute" waere gestern');
+  assert.equal(__test.usableOverviewMemo(null, { key: '7|de', now: at, today: '2026-10-21' }), null);
+});
+
+test('R21 Rueckweg: ein Schreibvorgang irgendwo verwirft den gemerkten Stand', () => {
+  const prev = globalThis.window;
+  const target = new EventTarget();
+  globalThis.window = { addEventListener: target.addEventListener.bind(target) };
+  try {
+    __test.watchOverviewWrites();
+    __test.setOverviewMemo({ key: '7|de' });
+    target.dispatchEvent(new Event('yuvomi:other'));
+    assert.ok(__test.getOverviewMemo(), 'ein fremdes Ereignis verwarf den Stand');
+    // Dasselbe Ereignis, das api.js nach jedem geglueckten Schreiben meldet (test:api).
+    target.dispatchEvent(new Event('yuvomi:write'));
+    assert.equal(__test.getOverviewMemo(), null, 'nach einem Schreibvorgang zeichnete die Uebersicht den alten Stand');
+  } finally {
+    globalThis.window = prev;
+    __test.setOverviewMemo(null);
+  }
+});
+
+test('R21 Rueckweg: die Nachfrage vergleicht den Inhalt, nicht die Reihenfolge der Slices', async () => {
+  const a = { events: [1, 2], pendingReminders: [], cycle: null, schedule: { x: 1 } };
+  const b = { cycle: null, schedule: { x: 1 }, events: [1, 2], pendingReminders: [] };
+  assert.equal(__test.overviewSignature(a), __test.overviewSignature(b));
+  assert.notEqual(__test.overviewSignature(a), __test.overviewSignature({ ...b, events: [1] }));
+  // Und render() nimmt den Stand wirklich (ohne DOM nur am Quelltext lesbar;
+  // die Wirkung misst die Browser-Sonde oben): kein Skelett, keine Anfrage
+  // davor, danach still nachfragen und nur bei Aenderung neu bauen.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  assert.match(render, /: memo \? '' : renderDashboardSkeleton\(\)/, 'mit gemerktem Stand steht wieder ein Skelett im ersten Bild');
+  assert.match(render, /= memo\s*\? \[memo\.data, memo\.weatherRes, \{ data: memo\.prefs \}, memo\.data\.pendingReminders\]\s*: await Promise\.all\(/,
+    'der gemerkte Stand wird nicht ohne Anfrage gezeichnet');
+  assert.match(render, /if \(memo\) refreshDashboardData\(\{ onlyIfChanged: true \}\);/, 'nach dem Zeichnen aus dem Stand fragt die Seite nicht nach');
+  assert.match(render, /if \(!unchanged\) rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
+});
+
+// Review zu R21 (PR #2142): der gemerkte Stand traegt die eigenen Slices
+// (Abfuhr, Zyklus), die /dashboard nie mitliefert - die ensure*-Aufrufe fragen
+// beim Aufbau daraus nichts. Reichte die stille Nachfrage sie dann nur weiter
+// (`fresh.waste = data.waste;`) und stempelte den Stand neu (`rememberOverview`),
+// hielten Besuche unter einer Minute Abstand einen alten Abholtermin oder einen
+// auf einem anderen Geraet geaenderten Zyklus unbegrenzt. Vorher holte jedes
+// Mounten die Slices neu. Jeder Slice, den die Nachfrage in den neuen Stand
+// uebernimmt, wird deshalb vorher zurueckgesetzt und neu geholt - derselbe Weg
+// wie beim Dienstplan (test:dashboard, M-6a).
+test('R21 Rueckweg: die stille Nachfrage holt jeden eigenen Slice neu, bevor sie den Stand neu stempelt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const refreshFn = src.slice(src.indexOf('async function refreshDashboardData('), src.indexOf('const refreshTimerId'));
+  assert.ok(refreshFn.length > 0, 'refreshDashboardData() nicht gefunden');
+  const carried = [...refreshFn.matchAll(/fresh\.(\w+) = data\.\1;/g)].map((m) => m[1]);
+  for (const slice of ['cycle', 'waste']) {
+    assert.ok(carried.includes(slice), `fresh.${slice} wird in der Nachfrage gar nicht mehr gesetzt - die Kachel fiele auf ihren Leerzustand`);
+  }
+  const stamp = refreshFn.indexOf('rememberOverview();');
+  assert.ok(stamp > 0, 'die Nachfrage merkt den neuen Stand nicht mehr');
+  for (const slice of carried) {
+    const ensure = `ensure${slice[0].toUpperCase()}${slice.slice(1)}Slice`;
+    // Ohne Ruecksetzen kehrt ensure*() an seinem eigenen "schon geladen" um.
+    assert.match(src, new RegExp(`async function ${ensure}\\(\\) \\{\\s*if \\(data\\.${slice} !== undefined\\) return;`),
+      `${ensure}() laedt nicht mehr nur bei undefined - dann misst dieser Test das Falsche`);
+    const visible = refreshFn.indexOf(`widgetConfig.some((w) => w.id === '${slice}' && w.visible)`);
+    const reset = refreshFn.indexOf(`data.${slice} = undefined;`);
+    const reload = refreshFn.indexOf(`await ${ensure}();`);
+    const carry = refreshFn.indexOf(`fresh.${slice} = data.${slice};`);
+    assert.ok(visible > -1 && reset > visible,
+      `${slice}: die Nachfrage setzt den Slice nicht (fuer eine sichtbare Kachel) zurueck - er reist nur weiter und bleibt alt, solange man unter einer Minute wiederkommt`);
+    assert.ok(reload > reset, `${slice}: nach dem Ruecksetzen wird nicht neu geholt`);
+    assert.ok(carry > reload, `${slice}: der Slice wird uebernommen, bevor er neu geholt ist`);
+    assert.ok(stamp > carry, `${slice}: der Stand wird neu gestempelt, bevor der Slice neu ist`);
+  }
 });

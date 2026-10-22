@@ -104,8 +104,75 @@
   box-shadow: var(--shadow-xs);
 }
 
-.app-loading__card + .app-loading__card { block-size: 6rem; }
-.app-loading__card:last-child { block-size: 12rem; }
+/* DIE SKIZZE IST DIE UEBERSICHT (R21 S9b, Critique a1 "Ladebild passt nicht
+ * zum ersten Schirm"). Seit D5 beginnt die Uebersicht mit Gruss, Wetterzeile
+ * und dem Tagesprogramm als EINER hohen Karte; die Skizze zeigte drei Karten
+ * (144/96/192px) ab y=84, das Programm stand dann ab y=226. Jetzt stehen
+ * Balken fuer Gruss, Wetter und "Heute wichtig" und eine Programmkarte dort,
+ * wo sie gleich stehen; am Desktop darunter die Kachelreihe. Die Balken sind
+ * Flaechen der Mulde, keine Schrift - nichts bewegt sich (R20). */
+.app-loading__bar {
+  display: block;
+  border-radius: var(--radius-full);
+  background-color: var(--color-fill-well);
+}
+
+.app-loading__bar--title {
+  block-size: var(--type-page-title-mobile);
+  inline-size: 64%;
+}
+
+.app-loading__bar--weather {
+  block-size: var(--type-caption);
+  inline-size: 28%;
+}
+
+.app-loading__bar--section {
+  block-size: var(--type-section-title);
+  inline-size: 36%;
+  margin-block-start: calc(var(--space-6) + var(--space-3));
+}
+
+.app-loading__card--program {
+  block-size: min(27rem, 52vh);
+}
+
+.app-loading__row {
+  display: none;
+}
+
+/* Am Desktop traegt die Seitenleiste die Marke (ihre Skizze ist die Schiene),
+ * und die Uebersicht beginnt mit dem Gruss ohne Wetterzeile: kein Kopf, kein
+ * Wetterbalken, der Gruss auf seiner Hoehe. */
+@media (min-width: 1024px) {
+  .app-loading__head,
+  .app-loading__bar--weather {
+    display: none;
+  }
+
+  .app-loading__bar--title {
+    margin-block-start: calc(var(--space-8) + var(--space-2));
+  }
+
+  .app-loading__bar--section {
+    margin-block-start: var(--space-6);
+  }
+
+  .app-loading__card--program {
+    block-size: min(19rem, 38vh);
+  }
+
+  .app-loading__row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+    margin-block-start: var(--space-2);
+  }
+
+  .app-loading__row > .app-loading__card {
+    block-size: 12rem;
+  }
+}
 
 .app-loading__capsule {
   position: fixed;
@@ -278,13 +345,23 @@ html.page-swapping .fab-layer .page-fab {
   pointer-events: none;
 }
 
-/* Die Bilder von Wurzel und Kopf blenden auf dem Token. */
+/* Die Bilder von Wurzel und Kopf blenden auf dem Token.
+ *
+ * UND HALTEN IHR ENDE (Critique R21, Geisterframe): die Gruppe des Kopfs
+ * steht (`animation: none` unten), und der Shorthand setzt dabei auch
+ * `animation-fill-mode` auf `none` - die Bilder erben ihn. Das alte Kopfbild
+ * war nach 200ms fertig, die Transition lebte aber noch einen Frame, weil die
+ * Wurzel ihr Ende per `both` haelt; ohne Fuellung stand der alte Kopf dort
+ * wieder deckend ueber dem neuen (beim Ankommen auf / 5 von 5 Mal "Aufgaben"
+ * ueber dem Gruss). Gilt auch unter reduzierter Bewegung, wo alle Gruppen
+ * stehen. Guard: test-motion.js. */
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-old(page-toolbar),
 ::view-transition-new(page-toolbar) {
   animation-duration: var(--duration-md);
   animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
 }
 
 /* AUCH DIE GRUPPEN laufen auf dem Token, nicht auf dem UA-Default (Critique
@@ -336,6 +413,20 @@ html.page-swapping .fab-layer .page-fab {
   animation: none;
 }
 
+/* ZWISCHEN ZWEI KUECHEN-REITERN BLENDET NUR DER KOERPER (Critique R21, D11).
+ * Die Leiste steht (`kitchen-tabs`, lebendes Bild), ihre Kapsel gleitet - aber
+ * die Kontextzeile darunter (`page-toolbar`: Wochenschritt, Suche, Listen)
+ * blendete 200ms doppelt belichtet mit der Seite: zwei verschiedene
+ * Bedienzeilen uebereinander. Sie gehoert zum Bedienelement und wechselt mit
+ * dem Tipp; nur der Inhalt darunter blendet. Typ aus swapPage (router.js). */
+html:active-view-transition-type(kitchen)::view-transition-old(page-toolbar) {
+  display: none;
+}
+
+html:active-view-transition-type(kitchen)::view-transition-new(page-toolbar) {
+  animation: none;
+}
+
 /* GERICHTETER WECHSEL EINER REGION (R19, utils/content-swap.js swapRegion).
  * Kalender-Ansichten und Drill-down: die Region traegt fuer die Dauer den
  * Namen `region-swap`, Navigation/Kapsel/FAB stehen (`html.page-swapping`
@@ -362,9 +453,14 @@ html:active-view-transition-type(region-forward, region-back, region-fade)::view
   animation: none;
 }
 
+/* NUR WAAGERECHT ZUGESCHNITTEN (Critique R21): nichts gleitet ueber
+ * Seitenleiste oder Rand - aber die Gruppe hat die Hoehe der NEUEN Ebene, und
+ * ein Blatt, das noch laedt, ist kurz. Ganz zugeschnitten stand die alte
+ * Uebersicht dann im ersten Frame auf zwei Zeilen gekappt (Einstellungs-Drill,
+ * gemessen 124px). Senkrecht laeuft das alte Bild weiter aus. */
 ::view-transition-group(region-swap) {
   animation: none;
-  overflow: clip;
+  overflow: clip visible;
 }
 
 ::view-transition-old(region-swap),
@@ -1187,7 +1283,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * selbst; unter 584px greift die Grenze nicht (390px: unveraendert 366px). */
   max-inline-size: var(--nav-capsule-max);
   margin-inline: auto;
-  background-color: var(--color-surface);
+  /* GRUPPIERT, NICHT KARTE IN KARTE (R21 S7, Detektor nested-cards, 3x mobil).
+   * Die Listen der Module sind Flaechen (`--sheet-tile-bg`), und sie standen
+   * als weisse Karten mit Schatten auf einem weissen Blatt. Wie die iOS-
+   * Einstellungen in einem Blatt traegt das Blatt den gruppierten Grund der
+   * Seite, die Listen heben sich davon ohne Schatten ab. */
+  background-color: var(--color-bg);
   border: 1px solid var(--glass-border);
   /* Dieselbe Stufe wie der Dialog (R18, Begruendung an `.modal-panel`). */
   border-radius: var(--radius-xl);
@@ -1287,7 +1388,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   flex-direction: column;
   background-color: var(--sheet-tile-bg);
   border-radius: calc(var(--radius-xl) - var(--space-3));
-  box-shadow: var(--shadow-xs);
   overflow: clip;
 }
 
@@ -1483,11 +1583,35 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * ausgeben, den Lucide-Rückfall eingeschlossen (`lucide.createIcons()`
  * übernimmt die Klassen des Platzhalters auf das erzeugte <svg>). Die beiden
  * Nav-Selektoren bleiben daneben stehen: die Sidebar-Suche baut ihr Zeichen als
- * rohen Lucide-Platzhalter, gehört aber in dieselbe Leiste. */
+ * rohen Lucide-Platzhalter, gehört aber in dieselbe Leiste.
+ *
+ * SEIT R21 (Critique 2026-10-21, D4) GILT DIE HAND FUER JEDES ZEICHEN, nicht
+ * nur fuer die Modulzeichen: `.lucide` (jedes von `createIcons()` erzeugte
+ * <svg>) und die eigenen Terminzeichen (`.event-icon--custom`) stehen in
+ * derselben Liste. Gemessen standen vorher 9 (mobil) bis 12 (Laptop)
+ * gerenderte Strichstaerken zwischen 1,0 und 4,7px nebeneinander - Lucide
+ * skaliert seine 2 mit der Groesse, ein 12px-Zeichen zeichnete 1,0px, ein
+ * 24px-Zeichen 2,0px.
+ *
+ * `vector-effect` STEHT AN DEN STRICHEN, NICHT AM <svg>. Die Eigenschaft gilt
+ * fuer Grafikelemente und wird nicht vererbt; am Wurzelelement, wo sie bis
+ * R21 stand, wirkte sie nie (gemessen: `none` auf jedem Pfad). Die
+ * Modulzeichen zeichneten deshalb skaliert - 1.5 auf viewBox 24 sind bei
+ * 16px 1,0px. `stroke-width` dagegen erbt und bleibt am Behaelter.
+ * Guard: test:frontend-audit, "Strich der Modulzeichen". */
+.lucide,
 .module-glyph,
 .nav-item__icon,
-.more-item__icon {
+.more-item__icon,
+.event-icon--custom {
   stroke-width: var(--icon-stroke);
+}
+
+.lucide *,
+.module-glyph *,
+.nav-item__icon *,
+.more-item__icon *,
+.event-icon--custom * {
   vector-effect: non-scaling-stroke;
 }
 
@@ -1693,6 +1817,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   margin-block: var(--space-2h);
 }
 
+/* Der feste Fuss des Blatts (R21 S7): Trennlinie und Systemreihe stehen
+ * unter dem scrollenden Koerper und schrumpfen nie - sie sind immer zu sehen. */
+.more-sheet__foot {
+  flex-shrink: 0;
+}
+
 /* ── System-Reihe: Einstellungen | Hilfe | Änderungen | Abmelden ──
  * Dieselben vier Spalten wie das Modul-Raster darueber, damit das Blatt EINE
  * Matrix ist und nicht zwei Raster mit verschiedenen Massen. Getrennt wird
@@ -1885,6 +2015,38 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   padding: var(--space-3) var(--space-4) calc(var(--space-4) + var(--safe-area-inset-bottom));
 }
 
+/* TASTENHINWEISE DER PALETTE (Critique R21): eine ruhige Fusszeile unter den
+ * Treffern - Pfeile, Enter, Esc in der Tastenform der Kuerzel-Hilfe. Nur mit
+ * feinem Zeiger: am Telefon gibt es diese Tasten nicht, und die Zeile naehme
+ * dem Sheet nur Hoehe. */
+.search-overlay__hints {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-overlay__hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    /* Footnote (13px), die Rolle der Metazeile - 12px bleibt Badges (D4). */
+    font-size: var(--type-caption);
+  }
+}
+
+.search-overlay__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.search-overlay__hint .shortcut-kbd {
+  min-width: var(--space-5);
+  padding-inline: var(--space-1);
+}
+
 /* Hinweis-, Fehler- und Kein-Treffer-Zustand der Suche sind seit Block 2 die
  * geteilte .empty-state--compact (emptyHintEl, utils/empty-state.js). */
 
@@ -1895,7 +2057,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .search-result__meta {
   display: block;
   margin-top: var(--space-0h);
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -2430,6 +2591,17 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   line-height: 1.1;
 }
 
+/* AB 640px CAPTION 1 STATT CAPTION 2 (R21, Critique 2026-10-21, D4). Die 11px
+ * sind die Antwort auf 58px je Slot am 375er-Telefon (oben); am Tablet traegt
+ * dieselbe Kapsel bei 834px fuenf Slots mit je ueber 100px, und das Label stand
+ * dort trotzdem in Caption 2 - fuer Inge die kleinste Schrift des Schirms.
+ * 12px ist die Stufe, die D4 den Nav-Labels gibt. */
+@media (min-width: 640px) {
+  .nav-bottom .nav-item__label {
+    font-size: var(--text-xs);
+  }
+}
+
 /* Das Label steht auf der getönten Indikator-Pille, also auf einer Tönung
  * SEINER EIGENEN FARBE - genau der Fall, für den tokens.css die Konvention
  * „Akzent-Text auf akzent-getöntem Grund" führt (70 % Akzent + 30 %
@@ -2600,7 +2772,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
       background-color var(--transition-fast),
       box-shadow var(--transition-fast),
       min-height var(--duration-md) var(--ease-out),
-      inline-size var(--duration-md) var(--ease-out);
+      inline-size var(--duration-md) var(--ease-out),
+      scale var(--duration-md) var(--ease-out);
   }
 
   .nav-bottom .nav-item__label {
@@ -2650,7 +2823,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
       color var(--transition-fast),
       opacity var(--duration-sm) var(--ease-out),
       visibility var(--duration-sm),
-      translate var(--duration-md) var(--ease-out);
+      translate var(--duration-md) var(--ease-out),
+      scale var(--duration-md) var(--ease-out);
   }
 
   /* NUR WO `translate` GILT (Review R20): Chromium kennt die Eigenschaft erst
@@ -2680,6 +2854,27 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
     .nav-bottom--minimized:not(:focus-within) .nav-item--pill {
       translate: var(--nav-pill-shift, 0px) 0;
+    }
+
+    /* FLACHER PER `scale`, NICHT PER HOEHE (Critique R21). Die Hoehe zog die
+     * Zone mit: die Kapsel steht unten fest, also wanderte ihre Oberkante -
+     * gemessen ein Layout-Shift je Frame (Quellen `.nav-bottom__items`,
+     * `.nav-bottom`), 0,0013 je Ein- und Ausfahren, unter reduzierter Bewegung
+     * in einem Schritt 0,017 je Wechsel. Jetzt behaelt die Kapsel ihre
+     * Layout-Hoehe und wird von der Unterkante aus gestaucht (Compositor, kein
+     * Layout); die Ziele strecken sich um denselben Faktor zurueck, Zeichen
+     * und Trefferflaeche bleiben 1:1. Den Faktor misst utils/ux.js
+     * (measureNavPill) an der ausgefahrenen Kapsel. Die Rundung steht dabei
+     * um 1/8 gestaucht - an einer Pille kaum zu sehen. Ohne `scale` (der
+     * @supports-Rahmen) bleibt die Hoehe der Rueckfall von oben. */
+    .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
+      min-height: var(--nav-height-mobile);
+      scale: 1 var(--nav-flat-scale, 1);
+      transform-origin: 50% 100%;
+    }
+
+    .nav-bottom--minimized:not(:focus-within) .nav-item {
+      scale: 1 var(--nav-flat-unscale, 1);
     }
 
     /* Die Tab-Pille der Leiste zeigt den Ort; in der Pille sagt es das Ziel
@@ -3572,9 +3767,19 @@ html.fab-steady .page-fab {
     overflow-y: auto;
   }
 
+  /* DIE HOEHE FOLGT DEM INHALT (Critique R21, D9: "Detailspalten nicht
+   * kuenstlich strecken"). Die Karte fuellte die ganze Zeile des Rasters, und
+   * ein kurzes Detail trug seinen Fuss an der Fensterkante - gemessen 1920:
+   * Geburtstag 528px leer ueber dem Fuss, Rezept 419, Kontakt 285, Aufgabe
+   * 210. Jetzt endet sie unter ihrem Inhalt (`align-self: start`), hoechstens
+   * so hoch wie die Spalte; laenger scrollt sie wie bisher, Kopf und Fuss
+   * kleben. Der Rand unten zaehlt in die Obergrenze, sonst ragte die Karte um
+   * ihn ueber die Zeile. */
   .split-view__detail {
     display: flex;
     flex-direction: column;
+    align-self: start;
+    max-block-size: calc(100% - var(--space-4));
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -3593,11 +3798,17 @@ html.fab-steady .page-fab {
     outline-offset: var(--focus-ring-offset-inset);
   }
 
-  /* Die ausgewaehlte Zeile: dieselbe Flaeche wie die Aktiv-Pille der
-   * Seitenleiste - „das steht rechts". Nur in der Spaltenform; darunter gibt
-   * es keine Auswahl, nur ein Oeffnen. */
+  /* Die ausgewaehlte Zeile - „das steht rechts". Nur in der Spaltenform;
+   * darunter gibt es keine Auswahl, nur ein Oeffnen.
+   *
+   * IM MODULTON, NICHT IM VIOLETT (R21 S9b, Critique a4 "Auswahl violett vs
+   * Modulton"). Sie stand in der Flaeche der Aktiv-Pille der Seitenleiste,
+   * waehrend der aktive Filter-Chip darueber und die gewaehlte Dokumentzeile
+   * den Modulton trugen - zwei Auswahlfarben auf einem Schirm. Nach der
+   * Eine-Stimme-Regel (DESIGN.md) beantwortet die Zeile "wo bin ich", wie
+   * ihre Chips und ihr Hover: Modulton. Die Seitenleiste bleibt Violett. */
   .split-view [data-md-id].is-selected {
-    background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
   }
 }
 
@@ -3642,10 +3853,6 @@ html.fab-steady .page-fab {
   align-items: center;
   justify-content: center;
   padding: var(--space-8) var(--space-6);
-}
-
-.split-view__selection[hidden] {
-  display: none;
 }
 
 .selection-pane {
@@ -3727,16 +3934,12 @@ html.fab-steady .page-fab {
   padding: var(--space-8) var(--space-6);
 }
 
-.split-view__empty[hidden],
-.split-view__detail-body[hidden] {
-  display: none;
-}
-
 .split-view__detail-body {
   display: flex;
   flex-direction: column;
-  /* Fuellt die Spalte, damit ein kurzes Detail seinen Fuss unten traegt. */
-  flex: 1 0 auto;
+  /* Waechst nicht mehr in eine gestreckte Spalte (R21, D9): die Karte ist so
+   * hoch wie ihr Inhalt, der Fuss steht direkt darunter. */
+  flex: 0 0 auto;
   min-height: 0;
 }
 
@@ -4388,6 +4591,45 @@ html.fab-steady .page-fab {
   }
 }
 
+/* Reduzierte Bewegung (R21, D2): kein Zug, kein Versatz - der neue Zeitraum
+ * blendet ein, statt hart zu schneiden. Dieselbe Start-Deckkraft wie oben. */
+.period-swipe-in--fade {
+  animation: period-swipe-fade var(--duration-sm) var(--ease-out);
+}
+
+@keyframes period-swipe-fade {
+  from {
+    opacity: 0.4;
+  }
+}
+
+/* ECHTES UMBLAETTERN (R21, D2): waehrend der Geste steht der vorgeladene
+ * Nachbarzeitraum (`.period-swipe-ghost`) neben dem Panel und zieht mit. Er
+ * liegt absolut im Traeger, deckungsgleich mit dem Panel (Lage und Groesse
+ * setzt period-swipe.js), und nimmt keine Eingaben an. */
+.is-period-paging {
+  position: relative;
+  overflow: hidden;
+}
+
+.period-swipe-ghost {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* GEPARKT (R21 S8, parkPeriodGhost): der Nachbar steht schon vor der Geste im
+ * Traeger, unsichtbar. Nach dem Ausrichten ruht sein Teilbaum
+ * (`content-visibility: hidden`): das Layout bleibt erhalten, und die
+ * Stilrunden der Seite (ein Dialog, ein Toast) rechnen ihn nicht mit. Die
+ * Geste nimmt beide Klassen ab und deckt ihn nur noch auf. */
+.period-swipe-ghost--parked {
+  visibility: hidden;
+}
+
+.period-swipe-ghost--rest {
+  content-visibility: hidden;
+}
+
 @keyframes page-title-settle {
   from { opacity: 0; }
 }
@@ -4479,8 +4721,13 @@ html.fab-steady .page-fab {
     pointer-events: none;
   }
 
-  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt. */
-  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > * {
+  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt.
+   * DIE KINDER BEIM NAMEN, NICHT `> *` (Critique R21 S8): ein Universalselektor
+   * hinter `:has()` machte die gemeinsame `:has()`-Invalidierung zum ganzen
+   * Teilbaum (siehe `.page-search__input::placeholder` unten). Die Faltzeile
+   * traegt die Slots der Werkzeugzeile (gemessen Rezepte, Vorrat, Mahlzeiten,
+   * Einkauf: __center + __actions). */
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools) {
     opacity: 0;
   }
 }
@@ -4691,26 +4938,23 @@ html.fab-steady .page-fab {
   }
 }
 
-/* DIE TAB-LEISTE IST DIE TITELZEILE (R19, Critique 2026-10-16 P2 mobil).
- *
+/* DIE REITER IN DER TITELZEILE (R19, Critique 2026-10-16 P2 mobil) - AB 768px.
  * Schichtplan, Belohnungen und Haushaltshilfe trugen unter 1024px zwei
- * Kopfzeilen: den Large Title und darunter ihre Reiter - 121/121/129px bei
- * 390px, 118-130px bei 834px, waehrend elf Module mit 65px auskommen.
- * `--tabs-title` stellt die Leiste in die Titelzeile, wie iOS ein Segment als
- * Titel der Navigationsleiste fuehrt:
- * - ab 768px stehen Large Title und Reiter nebeneinander; der Titel gibt nach
- *   (Ellipse), die Leiste scrollt, wenn sie nicht passt (Werkzeugzeilen-Regel 2);
- * - unter 768px weicht der Titel samt Siegel aus dem Bild, nicht aus dem Baum
- *   (das <h1> bleibt die Seitenueberschrift) - dasselbe, was die Kuechen-Leiste
- *   seit R9 tut. Die vier Reiter der Haushaltshilfe brauchen 351 der 358px;
- *   mit Titel oder Siegel davor liefe der vierte in den Fade ("Hau...").
- *   Wo man ist, sagen die Reiter selbst, ihr Segment im Modulton und der
- *   Mehr-Tab der Kapsel in derselben Farbe.
- * Der Kopf ist damit einzeilig: keine Lead-Zone, nichts dockt, die Linie steht
- * durchgehend (wie `--title-tools`). Am Desktop (ab 1024px) bleibt die
- * Bar-Zeile eine eigene Zeile unter dem Inline-Titel - dort traegt die
- * Titelzeile die angedockte Kopf-Pille. */
-@media (max-width: 1023px) {
+ * Kopfzeilen: den Large Title und darunter ihre Reiter - 118-130px bei 834px.
+ * `--tabs-title` stellt die Leiste dort in die Titelzeile, wie iOS ein Segment
+ * als Titel der Navigationsleiste fuehrt: Large Title und Reiter nebeneinander;
+ * der Titel gibt nach (Ellipse), die Leiste scrollt, wenn sie nicht passt
+ * (Werkzeugzeilen-Regel 2).
+ *
+ * UNTER 768px NENNT DER KOPF WIEDER DEN ORT (Critique R21, D7; a2 P2). Bis
+ * dahin wich dort der Titel samt Siegel aus dem Bild, und die drei Module
+ * zeigten nur ihre Reiter - "Besuche | Arbeiten | Berichte" sagt nicht, dass
+ * man in der Haushaltshilfe steht, und die Kapsel markierte "Mehr". Dort gilt
+ * jetzt der Kopf aller Module mit Reitern (Budget): Siegel und Name in der
+ * Titelzeile, die Reiter als Bar-Zeile darunter, und beim Scrollen klappt der
+ * Large Title ein wie ueberall (wireCollapsingHeader). Am Desktop (ab 1024px)
+ * bleibt die Bar-Zeile ohnehin eine eigene Zeile unter dem Inline-Titel. */
+@media (min-width: 768px) and (max-width: 1023px) {
   .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 0 1 auto;
     min-width: 0;
@@ -4726,24 +4970,43 @@ html.fab-steady .page-fab {
     flex: 1 1 0;
     block-size: auto;
   }
+}
 
+@media (max-width: 1023px) {
   .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__actions:empty {
     display: none;
   }
 }
 
+/* ANGEDOCKT NENNT DIE REITER-ZEILE DEN ORT, IN DER HOEHE DER LEISTE (R21 S7,
+ * Leitlinie Ulas "mobil mehr Platz fuer Inhalt").
+ *
+ * Unter 768px stehen die drei Koepfe zweizeilig (121-129px); beim Scrollen
+ * wanderte der Large Title weg, und uebrig blieb die Reiter-Zeile - 65px bei
+ * Belohnungen, 73px bei der Haushaltshilfe (ihre Leiste trug die feste
+ * Kuechenhoehe von 56px um 48px-Reiter), und in beiden kein Wort, wo man ist.
+ * Jetzt:
+ * - die Leiste ist so hoch wie ihre Reiter, wie zwischen 768 und 1023px
+ *   (angedockt 73 -> 65px);
+ * - angedockt (`--dock-tabs`, wireCollapsingHeader) steht der Inline-Titel
+ *   vorn in der Zeile, hoechstens 45 % breit, mit Ellipse; die Leiste nimmt
+ *   den Rest und scrollt, wenn ihre Reiter nicht mehr passen - der gewaehlte
+ *   bleibt im Bild. Die Zeile bricht nie um: `flex-basis: 0` an der Leiste,
+ *   sonst begaenne der Titel eine eigene Zeile und das negative `top` stimmte
+ *   nicht mehr. */
 @media (max-width: 767px) {
-  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    min-block-size: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__bar {
+    block-size: auto;
   }
 
-  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .module-seal--head {
-    display: none;
+  .page-toolbar--tabs-title.page-toolbar--dock-tabs.is-docked > .page-toolbar__dock-title {
+    flex: 0 1 auto;
+    max-inline-size: 45%;
+  }
+
+  .page-toolbar--tabs-title.page-toolbar--dock-tabs.is-docked:has(> .page-toolbar__dock-title) > [role="tablist"] {
+    flex: 1 1 0;
+    min-inline-size: 0;
   }
 }
 
@@ -4931,12 +5194,17 @@ html.fab-steady .page-fab {
     background: transparent;
   }
 
-  .page-toolbar
-    .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))
-    .page-search__input::placeholder,
-  .section-toolbar
-    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
-    .page-search__input::placeholder {
+  /* OHNE `:has()`, UND DAS IST GLEICHBEDEUTEND: einen Platzhalter zeigt das
+   * Feld nur, solange es leer ist - die Bedingung "ohne Wert" erfuellt er von
+   * selbst. Mit `:has()` VOR einem `::placeholder` hatte die Regel einen Preis
+   * weit ausserhalb der Suche (Critique R21 S8): Chrome fuehrt die Reste aller
+   * `:has()`-Regeln in EINER Invalidierungsmenge, ein Pseudo-Element darin
+   * macht sie zum "ganzen Teilbaum", und jedes Einfuegen unter <html> (Dialog,
+   * Toast, ein Feld) rechnete den Stil des ganzen Dokuments neu. Gemessen
+   * /tasks 1x: Einfuegen + Stil 2,7 -> 1,3 ms zusammen mit der Faltzeile.
+   * Guard: test:frontend-audit. */
+  .page-toolbar .page-search:not(.page-search--field):not(:focus-within) .page-search__input::placeholder,
+  .section-toolbar .page-search:not(:focus-within) .page-search__input::placeholder {
     color: transparent;
   }
 
@@ -5100,14 +5368,9 @@ html.fab-steady .page-fab {
  * Geteilt von Geburtstagen und Kontakten, deshalb hier und nicht im
  * Seiten-Stylesheet: der Router laedt je Route genau eines. "Jahr unbekannt"
  * tauscht den Datumswaehler gegen Monat und Tag - dieselbe Aufteilung wie der
- * Namenstag (`.birthday-name-day__controls`). `[hidden]` steht ausdruecklich
- * da: `yuvomi-datepicker { display: block }` schlaegt das UA-`[hidden]`.
+ * Namenstag (`.birthday-name-day__controls`). Das Ausblenden des jeweils
+ * anderen Teils traegt die globale `[hidden]`-Regel (reset.css, D13).
  * -------------------------------------------------------- */
-.birth-date-field yuvomi-datepicker[hidden],
-.birth-date-field__yearless[hidden] {
-  display: none;
-}
-
 .birth-date-field__yearless {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(88px, 0.55fr);
@@ -5225,14 +5488,6 @@ html.fab-steady .page-fab {
    * Trennung durch Abstand, nicht als isolierte Ziele in einer Zeile. */
   min-height: var(--target-md);
   transition: background-color var(--transition-fast);
-}
-
-/* `display: flex` oben schlaegt das UA-`[hidden]`. Menues blenden Eintraege
- * nach Zustand aus (Aufgaben: Ablegen und Tags nur waehrend der Auswahl;
- * Dokumente: „Alle auswaehlen" und Archivieren, R11 H4) - ohne diese Regel
- * standen sie immer da. */
-.popover-menu__item[hidden] {
-  display: none;
 }
 
 @media (hover: none) {
@@ -5402,10 +5657,6 @@ a.popover-menu__item {
  * Text liest sich als Fussnote, nicht als Zustand. */
 .page-filter-btn--labeled .page-filter-btn__count {
   position: static;
-}
-
-.page-filter-btn__count[hidden] {
-  display: none;
 }
 
 .filter-sheet__group + .filter-sheet__group {
@@ -5677,15 +5928,22 @@ a.popover-menu__item {
 @media (min-width: 1024px) {
   /* Der angedockte FAB IST der Toolbar-Knopf (siehe dockFabIntoToolbar in
    * router.js): dieselbe Node, dieselbe Verdrahtung, nur ohne die schwebende
-   * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`. */
+   * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`.
+   *
+   * NUR, WAS `.btn` NICHT SETZT. Höhe, Polster, Lücke und Schatten gehören
+   * `.btn`/`.btn--primary` - gleiche Spezifität, später in der Datei. Die
+   * eigenen Werte (44px, 4px Lücke) standen hier seit dem Andocken und griffen
+   * nie (gemessen 2026-10-22). So misst der Knopf, was jeder Knopf im Kopf
+   * misst: `--target-md` am Zeiger, `--target-lg` am Finger.
+   *
+   * `animation: none`, weil `fab-in` an `.page-fab` hängt und die Klasse
+   * bleibt. Der Kopf steht beim Seitenwechsel still (R18); die Pille darin fuhr
+   * beim Kaltstart trotzdem von halber Größe herein. */
   .page-fab--docked {
     position: static;
     width: auto;
     height: auto;
-    min-height: var(--target-base);
-    padding-inline: var(--space-4);
-    gap: var(--space-1);
-    box-shadow: var(--shadow-sm);
+    animation: none;
   }
 }
 
@@ -5721,18 +5979,9 @@ a.popover-menu__item {
  * ihrem Quellenfilter, und nur `display: flex` hier hielt den Knopf sichtbar -
  * eine Rettungsregel an dieser Stelle haette ihn versteckt (Review zu #1347).
  * Der Slot wird deshalb nie `hidden`; test:hidden-cascade verbietet es. */
-.page-fab[hidden],
-.btn[hidden],
-.form-group[hidden],
-.form-field[hidden],
-.form-row[hidden],
-.row-carrier[hidden],
-.row-action[hidden],
-.page-toolbar[hidden],
-.recipe-detail[hidden],
-p.field-hint--warn[hidden] {
-  display: none !important;
-}
+/* Die Liste darueber ist Geschichte: seit D13 (Critique R21) holt EINE Regel
+ * in reset.css jedes `[hidden]` zurueck, `!important` und ohne Klasse. Die
+ * Kommentare bleiben als Fundliste der Falle stehen. */
 
 /* DER RESET DER ZEITRAUM-NAVIGATION (Kalender „Heute", Essensplan „Heute",
  * Budget „Aktuell") BRAUCHT `hidden` GERADE NICHT - er braucht das Gegenteil.
@@ -6746,6 +6995,21 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   cursor: default;
 }
 
+/* DIE TAFEL WARTET EINEN FRAME AUF IHRE FELDER (Critique R21, a6 "Erstes
+ * Blatt kalt"; modal.js `staged`). Im Tipp stehen Dialog und Abdunklung, die
+ * Tafel ist noch leer - sie bleibt unsichtbar und faehrt nicht ein. Nach dem
+ * ersten Bild kommt das Formular, die Klasse geht, und die Einfahrt (glass.css)
+ * beginnt erst jetzt, also mit ihrer ganzen Feder. `:not(--closing)`: wird der
+ * Dialog vorher geschlossen, laeuft der Ausgang (und `animationend`) wie immer,
+ * nur unsichtbar. */
+.modal-panel.modal-panel--pending {
+  visibility: hidden;
+}
+
+.modal-panel.modal-panel--pending:not(.modal-panel--closing) {
+  animation: none;
+}
+
 @media (min-width: 768px) {
   .modal-panel {
     max-width: 520px;
@@ -6775,6 +7039,22 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   font-size: var(--type-section-title);
   font-weight: var(--font-weight-semibold);
   text-wrap: balance;
+}
+
+/* DIE TITELKANTE STEHT, WIE LANG DER TITEL AUCH IST (Critique R21). Der Kopf
+ * zentrierte seine Kinder senkrecht: ein einzeiliger Titel stand mittig neben
+ * den 48px-Knoepfen (Oberkante 25px), ein zweizeiliger fuellte ihre Hoehe und
+ * rutschte an die Polsterkante (13px) - von Aufgabe zu Aufgabe sprang die
+ * Titelkante um 12px. Jetzt steht die ERSTE Zeile mittig neben den Knoepfen,
+ * und weitere Zeilen wachsen nach unten. Nur in einem Kopf mit Knoepfen; ohne
+ * `:has()` bleibt es beim Zentrieren. */
+.modal-panel__header:has(> .modal-panel__header-actions, > .modal-panel__close) {
+  align-items: flex-start;
+}
+
+.modal-panel__header:has(> .modal-panel__header-actions, > .modal-panel__close) > .modal-panel__title {
+  line-height: var(--line-height-tight);
+  margin-block-start: calc((var(--target-base) - var(--type-section-title) * var(--line-height-tight)) / 2);
 }
 
 .modal-panel__close {
@@ -6906,11 +7186,6 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 
 .form-pair--wide {
   --form-pair-min: 11rem;
-}
-
-/* `hidden` verliert gegen `display: grid` (Kilometerstand im Inventar). */
-.form-pair[hidden] {
-  display: none;
 }
 
 /* Gleich hohe Karten/Boxen in Modal-Grids */
@@ -7226,7 +7501,7 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 }
 
 .form-advanced__hint {
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-regular);
   color: var(--color-text-tertiary);
 }
@@ -7632,7 +7907,11 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   white-space: nowrap;
 }
 
-@media (min-width: 1024px) {
+/* Am Zeiger die Mausgröße - nach der Zeigerfähigkeit, nicht nach der Breite
+ * allein (tokens.css, DESIGN.md). Ein Tablet im Querformat (1180px,
+ * `hover: none`) bekam hier 40px statt der Fingergröße, jeder Knopf im Kopf
+ * und der angedockte Primärknopf mit ihm (test:page-fab-docked-browser). */
+@media (min-width: 1024px) and (hover: hover) {
   .btn {
     min-height: var(--target-md);
   }
@@ -8183,9 +8462,14 @@ textarea::placeholder {
   opacity: 1; /* Firefox setzt ::placeholder sonst auf opacity < 1 und senkt den Kontrast erneut */
 }
 
+/* DAS FELD SPRICHT IN FOOTNOTE 13 (R21 S9b, D4; DESIGN.md "Footnote ... in
+ * medium das Label ueber Feldern"). Label, Hinweis darunter und Feldfehler
+ * standen bei 14 bzw. 12 - 14 ist die Stufe der Bedienelemente, 12 die der
+ * Badges; das Feld selbst traegt 16 (iOS-Zoom-Schwelle). Guard
+ * test:typography "R21 S9b: Label, Hinweis und Fehler am Feld sind Footnote 13". */
 .label, .form-label {
   display: block;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-1);
@@ -8220,7 +8504,7 @@ textarea::placeholder {
  * index.html fuer jede Route verlinkt. Nur die Zeilenlaenge der
  * Einstellungen (`.settings-page .form-hint`) bleibt in settings.css. */
 .form-hint {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
@@ -8267,7 +8551,7 @@ textarea::placeholder {
 
 .form-field__error {
   display: none;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-danger);
   gap: var(--space-1);
   align-items: center;
@@ -8889,7 +9173,8 @@ textarea::placeholder {
 
   .swipe-row--hint > :first-child { animation: none; }
 
-  .btn--loading::after { animation: none; }
+  /* Der Knopf-Spinner steht hier nicht mehr: Statusbewegung dreht weiter
+   * (reset.css, Critique R21 D12). */
 }
 
 /* --------------------------------------------------------
@@ -9050,7 +9335,6 @@ textarea::placeholder {
 }
 
 .empty-state__description {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   max-width: 280px;
   line-height: var(--line-height-base);
@@ -9181,8 +9465,11 @@ textarea::placeholder {
   padding: var(--space-4) var(--space-3);
   gap: var(--space-2);
 }
+/* Kompakt (Widgets, Seitenspalten): eine Stufe tiefer als die Rolle, auf
+ * die Footnote - nach UNTEN umgestellt, damit kein neuer Umbruch entsteht
+ * (R21, D4; vorher 14, die Stufe der Bedienelemente). */
 .empty-state--compact .empty-state__description {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
 }
 
 /* --------------------------------------------------------
@@ -9381,7 +9668,10 @@ textarea::placeholder {
  * -------------------------------------------------------- */
 .shell-bottom-stack {
   position: fixed;
-  bottom: calc(var(--nav-bottom-height) + var(--safe-area-inset-bottom) + var(--space-4));
+  /* `--nav-bottom-height` traegt den Home-Indikator schon (tokens.css). Er stand
+   * hier ein zweites Mal: mit 34px Inset 58 statt 24px Luft zur Kapsel
+   * (Critique R21, test:mobile-chrome). */
+  bottom: calc(var(--nav-bottom-height) + var(--space-4));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -9456,7 +9746,7 @@ html:has(.app-page.is-selecting) {
  * Abstand wie auf dem Telefon, nur ohne dessen FAB-Nachlauf. */
 @media (min-width: 768px) and (max-width: 1023px) {
   .shell-bottom-stack {
-    bottom: calc(var(--nav-bottom-height) + var(--safe-area-inset-bottom) + var(--space-4));
+    bottom: calc(var(--nav-bottom-height) + var(--space-4));
   }
 }
 
@@ -9529,6 +9819,21 @@ html:has(.app-page.is-selecting) {
    * bleibt beim Browser, damit die Seite unter dem Toast scrollbar bleibt;
    * `pinch-zoom` dazu, sonst verwirft er dort jeden Zwei-Finger-Bildlauf (#1276). */
   touch-action: pan-y pinch-zoom;
+}
+
+/* WIE OFT DERSELBE SATZ KAM (Critique R21): ein gleicher Toast stapelt sich
+ * nicht mehr, er zaehlt mit - als ruhige Zahl am Ende, in der Tinte des
+ * Toasts auf einem Hauch seiner selbst. */
+.toast__count {
+  flex-shrink: 0;
+  min-width: var(--space-5);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-full);
+  background-color: color-mix(in srgb, currentColor var(--tint-surface), transparent);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .toast__icon {
@@ -9896,12 +10201,6 @@ html:has(.app-page.is-selecting) {
   border-radius: var(--radius-sm);
 }
 
-/* Progressive Disclosure: bei „keine Wiederholung" trägt das Element das
- * hidden-Attribut — display:flex oben darf es nicht überstimmen. */
-.rrule-details[hidden] {
-  display: none;
-}
-
 .rrule-row {
   display: flex;
   align-items: flex-end;
@@ -9950,7 +10249,7 @@ html:has(.app-page.is-selecting) {
 
 .rrule-anchor__hint {
   margin: var(--space-1) 0 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
@@ -9960,7 +10259,7 @@ html:has(.app-page.is-selecting) {
  * dem Zustand, in dem der Irrtum moeglich ist, und verschwindet mit ihm. */
 .rrule-hint {
   margin: var(--space-1) 0 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
@@ -10028,28 +10327,55 @@ html:has(.app-page.is-selecting) {
   animation: btn-shake var(--duration-xl) var(--ease-out);
 }
 
+/* DIE RUECKMELDE-ZUSTAENDE (Fehler, Erfolg, Laden) schlagen jede Variante
+ * des Knopfes, auch im Hover - ohne `!important` (#2150). Die Gegner sind
+ * `.btn--<variante>` (0,1,0), ihr `:hover` (0,2,0) und `.quick-add__btn:hover`
+ * (0,2,0) in shopping.css, das NACH layout.css laedt; Quellreihenfolge allein
+ * reicht also nicht. `button.<zustand>:is(:enabled, :disabled)` hebt ihn auf
+ * (0,2,1) und trifft trotzdem JEDEN Knopf, denn jeder ist eins von beiden.
+ * Ein eigenes `:hover` waere dieselbe Spezifitaet, stuende aber als neue
+ * ungeschuetzte Hover-Regel in der Sperrklinke von test-motion.js - und unter
+ * `(hover: hover)` verloere der Zustand auf Touch gegen das klebende Hover der
+ * Variante. Jeder Traeger ist ein <button> (btnError, btnSuccess, btnLoading,
+ * withBusy, _flashAddBtn in shopping.js). Wer einen Kontext-Selektor ab
+ * (0,2,1) auf Hintergrund oder Schrift eines Knopfes setzt, muss diese
+ * Zustaende mitdenken. */
+
 /* prefers-reduced-motion: kein Schütteln, nur Farb-Feedback */
 .btn--error-static {
-  background-color: var(--color-danger) !important;
-  color: var(--color-ink-on-vivid) !important;
   pointer-events: none;
+}
+
+button.btn--error-static:is(:enabled, :disabled) {
+  background-color: var(--color-danger);
+  color: var(--color-ink-on-vivid);
 }
 
 .btn--success {
-  background-color: var(--color-success) !important;
-  color: var(--color-ink-on-vivid) !important;
   pointer-events: none;
 }
 
-/* Button loading state: hides text, shows spinner */
-@keyframes btn-spin {
+button.btn--success:is(:enabled, :disabled) {
+  background-color: var(--color-success);
+  color: var(--color-ink-on-vivid);
+}
+
+/* Button loading state: hides text, shows spinner.
+ *
+ * `status-spin` ist DIE Statusdrehung jedes Spinners (Knopf, Anmeldung,
+ * Dokumentvorschau), im Tempo `--spin-period` (tokens.css, Critique R21 D12).
+ * Sie steht hier, weil layout.css global laedt - Modul-Blaetter teilen sie. */
+@keyframes status-spin {
   to { transform: rotate(360deg); }
 }
 
 .btn--loading {
   position: relative;
-  color: transparent !important;
   pointer-events: none;
+}
+
+button.btn--loading:is(:enabled, :disabled) {
+  color: transparent;
 }
 
 .btn--loading::after {
@@ -10064,7 +10390,7 @@ html:has(.app-page.is-selecting) {
   border: 2px solid var(--color-glass-hover);
   border-top-color: var(--color-text-on-accent);
   border-radius: var(--radius-full);
-  animation: btn-spin 550ms linear infinite;
+  animation: status-spin var(--spin-period) linear infinite;
 }
 
 /* For non-primary buttons (secondary, ghost) */
@@ -10438,10 +10764,6 @@ html:has(.app-page.is-selecting) {
   animation: offline-banner-in var(--duration-md) var(--ease-out);
 }
 
-.offline-banner[hidden] {
-  display: none;
-}
-
 /* AM DESKTOP UEBER DEM INHALT, NICHT UEBER DER SEITENLEISTE (Re-Critique
  * 2026-10-17): volle Breite verdeckte Logo, Suche und Einklappen der
  * schwebenden Tafel. Das Banner beginnt rechts der Tafel und folgt dem
@@ -10784,15 +11106,15 @@ textarea.input { resize: vertical; }
 
 /* Kein statischer Hintergrund und kein Shadow-Highlight wenn Indikator aktiv */
 .nav-sidebar__items--liquid .nav-item[aria-current="page"] {
-  background: transparent !important;
-  box-shadow: none !important;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Kein statischer Hover-Hintergrund wenn Liquid-Indikator aktiv —
  * das separate .nav-sidebar__hover-Element übernimmt die Vorschau (via router.js). */
 .nav-sidebar__items--liquid .nav-item:hover:not([aria-current="page"]) {
-  background: transparent !important;
-  box-shadow: none !important;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* DIE PILLE DES GEPINNTEN EINTRAGS (Critique 2026-10-16). Dieselbe Klasse wie
@@ -10868,6 +11190,16 @@ textarea.input { resize: vertical; }
  * Bar-Kante, wo ihre Rundung gekappt wurde (#569-Nachtrag). Die exakte
  * Geometrie (Höhe/Breite/Versatz) setzt positionTabIndicator() aus dem
  * Icon-Well-Rect; die Werte hier sind der Stand vor dem ersten Messen. */
+/* Messfuehler der minimierten Hoehe (utils/ux.js, flatCapsuleHeight): loest
+ * `--nav-height-minimized` im Browser auf. Nimmt keinen Platz, malt nichts. */
+.nav-bottom__probe {
+  position: absolute;
+  inline-size: 0;
+  min-height: var(--nav-height-minimized);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .nav-bottom__indicator {
   position: absolute;
   top: 0;
@@ -10997,7 +11329,7 @@ textarea.input { resize: vertical; }
  * (#467, Codex-Review zu PR #754) - der Knopf ist weg, der Selektor mit ihm. */
 html[data-module-readonly] .page-fab,
 html[data-module-readonly] .notes-manage-categories {
-  display: none !important;
+  display: none;
 }
 
 /* Und ohne Knopf kein Nachlauf - die Paarung aus Etappe 6 (jede

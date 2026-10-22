@@ -9,7 +9,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, captureModalContext, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmOverModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -117,11 +117,15 @@ async function reload() {
  * Fehler-Toast der Seite (#1909): der Satz der App, nie der des Servers. Gibt
  * es die bearbeitete Art nicht mehr, geht der Dialog zu und die Liste kommt
  * frisch vom Server.
+ *
+ * Geschlossen wird nur der Dialog, aus dem die Anfrage kam (`modalContext`
+ * von VOR der Anfrage): kommt die Antwort, nachdem der Nutzer einen anderen
+ * geoeffnet hat, bleibt der stehen (#1997).
  */
-function reportError(err) {
+function reportError(err, modalContext) {
   window.yuvomi?.showToast(errorSentence(err), 'danger');
   if (!isGone(err)) return;
-  closeModal({ force: true }).then(() => reload()).then(() => refocusAfterRender()).catch(() => {});
+  closeModal({ force: true, context: modalContext }).then(() => reload()).then(() => refocusAfterRender()).catch(() => {});
 }
 
 function openTypeModal(type) {
@@ -133,7 +137,7 @@ function openTypeModal(type) {
     title: isEdit ? t('settings.healthPreventionEditType') : t('settings.healthPreventionAddType'),
     size: 'sm',
     content: `
-      <form id="health-prevention-type-form" class="form-stack">
+      <form id="health-prevention-type-form" class="form-stack" novalidate>
         <div class="form-field">
           <label class="label" for="hpt-name">${esc(t('settings.healthPreventionTypeName'))}${REQUIRED_MARK}</label>
           <input class="input" id="hpt-name" type="text" maxlength="200" required value="${esc(val(type?.name))}">
@@ -209,7 +213,7 @@ function openTypeModal(type) {
           await reload();
           refocusAfterRender();
         } catch (err) {
-          reportError(err);
+          reportError(err, modalContext);
         }
       });
 
@@ -221,15 +225,20 @@ function openTypeModal(type) {
         const intervalRaw = panel.querySelector('#hpt-interval').value.trim();
         const intervalUnit = panel.querySelector('#hpt-interval-unit').value;
         const icon = panel.querySelector('#hpt-icon').value.trim() || 'syringe';
-        if (!name) {
-          window.yuvomi?.showToast(t('settings.healthPreventionTypeNameRequired'), 'danger');
-          return;
-        }
+        // KEINE BROWSER-BLASEN UND KEIN TOAST OHNE ORT (Critique R21, Muster
+        // der Gesundheitsformulare): `novalidate`, die Regeln des Markups und
+        // die zwei eigenen Pruefungen stehen am Feld, nicht als Meldung oben.
         const intervalMonths = intervalInputToMonths(intervalRaw, intervalUnit);
-        if (Number.isNaN(intervalMonths) || (intervalMonths != null && (intervalMonths < 1 || intervalMonths > MAX_INTERVAL_MONTHS))) {
-          window.yuvomi?.showToast(t('settings.healthPreventionTypeIntervalInvalid'), 'danger');
-          return;
+        const errors = constraintErrors(e.currentTarget);
+        const flagged = (el) => errors.some(([field]) => field === el);
+        const nameEl = panel.querySelector('#hpt-name');
+        const intervalEl = panel.querySelector('#hpt-interval');
+        if (!name && !flagged(nameEl)) errors.push([nameEl, t('settings.healthPreventionTypeNameRequired')]);
+        if ((Number.isNaN(intervalMonths) || (intervalMonths != null && (intervalMonths < 1 || intervalMonths > MAX_INTERVAL_MONTHS)))
+          && !flagged(intervalEl)) {
+          errors.push([intervalEl, t('settings.healthPreventionTypeIntervalInvalid')]);
         }
+        if (reportFieldErrors(errors)) return;
         const body = { name, kind, icon };
         if (intervalMonths != null) body.default_interval_months = intervalMonths;
         else if (isEdit) body.default_interval_months = null;
@@ -248,7 +257,7 @@ function openTypeModal(type) {
           refocusAfterRender();
         } catch (err) {
           submitBtn.disabled = false;
-          reportError(err);
+          reportError(err, modalContext);
         }
       });
     },

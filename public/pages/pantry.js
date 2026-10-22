@@ -14,6 +14,9 @@ import { readRowHtml, readRowHintEl } from '/utils/read-row.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
+  captureModalContext,
+  captureOpenContext,
+  isModalContextCurrent,
   advancedSection,
   wireBlurValidation,
   reportFieldError,
@@ -1457,6 +1460,7 @@ function openItemModal(mode, item = null) {
     .join('');
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('common.editItem') : t('pantry.addItem'),
     size: 'md',
     content: `
@@ -1558,6 +1562,9 @@ async function saveItem(panel, mode, item) {
 
   saveBtn.disabled = true;
   try {
+    // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+    // aufgegangen ist (#1997).
+    const dialog = captureModalContext();
     if (mode === 'create') {
       const res = await api.post('/pantry', payload);
       state.items.push(res.data);
@@ -1570,7 +1577,7 @@ async function saveItem(panel, mode, item) {
     // Einzel-Antwort - deshalb nach dem Speichern einmal frisch laden, damit
     // Gruppierung und Meta-Zeile stimmen.
     await reloadAfterSave(() => loadPantry());
-    closeSharedModal({ force: true });
+    closeSharedModal({ force: true, context: dialog });
     renderFilters();
     renderList({ motion: true });
     window.yuvomi?.showToast(mode === 'create' ? t('pantry.created') : t('pantry.updated'), 'success');
@@ -1625,7 +1632,11 @@ async function removeItem(item) {
 async function openLocationManager() {
   // Zweite Linie hinter dem fehlenden Knopf im Kopf (Regel 7).
   if (readOnly()) return;
+  // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
+  const context = captureOpenContext();
   await import('/components/category-manager.js');
+  if (!isModalContextCurrent(context)) return;
 
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
   // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft

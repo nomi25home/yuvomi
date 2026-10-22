@@ -424,3 +424,156 @@ test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie
     else delete globalThis.navigator;
   }
 });
+
+/* D7 (Critique R21): KONTAKT UND GEBURTSTAG KENNEN EINANDER. Ein importierter
+ * Geburtstag traegt seit Migration 90 seinen Kontakt (`contact_id`), die
+ * Kontaktseite bekommt den Rueckweg (`birthday_id`, routes/contacts.js). Die
+ * Geburtstagszeile der Leseansicht fuehrt dann "In Geburtstagen anzeigen" -
+ * ein Schritt statt Modulwechsel, Suche und Antippen. Ohne Verknuepfung, oder
+ * ohne Zugang zum Geburtstagsmodul, gibt es den Knopf nicht. */
+test('R21 D7: die Geburtstagszeile eines verknuepften Kontakts fuehrt zum Geburtstag', async () => {
+  const rows = contacts.renderContactDetail({ id: 7, name: 'Tante', birthday: '1970-05-04', birthday_year_unknown: 0, birthday_id: 42 });
+  const row = rows.find((r) => r.icon === 'cake');
+  assert.ok(row?.action, 'die Zeile traegt eine Folgeaktion');
+  assert.equal(row.action.label, 'contacts.showBirthday');
+  assert.equal(contacts.birthdayHref(42), '/birthdays?open=42');
+  const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  setPermissions({ admin: false, modules: { calendar: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
+    assert.equal(lose.find((r) => r.icon === 'cake')?.action ?? null, null, 'ohne Verknuepfung und ohne Schreibrecht kein Weg');
+  } finally {
+    clearPermissions();
+  }
+});
+
+/* #2149: EIN KONTAKT MIT GEBURTSDATUM, ABER OHNE EINTRAG IN GEBURTSTAGE.
+ * Dieselbe Folgeaktion der Geburtstagszeile legt ihn an - den Eintrag, den
+ * der Import anlegen wuerde (`POST /birthdays/import` mit genau dieser id).
+ * Angeboten nur, wo der Server annimmt: `calendar: write` und das Modul
+ * nicht abgeschaltet. Ohne Geburtsdatum gibt es nichts anzulegen. */
+test('#2149: unverknuepft bietet die Geburtstagszeile "Zu Geburtstagen hinzufuegen" an - nur mit Schreibrecht', async () => {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const LOSE = { id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null };
+  const actionOf = (c) => contacts.renderContactDetail(c).find((r) => r.icon === 'cake')?.action ?? null;
+  const yuvomi = globalThis.window.yuvomi;
+  const savedDisabled = yuvomi.isModuleDisabled;
+  try {
+    setPermissions({ admin: false, modules: { calendar: 'write', contacts: 'read' }, widgets: {}, capabilities: {} });
+    const add = actionOf(LOSE);
+    assert.equal(add?.label, 'contacts.addToBirthdays', 'mit Schreibrecht steht der Weg in Geburtstage an der Zeile');
+    assert.equal(add.id, 'contact-detail-birthday-add');
+    assert.equal(actionOf({ ...LOSE, birthday_id: 5 })?.label, 'contacts.showBirthday', 'verknuepft bleibt es beim Anzeigen');
+    assert.equal(actionOf({ ...LOSE, birthday: null }), null, 'ohne Geburtsdatum nichts anzulegen');
+
+    setPermissions({ admin: false, modules: { calendar: 'read' }, widgets: {}, capabilities: {} });
+    assert.equal(actionOf(LOSE), null, 'calendar: read - der Import nimmt nicht an');
+    setPermissions({ admin: false, modules: { calendar: 'none' }, widgets: {}, capabilities: {} });
+    assert.equal(actionOf(LOSE), null, 'calendar: none');
+
+    setPermissions({ admin: false, modules: { calendar: 'write' }, widgets: {}, capabilities: {} });
+    yuvomi.isModuleDisabled = (key) => key === 'birthdays';
+    assert.equal(actionOf(LOSE), null, 'haushaltweit abgeschaltet - der Router leitet um');
+  } finally {
+    clearPermissions();
+    if (savedDisabled === undefined) delete yuvomi.isModuleDisabled;
+    else yuvomi.isModuleDisabled = savedDisabled;
+  }
+});
+
+test('#2149: Hinzufuegen ruft den Import mit genau diesem Kontakt und liest die Verknuepfung neu', async () => {
+  const yuvomi = globalThis.window.yuvomi;
+  const savedToast = yuvomi.showToast;
+  const calls = [];
+  const toasts = [];
+  yuvomi.showToast = (message, type) => toasts.push({ message, type });
+  let linked = 77;
+  globalThis.__apiStub = {
+    post: (path, body) => { calls.push(['POST', path, body]); return { data: { imported: 1, skipped: 0 } }; },
+    get: (path) => { calls.push(['GET', path]); return { data: { id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_id: linked } }; },
+  };
+  contacts.state.contacts = [{ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_id: null }];
+  try {
+    const seen = [];
+    const button = { disabled: false, isConnected: true };
+    const loaded = await contacts.addContactToBirthdays({ id: 8, name: 'Onkel', birthday: '1968-02-01' }, { button, onLinked: (c) => seen.push(c) });
+    assert.deepEqual(calls[0], ['POST', '/birthdays/import', { contact_ids: [8] }], 'der bestehende Import, eine id');
+    assert.deepEqual(calls[1], ['GET', '/contacts/8'], 'danach der Kontakt selbst');
+    assert.equal(loaded?.birthday_id, 77);
+    assert.equal(seen[0]?.birthday_id, 77, 'die Ansicht bekommt den Kontakt mit Verknuepfung');
+    assert.equal(contacts.state.contacts[0].birthday_id, 77, 'die Liste kennt die Verknuepfung');
+    assert.equal(toasts.at(-1)?.type, 'success');
+
+    // Kommt der Kontakt trotzdem ohne Eintrag zurueck, ist das kein Erfolg.
+    linked = null;
+    calls.length = 0;
+    const again = await contacts.addContactToBirthdays({ id: 8, name: 'Onkel', birthday: '1968-02-01' }, { button });
+    assert.equal(again, null);
+    assert.equal(toasts.at(-1)?.type, 'danger');
+    assert.equal(button.disabled, false, 'der Knopf ist wieder bedienbar');
+  } finally {
+    delete globalThis.__apiStub;
+    contacts.state.contacts = [];
+    if (savedToast === undefined) delete yuvomi.showToast;
+    else yuvomi.showToast = savedToast;
+  }
+});
+
+// R21 S7 (Critique a3): zwei Kanten im Kontakt. Im Leseblatt stand der erste
+// antippbare Wert mit dem halben Ueberstand seines 44px-Ziels unter dem Label
+// (Label -> Wert 15px, bei Kategorie 3px); im Formular endete der Platzhalter
+// des Labelfelds mobil als "Label (z. B. A" (122 von 162px).
+test('R21 S7: Label und Wert stehen dicht, das Labelfeld steht schmal unter dem Wert', () => {
+  const css = readFileSync(new URL('../public/styles/contacts.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const pull = rules.find((r) => r.selector.trim() === '.contact-detail__value:first-child > .contact-detail__link');
+  assert.match(pull?.body ?? '', /margin-block-start:\s*calc\(\(var\(--line-height-base\) \* 1em - var\(--target-base\)\) \/ 2\)/,
+    'der erste Wert zieht den Ueberstand seines Ziels zurueck');
+  const list = rules.find((r) => r.selector.trim() === '.contact-mv-list');
+  assert.match(list?.body ?? '', /container:\s*contact-mv \/ inline-size/);
+  const label = rules.find((r) => r.selector.trim() === '.contact-mv-row > .contact-mv-row__label' && r.at.some((a) => /@container contact-mv \(max-width:/.test(a)));
+  assert.match(label?.body ?? '', /grid-row:\s*2/, 'schmal steht das Label in einer eigenen Zeile');
+});
+
+// R21 S9b (Critique a3): Liste und Detail zeigten dieselbe Nummer verschieden -
+// die Zeile formatiert (enhancePhones), der Link der Detailansicht behielt den
+// Rohwert, weil der A-Zweig nur das Ziel setzte. Jetzt bekommt ein Link, der die
+// Nummer selbst traegt, dieselbe Anzeige; ein Aktionslink ("Anrufen") behaelt
+// sein Wort.
+test('Liste und Detail zeigen eine Telefonnummer in derselben Form', async () => {
+  const { __primePhoneLib } = await import('../public/utils/phone.js');
+  __primePhoneLib({
+    parse: (value) => ({
+      country: 'DE', number: '+492314452210',
+      formatNational: () => '0231 4452210', formatInternational: () => '+49 231 4452210',
+    }),
+    AsYouType: class {}, isPossible: () => true, metadata: {},
+  });
+  try {
+    contacts.state.defaultCountry = 'AT';
+    const raw = '+49 231 445 2210';
+    const el = (tag, text) => {
+      const node = document.createElement(tag);
+      // mini-dom fuehrt den Tag klein; der Browser (und enhancePhones) gross.
+      node.tagName = tag.toUpperCase();
+      node.dataset.phoneRaw = raw;
+      node.textContent = text;
+      if (tag === 'a') node.href = 'tel:x';
+      return node;
+    };
+    const zeile = el('span', raw);
+    const detail = el('a', raw);
+    const aktion = el('a', 'Anrufen');
+    const root = { querySelectorAll: () => [zeile, detail, aktion] };
+    await contacts.enhancePhones(root);
+    assert.equal(zeile.textContent, '+49 231 4452210', 'die Zeile formatiert');
+    assert.equal(detail.textContent, zeile.textContent, 'der Link der Detailansicht zeigt dieselbe Form');
+    assert.equal(detail.getAttribute('dir'), 'ltr');
+    assert.match(detail.href, /^tel:\+492314452210$/, 'und waehlt E.164');
+    assert.equal(aktion.textContent, 'Anrufen', 'ein Aktionslink behaelt sein Wort');
+    assert.match(aktion.href, /^tel:\+492314452210$/);
+  } finally {
+    __primePhoneLib(null);
+  }
+});

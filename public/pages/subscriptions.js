@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import {
   formatDate,
   getLocale,
@@ -21,7 +21,7 @@ import { todayKey } from '/utils/date.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -798,7 +798,7 @@ function renderSummary() {
   //
   // UEBER BUDGET SAGT DASSELBE WIE IM PLAN (Critique 2026-09-25). Eine
   // tatsaechliche Ueberschreitung ist eine Tatsache und traegt den Danger-Ton
-  // wie die ueberzogene Plan-Kategorie (`.metric-card--over`, Symbol und
+  // wie die ueberzogene Plan-Kategorie (seit R21 S7 am Balken, Symbol und
   // Label als Text); die Annaeherung ab 85 % traegt den Warnton am Balken -
   // wie im Plan. Neu ist der Weg zur Handlung: zur Liste, teuerste zuerst.
   // Das ist Lesen, kein Schreiben - der Weg steht bei jedem Recht.
@@ -845,7 +845,11 @@ function renderSummary() {
         </div>` : ''}
         <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
       </article>
-      <article class="metric-card${isOverBudget ? ' metric-card--over' : ''}">
+      ${/* DIE WARNUNG STEHT EINMAL (R21 S7, Critique a4 "Warnung doppelt"): der
+         Balken der Kostenkarte daneben steht ueber 100 % schon im Danger-Ton
+         (wie der Plan). Diese Karte nennt die Tatsache in Worten samt Symbol
+         und den Weg zur Handlung - ohne zweite rote Flaeche und Zahl. */ ''}
+      <article class="metric-card">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
         <div class="metric-card__note">${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}${isOverBudget ? ` <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button>` : ''}</div>
@@ -1544,7 +1548,7 @@ export function openSubscriptionModal(subscription = null) {
       </section>`;
 
   const content = `
-    <form id="subscription-form" class="subscription-form">
+    <form id="subscription-form" class="subscription-form" novalidate>
       <section class="subscription-form__section subscription-form__identity">
         <div class="subscription-logo-tools">
           <label class="subscription-logo-picker" for="subscription-logo" title="${t('subscriptions.logoLabel')}">
@@ -1581,7 +1585,7 @@ export function openSubscriptionModal(subscription = null) {
                    min="0"
                    step="${amountStep(formCurrency, subscription?.amount ?? '')}"
                    placeholder="${amountPlaceholder(formCurrency)}"
-                   inputmode="decimal" required value="${subscription?.amount ?? ''}">
+                   inputmode="decimal" required value="${esc(amountFieldValue(subscription?.amount ?? '', formCurrency))}">
           </div>
           ${comboboxMarkup({
             id: 'subscription-currency',
@@ -1657,6 +1661,7 @@ export function openSubscriptionModal(subscription = null) {
     </form>
   `;
   openModal({
+    staged: !edit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: edit ? t('subscriptions.editTitle') : t('subscriptions.addTitle'),
     content,
     size: 'lg',
@@ -1813,6 +1818,11 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
       currency: targetCurrency,
       step: smallestUnitLabel(targetCurrency),
     })]);
+  }
+  // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+  // Was die eigenen Pruefungen oben schon nennen, steht nicht doppelt.
+  for (const entry of constraintErrors(panel.querySelector('#subscription-form'))) {
+    if (!fieldErrors.some(([field]) => field === entry[0])) fieldErrors.push(entry);
   }
   if (reportFieldErrors(fieldErrors)) return;
 
@@ -2035,7 +2045,7 @@ async function deleteSubscription(subscription) {
 async function openSettingsModal() {
   if (readOnly()) return;
   const content = `
-    <form id="subscriptions-settings-form">
+    <form id="subscriptions-settings-form" novalidate>
       <div class="form-group">
         <label class="form-label" for="subscriptions-budget">${t('subscriptions.monthlyBudgetLabel')}</label>
         <input class="form-input" id="subscriptions-budget" type="number" min="0"
@@ -2072,6 +2082,8 @@ async function openSettingsModal() {
       panel.querySelector('#subscriptions-settings-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const baseCurrency = panel.querySelector('#subscriptions-base-currency').value;
         if (!baseCurrency) {
           reportFieldError(panel.querySelector('#subscriptions-base-currency-search'), t('subscriptions.currencyRequired'));
@@ -2335,6 +2347,10 @@ function openMetadataModal() {
           );
           if (!confirmed) return;
           const owner = pageOwner();
+          // Die Verwaltung ist jetzt zu. Was der Nutzer waehrend des Loeschens
+          // und Ladens oeffnet, gehoert ihm: openMetadataModal() schloesse es
+          // ebenso wie ein closeModal() ohne Kontext (#1997).
+          const afterConfirm = captureOpenContext();
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
           } catch (err) {
@@ -2342,7 +2358,7 @@ function openMetadataModal() {
             // Zahlungsarten haben keine Sichtbarkeit, die 404 heisst nur das.
             if (!isAlreadyDeleted(err, isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found')) {
               window.yuvomi?.showToast(errorText(err), 'danger');
-              if (isCurrentOwner(owner)) openMetadataModal();
+              if (isCurrentOwner(owner) && isModalContextCurrent(afterConfirm)) openMetadataModal();
               return;
             }
           }
@@ -2350,8 +2366,9 @@ function openMetadataModal() {
           // Ein Filter auf die geloeschte geht vor dem Laden auf "alle".
           resetGoneFilter(isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', id);
           if (!await reload(undefined, { owner })) return;
-          refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
+          if (!isModalContextCurrent(afterConfirm)) return;
+          refocusAfterRender();
           openMetadataModal();
         });
       });

@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Rien ne correspond à votre recherche et à vos filtres.",
         "searchReset": "Réinitialiser la recherche",
         "passwordMinLength": "8 caractères minimum.",
-        "savedReloadFailed": "La modification est enregistrée, mais l’affichage n’a pas pu être actualisé. Rechargez la page s’il manque quelque chose."
+        "savedReloadFailed": "La modification est enregistrée, mais l’affichage n’a pas pu être actualisé. Rechargez la page s’il manque quelque chose.",
+        "fieldNumber": "Saisissez un nombre.",
+        "fieldMin": "Au moins {{min}}.",
+        "fieldMax": "Au plus {{max}}.",
+        "fieldWholeNumber": "Saisissez un nombre entier.",
+        "fieldStep": "Saisissez une valeur par pas de {{step}}.",
+        "fieldInvalid": "Vérifiez cette saisie.",
+        "errorCheckRolledBack": "« {{name}} » est de nouveau à faire - la coche n'a pas été enregistrée. Réessayez.",
+        "errorUncheckRolledBack": "« {{name}} » est de nouveau coché - le retour n'a pas été enregistré. Réessayez."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -1296,6 +1304,9 @@
         "mvLabelPlaceholder": "Libellé (p. ex. travail)",
         "mvRemove": "Retirer l'entrée",
         "birthdayLabel": "Anniversaire",
+        "showBirthday": "Afficher dans les anniversaires",
+        "addToBirthdays": "Ajouter aux anniversaires",
+        "addedToBirthdays": "Ajouté aux anniversaires.",
         "birthdayHint": "Apparaît aussi dans le calendrier via l'import des anniversaires.",
         "phonePlaceholder": "+33 …",
         "phonePreview": "Aperçu : {{value}}",
@@ -1376,7 +1387,18 @@
         "errorEmailTooLong": "L’adresse e-mail ne peut pas dépasser {{limit}} caractères.",
         "errorAddressTooLong": "L’adresse ne peut pas dépasser {{limit}} caractères.",
         "errorNotesTooLong": "Les notes ne peuvent pas dépasser {{limit}} caractères.",
-        "errorBirthdayInvalid": "La date d’anniversaire n’est pas valide."
+        "errorBirthdayInvalid": "La date d’anniversaire n’est pas valide.",
+        "errorPhoneEntryInvalid": "L’un des numéros de téléphone est incomplet ou non valide.",
+        "errorPhonesTooMany": "Ce contact a trop de numéros de téléphone. Le maximum est de {{limit}}.",
+        "errorPhoneLabelTooLong": "Le libellé d’un numéro de téléphone ne peut pas dépasser {{limit}} caractères.",
+        "errorEmailEntryInvalid": "L’une des adresses e-mail est incomplète ou non valide.",
+        "errorEmailInvalid": "Une adresse e-mail n’est pas valide. Elle doit avoir la forme nom@exemple.fr.",
+        "errorEmailsTooMany": "Ce contact a trop d’adresses e-mail. Le maximum est de {{limit}}.",
+        "errorEmailLabelTooLong": "Le libellé d’une adresse e-mail ne peut pas dépasser {{limit}} caractères.",
+        "errorAddressEntryInvalid": "L’une des adresses est incomplète ou non valide.",
+        "errorAddressesTooMany": "Ce contact a trop d’adresses. Le maximum est de {{limit}}.",
+        "errorAddressLabelTooLong": "Le libellé d’une adresse ne peut pas dépasser {{limit}} caractères.",
+        "errorAddressPartTooLong": "La rue, la ville, la région, le code postal et le pays d’une adresse ne peuvent pas dépasser {{limit}} caractères chacun."
     },
     "budget": {
         "title": "Budget",
@@ -1522,7 +1544,6 @@
         "metaLoadError": "Impossible de charger les catégories du budget.",
         "addCategory": "+ catégorie",
         "addSubcategory": "+ sous-catégorie",
-        "moreDetails": "Plus de détails",
         "newCategoryPrompt": "Nom de la nouvelle catégorie :",
         "newSubcategoryPrompt": "Nom de la nouvelle sous-catégorie :",
         "categoryAddedToast": "Catégorie ajoutée.",
@@ -1608,6 +1629,18 @@
         "loanSavedToast": "Prêt enregistré",
         "loanDeletedToast": "Prêt supprimé",
         "loanPaymentTitle": "Remboursement du prêt : {{borrower}}",
+        "typeTransfer": "Virement",
+        "transferFromAccount": "Compte source",
+        "transferToAccount": "Compte destinataire",
+        "transferChooseAccounts": "Choisissez deux comptes différents.",
+        "transferCurrencyMismatch": "Choisissez des comptes dans la même devise. Le change de devises n’est pas pris en charge.",
+        "transferAccountArchived": "Choisissez des comptes actifs pour un virement.",
+        "accountHasTransfers": "Ce compte contient des virements. Archivez-le au lieu de le supprimer.",
+        "transferDeleteSeriesConfirm": "Supprimer toute cette série de virements ?",
+        "catSaving": "Épargne",
+        "summaryTransfers": "Virements",
+        "transferDeleteConfirm": "Supprimer les deux écritures de ce virement ?",
+        "transferDeleteConfirmDetail": "Les deux écritures liées sont supprimées et les soldes des deux comptes sont recalculés. Supprimer toute la série supprime aussi toutes ses occurrences. Cette action est irréversible.",
         "typeLoan": "Prêt",
         "tabsLabel": "Sections du budget",
         "budgetTab": "Aperçu",
@@ -1821,6 +1854,7 @@
         "healthCycleSaved": "Réglage du cycle enregistré.",
         "healthCyclePersonalLabel": "Afficher le cycle",
         "healthCyclePersonalHint": "Ne concerne que votre propre affichage. Si vous le désactivez, le cycle reste visible pour les autres membres du foyer.",
+        "healthCycleSettingsHint": "La durée du cycle, la contraception, les rappels et le mode grossesse se règlent sur la page du cycle.",
         "healthCyclePersonalHouseholdOff": "Le cycle est actuellement désactivé pour tout le foyer, il n’apparaît donc pour personne.",
         "healthCyclePersonalSaved": "Affichage du cycle enregistré.",
         "pageRewardsModule": "Récompenses",
@@ -2015,7 +2049,7 @@
         "familyRoleGrandparent": "Grand-parent",
         "familyRoleRelative": "Proche",
         "familyRoleOther": "Membre de la famille",
-        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget ni jeûne et voient l’Aide ménagère en lecture seule, sans salaires ni paiements. Vous pouvez le modifier ensuite dans «Rôles et autorisations».",
+        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget ni jeûne et voient l’Aide ménagère en lecture seule, sans salaires ni paiements. Vous pouvez le modifier ensuite dans «Rôles et autorisations». Le cycle est également masqué ; il peut être réaffiché dans les réglages personnels de l’enfant.",
         "systemAdminLabel": "Administrateur système",
         "systemAdminHint": "Les administrateurs système peuvent gérer les paramètres, intégrations, jetons API et comptes familiaux.",
         "systemAdminBadge": "Admin système",
@@ -2045,7 +2079,8 @@
         "languageTitle": "Langue",
         "dataLanguageLabel": "Langue des entrées enregistrées",
         "dataLanguageHint": "Langue dans laquelle Yuvomi enregistre les entrées qu'il crée lui-même, comme les événements d'anniversaire. Concerne l'API, le flux de calendrier et la synchronisation, pas l'affichage ici.",
-        "dataLanguageAuto": "Automatique ({{language}})",
+        "dataLanguageAuto": "Automatique",
+        "hintWithCurrent": "Actuellement : {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Seuls les administrateurs peuvent définir la langue des entrées enregistrées.",
         "dataLanguageSaved": "Langue des entrées enregistrées mise à jour",
         "sectionMeals": "Plan de repas",
@@ -2840,6 +2875,28 @@
         "regionTitle": "Région / Format",
         "regionLabel": "Région",
         "regionHint": "Définit la devise et les formats de nombre, de date et d’heure selon la région (p. ex. Suisse : 1'234.50). Choisissez « Personnalisé » pour les régler individuellement.",
+        "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "EAU",
+            "AG": "Antigua-et-Barbuda",
+            "BS": "Bahamas",
+            "DO": "Rép. dominicaine",
+            "GB": "Royaume-Uni",
+            "HK": "Hong Kong",
+            "KN": "Saint-Christophe",
+            "MO": "Macao",
+            "PH": "Philippines",
+            "SA": "Arabie saoudite",
+            "TT": "Trinité-et-Tobago",
+            "US": "États-Unis",
+            "VC": "Saint-Vincent"
+        },
+        "languageShort": {
+            "nb": "norvégien",
+            "ptBR": "portugais (BR)",
+            "zh": "chinois (simpl.)",
+            "zhHant": "chinois (trad.)"
+        },
         "regionAdminOnly": "Seuls les administrateurs peuvent modifier la région et la devise.",
         "formatsHouseholdHint": "Les formats de date et d'heure s'appliquent à tout le foyer. Chaque membre peut les modifier.",
         "regionCustom": "Personnalisé",
@@ -3065,7 +3122,7 @@
         "timezoneTitle": "Fuseau horaire",
         "timezoneLabel": "Fuseau horaire du foyer",
         "timezoneHint": "S'applique partout où une heure ne porte pas son propre fuseau : rappels, comptes à rebours, le jour du calendrier appelé « aujourd'hui », le flux de calendrier exporté et les événements envoyés vers Google ou Outlook.",
-        "timezoneAuto": "Automatique ({{zone}})",
+        "timezoneAuto": "Automatique",
         "timezoneAdminOnly": "Seuls les administrateurs peuvent changer le fuseau horaire.",
         "timezoneSaved": "Fuseau horaire enregistré.",
         "timezoneMismatch": "Votre navigateur est en {{browser}}, le foyer calcule en {{household}}.",
@@ -3116,6 +3173,7 @@
         "healthPreventionNotifyCaregiversSaved": "Paramètre de notification enregistré.",
         "healthVisibilityTitle": "Visibilité par défaut",
         "healthVisibilityHint": "Ce que sont les nouvelles entrées au départ. Tu peux le changer à chaque saisie.",
+        "healthVisibilityCaregivers": "Qui peut saisir pour vous voit aussi vos entrées privées, sauf le journal du cycle. Un administrateur le définit dans les membres.",
         "healthVisibilityOther": "Autres domaines",
         "healthVisibilityApply": "Modifier aussi les entrées existantes",
         "healthVisibilityApplyHint": "Enregistré. Faut-il aussi modifier les entrées existantes de {{area}} ?",
@@ -3252,10 +3310,12 @@
         "tasksDefaultVisibilityLabel": "Default visibility",
         "tasksDefaultVisibilityHint": "New tasks open with this visibility. You can still change it each time you create one.",
         "tasksDefaultLockedLabel": "Lock editing by default",
-        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."
+        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one.",
+        "backupDropzoneTitleTouch": "Touchez pour choisir un fichier de sauvegarde",
+        "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP"
     },
     "login": {
-        "tagline": "Bon retour sur votre planificateur familial.",
+        "tagline": "Bon retour. Votre foyer, au même endroit.",
         "usernameLabel": "Nom d'utilisateur",
         "passwordLabel": "Mot de passe",
         "loginButton": "Se connecter",
@@ -3324,7 +3384,6 @@
         "unsavedChanges": "Abandonner les modifications ?",
         "unsavedChangesDetail": "Tes saisies dans ce formulaire seront perdues.",
         "discardChanges": "Abandonner",
-        "moreSettings": "Plus de paramètres",
         "moreDetails": "Plus de détails"
     },
     "rrule": {
@@ -3449,7 +3508,9 @@
         "goTo": "Aller à",
         "newSection": "Créer",
         "recentLabel": "Ouverts récemment",
-        "createTaskNamed": "Créer « {{title}} » comme tâche"
+        "createTaskNamed": "Créer « {{title}} » comme tâche",
+        "hintMove": "Sélectionner",
+        "hintOpen": "Ouvrir"
     },
     "birthdays": {
         "inDays_one": "dans {{count}} jour",
@@ -3468,6 +3529,7 @@
         "editTitle": "Modifier l'anniversaire",
         "nameLabel": "Nom",
         "birthDateLabel": "Date de naissance",
+        "showContact": "Afficher le contact",
         "nameDay": "Fête",
         "celebratesNameDay": "célèbre sa fête",
         "nameDayLabel": "Fête du prénom (facultatif)",
@@ -3562,7 +3624,7 @@
     },
     "onboarding": {
         "step1Title": "Bienvenue dans {{name}}",
-        "step1Body": "Votre planificateur familial personnel. Tâches, calendrier, courses et plus - le tout au même endroit.",
+        "step1Body": "Tâches, calendrier, courses et plus pour votre foyer - que vous viviez seul, à deux ou en famille. Le tout au même endroit.",
         "step2Title": "Navigation & modules",
         "step2Body": "La barre du bas mène directement aux espaces les plus importants. Tous les autres modules se trouvent sous « Plus ».",
         "step3Title": "Démarrer rapidement",
@@ -3848,7 +3910,10 @@
         "errorDmsAccountGone": "Ce compte de GED n’existe plus.",
         "errorDmsDocumentGone": "Ce document n’existe plus dans la GED.",
         "errorDmsAlreadyLinked": "Ce document de la GED est déjà lié.",
-        "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED."
+        "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED.",
+        "dropzoneTitleTouch": "Touchez pour choisir un fichier",
+        "viewerPrevNamed": "Document précédent : {{name}}",
+        "viewerNextNamed": "Document suivant : {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Cuisine",
@@ -4098,7 +4163,8 @@
         "errorVisitGone": "Cette intervention n’existe plus.",
         "errorTaskGone": "Cette tâche n’existe plus.",
         "errorAlreadyCheckedOut": "Le départ de cette aide ménagère est déjà enregistré.",
-        "errorAlreadyCheckedIn": "L’arrivée de cette aide ménagère est déjà enregistrée."
+        "errorAlreadyCheckedIn": "L’arrivée de cette aide ménagère est déjà enregistrée.",
+        "allVisitsInReport": "Toutes les visites dans le rapport"
     },
     "userMultiSelect": {
         "moreUsers": "autres",
@@ -4319,7 +4385,7 @@
         "mobileSearch": "Ouvrez la recherche avec la loupe de l’aperçu ou via « Plus ».",
         "mobileSettings": "Vous trouvez les paramètres sous « Plus ».",
         "guideLink": "Guide utilisateur",
-        "guideHint": "Tenu par la communauté, dans son propre dépôt - il peut être en retard sur une version."
+        "guideHint": "Tenu à jour par la communauté. S'ouvre dans un nouvel onglet."
     },
     "changelog": {
         "title": "Journal des changements",
@@ -4360,8 +4426,9 @@
         "success": "Votre mot de passe a été modifié. Vous pouvez vous connecter.",
         "mismatch": "Les mots de passe ne correspondent pas.",
         "tooShort": "Le mot de passe doit comporter au moins 8 caractères.",
-        "invalidToken": "Ce lien est invalide ou expiré.",
-        "missingToken": "Aucun jeton valide n'a été trouvé."
+        "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré - demandez-en un nouveau.",
+        "missingToken": "Ce lien de réinitialisation est incomplet - demandez-en un nouveau.",
+        "requestNew": "Demander un nouveau lien"
     },
     "email": {
         "host": "Hôte SMTP",
@@ -4770,6 +4837,12 @@
             "reminders": {
                 "title": "Prochains rappels",
                 "empty": "Plus aucune prise aujourd'hui"
+            },
+            "brief": {
+                "changes": "Depuis la dernière mesure : {{list}}.",
+                "latest": "Dernière saisie : {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} : sans changement"
             }
         },
         "vitals": {
@@ -5177,7 +5250,7 @@
             "emptyDesc": "Enregistrez vos premières règles pour voir les prévisions, le calendrier et les statistiques.",
             "emptyCta": "Enregistrer les premières règles",
             "personsLabel": "Person",
-            "add": "Enregistrer les règles",
+            "add": "Ajouter des règles passées",
             "loadError": "Impossible de charger les données du cycle.",
             "loadErrorDesc": "Veuillez réessayer plus tard.",
             "retry": "Réessayer",
@@ -5387,15 +5460,14 @@
                 "family": "Famille"
             },
             "period": {
-                "add": "Enregistrer les règles",
+                "add": "Ajouter des règles passées",
                 "edit": "Modifier les règles",
                 "warningFuture": "La date de début est dans le futur - les prévisions ne se basent que sur les cycles passés.",
                 "warningOverlap": "Chevauche un cycle déjà enregistré."
             },
             "dayLog": {
                 "title": "Enregistrer le jour",
-                "date": "Date",
-                "more": "Plus de détails"
+                "date": "Date"
             },
             "export": {
                 "csv": "Exporter au format CSV"
@@ -5413,8 +5485,9 @@
                 "cycleLength": "Durée moyenne du cycle",
                 "periodLength": "Durée moyenne des règles",
                 "lutealLength": "Durée de la phase lutéale",
+                "daysUnit": "jours",
                 "trackFertility": "Afficher la fenêtre de fécondité",
-                "autoHint": "Laisser vide = calculé automatiquement à partir de votre historique.",
+                "autoHint": "Si vous laissez l’un des deux champs vide, Yuvomi calcule la valeur à partir des règles que vous avez saisies.",
                 "remindPeriodDaysBefore": "Rappel de règles",
                 "remindOff": "Désactivé",
                 "remindSameDay": "Le jour même",
@@ -5514,7 +5587,9 @@
                 "emptyError": "Choisissez un fichier CSV ou collez du texte.",
                 "error": "Échec de l'import."
             },
-            "discoveryHint": "Astuce : abonnez-vous au cycle prévu via un flux ICS dans <a href=\"/settings/modules/calendar?section=personal-feeds\">Paramètres → Modules → Calendrier</a>, ou affichez le widget du cycle sur l'<a href=\"/\">Accueil</a> via son mode de personnalisation."
+            "feedLink": "S’abonner au cycle prévu dans votre calendrier",
+            "widgetHint": "Ajoutez la tuile du cycle à {{overview}} via « {{customize}} ».",
+            "endBeforeStart": "La fin ne peut pas précéder le début."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -5523,6 +5598,7 @@
             "unitH": "h"
         },
         "careBanner": "Vous saisissez pour {{name}}.",
+        "whoSees": "Qui peut voir ceci ?",
         "nutrition": {
             "title": "Nutrition",
             "emptyTitle": "Aucune donnée nutritionnelle pour le moment",
@@ -5665,6 +5741,7 @@
         "weekdaySat": "sam",
         "weekdaySun": "dim",
         "intervalLabelWeekly": "Toutes les N semaines",
+        "intervalLabelMonthly": "Tous les N mois",
         "anchorDateLabel": "Première collecte",
         "monthDayLabel": "Jour du mois",
         "monthDayLastDay": "Dernier jour du mois",
@@ -6252,8 +6329,8 @@
         "success": "Votre compte a été créé. Vous pouvez vous connecter.",
         "mismatch": "Les mots de passe ne correspondent pas.",
         "tooShort": "Le mot de passe doit comporter au moins 8 caractères.",
-        "invalidToken": "Cette invitation est invalide, expirée ou déjà utilisée.",
-        "missingToken": "Aucun jeton valide n'a été trouvé.",
+        "invalidToken": "Cette invitation est invalide, expirée ou déjà utilisée - demandez un nouveau lien.",
+        "missingToken": "Ce lien d'invitation est invalide ou a expiré - demandez-en un nouveau.",
         "usernameRequired": "Veuillez choisir un nom d'utilisateur.",
         "usernameInvalid": "Le nom d'utilisateur doit comporter de 3 à 64 caractères et ne peut contenir que des lettres, des chiffres, des points, des tirets et des tirets bas.",
         "usernameTaken": "Ce nom d'utilisateur est déjà pris.",
@@ -6467,9 +6544,8 @@
         "templateWork": "Travail",
         "templateSchool": "École",
         "templateUniversity": "Université",
-        "overview": "Comparaison",
+        "overview": "Aperçu",
         "overviewPeopleLabel": "Comparer des personnes",
-        "overviewClearSelection": "Effacer la sélection",
         "continuesUntil": "…se poursuit jusqu’à {{time}}",
         "overviewEmptyTitle": "Choisissez des personnes à comparer",
         "overviewEmptyDescription": "Sélectionnez ci-dessus au moins un membre du foyer pour voir les emplois du temps hebdomadaires côte à côte.",
@@ -6501,6 +6577,7 @@
         "labelLabel": "Nom de cet appareil (facultatif)",
         "labelHint": "Aide à reconnaître plus tard de quel appareil il s'agit.",
         "submit": "Appairer",
-        "failed": "Ce code d'appairage n'est pas valide."
+        "failed": "Ce code d'appairage n'est pas valide.",
+        "codeRequired": "Saisis le code d’appairage affiché dans les réglages."
     }
 }

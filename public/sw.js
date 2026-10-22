@@ -19,7 +19,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.78.0';
+const APP_RELEASE        = '2.79.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -108,6 +108,7 @@ const APP_SHELL = [
   // Der Router laedt ihn als Seiteneffekt (`import '/components/datepicker.js'`),
   // also gehoert er in die Shell, nicht zu den Seitenmodulen. Der
   // Precache-Guard sah diese Import-Form bis #944 nicht.
+  '/components/budget-recurrence-fields.js',
   '/components/datepicker.js',
   '/components/detail-view.js',
   '/components/document-attach.js',
@@ -120,11 +121,14 @@ const APP_SHELL = [
   '/components/wall-timer.js',
   '/utils/birth-date.js',
   '/utils/birthday-event.js',
+  '/utils/budget-chart-category.js',
+  '/utils/budget-recurrence.js',
   '/utils/budget-category-colors.js',
   '/utils/bulk-pill.js',
   '/utils/category-labels.js',
   '/utils/chart.js',
   '/utils/color.js',
+  '/utils/contact-limits.js',
   '/utils/contact-name.js',
   '/utils/contrast.js',
   '/utils/countdown.js',
@@ -316,6 +320,7 @@ const APP_LOCALES = [
   '/locales/uk.json',
   '/locales/vi.json',
   '/locales/zh.json',
+  '/locales/zh-Hant.json',
 ];
 const APP_LOCALE_SET = new Set(APP_LOCALES);
 
@@ -359,6 +364,7 @@ const PAGE_MODULES = [
   '/pages/budget-stats.js',
   '/pages/split-expenses.js',
   '/pages/subscriptions.js',
+  '/components/budget-transfer-dialog.js',
   '/components/category-manager.js',
   '/components/icon-picker.js',
   '/components/tag-manager.js',

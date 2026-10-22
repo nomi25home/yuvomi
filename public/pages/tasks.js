@@ -1174,7 +1174,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   if (task?.documents?.length) advancedSummary.push(task.documents.map((d) => d.name).join(', '));
 
   const advancedLabel = advancedSummary.length
-    ? `${t('modal.moreSettings')} · ${advancedSummary.join(' · ')}`
+    ? `${t('modal.moreDetails')} · ${advancedSummary.join(' · ')}`
     : undefined;
   /* WIEDERHOLUNG UND ERINNERUNG LIEGEN HINTER DEM AUFKLAPPER, SOLANGE SIE LEER
    * SIND (Critique 2026-10-05, R16). Beide standen offen unter ihm - eine
@@ -1709,11 +1709,32 @@ async function reloadWithRowMotion(container, taskId, { holdUntil = 0 } = {}) {
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const group = row.closest('.task-group');
     const lastInGroup = group && group.querySelectorAll('.swipe-row').length === 1;
+    previewGroupCounts(container);
     await collapseOut(lastInGroup ? group : row);
     if (patchRowRemoval(container, taskId)) return;
   }
   renderTaskList(container);
   if (!row && staysInView && state.viewMode === 'list') expandIn(taskRowEl(container, taskId));
+}
+
+/**
+ * DER ZAEHLER WECHSELT MIT DER ZEILE (Critique R21, D3). Er zog erst nach dem
+ * Austritt nach (patchRowRemoval) - gemessen ~900ms nach dem Haken, 400ms
+ * nachdem die Zeile zu gehen begann. Der neue Bestand steht schon vor dem
+ * Austritt fest (reloadWithRowMotion laedt vorher); die Zaehler nehmen ihn im
+ * selben Frame an, in dem die Zeile ausblendet. Eine Gruppe, die mit ihrer
+ * letzten Zeile geht, behaelt ihre Zahl, bis sie weg ist.
+ */
+function previewGroupCounts(container) {
+  const listEl = container?.querySelector?.('#task-list');
+  if (!listEl || state.viewMode !== 'list') return;
+  const counts = new Map(groupBy(filteredTasks(), state.groupMode).map((g) => [String(g.id), g.tasks.length]));
+  for (const el of listEl.querySelectorAll(':scope > .task-group')) {
+    const n = counts.get(el.dataset.groupId);
+    const count = el.querySelector(':scope > .list-group__title > .list-group__count');
+    if (n == null || !count || count.textContent === String(n)) continue;
+    count.textContent = String(n);
+  }
 }
 
 /**
@@ -1881,6 +1902,21 @@ function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
       }
     },
   );
+}
+
+/**
+ * Der Satz, wenn ein Haken nicht ankam (Critique R21, D15): welche Aufgabe, in
+ * welchem Stand sie nach dem Neuladen wieder steht, und dass es noch einmal
+ * geht - statt "Ein Fehler ist aufgetreten.". Ein bekannter Fall (gesperrt,
+ * geloescht, offline) behaelt seinen eigenen Satz (errorSentence).
+ * @param {unknown} err
+ * @param {number|string} taskId
+ * @param {string} nextStatus der Status, der geschrieben werden sollte
+ */
+function toggleFailedSentence(err, taskId, nextStatus) {
+  const title = state.tasks.find((x) => String(x.id) === String(taskId))?.title;
+  if (!title) return errorSentence(err);
+  return errorSentence(err, nextStatus === 'done' ? 'common.errorCheckRolledBack' : 'common.errorUncheckRolledBack', { name: title });
 }
 
 async function loadTaskForEdit(id) {
@@ -2287,7 +2323,10 @@ function openTaskModal({ task = null, users = [], reminder = null } = {}, contai
   modalTags = normalizeTagList(task?.tags);
   openSharedModal({
     title: isEdit ? t('tasks.editTask') : t('tasks.newTask'),
-    content: renderModalContent({ task, users, reminder }),
+    // Erst die Buehne, dann das Formular (modal.js `staged`, Critique R21 a6):
+    // das Markup entsteht erst im zweiten Schritt.
+    content: () => renderModalContent({ task, users, reminder }),
+    staged: !isEdit,
     size: 'lg',
     // Eine neue Aufgabe startet weiterhin mit dem Fokus im Titelfeld - hier ist
     // Tippen die Absicht.
@@ -4579,7 +4618,7 @@ function wireSwipeGestures(container) {
           await reloadWithRowMotion(container, taskId);
           acknowledgeStatusToggle(container, taskId, nextStatus, response);
         } catch (err) {
-          window.yuvomi.showToast(errorSentence(err), 'danger');
+          window.yuvomi.showToast(toggleFailedSentence(err, taskId, nextStatus), 'danger');
           await loadTasks(container);
         }
       },
@@ -5538,7 +5577,7 @@ function wireTaskList(container) {
         // Derselbe Rückweg wie beim Wischen - und dieselbe Quittung.
         acknowledgeStatusToggle(container, id, nextStatus, response);
       } catch (err) {
-        window.yuvomi.showToast(errorSentence(err), 'danger');
+        window.yuvomi.showToast(toggleFailedSentence(err, id, nextStatus), 'danger');
         await loadTasks(container);
       }
     }
@@ -6363,6 +6402,8 @@ export async function render(container, { user, signal } = {}) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Critique R21 (D15): der Satz eines zurueckgerollten Hakens.
+  toggleFailedSentence,
   // E13: am Desktop haengen die Filter als Popover am Knopf (utils/filter-sheet.js).
   openTaskFilters,
   // R17: die neue Aufgabe kommt an (Gruppe auf, Zeile zieht ein, rollt ins Bild, ausgewaehlt).

@@ -798,7 +798,7 @@ onWallActiveChange(reportWallPauseState);
 // schon gesetzt hat, bevor hier eine Navigation stattfand (Kaltstart auf `/`).
 // Und ein Geraet, das mit aktiver Wand gekilled wurde, bleibt bei Rueckkehr
 // pausiert, bis syncWallMode einen Wechsel sieht.
-// Zwei Stellen schliessen die Luecke:
+// Drei Stellen schliessen die Luecke:
 // - initPushAndReport: einmal pro Sitzung direkt nach initPush()
 // - visibilitychange: bei jedem Aufwachen, z. B. nach Telefon-Sperrbildschirm
 // - stundliches Interval: eine lang laufende Wand erneuert die Pause automatisch
@@ -1474,8 +1474,9 @@ function paintMoreSheetBadges(sheet) {
  * (keine Luecke), monochrom (Meta, nicht Modul) und kostet als Reihe 64px
  * statt vier Zeilen.
  *
- * Gibt EINEN Knoten in einem Array zurück (`.more-sheet__body`, der Scroller);
- * beide Aufrufer spreizen das Ergebnis und bleiben davon unberührt.
+ * Gibt ZWEI Knoten in einem Array zurück (`.more-sheet__body`, der Scroller,
+ * und `.more-sheet__foot`, die feste Systemreihe darunter, R21 S7); beide
+ * Aufrufer spreizen das Ergebnis und bleiben davon unberührt.
  *
  * EINE Quelle der Wahrheit für renderAppShell() UND rebuildNavigation() —
  * beide Pfade müssen dieselbe Struktur erzeugen, sonst zerstört ein
@@ -1558,10 +1559,18 @@ function buildMoreSheetBody() {
   const labelCounts = navSectionEntryCounts(navItems().filter((item) => item.module !== 'settings'));
   nodes.push(...moreSheetSections(modules, labelCounts));
 
+  // DER FUSS STEHT FEST, NICHT IM SCROLLER (R21 S7, D7: "Mehr-Blatt mit
+  // festem Fuss"). Einstellungen, Hilfe, Neuigkeiten und Abmelden lagen am
+  // Ende des Koerpers: bei 390x844 stand die Reihe bei y 753-802 unter dem
+  // Blattende (764), bei 375x667 ganz ausserhalb - erreichbar nur durch
+  // Scrollen in einem Blatt, das nicht nach Scrollen aussieht. Sie stehen
+  // jetzt als eigener Abschnitt unter dem Koerper; nur die Module scrollen.
+  const foot = document.createElement('div');
+  foot.className = 'more-sheet__foot';
   const divider = document.createElement('div');
   divider.className = 'more-sheet__divider';
   divider.setAttribute('aria-hidden', 'true');
-  nodes.push(divider);
+  foot.appendChild(divider);
 
   // System-Reihe im selben Vierer-Raster (Icon-über-Label, monochrom).
   const system = document.createElement('div');
@@ -1625,10 +1634,10 @@ function buildMoreSheetBody() {
   // sind es drei Ziele, und drei Ziele in vier Spalten lassen eine Lücke, die
   // wie ein fehlendes Element aussieht.
   system.style.setProperty('--more-system-cols', String(system.children.length || 1));
-  nodes.push(system);
+  foot.appendChild(system);
 
   body.append(...nodes);
-  return [body];
+  return [body, foot];
 }
 
 /**
@@ -1829,6 +1838,20 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // erscheinen. Der zweite Aufruf unten holt die Nachzügler.
       adoptPageFab();
       wirePageToolbars();
+
+      // DAS NEUE BILD WARTET AUF DEN INHALT (Critique R21, D1): swapPage haelt
+      // das alte Bild, bis dieser Render steht - hoechstens FIRST_RENDER_WAIT_MS
+      // (utils/view-transition.js). Was zum fertigen ersten Bild gehoert, kommt
+      // deshalb hier schon dazu: der gemerkte Scrollstand des Rueckwegs (sonst
+      // zeigte das neue Bild den Seitenanfang und sprang danach) und ein FAB,
+      // den die Seite erst mit ihren Daten anlegt. Beides ist idempotent; der
+      // Router wiederholt es unten fuer eine Seite, die die Frist verpasst.
+      // Ein Fehler der Seite gehoert dem `await` unten, nicht diesem Zweig.
+      return Promise.resolve(renderPromise).then(() => {
+        if (signal?.aborted) return;
+        if (scrollTarget > 0) content.scrollTop = scrollTarget;
+        adoptPageFab();
+      }, () => {});
     };
 
     // Wird die Navigation erst NACH dem Tausch ueberholt, verliert die neue
@@ -1843,6 +1866,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // solange `isNavigating` steht.
       whenSettled: navigationIdle,
       settle: settleClosingOverlays,
+      // ZWISCHEN ZWEI KUECHEN-REITERN BLENDET NUR DER KOERPER (Critique R21,
+      // D11): Leiste und Kontextzeile sind das Bedienelement, die Zeile wechselt
+      // mit dem Tipp statt doppelt belichtet zu blenden (layout.css, `kitchen`).
+      types: isKitchenRoute(previousPath) && isKitchenRoute(route.path) ? ['kitchen'] : [],
     });
 
     // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch
@@ -2198,6 +2225,9 @@ function renderAppShell(container) {
     moreSheet.setAttribute('role', 'dialog');
     moreSheet.setAttribute('aria-modal', 'true');
     moreSheet.setAttribute('aria-label', t('nav.more'));
+    // Der Toast-Stapel weicht dem offenen Blatt ganz (utils/toast-placement.js,
+    // YIELD_SELECTOR): er landete sonst auf Griff und Suche.
+    moreSheet.dataset.toastYield = '';
     setOverlayInteractive(moreSheet, false);
     const dragHandle = document.createElement('div');
     dragHandle.className = 'more-sheet__handle';
@@ -2273,6 +2303,28 @@ function renderAppShell(container) {
   searchPanel.className = 'search-overlay__panel';
   searchPanel.appendChild(searchHeader);
   searchPanel.appendChild(searchResults);
+  // TASTENHINWEISE (Critique R21, Persona Alex): die Palette ist eine Combobox
+  // (Pfeile markieren, Enter oeffnet, Esc schliesst), aber nichts sagte es -
+  // wer sie mit ⌘K oeffnet, kennt den Weg, wer sie anklickt, nicht. Eine
+  // ruhige Fusszeile in der Tastenform der Kuerzel-Hilfe (`.shortcut-kbd`).
+  // Nur fuer die Augen (`aria-hidden`): Screenreader hoeren die Bedienung
+  // schon aus der Combobox-Rolle. Ohne feinen Zeiger blendet layout.css sie aus.
+  const searchHints = document.createElement('div');
+  searchHints.className = 'search-overlay__hints';
+  searchHints.setAttribute('aria-hidden', 'true');
+  for (const [keys, label] of [[['\u2191', '\u2193'], t('search.hintMove')], [['\u21b5'], t('search.hintOpen')], [['Esc'], t('common.close')]]) {
+    const hint = document.createElement('span');
+    hint.className = 'search-overlay__hint';
+    for (const key of keys) {
+      const kbd = document.createElement('kbd');
+      kbd.className = 'shortcut-kbd';
+      kbd.textContent = key;
+      hint.appendChild(kbd);
+    }
+    hint.append(label);
+    searchHints.appendChild(hint);
+  }
+  searchPanel.appendChild(searchHints);
   // Sr-only Live-Region: sagt „Suche läuft…" und die Trefferzahl an, damit der
   // debounced Fetch für Screenreader nicht als Stille verpufft (Critique P1).
   // Die sichtbaren Skeletons tragen aria-hidden; die Semantik lebt hier.
@@ -2718,7 +2770,10 @@ const SHORTCUTS = [
   { key: 'g d', description: () => t('shortcuts.goDash'),  action: () => navigate('/') },
   { key: 'g t', description: () => t('shortcuts.goTasks'), action: () => navigate('/tasks') },
   { key: 'g c', description: () => t('shortcuts.goCal'),   action: () => navigate('/calendar') },
-  { key: 'g s', description: () => t('shortcuts.goShop'),  action: () => navigate('/shopping') },
+  // `g s` WIRKT WEITER, steht aber nicht doppelt in der Hilfe (Critique R21,
+  // Alex): neben `g k s` stand derselbe Einkauf zweimal. Die eine Zeile nennt
+  // beide Wege (Label an `g k s`).
+  { key: 'g s', hidden: true, description: () => t('shortcuts.goShop'),  action: () => navigate('/shopping') },
   { key: 'g n', description: () => t('shortcuts.goNotes'),   action: () => navigate('/notes')              },
   { key: 'g h', description: () => t('shortcuts.goHealth'),  action: () => navigate(getLastHealthRoute())  },
   // Die 3er-Chords nennen ihr konkretes Ziel (Essensplan/Rezepte/Einkauf):
@@ -2727,7 +2782,7 @@ const SHORTCUTS = [
   { key: 'g k',   description: () => t('shortcuts.goKitchen'), action: () => navigate(getLastKitchenRoute()) },
   { key: 'g k m', description: () => t('nav.meals'),           action: () => navigate('/meals')             },
   { key: 'g k r', description: () => t('nav.recipes'),         action: () => navigate('/recipes')           },
-  { key: 'g k s', description: () => t('nav.shopping'),        action: () => navigate('/shopping')          },
+  { key: 'g k s', label: () => 'g s / g k s', description: () => t('nav.shopping'), action: () => navigate('/shopping') },
   { key: 'g k v', description: () => t('nav.pantry'),          action: () => navigate('/pantry')            },
   { key: 'g i', description: () => t('shortcuts.goInventory'), action: () => navigate('/inventory') },
   // Beschriftung wie bei den Kuechen-3er-Chords direkt aus den Nav-Labels -

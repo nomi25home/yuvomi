@@ -1637,6 +1637,12 @@
    * Seitenleiste (320px, Apples Systemeinstellungen), nicht die Listenbahn
    * oben. EIN Wert fuer beide, damit sie nicht auseinanderlaufen (R10). */
   --layout-nav-list: 20rem;
+  /* Breite eines Textfelds in einer Formularzeile der Einstellungen (R21 S7,
+   * Critique a5): die Bedienspalte ist die halbe Zeile (50cqi), aber hoechstens
+   * so breit. Ohne Obergrenze standen die Felder einer Seite an drei Kanten
+   * (Konto bei 1280: 972 / 922 / 999px), weil Profil, Kontaktdaten und
+   * Datumsfeld verschieden breite Zeilen haben. */
+  --layout-field-max: 16rem;
   /* Seitenspalte der Flaechen mit Spalten (`.page-columns`, layout.css;
    * DESIGN.md, Breitenregel, R16 2026-10-05): links die Liste auf dem
    * Lesemass, rechts eine Spalte, die den Rest bis zur Modulkante nimmt und
@@ -1685,6 +1691,11 @@
    * Tag, Ganztag und Listenzeile tragen sie gleich breit. Die Titelfassung des
    * Telefon-Monats nimmt 2px (--space-0h), eine Geometrie, keine zweite Kante. */
   --cal-event-edge: 3px;
+  /* Das Polster ueber und unter dem Titel eines Monatschips (R21 S9b): 3px
+   * statt 2px, damit die Zeile nicht buendig an Kante und Flaeche liegt
+   * (Detektor cramped-padding ab 3px). Die Spurhoehe der Monatsbaender
+   * (--month-band-h, calendar.css) rechnet mit demselben Wert. */
+  --cal-chip-pad-block: 3px;
   --sub-tabs-height: 52px;
   --kitchen-tabs-height: 56px;
 
@@ -1816,6 +1827,12 @@
    * auf ihr ruhen, bevor sie ausklappt (150-250ms, A1 P3-1 der Re-Critique
    * 2026-09-27). Eine Wartezeit, keine Bewegungsdauer. */
   --sidebar-hover-intent: 200ms;
+  /* EIN TEMPO FUER JEDEN SPINNER (Critique R21, D12): eine Umdrehung der
+   * Statusdrehung. Vorher drehten drei Spinner in drei Tempi (Knopf 550ms,
+   * Anmeldung 700ms, Dokumentvorschau 800ms) - dieselbe Aussage "es laeuft
+   * noch" in drei Stimmen. Eine Schleife, kein Uebergang: deshalb ausserhalb
+   * der --duration-Stufen. Unter reduzierter Bewegung dreht er weiter (reset.css). */
+  --spin-period: 700ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und
@@ -2118,6 +2135,26 @@
    * mitverschluckt; der Token sagt stattdessen, was gemeint ist. Guard:
    * "ein Maskenstopp kommt aus --mask-opaque" (test-frontend-audit.js). */
   --mask-opaque: #000;
+}
+
+/* DIE GLASFEDER ALS FEDER (Critique R21, D1). `--ease-glass` ist eine
+ * Back-Out-Bezier: der Gipfel des Ueberschwingers liegt bei 57 % der Zeit, und
+ * erst ab 91 % steht sie innerhalb von 1 % - das Blatt hing gemessen 117ms
+ * sichtbar ueber seiner Ruhelage (Gipfel -2,33px bei +162ms der 300ms). Wo der
+ * Browser `linear()` kennt, laeuft dieselbe Bewegung als gedaempfte Feder
+ * (Daempfung 0,6, Eigenfrequenz 11/Dauer): gleicher Gipfel (1,095 gegen 1,098),
+ * gleiche Dauer, aber der Gipfel liegt bei 36 % und sie steht ab 57 % - das
+ * Blatt schwingt einmal kurz und ruht dann. Die Stuetzstellen sind die Feder,
+ * abgetastet in 2,5-%-Schritten (Interpolationsfehler unter 1 %). Ohne
+ * `linear()` bleibt die Bezier; ungetestet waere der Wert dort ungueltig und
+ * jede Transition, die ihn liest, fiele aus - daher der @supports-Rahmen. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-glass: linear(0, 0.034 2.5%, 0.12 5%, 0.238 7.5%, 0.372 10%, 0.508 12.5%, 0.638 15%, 0.754 17.5%,
+      0.853 20%, 0.934 22.5%, 0.997 25%, 1.042 27.5%, 1.071 30%, 1.088 32.5%, 1.094 35%, 1.093 37.5%,
+      1.086 40%, 1.076 42.5%, 1.063 45%, 1.05 47.5%, 1.038 50%, 1.026 52.5%, 1.016 55%, 1.008 57.5%,
+      1.002 60%, 0.997 62.5%, 0.992 67.5%, 0.991 72.5%, 0.994 80%, 0.998 90%, 1);
+  }
 }
 
 /* ================================================================
@@ -2869,5 +2906,17 @@
     --brand-field-opacity: 0;  /* Marken-Lichtfeld aus - gleiche Gattung */
     /* Specular aus, siehe der Schwesterblock oben. */
     --glass-inset-strength: 0;
+
+    /* METATEXT HEBT SICH MIT (R21, Critique 2026-10-21, D4). Glas, Kanten
+     * und Blur wurden hier gehaertet, die Metazeile - die kleinste Schrift
+     * des Schirms - blieb in derselben Farbe (gemessen hell #63615B, dunkel
+     * #B4AEA5). Sekundaer- und Tertiaertext stehen eine Rampenstufe naeher an
+     * der Textfarbe: hell #4A4741 (9,3:1 auf Weiss statt 6,2), dunkel #CBC5BC
+     * (8,6:1 auf der Karte #2B2825 statt 6,7).
+     * Ueber die Rampe, nicht als Literal: die Dark-Bloecke setzen nur die
+     * private Haelfte (--_neutral-700), der Wert folgt so dem Theme.
+     * Guard: test:typography "prefers-contrast: more hebt". */
+    --color-text-secondary: var(--neutral-700);
+    --color-text-tertiary:  var(--neutral-700);
   }
 }

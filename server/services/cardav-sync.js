@@ -14,6 +14,7 @@ import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { mayChangeContactEmails } from './contact-identity.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { createCardDAVClient } from '../utils/caldav-client.js';
+import { calendarDisplayName } from '../utils/calendar-meta.js';
 
 // --------------------------------------------------------
 // Helper Functions
@@ -323,6 +324,10 @@ function yearlessBirthday(month, day) {
  * `--0315` oder `--03-15`. Beide liefern Tag und Monat mit dem Platzhalterjahr
  * 2000 und `yearUnknown: true`. Ein Jahr, das nicht dem Parameter entspricht,
  * ist echt (so liest es auch sabre/vobject) - ausser 1604, siehe unten.
+ *
+ * MIT UHRZEIT: vCard 3.0 erlaubt `VALUE=date-time` (RFC 2426 3.1.5,
+ * `1953-10-15T23:10:00Z`), vCard 4 `date-and-or-time` (RFC 6350 6.2.5,
+ * `19531015T231000Z`). Es zaehlt das Datum, wie es dasteht.
  * Spiegel: public/utils/vcard.js#parseBirthdayValue.
  * @param {string} value - Birthday value from vCard
  * @param {Array<string>} [params] - Property parameters
@@ -331,13 +336,21 @@ function yearlessBirthday(month, day) {
 function parseBirthday(value, params = []) {
   if (!value) return null;
 
+  // Uhrzeit abschneiden, vor der Bereinigung: die haengte ihre Ziffern sonst
+  // an das Datum ("1990-07-1800000000" -> kein Muster -> null). Keine
+  // Umrechnung der Zone - ein Geburtstag ist ein Kalendertag, und
+  // `1990-07-18T00:00:00+02:00` in UTC waere der 17.
+  const trimmed = String(value).trim();
+  const dateTime = /^(\d{4}-?\d{2}-?\d{2}|--\d{2}-?\d{2})T\d/.exec(trimmed);
+  const datePart = dateTime ? dateTime[1] : trimmed;
+
   // vCard 4 ohne Jahr: --MMDD oder --MM-DD (vor der Bereinigung, die die
   // fuehrenden Striche sonst stehen liesse und kein Muster traefe).
-  const yearless = /^--(\d{2})-?(\d{2})$/.exec(String(value).trim());
+  const yearless = /^--(\d{2})-?(\d{2})$/.exec(datePart);
   if (yearless) return yearlessBirthday(yearless[1], yearless[2]);
 
   // Remove any non-numeric characters except hyphens
-  const cleaned = value.replace(/[^\d-]/g, '');
+  const cleaned = datePart.replace(/[^\d-]/g, '');
 
   let date = null;
   // Try ISO format (YYYY-MM-DD)
@@ -490,7 +503,7 @@ async function addAccount(name, cardavUrl, username, password) {
     // Insert addressbook selections (all enabled by default)
     const addressbookData = [];
     for (const abook of addressbooks) {
-      const abookName = abook.displayName || 'Unnamed Addressbook';
+      const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
 
       db.get().prepare(`
         INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
@@ -661,7 +674,7 @@ async function discoverAddressbooks(accountId) {
     // UPSERT into carddav_addressbook_selection
     const result = [];
     for (const abook of addressbooks) {
-      const abookName = abook.displayName || 'Unnamed Addressbook';
+      const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
 
       // Check if exists
       const existing = db.get().prepare(`
@@ -1077,7 +1090,7 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       log.error(`Failed to fetch vCards from ${addressbookUrl}:`, err.message);
       // Die Meldung wird mit zurückgegeben, damit sie der Aufrufer am Konto
       // festhalten kann - im Log allein sieht sie niemand (#534).
-      const label = serverAddressbook?.displayName || addressbookUrl;
+      const label = calendarDisplayName(serverAddressbook?.displayName, addressbookUrl);
       return { synced: 0, errors: 1, errorMessage: `${label}: ${err.message}` };
     }
 

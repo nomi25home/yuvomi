@@ -59,6 +59,25 @@ test('auth.login: 401 feuert kein auth:expired', async () => {
   assert.equal(expired.length, 0, 'auth:expired darf bei Login-401 nicht gefeuert werden');
 });
 
+// Critique R21: die Uebersicht zeichnet einen eben geladenen Stand beim
+// Zurueckkommen sofort - aber nur, solange niemand etwas geschrieben hat.
+// Dafuer meldet sich jeder GEGLUECKTE Schreibvorgang einmal am window.
+test('api: ein geglueckter Schreibvorgang meldet sich als yuvomi:write, Lesen und Fehler nicht', async () => {
+  setup();
+  const writes = () => dispatchedEvents.filter((e) => e.type === 'yuvomi:write');
+  _mockFetch = () => mockResponse(200, { data: {} });
+  await api.get('/tasks');
+  assert.equal(writes().length, 0, 'ein Lesen meldete sich als Schreibvorgang');
+  for (const call of [() => api.post('/tasks', { title: 'x' }), () => api.patch('/tasks/1', {}), () => api.put('/preferences', {}), () => api.delete('/notes/2')]) {
+    await call();
+  }
+  assert.deepEqual(writes().map((e) => e.detail?.path), ['/tasks', '/tasks/1', '/preferences', '/notes/2'],
+    'nicht jeder Schreibvorgang meldete sich genau einmal');
+  _mockFetch = () => mockResponse(400, { error: 'Nope.' });
+  await assert.rejects(() => api.post('/tasks', {}));
+  assert.equal(writes().length, 4, 'ein abgelehnter Schreibvorgang meldete sich');
+});
+
 test('auth.login: 401 wirft ApiError mit status 401', async () => {
   setup();
   _mockFetch = () => mockResponse(401, { error: 'Invalid credentials.', code: 401 });
@@ -914,6 +933,8 @@ const REASONS_PASSED_THROUGH = new Map([
   // Stellen ausgeschrieben, 409 - eine 403 baut sie nie.
   ['routes/budget/helpers.js: first.reason', { sites: 1, at403: [], why: '400 oder 409' }],
   ['routes/budget/loans.js: derived.reason', { sites: 1, at403: [], why: 'Vorschau: 200 mit ok: false' }],
+  ["routes/budget/transfers.js: v.reason ?? 'transfer_invalid'", { sites: 1, at403: [],
+    why: 'guard: feste 400 fuer transfer_account_archived, transfer_currency_mismatch, entry_amount_invalid oder transfer_invalid; Zugriff verweigert access() getrennt mit 403 ohne reason' }],
   ['routes/modules.js: err.reason', { sites: 2, at403: [],
     why: 'sendInstallError: InstallError traegt nur 400-429 und 502/503 (REASON_STATUS in services/module-install.js); '
       + 'PATCH /:id: setModuleEnabled setzt nur busy (409) und not_writable (503); '

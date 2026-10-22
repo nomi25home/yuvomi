@@ -99,7 +99,15 @@
         "searchNoResultsFilteredDescription": "Vašemu hledání a filtrům nic neodpovídá.",
         "searchReset": "Zrušit hledání",
         "passwordMinLength": "Alespoň 8 znaků.",
-        "savedReloadFailed": "Změna je uložena, ale zobrazení se nepodařilo obnovit. Pokud něco chybí, načtěte stránku znovu."
+        "savedReloadFailed": "Změna je uložena, ale zobrazení se nepodařilo obnovit. Pokud něco chybí, načtěte stránku znovu.",
+        "fieldNumber": "Zadejte číslo.",
+        "fieldMin": "Nejméně {{min}}.",
+        "fieldMax": "Nejvýše {{max}}.",
+        "fieldWholeNumber": "Zadejte celé číslo.",
+        "fieldStep": "Zadejte hodnotu v krocích po {{step}}.",
+        "fieldInvalid": "Zkontrolujte tento údaj.",
+        "errorCheckRolledBack": "„{{name}}“ je znovu otevřené - odškrtnutí se nepodařilo. Zkuste to znovu.",
+        "errorUncheckRolledBack": "„{{name}}“ je znovu odškrtnuté - vrácení se nepodařilo. Zkuste to znovu."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -1369,6 +1377,9 @@
         "mvLabelPlaceholder": "Štítek (např. práce)",
         "mvRemove": "Odebrat záznam",
         "birthdayLabel": "Narozeniny",
+        "showBirthday": "Zobrazit v narozeninách",
+        "addToBirthdays": "Přidat do narozenin",
+        "addedToBirthdays": "Přidáno do narozenin.",
         "birthdayHint": "Přes import narozenin se zobrazí i v kalendáři.",
         "phonePlaceholder": "+420 …",
         "phonePreview": "Náhled: {{value}}",
@@ -1450,7 +1461,18 @@
         "errorEmailTooLong": "E-mailová adresa může mít nejvýše {{limit}} znaků.",
         "errorAddressTooLong": "Adresa může mít nejvýše {{limit}} znaků.",
         "errorNotesTooLong": "Poznámky mohou mít nejvýše {{limit}} znaků.",
-        "errorBirthdayInvalid": "Datum narozenin není platné."
+        "errorBirthdayInvalid": "Datum narozenin není platné.",
+        "errorPhoneEntryInvalid": "Jedno z telefonních čísel je neúplné nebo neplatné.",
+        "errorPhonesTooMany": "Tento kontakt má příliš mnoho telefonních čísel. Maximum je {{limit}}.",
+        "errorPhoneLabelTooLong": "Označení telefonního čísla může mít nejvýše {{limit}} znaků.",
+        "errorEmailEntryInvalid": "Jedna z e-mailových adres je neúplná nebo neplatná.",
+        "errorEmailInvalid": "E-mailová adresa není platná. Musí mít tvar jmeno@priklad.cz.",
+        "errorEmailsTooMany": "Tento kontakt má příliš mnoho e-mailových adres. Maximum je {{limit}}.",
+        "errorEmailLabelTooLong": "Označení e-mailové adresy může mít nejvýše {{limit}} znaků.",
+        "errorAddressEntryInvalid": "Jedna z adres je neúplná nebo neplatná.",
+        "errorAddressesTooMany": "Tento kontakt má příliš mnoho adres. Maximum je {{limit}}.",
+        "errorAddressLabelTooLong": "Označení adresy může mít nejvýše {{limit}} znaků.",
+        "errorAddressPartTooLong": "Ulice, obec, kraj, PSČ a země adresy mohou mít každá nejvýše {{limit}} znaků."
     },
     "budget": {
         "title": "Rozpočet",
@@ -1599,7 +1621,6 @@
         "metaLoadError": "Kategorie rozpočtu se nepodařilo načíst.",
         "addCategory": "+ kategorie",
         "addSubcategory": "+ podkategorie",
-        "moreDetails": "Další údaje",
         "newCategoryPrompt": "Název nové kategorie:",
         "newSubcategoryPrompt": "Název nové podkategorie:",
         "emptyAction": "Vytvořit záznam",
@@ -1685,6 +1706,18 @@
         "loanSavedToast": "Půjčka uložena",
         "loanDeletedToast": "Půjčka smazána",
         "loanPaymentTitle": "Splátka půjčky: {{borrower}}",
+        "typeTransfer": "Převod",
+        "transferFromAccount": "Z účtu",
+        "transferToAccount": "Na účet",
+        "transferChooseAccounts": "Vyberte dva různé účty.",
+        "transferCurrencyMismatch": "Vyberte účty se stejnou měnou. Směna měn není podporována.",
+        "transferAccountArchived": "Pro převod vyberte aktivní účty.",
+        "accountHasTransfers": "Tento účet obsahuje převody. Místo smazání jej archivujte.",
+        "transferDeleteSeriesConfirm": "Smazat celou tuto sérii převodů?",
+        "catSaving": "Spoření",
+        "summaryTransfers": "Převody",
+        "transferDeleteConfirm": "Smazat obě strany tohoto převodu?",
+        "transferDeleteConfirmDetail": "Oba propojené záznamy budou smazány a zůstatky obou účtů přepočítány. Smazáním celé série se smažou i všechny její výskyty. Tuto akci nelze vrátit zpět.",
         "typeLoan": "Půjčka",
         "tabsLabel": "Oblasti rozpočtu",
         "budgetTab": "Přehled",
@@ -1899,6 +1932,7 @@
         "healthCycleSaved": "Nastavení cyklu uloženo.",
         "healthCyclePersonalLabel": "Zobrazit cyklus",
         "healthCyclePersonalHint": "Platí jen pro tvé vlastní zobrazení. Když ho vypneš, cyklus zůstane viditelný pro ostatní v domácnosti.",
+        "healthCycleSettingsHint": "Délku cyklu, antikoncepci, připomínky a režim těhotenství nastavíte na stránce cyklu.",
         "healthCyclePersonalHouseholdOff": "Cyklus je teď vypnutý pro celou domácnost, a proto se nezobrazuje nikomu.",
         "healthCyclePersonalSaved": "Zobrazení cyklu uloženo.",
         "pageRewardsModule": "Odměny",
@@ -2234,7 +2268,7 @@
         "familyRoleGrandparent": "Prarodič",
         "familyRoleRelative": "Příbuzný/á",
         "familyRoleOther": "Člen rodiny",
-        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“.",
+        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“. Cyklus je také skrytý; zobrazit ho lze v osobním nastavení dítěte.",
         "systemAdminLabel": "Správce systému",
         "systemAdminHint": "Správci systému mohou spravovat nastavení aplikace, integrace, API tokeny a rodinné účty.",
         "systemAdminBadge": "Správce systému",
@@ -2264,7 +2298,8 @@
         "languageTitle": "Jazyk",
         "dataLanguageLabel": "Jazyk uložených záznamů",
         "dataLanguageHint": "Jazyk, ve kterém Yuvomi ukládá záznamy, které vytváří sám, například narozeninové události. Týká se API, kalendářového kanálu a synchronizace, nikoli zobrazení zde.",
-        "dataLanguageAuto": "Automaticky ({{language}})",
+        "dataLanguageAuto": "Automaticky",
+        "hintWithCurrent": "Aktuálně: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Jazyk uložených záznamů mohou nastavit pouze správci.",
         "dataLanguageSaved": "Jazyk uložených záznamů byl aktualizován",
         "sectionMeals": "Jídelní plán",
@@ -2933,6 +2968,28 @@
         "regionTitle": "Region / Formát",
         "regionLabel": "Region",
         "regionHint": "Nastaví měnu a formát čísel, data a času podle regionu (např. Švýcarsko: 1'234.50). Pro individuální nastavení zvolte „Vlastní“.",
+        "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "SAE",
+            "AG": "Antigua a Barbuda",
+            "BS": "Bahamy",
+            "DO": "Dominikánská rep.",
+            "GB": "Velká Británie",
+            "HK": "Hongkong",
+            "KN": "Svatý Kryštof",
+            "MO": "Macao",
+            "PH": "Filipíny",
+            "SA": "Saúdská Arábie",
+            "TT": "Trinidad a Tobago",
+            "US": "Spojené státy",
+            "VC": "Svatý Vincenc"
+        },
+        "languageShort": {
+            "nb": "norština",
+            "ptBR": "portugalština (BR)",
+            "zh": "čínština (zjedn.)",
+            "zhHant": "čínština (trad.)"
+        },
         "regionAdminOnly": "Region a měnu mohou měnit pouze administrátoři.",
         "formatsHouseholdHint": "Formát data a času platí pro celou domácnost. Změnit ho může každý člen.",
         "regionCustom": "Vlastní",
@@ -3161,7 +3218,7 @@
         "timezoneTitle": "Časové pásmo",
         "timezoneLabel": "Časové pásmo domácnosti",
         "timezoneHint": "Platí všude tam, kde čas nemá vlastní pásmo: připomínky, odpočty, kalendářní den „dnes“, exportovaný kalendářový kanál a události odesílané do Googlu nebo Outlooku.",
-        "timezoneAuto": "Automaticky ({{zone}})",
+        "timezoneAuto": "Automaticky",
         "timezoneAdminOnly": "Časové pásmo mohou měnit pouze správci.",
         "timezoneSaved": "Časové pásmo uloženo.",
         "timezoneMismatch": "Váš prohlížeč je v pásmu {{browser}}, domácnost počítá v pásmu {{household}}.",
@@ -3213,6 +3270,7 @@
         "healthPreventionNotifyCaregiversSaved": "Nastavení upozornění uloženo.",
         "healthVisibilityTitle": "Výchozí viditelnost",
         "healthVisibilityHint": "S čím nové záznamy začínají. U každého záznamu to můžeš změnit.",
+        "healthVisibilityCaregivers": "Kdo smí zapisovat za vás, vidí přitom i vaše soukromé záznamy, kromě deníku cyklu. Určuje to správce u členů.",
         "healthVisibilityOther": "Další oblasti",
         "healthVisibilityApply": "Upravit i stávající záznamy",
         "healthVisibilityApplyHint": "Uloženo. Mají se upravit i stávající záznamy v oblasti {{area}}?",
@@ -3353,10 +3411,12 @@
         "tasksDefaultVisibilityLabel": "Default visibility",
         "tasksDefaultVisibilityHint": "New tasks open with this visibility. You can still change it each time you create one.",
         "tasksDefaultLockedLabel": "Lock editing by default",
-        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."
+        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one.",
+        "backupDropzoneTitleTouch": "Klepnutím vyberte soubor zálohy",
+        "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP"
     },
     "login": {
-        "tagline": "Vítejte zpět ve svém rodinném plánovači.",
+        "tagline": "Vítejte zpět. Váš domov na jednom místě.",
         "usernameLabel": "Uživatelské jméno",
         "passwordLabel": "Heslo",
         "loginButton": "Přihlásit se",
@@ -3425,7 +3485,6 @@
         "unsavedChanges": "Zahodit změny?",
         "unsavedChangesDetail": "Tvoje zadané údaje v tomto formuláři budou ztraceny.",
         "discardChanges": "Zahodit",
-        "moreSettings": "Další nastavení",
         "moreDetails": "Další údaje"
     },
     "search": {
@@ -3442,7 +3501,9 @@
         "goTo": "Přejít na",
         "newSection": "Vytvořit nové",
         "recentLabel": "Nedávno otevřené",
-        "createTaskNamed": "Vytvořit „{{title}}“ jako úkol"
+        "createTaskNamed": "Vytvořit „{{title}}“ jako úkol",
+        "hintMove": "Vybrat",
+        "hintOpen": "Otevřít"
     },
     "shortcuts": {
         "search": "Otevřít vyhledávání",
@@ -3527,7 +3588,7 @@
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",
-        "step1Body": "Váš osobní rodinný plánovač. Úkoly, kalendář, nákupy a další - vše na jednom místě.",
+        "step1Body": "Úkoly, kalendář, nákupy a další pro vaši domácnost - ať žijete sami, ve dvou, nebo jako rodina. Vše na jednom místě.",
         "step2Title": "Navigace a moduly",
         "step2Body": "Lišta dole vede přímo k nejdůležitějším částem. Všechny ostatní moduly najdeš pod „Více“.",
         "step3Title": "Rychlý start",
@@ -3727,7 +3788,8 @@
         "errorVisitGone": "Tato návštěva už neexistuje.",
         "errorTaskGone": "Tento úkol už neexistuje.",
         "errorAlreadyCheckedOut": "Tento pracovník je už odhlášen.",
-        "errorAlreadyCheckedIn": "Tento pracovník je už přihlášen."
+        "errorAlreadyCheckedIn": "Tento pracovník je už přihlášen.",
+        "allVisitsInReport": "Všechny návštěvy v hlášení"
     },
     "splitExpenses": {
         "title": "Společné výdaje",
@@ -4180,7 +4242,10 @@
         "errorDmsAccountGone": "Tento účet DMS už neexistuje.",
         "errorDmsDocumentGone": "Tento dokument už v DMS neexistuje.",
         "errorDmsAlreadyLinked": "Tento dokument z DMS je už propojený.",
-        "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS."
+        "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS.",
+        "dropzoneTitleTouch": "Klepnutím vyberte soubor",
+        "viewerPrevNamed": "Předchozí dokument: {{name}}",
+        "viewerNextNamed": "Další dokument: {{name}}"
     },
     "reminders": {
         "sectionTitle": "Připomínka",
@@ -4241,6 +4306,7 @@
         "editTitle": "Upravit narozeniny",
         "nameLabel": "Jméno",
         "birthDateLabel": "Datum narození",
+        "showContact": "Zobrazit kontakt",
         "nameDay": "Svátek",
         "celebratesNameDay": "oslaví svátek",
         "nameDayLabel": "Svátek (volitelné)",
@@ -4437,7 +4503,7 @@
         "mobileSearch": "Vyhledávání otevřeš lupou na přehledu nebo přes „Více“.",
         "mobileSettings": "Nastavení najdeš pod „Více“.",
         "guideLink": "Uživatelská příručka",
-        "guideHint": "Spravuje ji komunita ve vlastním repozitáři - může zaostávat za vydáním."
+        "guideHint": "Spravuje ho komunita. Otevře se na nové kartě."
     },
     "changelog": {
         "title": "Změny",
@@ -4479,8 +4545,9 @@
         "success": "Heslo bylo změněno. Nyní se můžeš přihlásit.",
         "mismatch": "Hesla se neshodují.",
         "tooShort": "Heslo musí mít alespoň 8 znaků.",
-        "invalidToken": "Tento odkaz je neplatný nebo vypršel.",
-        "missingToken": "Nebyl nalezen platný token."
+        "invalidToken": "Tento odkaz pro obnovení je neplatný nebo vypršel - vyžádejte si nový.",
+        "missingToken": "Tento odkaz pro obnovení je neúplný - vyžádejte si nový.",
+        "requestNew": "Vyžádat nový odkaz"
     },
     "email": {
         "host": "SMTP server",
@@ -4894,6 +4961,12 @@
             "reminders": {
                 "title": "Další připomenutí",
                 "empty": "Dnes už žádné další užití"
+            },
+            "brief": {
+                "changes": "Od posledního měření: {{list}}.",
+                "latest": "Naposledy zaznamenáno: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} beze změny"
             }
         },
         "vitals": {
@@ -5303,7 +5376,7 @@
             "emptyDesc": "Zaznamenej svou první menstruaci a uvidíš předpovědi, kalendář a statistiky.",
             "emptyCta": "Zaznamenat první menstruaci",
             "personsLabel": "Person",
-            "add": "Zaznamenat menstruaci",
+            "add": "Doplnit dřívější menstruaci",
             "loadError": "Data cyklu se nepodařilo načíst.",
             "loadErrorDesc": "Zkuste to prosím později.",
             "retry": "Zkusit znovu",
@@ -5516,15 +5589,14 @@
                 "family": "Rodina"
             },
             "period": {
-                "add": "Zaznamenat menstruaci",
+                "add": "Doplnit dřívější menstruaci",
                 "edit": "Upravit menstruaci",
                 "warningFuture": "Datum zahájení je v budoucnosti - předpovědi vycházejí jen z minulých cyklů.",
                 "warningOverlap": "Překrývá se s již zaznamenaným cyklem."
             },
             "dayLog": {
                 "title": "Zaznamenat den",
-                "date": "Datum",
-                "more": "Další údaje"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Exportovat jako CSV"
@@ -5542,8 +5614,9 @@
                 "cycleLength": "Průměrná délka cyklu",
                 "periodLength": "Průměrná délka menstruace",
                 "lutealLength": "Délka luteální fáze",
+                "daysUnit": "dny",
                 "trackFertility": "Zobrazit plodné období",
-                "autoHint": "Ponech prázdné = vypočítá se automaticky z tvé historie.",
+                "autoHint": "Když jedno z obou polí necháte prázdné, Yuvomi hodnotu spočítá ze zaznamenaných menstruací.",
                 "remindPeriodDaysBefore": "Připomenutí menstruace",
                 "remindOff": "Vypnuto",
                 "remindSameDay": "V daný den",
@@ -5644,7 +5717,9 @@
                 "emptyError": "Vyberte soubor CSV nebo vložte text.",
                 "error": "Import se nezdařil."
             },
-            "discoveryHint": "Tip: předpovězený cyklus si můžete odebírat jako ICS kanál v <a href=\"/settings/modules/calendar?section=personal-feeds\">Nastavení → Moduly → Kalendář</a>, nebo zobrazit widget cyklu na <a href=\"/\">Přehledu</a> v režimu úprav."
+            "feedLink": "Odebírat předpokládaný cyklus v kalendáři",
+            "widgetHint": "Dlaždici cyklu přidáte do přehledu „{{overview}}“ přes „{{customize}}“.",
+            "endBeforeStart": "Konec nesmí být před začátkem."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -5653,6 +5728,7 @@
             "unitH": "h"
         },
         "careBanner": "Zapisuješ za {{name}}.",
+        "whoSees": "Kdo to uvidí?",
         "nutrition": {
             "title": "Výživa",
             "emptyTitle": "Zatím žádné výživové údaje",
@@ -5796,6 +5872,7 @@
         "weekdaySat": "so",
         "weekdaySun": "ne",
         "intervalLabelWeekly": "Každých N týdnů",
+        "intervalLabelMonthly": "Každých N měsíců",
         "anchorDateLabel": "První svoz",
         "monthDayLabel": "Den v měsíci",
         "monthDayLastDay": "Poslední den měsíce",
@@ -6410,8 +6487,8 @@
         "success": "Účet byl vytvořen. Nyní se můžeš přihlásit.",
         "mismatch": "Hesla se neshodují.",
         "tooShort": "Heslo musí mít alespoň 8 znaků.",
-        "invalidToken": "Tato pozvánka je neplatná, vypršela nebo už byla použita.",
-        "missingToken": "Nebyl nalezen platný token.",
+        "invalidToken": "Tato pozvánka je neplatná, vypršela nebo už byla použita - požádejte o nový odkaz.",
+        "missingToken": "Tento odkaz s pozvánkou je neplatný nebo vypršel - požádejte o nový.",
         "usernameRequired": "Zvol si uživatelské jméno.",
         "usernameInvalid": "Uživatelské jméno musí mít 3 až 64 znaků a smí obsahovat pouze písmena, číslice, tečky, pomlčky a podtržítka.",
         "usernameTaken": "Toto uživatelské jméno je již obsazené.",
@@ -6629,9 +6706,8 @@
         "templateWork": "Práce",
         "templateSchool": "Škola",
         "templateUniversity": "Univerzita",
-        "overview": "Porovnání",
+        "overview": "Přehled",
         "overviewPeopleLabel": "Porovnat osoby",
-        "overviewClearSelection": "Zrušit výběr",
         "continuesUntil": "…pokračuje do {{time}}",
         "overviewEmptyTitle": "Vyberte osoby k porovnání",
         "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe.",
@@ -6663,6 +6739,7 @@
         "labelLabel": "Název tohoto zařízení (nepovinné)",
         "labelHint": "Pomůže později poznat, o které zařízení jde.",
         "submit": "Spárovat",
-        "failed": "Tento párovací kód neplatí."
+        "failed": "Tento párovací kód neplatí.",
+        "codeRequired": "Zadej párovací kód zobrazený v nastavení."
     }
 }
