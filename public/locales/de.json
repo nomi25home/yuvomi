@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Nichts passt zu deiner Suche und den Filtern.",
         "searchReset": "Suche zurücksetzen",
         "passwordMinLength": "Mindestens 8 Zeichen.",
-        "savedReloadFailed": "Die Änderung ist gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Lade die Seite neu, falls etwas fehlt."
+        "savedReloadFailed": "Die Änderung ist gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Lade die Seite neu, falls etwas fehlt.",
+        "fieldNumber": "Bitte eine Zahl eingeben.",
+        "fieldMin": "Mindestens {{min}}.",
+        "fieldMax": "Höchstens {{max}}.",
+        "fieldWholeNumber": "Bitte eine ganze Zahl eingeben.",
+        "fieldStep": "Bitte in Schritten von {{step}} eingeben.",
+        "fieldInvalid": "Bitte prüfe diese Eingabe.",
+        "errorCheckRolledBack": "„{{name}}“ ist wieder offen - das Abhaken hat nicht geklappt. Versuch es noch einmal.",
+        "errorUncheckRolledBack": "„{{name}}“ ist wieder abgehakt - das Zurückholen hat nicht geklappt. Versuch es noch einmal."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -169,7 +177,9 @@
         "goTo": "Gehe zu",
         "newSection": "Neu anlegen",
         "recentLabel": "Zuletzt geöffnet",
-        "createTaskNamed": "„{{title}}“ als Aufgabe anlegen"
+        "createTaskNamed": "„{{title}}“ als Aufgabe anlegen",
+        "hintMove": "Auswählen",
+        "hintOpen": "Öffnen"
     },
     "dashboard": {
         "title": "Übersicht",
@@ -1313,6 +1323,7 @@
         "mvLabelPlaceholder": "Label (z. B. Arbeit)",
         "mvRemove": "Eintrag entfernen",
         "birthdayLabel": "Geburtstag",
+        "showBirthday": "In Geburtstagen anzeigen",
         "birthdayHint": "Erscheint über den Geburtstags-Import auch im Kalender.",
         "phonePlaceholder": "+49 …",
         "phonePreview": "Vorschau: {{value}}",
@@ -1550,7 +1561,6 @@
         "metaLoadError": "Budget-Kategorien konnten nicht geladen werden.",
         "addCategory": "+ Kategorie",
         "addSubcategory": "+ Unterkategorie",
-        "moreDetails": "Weitere Angaben",
         "newCategoryPrompt": "Name der neuen Kategorie:",
         "newSubcategoryPrompt": "Name der neuen Unterkategorie:",
         "categoryAddedToast": "Kategorie hinzugefügt.",
@@ -1860,6 +1870,7 @@
         "healthCycleSaved": "Zyklus-Einstellung gespeichert.",
         "healthCyclePersonalLabel": "Zyklus anzeigen",
         "healthCyclePersonalHint": "Gilt nur für deine eigene Ansicht. Schaltest du den Zyklus ab, bleibt er für die anderen im Haushalt sichtbar.",
+        "healthCycleSettingsHint": "Zykluslänge, Verhütung, Erinnerungen und Schwangerschafts-Modus stellst du auf der Zyklusseite ein.",
         "healthCyclePersonalHouseholdOff": "Der Zyklus ist zurzeit für den ganzen Haushalt abgeschaltet, deshalb erscheint er bei niemandem.",
         "healthCyclePersonalSaved": "Zyklus-Ansicht gespeichert.",
         "pageRewardsModule": "Belohnungen",
@@ -2192,7 +2203,7 @@
         "familyRoleGrandparent": "Großelternteil",
         "familyRoleRelative": "Verwandte/r",
         "familyRoleOther": "Familienmitglied",
-        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“.",
+        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“. Auch der Zyklus ist ausgeblendet; einblenden lässt er sich in den persönlichen Einstellungen des Kindes.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratoren können App-Einstellungen, Integrationen, API-Tokens und Familienkonten verwalten.",
         "systemAdminBadge": "Systemadministrator",
@@ -2222,7 +2233,8 @@
         "languageTitle": "Sprache",
         "dataLanguageLabel": "Sprache gespeicherter Einträge",
         "dataLanguageHint": "Sprache, in der Yuvomi selbst erzeugte Einträge speichert, etwa Geburtstags-Termine. Wirkt auf API, Kalender-Feed und Synchronisierung, nicht auf die Anzeige hier.",
-        "dataLanguageAuto": "Automatisch ({{language}})",
+        "dataLanguageAuto": "Automatisch",
+        "hintWithCurrent": "Gerade {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Die Sprache gespeicherter Einträge legen Administratoren fest.",
         "dataLanguageSaved": "Sprache gespeicherter Einträge aktualisiert",
         "sectionMeals": "Essensplan",
@@ -2916,6 +2928,7 @@
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Setzt Währung, Zahlen-, Datums- und Zeitformat passend zur Region (z. B. Schweiz: 1'234.50). Für individuelle Einstellungen „Benutzerdefiniert“ wählen.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Region und Währung ändern nur Administratoren.",
         "formatsHouseholdHint": "Datums- und Zeitformat gelten für den ganzen Haushalt. Alle Mitglieder können sie ändern.",
         "regionCustom": "Benutzerdefiniert",
@@ -3104,7 +3117,7 @@
         "timezoneTitle": "Zeitzone",
         "timezoneLabel": "Zeitzone des Haushalts",
         "timezoneHint": "Gilt überall dort, wo eine Zeit keine eigene Zone trägt: Erinnerungen, Countdowns, der Kalendertag „heute“, der exportierte Kalender-Feed und Termine, die zu Google oder Outlook hinausgehen.",
-        "timezoneAuto": "Automatisch ({{zone}})",
+        "timezoneAuto": "Automatisch",
         "timezoneAdminOnly": "Die Zeitzone ändern nur Administratoren.",
         "timezoneSaved": "Zeitzone gespeichert.",
         "timezoneMismatch": "Dein Browser steht in {{browser}}, der Haushalt rechnet in {{household}}.",
@@ -3155,6 +3168,7 @@
         "healthPreventionNotifyCaregiversSaved": "Benachrichtigungs-Einstellung gespeichert.",
         "healthVisibilityTitle": "Standard-Sichtbarkeit",
         "healthVisibilityHint": "Womit neue Einträge vorbelegt werden. Beim Eintragen lässt sich das jedes Mal ändern.",
+        "healthVisibilityCaregivers": "Wer für dich eintragen darf, sieht dabei auch deine privaten Einträge, nur das Zyklus-Tagebuch nicht. Das legt ein Admin bei den Mitgliedern fest.",
         "healthVisibilityOther": "Weitere Bereiche",
         "healthVisibilityApply": "Bestehende Einträge mitziehen",
         "healthVisibilityApplyHint": "Gespeichert. Sollen die vorhandenen Einträge unter {{area}} auch umgestellt werden?",
@@ -3287,10 +3301,12 @@
         "weatherPlaceTooShort": "Gib mindestens zwei Zeichen ein.",
         "weatherPlaceNotFound": "Kein Ort mit diesem Namen gefunden. Häng das Land an, z. B. „Halle, Deutschland“.",
         "weatherPlaceUnavailable": "Die Ortssuche ist gerade nicht erreichbar. Versuch es gleich noch einmal oder trag die Koordinaten von Hand ein.",
-        "weatherManualTitle": "Koordinaten von Hand"
+        "weatherManualTitle": "Koordinaten von Hand",
+        "backupDropzoneTitleTouch": "Tippen, um eine Backup-Datei auszuwählen",
+        "installModuleDropzoneTitleTouch": "Tippen, um eine ZIP-Datei auszuwählen"
     },
     "login": {
-        "tagline": "Willkommen zurück bei deinem Familienplaner.",
+        "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
         "usernameLabel": "Benutzername",
         "passwordLabel": "Passwort",
         "loginButton": "Anmelden",
@@ -3359,7 +3375,6 @@
         "unsavedChanges": "Änderungen verwerfen?",
         "unsavedChangesDetail": "Deine Eingaben in diesem Formular gehen verloren.",
         "discardChanges": "Verwerfen",
-        "moreSettings": "Weitere Einstellungen",
         "moreDetails": "Weitere Angaben"
     },
     "rrule": {
@@ -3464,6 +3479,7 @@
         "editTitle": "Geburtstag bearbeiten",
         "nameLabel": "Name",
         "birthDateLabel": "Geburtsdatum",
+        "showContact": "Kontakt anzeigen",
         "nameDay": "Namenstag",
         "celebratesNameDay": "feiert Namenstag",
         "nameDayLabel": "Namenstag (optional)",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "Willkommen bei {{name}}",
-        "step1Body": "Dein persönlicher Familienplaner. Aufgaben, Kalender, Einkauf und mehr - alles an einem Ort.",
+        "step1Body": "Aufgaben, Kalender, Einkauf und mehr für deinen Haushalt - ob du allein lebst, zu zweit oder als Familie. Alles an einem Ort.",
         "step2Title": "Navigation & Module",
         "step2Body": "Die Leiste unten führt direkt zu den wichtigsten Bereichen. Alle weiteren Module findest du unter „Mehr“.",
         "step3Title": "Schnell loslegen",
@@ -3931,7 +3947,10 @@
         "errorDmsAccountGone": "Dieses DMS-Konto gibt es nicht mehr.",
         "errorDmsDocumentGone": "Dieses Dokument gibt es im DMS nicht mehr.",
         "errorDmsAlreadyLinked": "Dieses DMS-Dokument ist schon verknüpft.",
-        "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS."
+        "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS.",
+        "dropzoneTitleTouch": "Tippen, um eine Datei auszuwählen",
+        "viewerPrevNamed": "Vorheriges Dokument: {{name}}",
+        "viewerNextNamed": "Nächstes Dokument: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Niemand",
@@ -4121,7 +4140,8 @@
         "errorVisitGone": "Diesen Einsatz gibt es nicht mehr.",
         "errorTaskGone": "Diese Aufgabe gibt es nicht mehr.",
         "errorAlreadyCheckedOut": "Diese Haushaltshilfe ist schon ausgecheckt.",
-        "errorAlreadyCheckedIn": "Diese Haushaltshilfe ist schon eingecheckt."
+        "errorAlreadyCheckedIn": "Diese Haushaltshilfe ist schon eingecheckt.",
+        "allVisitsInReport": "Alle Besuche im Bericht"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Die Suche öffnest du über die Lupe auf der Übersicht oder unter „Mehr“.",
         "mobileSettings": "Einstellungen findest du unter „Mehr“.",
         "guideLink": "Nutzerhandbuch",
-        "guideHint": "Aus der Community, in einem eigenen Repository - kann hinter einem Release zurückliegen."
+        "guideHint": "Von der Community gepflegt. Öffnet sich in einem neuen Tab."
     },
     "changelog": {
         "title": "Änderungsverlauf",
@@ -4379,8 +4399,9 @@
         "success": "Dein Passwort wurde geändert. Du kannst dich jetzt anmelden.",
         "mismatch": "Die Passwörter stimmen nicht überein.",
         "tooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
-        "invalidToken": "Dieser Link ist ungültig oder abgelaufen.",
-        "missingToken": "Es wurde kein gültiger Token gefunden."
+        "invalidToken": "Dieser Link zum Zurücksetzen ist ungültig oder abgelaufen - fordere einen neuen an.",
+        "missingToken": "Dieser Link zum Zurücksetzen ist unvollständig - fordere einen neuen an.",
+        "requestNew": "Neuen Link anfordern"
     },
     "email": {
         "host": "SMTP-Host",
@@ -4679,7 +4700,7 @@
             "targetAt": "Zielzeit: {{date}}",
             "utcOffset": "UTC-Versatz (wiederholte Ortszeit)",
             "wallTimeError": "Diese Ortszeit existiert in der erfassten Zeitzone nicht. Bitte eine andere Zeit wählen.",
-            "dateReadOnly": "Dieses Datum lässt sich nicht im Datumsfeld bearbeiten. Der ursprüngliche Zeitstempel bleibt erhalten; die anderen Felder können Sie ändern.",
+            "dateReadOnly": "Dieses Datum lässt sich nicht im Datumsfeld bearbeiten. Der ursprüngliche Zeitstempel bleibt erhalten; die anderen Felder kannst du ändern.",
             "offline": "Vor Änderungen am Fasten bitte eine Verbindung herstellen.",
             "zoneMode": "Informationen am Zifferblatt",
             "zoneTimer": "Nur Zeitmesser",
@@ -4692,7 +4713,7 @@
             "zoneVariability": "Diese allgemeinen Phasen überlappen. Der Übergang zur stärkeren Nutzung von Fett und Ketonen ist unterschiedlich, häufig über 12-36 Stunden. Dieser Zeitmesser misst keinen Stoffwechselzustand; längeres Fasten ist nicht unbedingt besser.",
             "extraDays": "+{{count}} Tage",
             "extraDays_one": "+{{count}} Tag",
-            "safetyDialog": "Yuvomi dient der Aufzeichnung und ist weder ein Medizinprodukt noch medizinischer Rat. Fasten ist nicht für alle geeignet. Holen Sie fachlichen Rat ein, besonders bei Schwangerschaft oder Stillzeit, für Kinder und Jugendliche, bei früheren Essstörungen, Diabetes, relevanten Medikamenten oder chronischen Erkrankungen. Sie können das Fasten jederzeit beenden.",
+            "safetyDialog": "Yuvomi dient der Aufzeichnung und ist weder ein Medizinprodukt noch medizinischer Rat. Fasten ist nicht für alle geeignet. Hol dir fachlichen Rat, besonders bei Schwangerschaft oder Stillzeit, für Kinder und Jugendliche, bei früheren Essstörungen, Diabetes, relevanten Medikamenten oder chronischen Erkrankungen. Du kannst das Fasten jederzeit beenden.",
             "saveError": "Fasten konnte nicht gespeichert werden.",
             "loadError": "Fasten konnte nicht geladen werden.",
             "zone": {
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Nächste Erinnerungen",
                 "empty": "Heute keine weiteren Einnahmen"
+            },
+            "brief": {
+                "changes": "Seit der letzten Messung: {{list}}.",
+                "latest": "Zuletzt erfasst: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} unverändert"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
             "emptyCta": "Erste Periode erfassen",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
+            "add": "Periode nachtragen",
             "loadError": "Zyklusdaten konnten nicht geladen werden.",
             "loadErrorDesc": "Bitte versuche es später erneut.",
             "retry": "Erneut versuchen",
@@ -5406,15 +5433,14 @@
                 "family": "Familie"
             },
             "period": {
-                "add": "Periode erfassen",
+                "add": "Periode nachtragen",
                 "edit": "Periode bearbeiten",
                 "warningFuture": "Startdatum liegt in der Zukunft - Vorhersagen basieren nur auf vergangenen Perioden.",
                 "warningOverlap": "Überschneidet sich mit einer bereits erfassten Periode."
             },
             "dayLog": {
                 "title": "Tag protokollieren",
-                "date": "Datum",
-                "more": "Weitere Angaben"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Als CSV exportieren"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Durchschnittliche Zykluslänge",
                 "periodLength": "Durchschnittliche Periodenlänge",
                 "lutealLength": "Länge der Lutealphase",
+                "daysUnit": "Tage",
                 "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
+                "autoHint": "Bleibt eines der beiden Felder leer, rechnet Yuvomi den Wert aus deinen eingetragenen Perioden aus.",
                 "remindPeriodDaysBefore": "Periode-Erinnerung",
                 "remindOff": "Aus",
                 "remindSameDay": "Am Tag selbst",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Bitte eine CSV-Datei auswählen oder Text einfügen.",
                 "error": "Import fehlgeschlagen."
             },
-            "discoveryHint": "Tipp: Der vorhergesagte Zyklus lässt sich als ICS-Feed unter <a href=\"/settings/modules/calendar?section=personal-feeds\">Einstellungen → Module → Kalender</a> abonnieren; das Zyklus-Widget lässt sich in der <a href=\"/\">Übersicht</a> über „Anpassen“ einblenden."
+            "feedLink": "Vorhergesagten Zyklus im Kalender abonnieren",
+            "widgetHint": "Die Zyklus-Kachel blendest du in der {{overview}} unter „{{customize}}“ ein.",
+            "endBeforeStart": "Das Ende darf nicht vor dem Beginn liegen."
         },
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",
@@ -5542,6 +5571,7 @@
             "unitH": "Std."
         },
         "careBanner": "Du trägst für {{name}} ein.",
+        "whoSees": "Wer sieht das?",
         "nutrition": {
             "title": "Nährwerte",
             "emptyTitle": "Noch keine Nährwerte erfasst",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "Sa",
         "weekdaySun": "So",
         "intervalLabelWeekly": "Alle N Wochen",
+        "intervalLabelMonthly": "Alle N Monate",
         "anchorDateLabel": "Erste Abholung",
         "monthDayLabel": "Tag im Monat",
         "monthDayLastDay": "Letzter Tag des Monats",
@@ -6271,8 +6302,8 @@
         "success": "Dein Konto wurde erstellt. Du kannst dich jetzt anmelden.",
         "mismatch": "Die Passwörter stimmen nicht überein.",
         "tooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
-        "invalidToken": "Diese Einladung ist ungültig, abgelaufen oder wurde bereits eingelöst.",
-        "missingToken": "Es wurde kein gültiger Token gefunden.",
+        "invalidToken": "Diese Einladung ist ungültig, abgelaufen oder schon eingelöst - bitte um einen neuen Link.",
+        "missingToken": "Dieser Einladungslink ist ungültig oder abgelaufen - bitte um einen neuen.",
         "usernameRequired": "Bitte wähle einen Benutzernamen.",
         "usernameInvalid": "Der Benutzername muss 3 bis 64 Zeichen lang sein und darf nur Buchstaben, Zahlen, Punkt, Bindestrich und Unterstrich enthalten.",
         "usernameTaken": "Dieser Benutzername ist bereits vergeben.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Arbeit",
         "templateSchool": "Schule",
         "templateUniversity": "Universität",
-        "overview": "Vergleich",
+        "overview": "Übersicht",
         "overviewPeopleLabel": "Personen vergleichen",
-        "overviewClearSelection": "Auswahl leeren",
         "continuesUntil": "…geht bis {{time}}",
         "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
         "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Name dieses Geräts (optional)",
         "labelHint": "Hilft später zu erkennen, welches Gerät gemeint ist.",
         "submit": "Koppeln",
-        "failed": "Dieser Kopplungscode gilt nicht."
+        "failed": "Dieser Kopplungscode gilt nicht.",
+        "codeRequired": "Gib den Kopplungscode aus den Einstellungen ein."
     }
 }

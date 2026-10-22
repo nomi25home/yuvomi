@@ -728,6 +728,27 @@ END:VCARD`;
       assert.strictEqual(parseVCard(card('BDAY:--0230')).birthday, null, 'kein 30. Februar');
     });
 
+    // Mit Uhrzeit (RFC 2426 3.1.5 VALUE=date-time, RFC 6350 6.2.5) war der
+    // Geburtstag hier `null`. Es zaehlt das Datum, wie es dasteht, ohne
+    // Umrechnung der Zone - in UTC waere der letzte Fall der 17.
+    it('liest das Datum eines BDAY mit Uhrzeit', () => {
+      const card = (bday) => `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u\r\nFN:X\r\n${bday}\r\nEND:VCARD`;
+      for (const [line, expected] of [
+        ['BDAY:1953-10-15T23:10:00Z', '1953-10-15'],
+        ['BDAY;VALUE=date-time:1987-09-27T23:30:00-06:00', '1987-09-27'],
+        ['BDAY:19531015T231000Z', '1953-10-15'],
+        ['BDAY:1990-07-18T00:00:00+02:00', '1990-07-18'],
+      ]) {
+        const parsed = parseVCard(card(line));
+        assert.strictEqual(parsed.birthday, expected, line);
+        assert.strictEqual(parsed.birthdayYearUnknown, false, line);
+      }
+
+      const yearless = parseVCard(card('BDAY:--0315T1200'));
+      assert.strictEqual(yearless.birthday, '2000-03-15');
+      assert.strictEqual(yearless.birthdayYearUnknown, true);
+    });
+
     it('should parse URL, NICKNAME, NOTE, CATEGORIES', () => {
       const vCardText = `BEGIN:VCARD
 VERSION:3.0
@@ -2438,6 +2459,21 @@ describe('Contacts API - Multi-Value Fields', () => {
     // Marke. Nur die Kontaktspalte - Migration 254 fasst auch birthdays an,
     // die dieses Fixture nicht hat.
     contactsApiDb.exec('ALTER TABLE contacts ADD COLUMN birthday_year_unknown INTEGER NOT NULL DEFAULT 0');
+    // Der Weg zum Geburtstag (Critique R21, D7): CONTACT_SELECT holt
+    // `birthday_id` per Unterabfrage aus `birthdays` (Spalte contact_id seit
+    // Migration 90). Produktiv gibt es die Tabelle immer; dieses Fixture baut
+    // sein Schema von Hand, also steht sie hier in der Form, die die Abfrage
+    // liest. Die Abfrage robust gegen eine fehlende Tabelle zu machen, hiesse
+    // einen Zustand abzufangen, den keine Installation hat.
+    contactsApiDb.exec(`
+      CREATE TABLE birthdays (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL,
+        birth_date TEXT NOT NULL,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL
+      );
+      CREATE UNIQUE INDEX idx_birthdays_contact_id ON birthdays(contact_id) WHERE contact_id IS NOT NULL;
+    `);
 
     // Override db.get() to use our test database
     const dbModule = await import('../server/db.js');

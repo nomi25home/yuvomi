@@ -53,6 +53,17 @@
   max-width: var(--page-measure, var(--layout-reading));
 }
 
+/* Lange Listen rechnen nur, was in Sicht ist (Critique R21 S8; dieselbe Regel
+ * wie die Agenda in calendar.css): ab der zweiten Gruppe ueberspringt der
+ * Browser Gruppen ausser Sicht; Schatten und Fokusring bleiben ganz. */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .inventory-list > .list-group + .list-group {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 210px;
+    overflow-clip-margin: var(--space-2);
+  }
+}
+
 /* --------------------------------------------------------
  * Kategorie-Chips (Alle / je Kategorie mit Bestand, R17 E3) - gleiche
  * einzeilige Scroll-Zeile wie .pantry-filters (pantry.css), .filter-chip
@@ -75,12 +86,6 @@
 }
 
 .inventory-filters::-webkit-scrollbar {
-  display: none;
-}
-
-/* [hidden] hat gegenüber display:flex zu geringe Spezifität - explizit
- * übersteuern (gleiches Muster wie .pantry-filters[hidden] in list-row.css). */
-.inventory-filters[hidden] {
   display: none;
 }
 
@@ -176,10 +181,13 @@
 }
 
 /* Kaufpreis, trailing außerhalb des Klickbereichs (wie der Stepper im Vorrat) -
- * reine Anzeige, kein eigenes Bedienelement, deshalb kein .list-row__actions. */
+ * reine Anzeige, kein eigenes Bedienelement, deshalb kein .list-row__actions.
+ * DIE BETRAGSREGEL (DESIGN.md, R16) gilt auch hier (R21 S9b, Critique a4): ein
+ * Betrag in einer Zeile steht semibold, in Tabellenziffern und in Textfarbe -
+ * der Preis stand als einziger Betrag der App regulaer und sekundaer. */
 .inventory-row__value {
   flex-shrink: 0;
-  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -217,7 +225,6 @@
 }
 
 .inventory-detail-list__sub {
-  font-size: var(--type-caption);
   color: var(--color-text-tertiary);
 }
 
@@ -361,12 +368,6 @@
   gap: var(--space-1);
 }
 
-/* [hidden] hat gegenüber display:flex zu geringe Spezifität - explizit übersteuern. */
-.inventory-booking-picker__list[hidden],
-.inventory-booking-picker__nav[hidden] {
-  display: none;
-}
-
 .inventory-booking-picker__status {
   margin: auto;
   color: var(--color-text-tertiary);
@@ -454,7 +455,7 @@
 
 .inventory-tracked-dates-hint {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
@@ -557,7 +558,6 @@
 }
 
 .inventory-history-entry__sub {
-  font-size: var(--type-caption);
   color: var(--color-text-tertiary);
 }
 
@@ -622,9 +622,12 @@
     /* Von der GEMESSENEN Oberkante bis zur Luft ueber dem Fensterrand
      * (inventory.js, syncDetailTop): in Ruhe steht die Filterzeile zwischen
      * Kopf und Spalte, beim Kleben nicht mehr. Ohne Messwert (erster Frame)
-     * gilt der Klebestand. Volle Hoehe statt Hoechstmass: die Spalte ist ein
-     * Ort, keine Karte, die mit ihrem Inhalt waechst. */
-    height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
+     * gilt der Klebestand. HOECHSTMASS STATT VOLLER HOEHE (R21, D9: "Detail-
+     * spalten nicht kuenstlich strecken"): bis dahin galt die Spalte als Ort,
+     * der bis zum Fensterrand reicht - und trug bei 1920 ein Leerband ueber
+     * dem Fuss. Jetzt endet sie unter ihrem Inhalt und scrollt, wo er laenger
+     * ist, wie Kontakte, Rezepte und Aufgaben. */
+    max-height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
   }
 
   /* KENNZAHLEN ALS ZEILEN, NICHT ALS DREI KACHELN IN 424PX. Drei Kacheln je

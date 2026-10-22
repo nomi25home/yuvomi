@@ -2023,7 +2023,10 @@ test('Monatswechsel: gewaehlt ist heute, wenn der Monat heute enthaelt, sonst de
   assert(monthStepCursor('2026-03-31', -1, TODAY) === '2026-02-01', 'rueckwaerts genauso');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const nav = src.slice(src.indexOf('async function navigate('), src.indexOf('async function goToday('));
-  assert(/monthStepCursor\(/.test(nav), 'navigate() blaettert den Monat nicht ueber monthStepCursor()');
+  // Seit R21 (D2) rechnet EINE Stelle den Nachbarzeitraum fuer Pfeil, Kuerzel und Wisch.
+  assert(/state\.cursor = neighborCursor\(dir\)/.test(nav), 'navigate() rechnet den Schritt nicht ueber neighborCursor()');
+  const nc = src.slice(src.indexOf('function neighborCursor('), src.indexOf('function canPagePeriods('));
+  assert(/monthStepCursor\(/.test(nc), 'der Nachbarzeitraum blaettert den Monat nicht ueber monthStepCursor()');
 });
 
 // EINGEKLAPPT GEHT DER TELEFON-MONAT WOCHENWEISE (Critique 2026-09-24, Rest 1).
@@ -2338,6 +2341,42 @@ test('Tagesansicht: der Reset ist nur am heutigen TAG aktuell, nicht in der Lade
     assert(btn.classList.contains('is-current') === false, 'einen Tag nach heute muss „Heute" erreichbar sein');
   } finally {
     Object.assign(state, zuvor);
+  }
+});
+
+// Critique R21 (a3): am Telefon zeigt die Woche drei Tage ab dem Cursor, die
+// Ladespanne ist aber die ganze 7-Tage-Woche (getWeekRange, mobile). Nach
+// "Weiter" stand heute nicht mehr auf dem Schirm, lag aber in der Ladespanne -
+// der Reset blieb inert, und es gab keinen Weg zurueck zu heute.
+test('Telefon-Woche: „Heute" bleibt erreichbar, sobald heute nicht unter den drei sichtbaren Tagen steht (Critique R21)', () => {
+  const { state, syncTodayButton, getRangeForView } = calendarHelpers;
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const previousWindow = globalThis.window;
+  const zuvor = { view: state.view, cursor: state.cursor, today: state.today, weekStart: state.weekStart };
+  const btn = fakeResetButton();
+  const root = { querySelector: (sel) => (sel === '#cal-today' ? btn : null), contains: () => false };
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    // Mittwoch heute, die Woche beginnt Montag; "Weiter" fuehrt auf Freitag.
+    Object.assign(state, { view: 'week', weekStart: 1, today: '2026-10-21', cursor: '2026-10-23' });
+    const { from, to } = getRangeForView('week', state.cursor);
+    assert(state.today >= from && state.today <= to, 'Vorbedingung: heute liegt in der Ladespanne der Woche');
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'Fr-So sichtbar, heute (Mi) nicht - „Heute" muss erreichbar sein');
+    assert(btn.inert === false, 'der Reset darf nicht inert sein');
+
+    state.cursor = '2026-10-20';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'Di-Do sichtbar, heute darunter: der Reset ist aktuell');
+
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    state.cursor = '2026-10-23';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'am Desktop zeigt die Woche alle sieben Tage - heute steht darin');
+  } finally {
+    Object.assign(state, zuvor);
+    if (hadWindow) globalThis.window = previousWindow;
+    else delete globalThis.window;
   }
 });
 
@@ -3796,14 +3835,27 @@ test('Kalenderkopf (Sonde 19): die eine Zeile gilt nur, wenn Titelzeile und Mind
     const wide = make(1176);
     calendarHelpers.syncToolbarFit(wide);
     assert(wide.classes.has('cal-toolbar--one-row'), 'passt genau: eine Zeile');
+    assert(!wide.classes.has('cal-toolbar--compact'), 'die volle Zeile braucht keine kompakte Form');
+    // R21 S7 (D9): ein Pixel zu wenig fuer das Suchfeld - die Zeile bleibt eine,
+    // kompakt: die Suche in Icon-Form (44px statt 152).
     const narrow = make(1175);
     calendarHelpers.syncToolbarFit(narrow);
-    assert(!narrow.classes.has('cal-toolbar--one-row'), 'ein Pixel zu wenig: die Bar-Zeile steht als eigene Zeile');
+    assert(narrow.classes.has('cal-toolbar--one-row') && narrow.classes.has('cal-toolbar--compact'),
+      'ein Pixel zu wenig fuer das Suchfeld: eine kompakte Zeile statt zweier (1280: 113 -> 69px)');
+    // Titelzeile 656 + kompakte Bar (280 + 8 + 44 + 8 + 40 = 380) + 32 = 1068.
+    const compactFit = make(1068);
+    calendarHelpers.syncToolbarFit(compactFit);
+    assert(compactFit.classes.has('cal-toolbar--compact'), 'passt kompakt genau: eine Zeile');
+    const tooNarrow = make(1067);
+    calendarHelpers.syncToolbarFit(tooNarrow);
+    assert(!tooNarrow.classes.has('cal-toolbar--one-row') && !tooNarrow.classes.has('cal-toolbar--compact'),
+      'auch kompakt ein Pixel zu wenig: die Bar-Zeile steht als eigene Zeile');
     globalThis.window = { matchMedia: () => ({ matches: false }) };
     const phone = make(5000);
     phone.classes.add('cal-toolbar--one-row');
     calendarHelpers.syncToolbarFit(phone);
     assert(!phone.classes.has('cal-toolbar--one-row'), 'unter 1024px gibt es die eine Zeile nicht');
+    assert(!phone.classes.has('cal-toolbar--compact'));
   } finally {
     globalThis.window = prevWindow;
     globalThis.getComputedStyle = prevGcs;
@@ -3824,7 +3876,8 @@ test('Kalenderkopf (Sonde 1): Stepper und Ansichts-Knopf laufen mobil nie ueber 
   assert(/contain:\s*inline-size/.test(stepper?.body ?? ''), 'der Stepper ist in der Breite eingeschlossen');
   const menu = rules.find((r) => r.selector.trim() === '.cal-toolbar__view-menu');
   assert(/max-inline-size:/.test(menu?.body ?? '') && /min-width:\s*0/.test(menu?.body ?? ''), 'der Ansichts-Knopf hat eine Obergrenze');
-  const word = rules.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-label');
+  // Seit R21 teilt das Wort seine Regel mit den Platzhaltern des Stapels.
+  const word = rules.find((r) => r.selector.split(',').some((x) => x.trim() === '.cal-toolbar__view-menu-label'));
   assert(/text-overflow:\s*ellipsis/.test(word?.body ?? ''), 'ein langes Wort kuerzt mit Ellipse');
 });
 
@@ -6238,6 +6291,452 @@ test('R20: die Seitenleiste reserviert ihre Spalte schon im ersten Markup', () =
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   assert(/class="calendar-page app-page app-page--full\$\{sidebarWanted\(\) \? ' has-cal-sidebar' : ''\}" id="calendar-page"/.test(src), 'die Seite traegt has-cal-sidebar schon im Markup');
   assert(/<aside class="cal-sidebar" id="cal-sidebar" aria-label="[^"]*"\$\{sidebarWanted\(\) \? '' : ' hidden'\}><\/aside>/.test(src), 'die leere Leiste ist nicht verborgen');
+});
+
+// R21 (Critique 2026-10-21, a1/a6): der Kalender sprang beim Laden - der erste
+// Frame trug nur Titel und Aktions-Slot, die Zeitraum-Zeile kam mit den Daten,
+// und `.cal-frame` rutschte von y 65 auf 117 (CLS 0,057 mobil, 0,026 laptop).
+// Der volle Kopf steht jetzt im synchronen Teil von render(), vor dem ersten
+// await; bis die Daten da sind, ist er inert.
+test('R21: der volle Kalenderkopf steht vor den Daten, bis dahin inert', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const start = src.indexOf('export async function render(');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const firstAwait = body.indexOf('await ');
+  const firstToolbar = body.indexOf('renderToolbar();');
+  assert(firstToolbar > 0 && firstToolbar < firstAwait,
+    'renderToolbar() laeuft erst nach dem ersten await - die Zeitraum-Zeile kommt mit den Daten und schiebt die Flaeche');
+  const inertOn = body.indexOf('toolbarEl.inert = true');
+  const inertOff = body.indexOf('toolbarEl.inert = false');
+  assert(inertOn > firstToolbar && inertOn < firstAwait, 'der fruehe Kopf ist bis zum Laden inert');
+  assert(inertOff > body.indexOf('await Promise.all('), 'nach dem Laden ist der Kopf wieder bedienbar');
+});
+
+// R21 (Critique 2026-10-21, a3): der Weiter-Pfeil sprang mobil 26px zwischen
+// den Ansichten. Das Label nimmt den Rest der Zeile, und der hing an der
+// Breite des Worts im Ansichtsknopf („Tag" 66px, „Agenda" 92px). Unter dem
+// sichtbaren Wort liegen alle vier in einer Rasterzelle und geben die Breite vor.
+test('R21: der Ansichtsknopf ist so breit wie sein laengstes Wort - die Pfeile stehen in jeder Ansicht', () => {
+  const words = new Set();
+  for (const view of ['month', 'week', 'day', 'agenda']) {
+    const html = calendarHelpers.viewMenuHtml(view);
+    const sizers = [...html.matchAll(/<span class="cal-toolbar__view-menu-sizer">([^<]*)<\/span>/g)].map((m) => m[1]);
+    assert(sizers.length === 4, `${view}: alle vier Woerter reservieren ihre Breite, gefunden ${sizers.length}`);
+    words.add(sizers.join('|'));
+    assert(/<span class="cal-toolbar__view-menu-words" aria-hidden="true">\s*<span class="cal-toolbar__view-menu-label">/.test(html),
+      `${view}: das sichtbare Wort steht im selben Stapel`);
+  }
+  assert(words.size === 1, 'der Stapel ist in jeder Ansicht derselbe - sonst haengt die Breite wieder an der Ansicht');
+  const mobile = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const stack = mobile.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-words');
+  assert(/display:\s*grid/.test(stack?.body ?? '') && /min-width:\s*0/.test(stack?.body ?? ''), 'der Stapel ist ein Raster, das unter die Obergrenze schrumpfen darf');
+  const cell = mobile.find((r) => /\.cal-toolbar__view-menu-label/.test(r.selector) && /\.cal-toolbar__view-menu-sizer/.test(r.selector));
+  assert(/grid-area:\s*1 \/ 1/.test(cell?.body ?? ''), 'Wort und Platzhalter liegen in EINER Zelle');
+  const sizer = mobile.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-sizer');
+  assert(/visibility:\s*hidden/.test(sizer?.body ?? ''), 'die Platzhalter sind unsichtbar, nicht weg');
+});
+
+// R21 (Critique 2026-10-21, a3): beim Monatswechsel am Telefon sprang die
+// Tagesliste 48px - fuenf gegen sechs Wochen. Die Wochen teilen sich jetzt ein
+// festes Budget von sechs Zeilen zu 48px (wie die Titelfassung ihre 320px);
+// eingeklappt traegt die eine Woche die Hoehe ihres Inhalts.
+test('R21: das Telefon-Raster hat in jedem Monat dieselbe Hoehe, die Liste springt nicht', () => {
+  const mobile = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const day = mobile.find((r) => r.selector.trim() === '.month-view--split .month-day');
+  const m = (day?.body ?? '').match(/--month-row-h:\s*calc\(var\(--space-12\) \* (\d+) \/ var\(--month-weeks, 5\)\)/);
+  assert(m, `die Zeilenhoehe teilt kein festes Budget: ${(day?.body ?? '').match(/--month-row-h:[^;]*/)?.[0]}`);
+  const rows = Number(m[1]);
+  // Hoehe des Rasters = Wochen x Zeilenhoehe: fuer 4, 5 und 6 Wochen gleich, und
+  // keine Zeile unter der Zielgroesse (48px).
+  const heights = [4, 5, 6].map((w) => Math.round(w * 48 * rows / w));
+  assert(new Set(heights).size === 1, `Rasterhoehe je Wochenzahl: ${heights.join(', ')}`);
+  assert(48 * rows / 6 >= 48, 'sechs Wochen bleiben mindestens 48px hoch');
+  const collapsed = mobile.find((r) => r.selector.trim() === '.month-view--split.month-view--collapsed .month-day--selweek');
+  assert(/--month-row-h:\s*var\(--space-12\)/.test(collapsed?.body ?? ''), 'eingeklappt springt die Liste an Monatsgrenzen nicht mit dem Budget');
+});
+
+/* R21 (Critique 2026-10-21, D2): ECHTES UMBLAETTERN. Der Wisch zog die ganze
+ * Ansicht samt Stundenachse ~110px gedaempft mit, daneben stand leere Flaeche,
+ * und der neue Zeitraum kam erst nach Loslassen und Laden. Jetzt: der Nachbar
+ * (neighbor) steht als Panel daneben und zieht 1:1 mit, die Achse (axis) steht,
+ * Einrasten ab Schwelle ODER mit Schwung, sonst Zurueckfedern; reduziert kein
+ * Zug, nur Blende. Gemessen an der echten Geste mit einer gestellten Uhr. */
+test('R21 D2: ein Flick blaettert auch unter der Schwelle um, ein langsamer kurzer Wisch nicht', () => {
+  const { periodSwipeCommit, PERIOD_FLICK_VELOCITY, PERIOD_FLICK_MIN } = periodSwipe;
+  assert(periodSwipeCommit(-120, 0) === 1 && periodSwipeCommit(120, 0) === -1, 'ab der Schwelle zaehlt der Weg allein');
+  assert(periodSwipeCommit(-50, -1.2) === 1, 'ein schneller kurzer Wisch nach links blaettert vor');
+  assert(periodSwipeCommit(50, 1.2) === -1, 'nach rechts zurueck');
+  assert(periodSwipeCommit(-50, -0.1) === 0, 'langsam und kurz federt zurueck');
+  assert(periodSwipeCommit(-50, 1.2) === 0, 'Schwung gegen den Weg (Finger kehrt um) blaettert nicht');
+  assert(periodSwipeCommit(-(PERIOD_FLICK_MIN - 1), -3) === 0, 'unter dem Mindestweg ist es ein Zittern');
+  assert(periodSwipeCommit(-50, -1.2, { rtl: true }) === -1, 'RTL gespiegelt');
+  assert(PERIOD_FLICK_VELOCITY > 0.2 && PERIOD_FLICK_VELOCITY < 1, `Schwelle plausibel: ${PERIOD_FLICK_VELOCITY}`);
+});
+
+function pagerFixture({ reduced = false } = {}) {
+  const classes = () => { const set = new Set(); return { add: (...c) => c.forEach((x) => set.add(x)), remove: (...c) => c.forEach((x) => set.delete(x)), contains: (c) => set.has(c) }; };
+  const axisLive = { style: {} };
+  const live = {
+    style: {}, isConnected: true, offsetTop: 12, offsetLeft: 0, offsetHeight: 600, classList: classes(),
+    getBoundingClientRect: () => ({ width: 390 }),
+    querySelectorAll: () => [axisLive],
+    addEventListener() {}, removeEventListener() {},
+  };
+  const made = [];
+  const neighbor = (step) => {
+    const ghost = { step, style: {}, isConnected: false, classList: classes(), attrs: {}, axis: { style: {} } };
+    ghost.setAttribute = (k, v) => { ghost.attrs[k] = v; };
+    ghost.querySelectorAll = () => [ghost.axis];
+    ghost.remove = () => { ghost.removed = true; ghost.isConnected = false; };
+    made.push(ghost);
+    return ghost;
+  };
+  const handlers = {};
+  const surface = {
+    firstElementChild: live, classList: classes(),
+    appendChild(el) { el.isConnected = true; },
+    addEventListener: (t, fn) => { handlers[t] = fn; }, removeEventListener() {}, closest: () => null,
+  };
+  const realNow = performance.now;
+  let clock = 1000;
+  performance.now = () => clock;
+  const zuvor = { window: globalThis.window, document: globalThis.document };
+  globalThis.window = { matchMedia: (q) => ({ matches: reduced && /reduce/.test(q) }), innerWidth: 390 };
+  globalThis.document = { getElementById: () => null, documentElement: { dir: '' } };
+  const target = { closest: () => null };
+  const at = (x) => ({ clientX: x, clientY: 300 });
+  return {
+    live, axisLive, made, surface,
+    wire: (opts) => periodSwipe.wirePeriodSwipe(surface, { enabled: () => true, neighbor, axis: '.axis', ...opts }),
+    start: (x) => handlers.touchstart({ touches: [at(x)], target }),
+    move: (x, ms = 16) => { clock += ms; handlers.touchmove({ touches: [at(x)], cancelable: true, preventDefault() {} }); },
+    end: () => handlers.touchend({ touches: [] }),
+    restore: () => { performance.now = realNow; globalThis.window = zuvor.window; globalThis.document = zuvor.document; },
+  };
+}
+
+await test('R21 D2: der Nachbar zieht 1:1 mit, die Achse steht, eingerastet baut onStep an derselben Stelle', async () => {
+  const f = pagerFixture();
+  try {
+    const steps = [];
+    const fresh = { classList: { list: [], add(c) { this.list.push(c); }, remove() {} } };
+    f.wire({ onStep: (step) => { steps.push(step); f.live.isConnected = false; f.surface.firstElementChild = fresh; } });
+    f.start(300);
+    f.move(250);
+    assert(f.made.length === 1 && f.made[0].step === 1, `Finger nach links holt den NAECHSTEN Zeitraum: ${f.made.map((g) => g.step)}`);
+    const ghost = f.made[0];
+    assert(ghost.isConnected && ghost.inert === true && ghost.attrs['aria-hidden'] === 'true', 'der Nachbar steht im Traeger, inert und verborgen fuer Hilfsmittel');
+    assert(ghost.style.width === '390px' && ghost.style.top === '12px', 'deckungsgleich mit dem Panel');
+    f.move(150);
+    assert(f.live.style.transform === 'translateX(-150px)', `1:1 statt gedaempft: ${f.live.style.transform}`);
+    assert(ghost.style.transform === 'translateX(240px)', `der Nachbar haengt am Panel: ${ghost.style.transform}`);
+    assert(f.axisLive.style.transform === 'translateX(150px)', `die Achse steht (gegen den Zug gehalten): ${f.axisLive.style.transform}`);
+    assert(ghost.axis.style.transform === 'translateX(-240px)', 'auch die Achse des Nachbarn steht');
+    assert(f.surface.classList.contains('is-period-paging'), 'der Traeger weiss, dass geblaettert wird');
+    await f.end();
+    assert(steps.length === 1 && steps[0] === 1, `eingerastet blaettert genau einmal vor: ${steps}`);
+    assert(!fresh.classList.list.length, `kein zweites Hereingleiten ueber dem Neuaufbau: ${fresh.classList.list}`);
+    assert(!f.surface.classList.contains('is-period-paging'), 'danach ist das Blaettern abgeraeumt');
+  } finally { f.restore(); }
+});
+
+/* R21 S8 (Nachtrag aus D2): DER NACHBAR WIRD IM LEERLAUF GEPARKT. Eingesetzt
+ * erst bei der Sperre auf "waagerecht", kostete er den ersten Zugframe (4x CPU:
+ * Monat 41, Woche 45, Tag 37 ms; davor 19-31): Stil und Layout seines Teilbaums,
+ * im Monat das Vermessen der Zellen. Geparkt steht er mit der Box des Panels im
+ * Traeger, unsichtbar und ruhend; die Geste haengt ihn nicht neu ein und schreibt
+ * seine Box nicht neu - sie deckt ihn nur auf. */
+await test('R21 S8: ein geparkter Nachbar wird bei der Geste nur aufgedeckt, nicht neu eingesetzt', async () => {
+  const f = pagerFixture();
+  try {
+    const classes = () => { const set = new Set(); return { add: (...c) => c.forEach((x) => set.add(x)), remove: (...c) => c.forEach((x) => set.delete(x)), contains: (c) => set.has(c) }; };
+    const writes = [];
+    const style = new Proxy({}, { set(t, k, v) { writes.push(k); t[k] = v; return true; } });
+    const ghost = { step: 1, style, isConnected: false, parentNode: null, classList: classes(), attrs: {}, axis: { style: {} } };
+    ghost.setAttribute = (k, v) => { ghost.attrs[k] = v; };
+    ghost.querySelectorAll = () => [ghost.axis];
+    ghost.remove = () => { ghost.removed = true; };
+    let appended = 0;
+    f.surface.appendChild = (el) => { appended += 1; el.isConnected = true; el.parentNode = f.surface; };
+    let parkedWith = null;
+    assert(periodSwipe.parkPeriodGhost(f.surface, ghost, (g, live) => { parkedWith = [g, live]; }) === true, 'geparkt');
+    assert(appended === 1 && ghost.parentNode === f.surface, 'der Nachbar steht schon vor der Geste im Traeger');
+    assert(ghost.classList.contains('period-swipe-ghost--parked') && ghost.classList.contains('period-swipe-ghost--rest'), 'unsichtbar und ruhend');
+    assert(ghost.inert === true && ghost.attrs['aria-hidden'] === 'true', 'ohne Eingaben, verborgen fuer Hilfsmittel');
+    assert(ghost.style.width === '390px' && ghost.style.top === '12px' && ghost.style.height === '600px', 'mit der Box des Panels');
+    assert(parkedWith?.[0] === ghost && parkedWith[1] === f.live, 'ausgerichtet wird beim Parken, im Leerlauf');
+    writes.length = 0;
+    f.wire({ neighbor: () => ghost, onStep: () => {} });
+    f.start(300);
+    f.move(250);
+    assert(appended === 1, 'die Geste haengte den geparkten Nachbarn neu ein - sein Layout waere verworfen');
+    assert(!writes.some((k) => ['top', 'left', 'width', 'height'].includes(k)), `gleiche Box neu geschrieben: ${writes.join(',')}`);
+    assert(!ghost.classList.contains('period-swipe-ghost--parked') && !ghost.classList.contains('period-swipe-ghost--rest'), 'aufgedeckt');
+    assert(ghost.style.transform === 'translateX(340px)', `und er zieht mit: ${ghost.style.transform}`);
+  } finally { f.restore(); }
+});
+
+await test('R21 D2: ein langsamer kurzer Wisch federt zurueck, Nachbar und Achse raeumen ab', async () => {
+  const f = pagerFixture();
+  try {
+    const steps = [];
+    f.wire({ onStep: (step) => { steps.push(step); } });
+    f.start(300);
+    f.move(285, 120);
+    f.move(260, 120);
+    await f.end();
+    await new Promise((r) => setTimeout(r, 300));
+    assert(steps.length === 0, 'zurueckgefedert blaettert nichts');
+    assert(f.made[0]?.removed === true, 'der Nachbar geht wieder');
+    assert(!f.live.style.transform && !f.axisLive.style.transform, `Panel und Achse stehen wieder an ihrem Platz: ${f.live.style.transform} / ${f.axisLive.style.transform}`);
+  } finally { f.restore(); }
+});
+
+await test('R21 D2: unter reduzierter Bewegung kein Zug und kein Nachbar - der neue Zeitraum blendet nur ein', async () => {
+  const f = pagerFixture({ reduced: true });
+  try {
+    const fresh = { classList: { list: [], add(c) { this.list.push(c); }, remove() {} } };
+    f.wire({ onStep: () => { f.surface.firstElementChild = fresh; } });
+    f.start(300);
+    f.move(150);
+    assert(!f.live.style.transform && f.made.length === 0, 'reduziert folgt nichts dem Finger');
+    await f.end();
+    assert(fresh.classList.list.includes('period-swipe-in--fade'), `reduziert: Blende statt hartem Schnitt, gesetzt: ${fresh.classList.list}`);
+  } finally { f.restore(); }
+});
+
+/* Das Bild des Nachbarn zeichnet der Renderer der Ansicht mit den Daten des
+ * NACHBARN - und danach gilt wieder der gezeigte Zeitraum: ein Leck hier
+ * zeigte nach dem Wisch die Termine des falschen Zeitraums. */
+test('R21 D2: das Bild des Nachbarn traegt seine eigenen Termine, der gezeigte Zustand bleibt unberuehrt', () => {
+  const restoreDom = installMiniDom();
+  const navDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const zuvor = { ...calendarHelpers.state };
+  try {
+    Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 5 }, configurable: true, writable: true });
+    globalThis.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+    calendarHelpers.setContainerForTest({ isConnected: true, querySelector: () => null });
+    const live = { id: 1, title: 'Gezeigt', start_datetime: '2026-06-17T09:00', end_datetime: '2026-06-17T10:00', assigned_users: [] };
+    const next = { id: 2, title: 'Naechste Woche', start_datetime: '2026-06-23T09:00', end_datetime: '2026-06-23T10:00', assigned_users: [] };
+    Object.assign(calendarHelpers.state, {
+      view: 'week', cursor: '2026-06-15', today: '2026-06-15', weekStart: 1, events: [live], tasks: [], holidays: [],
+      scheduleEntries: [], wasteOccurrences: [], rangeFrom: '2026-06-15', rangeTo: '2026-06-21', loadError: null,
+      layerSchedule: false, layerWaste: false, assignedToMe: false, people: new Set(), hiddenSources: new Map(), users: [],
+    });
+    const nextCursor = calendarHelpers.neighborCursor(1);
+    assert(nextCursor === '2026-06-22', `eine Woche weiter: ${nextCursor}`);
+    const { from, to } = calendarHelpers.getRangeForView('week', nextCursor);
+    calendarHelpers.setNeighborDataForTest(`${from}|${to}`, { from, to, events: [next], holidays: [], scheduleEntries: [], scheduleWarnings: [], wasteOccurrences: [] });
+    const host = fakeContainer();
+    calendarHelpers.buildPeriodGhost(1, host);
+    const html = host.html;
+    assert(html.includes('Naechste Woche') && !html.includes('Gezeigt'), 'das Bild zeigt den Nachbarn, nicht den gezeigten Zeitraum');
+    assert(html.includes('data-date="2026-06-22"'), 'mit den Tagen des Nachbarn');
+    const s = calendarHelpers.state;
+    assert(s.cursor === '2026-06-15' && s.events.length === 1 && s.events[0].id === 1 && s.rangeFrom === '2026-06-15',
+      `der gezeigte Zustand ist zurueck: ${s.cursor} ${s.rangeFrom} ${s.events.map((e) => e.id)}`);
+    // Ohne vorgeladene Daten gibt es kein Bild - der Wisch faellt auf den alten Weg zurueck.
+    calendarHelpers.clearNeighborDataForTest();
+    const empty = fakeContainer();
+    assert(calendarHelpers.buildPeriodGhost(1, empty) === null && empty.html === '', 'ohne Daten kein Bild');
+  } finally {
+    calendarHelpers.clearNeighborDataForTest();
+    Object.assign(calendarHelpers.state, zuvor);
+    if (navDesc) Object.defineProperty(globalThis, 'navigator', navDesc); else delete globalThis.navigator;
+    restoreDom();
+  }
+});
+
+/* R21 S8 (Nachtrag aus Handoff 2): DAS VORLADEN FRAGT BEIDE NACHBARN IN EINEM
+ * ABRUF JE QUELLE. Vorher je Nachbar vier Quellen (Termine, Feiertage,
+ * Schichtplan, Abfall) - nach jedem Zeichnen am Telefon bis zu acht Anfragen
+ * fuer zwei Zeitraeume. Jeder Nachbar behaelt seine eigenen Grenzen; was ueber
+ * seinen Rand reicht, klammert buildDayIndex() weg. */
+await test('R21 S8: beide Nachbarn kommen in einem Abruf je Quelle, jeder mit seinen eigenen Grenzen', async () => {
+  const restoreDom = installMiniDom();
+  const navDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const zuvor = { ...calendarHelpers.state };
+  const savedStub = globalThis.__apiStub;
+  const calls = [];
+  try {
+    Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 5, onLine: true }, configurable: true, writable: true });
+    calendarHelpers.setContainerForTest({ isConnected: true, querySelector: () => null });
+    globalThis.__apiStub = { get: async (url) => { calls.push(url); return { data: url.startsWith('/calendar?') ? [{ id: 7, title: 'X', start_datetime: '2026-06-10T09:00', end_datetime: '2026-06-10T10:00', assigned_users: [] }] : [] }; } };
+    Object.assign(calendarHelpers.state, {
+      view: 'week', cursor: '2026-06-17', today: '2026-06-17', weekStart: 1, events: [], tasks: [], holidays: [],
+      scheduleEntries: [], wasteOccurrences: [], rangeFrom: '2026-06-15', rangeTo: '2026-06-21', loadError: null,
+    });
+    calendarHelpers.clearNeighborDataForTest();
+    await calendarHelpers.prefetchNeighbors();
+    const prev = calendarHelpers.getRangeForView('week', calendarHelpers.neighborCursor(-1));
+    const next = calendarHelpers.getRangeForView('week', calendarHelpers.neighborCursor(1));
+    const cal = calls.filter((u) => u.startsWith('/calendar?'));
+    const hol = calls.filter((u) => u.startsWith('/calendar/holidays?'));
+    assert(cal.length === 1 && hol.length === 1, `je Quelle EIN Abruf fuer beide Nachbarn, nicht einer je Nachbar: ${calls.join(' ')}`);
+    assert(hol[0] === `/calendar/holidays?from=${prev.from}&to=${next.to}`, `die Spanne reicht vom vorigen bis zum naechsten Zeitraum: ${hol[0]}`);
+    for (const r of [prev, next]) {
+      const data = calendarHelpers.neighborDataForTest(`${r.from}|${r.to}`);
+      assert(data && data.from === r.from && data.to === r.to, `jeder Nachbar behaelt seine Grenzen: ${JSON.stringify(data && { from: data.from, to: data.to })}`);
+    }
+    // Liegt einer schon bereit, fragt der Abruf nur den anderen.
+    calls.length = 0;
+    calendarHelpers.state.cursor = next.from;
+    await calendarHelpers.prefetchNeighbors();
+    const after = calendarHelpers.getRangeForView('week', calendarHelpers.neighborCursor(1));
+    const hol2 = calls.filter((u) => u.startsWith('/calendar/holidays?'));
+    assert(hol2.length === 1 && hol2[0] === `/calendar/holidays?from=${after.from}&to=${after.to}`, `nur der fehlende Nachbar: ${calls.join(' ')}`);
+  } finally {
+    calendarHelpers.clearNeighborDataForTest();
+    Object.assign(calendarHelpers.state, zuvor);
+    globalThis.__apiStub = savedStub;
+    if (navDesc) Object.defineProperty(globalThis, 'navigator', navDesc); else delete globalThis.navigator;
+    restoreDom();
+  }
+});
+
+test('R21 S8: der Kalender parkt die vorgebauten Nachbarn und vermisst die Zellen nur einmal', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const pre = src.slice(src.indexOf('function prebuildGhosts()'), src.indexOf('async function prefetchNeighbors()'));
+  assert(/parkPeriodGhost\(surface, el, alignPeriodGhost\)/.test(pre), 'die Bilder werden im Leerlauf nur gebaut, nicht geparkt - der erste Zugframe setzt sie ein');
+  assert(/hit\?\.parked\) hit\.el\.remove\(\)/.test(pre), 'ein verworfenes geparktes Bild bliebe im Traeger stehen');
+  const align = src.slice(src.indexOf('function alignPeriodGhost('), src.indexOf('async function stepFromSwipe('));
+  assert(/if \(ghost\._fittedWidth === width\) return;/.test(align), 'beim Aufdecken vermass der Monat seine Zellen ein zweites Mal');
+  const view = src.slice(src.indexOf('function scheduleNeighborPrefetch()'), src.indexOf('const _ghostCache'));
+  assert(/clearGhostCache\(\);/.test(view), 'nach dem Zeichnen blieben alte geparkte Bilder im Traeger');
+});
+
+test('R21 D2: der Kalender verdrahtet den Nachbarn, die stehende Achse und den Weg eines Blatts', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const wire = src.slice(src.indexOf('wirePeriodSwipe(bodyEl, {'), src.indexOf('});', src.indexOf('wirePeriodSwipe(bodyEl, {')));
+  for (const part of ['neighbor: periodGhost', 'axis: CAL_SWIPE_AXIS', 'ghostMounted: alignPeriodGhost', 'span: periodSpan', 'onStep: (step) => stepFromSwipe(bodyEl, step)']) {
+    assert(wire.includes(part), `der Wisch kennt ${part} nicht`);
+  }
+  for (const sel of ['.month-weekdays', '.week-view__times', '.day-view__times', '.week-view__time-gutter']) {
+    assert(calendarHelpers.CAL_SWIPE_AXIS.includes(sel), `${sel} steht beim Blaettern nicht`);
+  }
+  // Nach jedem Zeichnen liegen die Nachbarn bereit.
+  const view = src.slice(src.indexOf('function renderView()'), src.indexOf('function syncHeadToScrollport('));
+  assert(/scheduleNeighborPrefetch\(\);/.test(view), 'renderView() laedt die Nachbarn nicht vor');
+});
+
+/* R21 S9a (Handoff 2, "Tag: Kartenluecke im Einrastframe"): der Tag blaetterte
+ * um seine ganze Breite, waehrend seine Stundenachse stand - zwischen alter und
+ * neuer Spalte zogen beide Kartenraender und die leere Achsenflaeche des
+ * Nachbarn mit (gemessen 76px in 44 von 110 Frames bei 390). Jetzt ist der Weg
+ * die Spalte, und dem Nachbarn sind Rand und Achse abgeschnitten. */
+test('R21 S9a: der Tag blaettert um seine Spalte, der Nachbar zeigt nur seine Spalte', () => {
+  const rect = (left, width) => ({ left, right: left + width, width, top: 0 });
+  const live = {
+    getBoundingClientRect: () => rect(0, 390),
+    querySelector: (sel) => (sel === '.day-view__col' ? { getBoundingClientRect: () => rect(60, 314) }
+      : sel === '.week-view__times' ? { getBoundingClientRect: () => rect(0, 44) } : null),
+  };
+  const ghost = { style: {}, querySelector: () => null };
+  const zuvor = calendarHelpers.state.view;
+  try {
+    calendarHelpers.state.view = 'day';
+    assert(calendarHelpers.periodSpan(live) === 314, `der Tag blaettert um ${calendarHelpers.periodSpan(live)}px statt um seine Spalte (314)`);
+    calendarHelpers.alignPeriodGhost(ghost, live);
+    assert(ghost.style.clipPath === 'inset(0 0 0 60px)', `Rand und Achse des Nachbarn stehen sichtbar: ${ghost.style.clipPath}`);
+    calendarHelpers.state.view = 'week';
+    assert(calendarHelpers.periodSpan(live) === 346, 'die Woche blaettert weiter ohne ihre Achse');
+    const weekGhost = { style: {}, querySelector: () => null };
+    calendarHelpers.alignPeriodGhost(weekGhost, live);
+    assert(!weekGhost.style.clipPath, 'die Woche schneidet nichts ab');
+    calendarHelpers.state.view = 'month';
+    assert(calendarHelpers.periodSpan(live) === 390, 'der Monat blaettert um seine ganze Breite');
+  } finally {
+    calendarHelpers.state.view = zuvor;
+  }
+});
+
+/* R21 S7 (D9, Handoff 2): DAS ZEITRAUM-LABEL WIRD NIE GEKAPPT. Gemessen vor dem
+ * Fix: mobil uk "21.10. - 23.10.2026" um 24px gekappt (el/it 13, ru 11), am
+ * Desktop en "Wednesday, 21.10.2026" um 20px. Statt der Ellipse nimmt das Label
+ * die kuerzere Fassung desselben Zeitraums - ohne das laufende Jahr, mit dem
+ * kurzen Wochentag. Ein anderes Jahr bleibt stehen. */
+test('R21 S7: das Zeitraum-Label nimmt die kuerzere Fassung, bevor es kappt', () => {
+  const s = calendarHelpers.state;
+  const prev = { view: s.view, cursor: s.cursor, today: s.today };
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = { ...(prevWindow ?? {}), matchMedia: () => ({ matches: true }) };
+    s.today = '2026-10-21';
+    s.cursor = '2026-10-21';
+    s.view = 'week';
+    const [short] = calendarHelpers.periodLabelFallbacks();
+    assert(short, 'mobil im laufenden Jahr gibt es die Fassung ohne Jahr');
+    // Ein Label, das 8px je Zeichen misst, in einer 120px-Box.
+    const lbl = { clientWidth: 120, textContent: 'x'.repeat(19), get scrollWidth() { return this.textContent.length * 8; } };
+    calendarHelpers.fitPeriodLabel(lbl);
+    assert(lbl.textContent === short, `die kurze Fassung ersetzt die gekappte: ${lbl.textContent}`);
+    // Ein anderes Jahr verliert es nicht - lieber die Ellipse als ein falsches Jahr.
+    s.cursor = '2027-01-05';
+    assert(calendarHelpers.periodLabelFallbacks().length === 0, 'ausserhalb des laufenden Jahres keine Fassung ohne Jahr');
+    // Der Tag nimmt den kurzen Wochentag.
+    s.view = 'day';
+    s.cursor = '2026-10-21';
+    assert(calendarHelpers.periodLabelFallbacks().length === 1, 'der Tag hat eine kurze Fassung');
+    // Was passt, bleibt, wie es ist.
+    const fits = { clientWidth: 300, textContent: 'KW 43', scrollWidth: 60 };
+    calendarHelpers.fitPeriodLabel(fits);
+    assert(fits.textContent === 'KW 43', 'ein Label, das passt, bleibt');
+  } finally {
+    Object.assign(s, prev);
+    globalThis.window = prevWindow;
+  }
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const upd = src.slice(src.indexOf('function updateLabel('), src.indexOf('function updateLabel(') + 2600);
+  assert(/fitPeriodLabel\(lbl\);\s*syncPeriodArrows\(\);/.test(upd), 'updateLabel() passt das Label nach jedem Setzen ein');
+  assert(/to: formatDayMonth\(span\.to\)/.test(src), 'die kurze Spanne nennt das Ende ohne Jahr');
+});
+
+/* R21 S7 (D9): die kompakte eine Zeile - Suche als Icon, Verwalten im Filterblatt. */
+test('R21 S7: die kompakte Kopfzeile faltet Suche und Verwalten, die offene Suche nimmt den Platz der Ansichtswahl', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a))
+    && r.selector.includes('.cal-toolbar--compact'));
+  const hides = rules.find((r) => /\.cal-toolbar__calendars-btn$/.test(r.selector.trim()));
+  assert(hides && /display:\s*none/.test(hides.body), 'kompakt steht Verwalten nur im Filterblatt');
+  const icon = rules.find((r) => /label\.page-search:not\(:focus-within\):not\(:has\(input:not\(:placeholder-shown\)\)\)$/.test(r.selector.trim()));
+  assert(icon && /width:\s*var\(--target-base\)/.test(icon.body) && /border-radius:\s*var\(--radius-full\)/.test(icon.body),
+    'die Suche steht als Icon-Knopf in Zielgroesse');
+  const views = rules.find((r) => /\.cal-toolbar__views$/.test(r.selector.trim()) && /display:\s*none/.test(r.body));
+  assert(views && /:focus-within/.test(views.selector) && /:placeholder-shown/.test(views.selector),
+    'mit Fokus und mit Begriff weicht die Ansichtswahl - die Zeile bricht nicht um');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/data-filter-manage-calendars/.test(src), 'Verwalten steht im Filterblatt');
+});
+
+/* R21 S7 (a3): bei 1920 doppelte der Mini-Monat neben dem Monat das Raster. */
+test('R21 S7: im Monat steht kein Mini-Monat in der Seitenleiste', () => {
+  const s = calendarHelpers.state;
+  const prev = s.view;
+  try {
+    s.view = 'month';
+    assert(calendarHelpers.miniMonthWanted() === false, 'im Monat zeigt die Ansicht selbst den Monat');
+    s.view = 'week';
+    assert(calendarHelpers.miniMonthWanted() === true, 'in Woche und Tag bleibt er die Uebersicht');
+  } finally { s.view = prev; }
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/\(miniMonthWanted\(\) \? miniMonthHtml\(\) : ''\)/.test(src), 'renderSidebar fragt nach dem Mini-Monat');
+});
+
+/* R21 S9b (Detektor B): der Monatschip lag mit 2px Polster buendig an Kante und
+ * Flaeche (cramped-padding, 16 Treffer bei 1280 hell/dunkel). Das Polster ist ein
+ * Token, und die Spur der Monatsbaender rechnet mit demselben Wert - sonst stuende
+ * ein Band neben einem Chip anderer Hoehe. */
+test('R21 S9b: Monatschip und Monatsband teilen ein Polster von mindestens 3px', () => {
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const pad = /--cal-chip-pad-block:\s*(\d+)px/.exec(tokens);
+  assert(pad && Number(pad[1]) >= 3, `--cal-chip-pad-block fehlt oder ist kleiner als 3px: ${pad?.[1]}`);
+  const rules = [...eachRule(calendarCss)];
+  const body = (selector) => rules.filter((r) => r.selector.trim() === selector).map((r) => r.body).join(';');
+  for (const selector of ['.month-day__event', '.month-day .cal-task-chip']) {
+    assert(/(?:^|;)\s*padding:\s*var\(--cal-chip-pad-block\) var\(--space-1\)/.test(body(selector)),
+      `${selector}: das Polster kommt nicht aus --cal-chip-pad-block`);
+  }
+  assert(/--month-band-h:\s*calc\(var\(--text-xs\) \* 1\.4 \+ 2 \* var\(--cal-chip-pad-block\)\)/.test(body('.month-grid')),
+    'die Spur der Monatsbaender rechnet nicht mit dem Polster des Chips');
 });
 
 // --------------------------------------------------------

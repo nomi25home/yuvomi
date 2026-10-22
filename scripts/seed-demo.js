@@ -9,7 +9,8 @@
  * installation works the same as an unencrypted one) and migrates the schema,
  * so a database the server has not opened yet works too. `--db` wins over
  * DB_PATH from the environment or `.env`. Populates EVERY module:
- *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children), maria (housekeeper)
+ *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children, with the
+ *     child start permissions the app gives every new child), maria (housekeeper)
  *   - Tasks (categories, priorities, statuses, start/due dates, multi-assignment, tags, points)
  *   - Calendar events (appointments, activities, recurring, assignments)
  *   - Meals (full week, all slots incl. today) linked to recipes,
@@ -49,6 +50,7 @@ import { resolve } from 'node:path';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
 import { assignPantryProduct } from '../server/services/pantry-products.js';
+import { applyChildStartPermissions } from '../server/permissions.js';
 
 const args = process.argv.slice(2);
 const dbIdx = args.indexOf('--db');
@@ -284,9 +286,15 @@ cfgSet.run('weather_units', 'metric');
 // sind es acht Zellen: zwei volle Zeilen, kein Loch. Gemessen am gerenderten
 // Raster, nicht am Reissbrett - die Kachelbreiten stehen im CSS, die
 // Spaltenzahl aber erst im Fenster.
+//
+// SEIT R21 IST DAS BUDGET AUS, wie im Autor-Default (Critique 2026-10-21, D5
+// "Uebersicht als Briefing": kein Kontostand auf dem Schirm, den jeder im
+// Haushalt sieht). Es bleibt in der Liste, damit "Anpassen" es an seinem Platz
+// zurueckholt. Ein Loch hinterlaesst es nicht: das Raster laesst seit R21 auch
+// eine Kachel nach UNTEN in eine freie Zelle wachsen (`columnFillSpans`).
 const dashboardWidgets = [
   { id: 'family',    visible: true,  size: '1x2' },
-  { id: 'budget',    visible: true,  size: '1x2' },
+  { id: 'budget',    visible: false, size: '1x2' },
   // 1x2 wie der Autor-Default (defaultWidgetSize in public/pages/dashboard.js).
   // Auf 1x1 war die Geburtstagskachel die KURZE Karte einer Rasterzeile - und
   // damit bestimmte SIE die Zeilenhoehe, waehrend Familie und Budget daneben
@@ -392,6 +400,14 @@ const lindaId   = insertUser.run('linda', 'Linda Johnson', pw, 'admin',  'mom', 
 const emmaId  = insertUser.run('emma',  'Emma Johnson',  pw, 'member', 'child', '#EC4899').lastInsertRowid;
 const leoId   = insertUser.run('leo',   'Leo Johnson',   pw, 'member', 'child', '#F97316').lastInsertRowid;
 const mariaId = insertUser.run('maria', 'Maria Silva',   pw, 'member', 'other', '#7C3AED').lastInsertRowid;
+// Die Kinder entstehen wie in der App (POST /auth/users, Einladung): direkt
+// nach dem Konto die Kinder-Startrechte (server/permissions.js) - kein Budget,
+// Haushaltshilfe nur lesend und ohne Betraege, kein Fasten, Zyklus aus. Ohne
+// diesen Schritt zeigte die Demo ein Kinderkonto, das es so nie gaebe: Emma
+// sah Kontostaende, Loehne und den Zyklus (Critique 2026-10-21, D14).
+for (const childId of [emmaId, leoId]) {
+  applyChildStartPermissions(db, { id: Number(childId), role: 'member', family_role: 'child' });
+}
 console.log(`  alex=${alexId} linda=${lindaId} emma=${emmaId} leo=${leoId} maria=${mariaId}`);
 
 // ── Tasks ────────────────────────────────────────────────────────────────────
@@ -706,29 +722,33 @@ const insertPantry = db.prepare(`
 `);
 // unit MUSS aus PANTRY_UNITS stammen (public/utils/pantry-units.js) - alles
 // andere fällt beim Speichern still auf 'pcs' zurück.
+// "Fast leer" ist ein Signal, keine Grundfarbe (Critique 2026-10-21, a2): es
+// stand an 10 von 24 Zeilen, weil fast jeder Bestand genau auf seinem Minimum
+// lag. Knapp sind jetzt vier Dinge, wie in einem echten Haushalt - Mehl,
+// Milch, Butter und das Wasser im Keller.
 [
   // name, qty, unit, location, category, expires in days (null = unbegrenzt), min, note
   [L('Spaghetti',        'Spaghetti'),            3,   'pkg',    LOC.pantry,  CAT.other,     240,  2,    null],
   [L('Passata',          'Passierte Tomaten'),    4,   'can',    LOC.pantry,  CAT.other,     300,  2,    null],
   [L('Basmati rice',     'Basmatireis'),          1.5, 'kg',     LOC.pantry,  CAT.other,     400,  1,    null],
-  [L('Olive oil',        'Olivenöl'),             1,   'bottle', LOC.pantry,  CAT.other,     500,  1,    null],
+  [L('Olive oil',        'Olivenöl'),             2,   'bottle', LOC.pantry,  CAT.other,     500,  1,    null],
   [L('Plain flour',      'Mehl'),                 0.5, 'kg',     LOC.pantry,  CAT.other,     180,  1,    L('Running low - pizza night', 'Wird knapp - Pizzaabend')],
   [L('Coffee beans',     'Kaffeebohnen'),         2,   'pkg',    LOC.pantry,  CAT.drinks,    120,  1,    null],
   [L('Tinned chickpeas', 'Kichererbsen'),         6,   'can',    LOC.pantry,  CAT.other,     540,  3,    null],
   [L('Whole milk',       'Vollmilch'),            1,   'l',      LOC.fridge,  CAT.dairy,     3,    2,    null],
   [L('Butter',           'Butter'),               1,   'pcs',    LOC.fridge,  CAT.dairy,     14,   1,    null],
-  [L('Greek yoghurt',    'Griechischer Joghurt'), 2,   'jar',    LOC.fridge,  CAT.dairy,     6,    2,    null],
-  [L('Parmesan',         'Parmesan'),             1,   'pcs',    LOC.fridge,  CAT.dairy,     21,   1,    null],
+  [L('Greek yoghurt',    'Griechischer Joghurt'), 2,   'jar',    LOC.fridge,  CAT.dairy,     6,    1,    null],
+  [L('Parmesan',         'Parmesan'),             1,   'pcs',    LOC.fridge,  CAT.dairy,     21,   null, null],
   [L('Eggs',             'Eier'),                 8,   'pcs',    LOC.fridge,  CAT.dairy,     11,   6,    null],
   [L('Baby spinach',     'Babyspinat'),           1,   'bag',    LOC.fridge,  CAT.produce,   2,    null, L('Use for the curry', 'Für das Curry verwenden')],
   [L('Frozen peas',      'Tiefkühlerbsen'),       2,   'pkg',    LOC.freezer, CAT.frozen,    365,  1,    null],
-  [L('Fish fingers',     'Fischstäbchen'),        1,   'pkg',    LOC.freezer, CAT.frozen,    200,  1,    null],
+  [L('Fish fingers',     'Fischstäbchen'),        2,   'pkg',    LOC.freezer, CAT.frozen,    200,  1,    null],
   [L('Berry mix',        'Beerenmischung'),       3,   'pkg',    LOC.freezer, CAT.frozen,    280,  2,    null],
   [L('Sparkling water',  'Sprudelwasser'),        4,   'bottle', LOC.cellar,  CAT.drinks,    null, 6,    L('Crate in the cellar', 'Kasten steht im Keller')],
   [L('Apple juice',      'Apfelsaft'),            6,   'bottle', LOC.cellar,  CAT.drinks,    150,  4,    null],
   [L('Potatoes',         'Kartoffeln'),           4,   'kg',     LOC.cellar,  CAT.produce,   40,   2,    null],
-  [L('Kitchen roll',     'Küchenrolle'),          2,   'pkg',    LOC.other,   CAT.household, null, 2,    null],
-  [L('Washing powder',   'Waschmittel'),          1,   'pkg',    LOC.other,   CAT.household, null, 1,    null],
+  [L('Kitchen roll',     'Küchenrolle'),          4,   'pkg',    LOC.other,   CAT.household, null, 2,    null],
+  [L('Washing powder',   'Waschmittel'),          2,   'pkg',    LOC.other,   CAT.household, null, 1,    null],
 ].forEach(([name, qty, unit, loc, cat, expiresInDays, min, note]) => {
   const { lastInsertRowid } = insertPantry.run(name, qty, unit, locId[loc] ?? null, cat,
     expiresInDays === null ? null : daysFromNow(expiresInDays), min, note, alexId);
@@ -906,8 +926,8 @@ console.log('Inserting notes…');
 const insertNote = db.prepare('INSERT INTO notes (title, content, color, pinned, created_by) VALUES (?, ?, ?, ?, ?)');
 [
   [L('Holiday Checklist 🌍', 'Urlaubs-Checkliste 🌍'),
-   L('Passports (exp. 2028)\nTravel insurance - check!\nEuro cash - €300\nBook airport parking\nAsk Mike to water the plants\nPack sunscreen SPF 50',
-     'Reisepässe (gültig bis 2028)\nAuslandskrankenschein - prüfen!\nBargeld - 300 €\nParkplatz am Flughafen buchen\nMike wegen Blumengießen fragen\nSonnencreme LSF 50 einpacken'), '#0EA5E9', 1, alexId],
+   L('- [x] Passports (exp. 2028)\n- [x] Travel insurance\n- [ ] Euro cash - €300\n- [ ] Book airport parking\n- [ ] Ask Mike to water the plants\n- [ ] Pack sunscreen SPF 50',
+     '- [x] Reisepässe (gültig bis 2028)\n- [x] Auslandskrankenschein\n- [ ] Bargeld - 300 €\n- [ ] Parkplatz am Flughafen buchen\n- [ ] Mike wegen Blumengießen fragen\n- [ ] Sonnencreme LSF 50 einpacken'), '#0EA5E9', 1, alexId],
   [L('WiFi & Smart Home', 'WLAN & Smart Home'),
    L('WiFi: Yuvomi_Home_5G (password in the router app)\nPhilips Hue: bridge 192.168.1.42\nThermostat: eco mode 18°C\nRouter admin: fritz.box',
      'WLAN: Yuvomi_Home_5G (Passwort in der Router-App)\nPhilips Hue: Bridge 192.168.1.42\nThermostat: Eco-Modus 18 °C\nRouter-Verwaltung: fritz.box'), '#F59E0B', 1, alexId],
@@ -924,11 +944,14 @@ const insertNote = db.prepare('INSERT INTO notes (title, content, color, pinned,
    L('Next service: this June (60,000 km)\nMOT due: September\nWinter tyres: stored at AutoHaus König\nInsurance renewal: October',
      'Nächste Inspektion: im Juni (60.000 km)\nTÜV fällig: September\nWinterreifen: eingelagert beim AutoHaus König\nVersicherungswechsel: Oktober'), '#6B7280', 0, alexId],
   [L('Book Recommendations', 'Buchempfehlungen'),
-   L('Reading: "Atomic Habits" - James Clear\nWishlist:\n• The Thursday Murder Club\n• Lessons in Chemistry\n• Tomorrow, and Tomorrow, and Tomorrow',
-     'Gerade dabei: „Die 1%-Methode" - James Clear\nWunschliste:\n• Der Donnerstagsmordclub\n• Eine Frage der Chemie\n• Morgen, morgen und wieder morgen'), '#8B5CF6', 0, lindaId],
+   L('Reading: "Atomic Habits" - James Clear\nWishlist:\n- The Thursday Murder Club\n- Lessons in Chemistry\n- Tomorrow, and Tomorrow, and Tomorrow',
+     'Gerade dabei: „Die 1%-Methode" - James Clear\nWunschliste:\n- Der Donnerstagsmordclub\n- Eine Frage der Chemie\n- Morgen, morgen und wieder morgen'), '#8B5CF6', 0, lindaId],
   [L('Garden To-Do', 'Garten-Aufgaben'),
-   L('□ Re-pot herbs (basil, rosemary)\n□ Fix fence panel (3rd from gate)\n□ Order mulch for the flower beds\n□ Plant tulip bulbs before November',
-     '□ Kräuter umtopfen (Basilikum, Rosmarin)\n□ Zaunfeld reparieren (3. vom Tor)\n□ Rindenmulch für die Beete bestellen\n□ Tulpenzwiebeln vor November setzen'), '#10B981', 0, alexId],
+   // Eine echte Markdown-Checkliste (`- [ ]`), wie sie der Knopf im Editor
+   // schreibt: nur dann zeichnet die Notiz Kaestchen, die man abhaken kann
+   // (utils/markdown-checklist.js). Die Glyphe □ war Text.
+   L('- [x] Re-pot herbs (basil, rosemary)\n- [ ] Fix fence panel (3rd from gate)\n- [ ] Order mulch for the flower beds\n- [ ] Plant tulip bulbs before November',
+     '- [x] Kräuter umtopfen (Basilikum, Rosmarin)\n- [ ] Zaunfeld reparieren (3. vom Tor)\n- [ ] Rindenmulch für die Beete bestellen\n- [ ] Tulpenzwiebeln vor November setzen'), '#10B981', 0, alexId],
 ].forEach(row => insertNote.run(...row));
 
 // ── Birthdays ────────────────────────────────────────────────────────────────
@@ -1320,14 +1343,14 @@ const insertMedLog = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?)
 `);
 // Daily supplements with a schedule + a week of adherence logs (evening dose still open today)
-const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU', '1000 IE'), 'tablet', 1, 0, 42,
+const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU', '1000 IE'), L('tablet', 'Tablette'), 1, 0, 42,
   L('tablets', 'Tabletten'), 10, L('With breakfast', 'Zum Frühstück')).lastInsertRowid;
 const vitDSched = insertMedSched.run(vitDId, '08:00', 127, 1, daysFromNow(-40)).lastInsertRowid;
-const ironId = insertMed.run(lindaId, L('Iron (Ferrous bisglycinate)', 'Eisen (Eisenbisglycinat)'), '25 mg', 'capsule', 1, 0, 18,
+const ironId = insertMed.run(lindaId, L('Iron (Ferrous bisglycinate)', 'Eisen (Eisenbisglycinat)'), '25 mg', L('capsule', 'Kapsel'), 1, 0, 18,
   L('capsules', 'Kapseln'), 14, L('Low ferritin - evening, away from dairy', 'Niedriges Ferritin - abends, nicht mit Milchprodukten')).lastInsertRowid;
 const ironSched = insertMedSched.run(ironId, '20:00', 127, 1, daysFromNow(-25)).lastInsertRowid;
 // As-needed medication (no schedule)
-insertMed.run(lindaId, 'Ibuprofen', '400 mg', 'tablet', 1, 1, 20,
+insertMed.run(lindaId, 'Ibuprofen', '400 mg', L('tablet', 'Tablette'), 1, 1, 20,
   L('tablets', 'Tabletten'), 5, L('For headaches - max 3/day', 'Bei Kopfschmerzen - höchstens 3 pro Tag'));
 // Adherence logs: the morning dose is taken every day INCLUDING today, only the
 // evening iron is still open today. The screenshot clock stands at 18:10: an

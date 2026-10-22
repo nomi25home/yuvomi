@@ -11,7 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
@@ -50,7 +50,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { filterButtonHtml, openFilterSheet, filterChipsHtml, filtersAsPopover } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator, afterGlideStart } from '/utils/segment-indicator.js';
-import { wirePeriodSwipe } from '/utils/period-swipe.js';
+import { wirePeriodSwipe, parkPeriodGhost } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
@@ -641,8 +641,11 @@ function localDate(str) {
   return zonedDateKey(str);
 }
 
+// Geprueft wird derselbe Wert, der zurueckgeht: nur so erkennt CodeQL den
+// verankerten Test als Bereinigung des URL-Parameters (js/xss, #2142).
 function validDateParam(value) {
-  return DATE_KEY_RE.test(String(value || '')) ? String(value) : '';
+  const text = String(value || '');
+  return DATE_KEY_RE.test(text) ? text : '';
 }
 
 /**
@@ -1984,6 +1987,27 @@ export async function render(container, { user, signal } = {}) {
     </div>
   `);
 
+  // DER VOLLE KOPF STEHT VOR DEN DATEN (Critique R21, a1/a6: CLS 0,057 mobil,
+  // 0,026 laptop). Bis hierher trug der erste Frame nur Titel und Aktions-Slot,
+  // und die Zeitraum-Zeile kam mit renderToolbar() nach dem Laden dazu - die
+  // ganze Flaeche darunter (`.cal-frame`) rutschte 52px tiefer. Zeitraum,
+  // Ansicht und Werkzeuge haengen an Cursor und Ansicht, nicht an den Daten;
+  // die Ueberlappungswarnung ist eine Meldung UEBER die Daten und kommt mit
+  // ihnen. Bis die Daten da sind, ist der Kopf `inert`: ein Schritt oder
+  // Ansichtswechsel vor dem ersten Laden liefe gegen einen Wochenstart, den
+  // erst die Praeferenzen kennen. Nach dem Laden baut renderToolbar() ihn mit
+  // Filterzahl und Warnung neu - derselbe Knoten, nur sein Inhalt.
+  state.scheduleWarnings = [];
+  // WER SCHAUT, STEHT VOR DEM ERSTEN KOPF FEST: der Kopf steht seit R21 vor
+  // den Daten (renderToolbar unten), und sein Filterzaehler liest
+  // "Mir zugewiesen". Der Rest des Zustands folgt nach dem Laden.
+  state.currentUserId = user?.id ?? null;
+  state.user          = user ?? null;
+  state.assignedToMe  = restoreAssignedToMe(state.user);
+  const toolbarEl = container.querySelector('#cal-toolbar');
+  renderToolbar();
+  toolbarEl.inert = true;
+
   // Lade-Skeleton sofort einblenden, damit der erste Frame nicht leer bleibt,
   // während Termine/Präferenzen laden (Sichtbarkeit des Systemstatus). Wird von
   // renderView() beim ersten Render ersetzt; aria-busy quittiert den Ladezustand.
@@ -2023,6 +2047,7 @@ export async function render(container, { user, signal } = {}) {
     api.get('/preferences').catch(() => ({ data: {} })),
     api.get('/documents/meta/options').catch(() => ({ data: {} })),
   ]);
+  toolbarEl.inert = false;
   state.holidayPrefs  = prefsRes.data ?? {};
   state.weekStart     = weekStartIndex(prefsRes.data?.week_start);
   state.defaultDuration = Number(prefsRes.data?.calendar_default_duration) || 60;
@@ -2054,6 +2079,7 @@ export async function render(container, { user, signal } = {}) {
 
   _miniMonth = null;
   _upNext = { events: null, loading: null, day: null, error: null };
+  _neighborData.clear();
   wireSidebar(signal);
   renderToolbar();
   renderView();
@@ -2065,10 +2091,17 @@ export async function render(container, { user, signal } = {}) {
   // sind Zeitraeume mit Nachbarn; die Agenda ist eine fortlaufende Liste, die
   // senkrecht gelesen wird, und die Suche hat gar keinen Zeitraum. Die
   // Pfeilknoepfe bleiben der Weg fuer Tastatur und Maus.
+  // Seit R21 (D2) blaettert der Wisch ECHT um: der Nachbarzeitraum steht
+  // vorgeladen als Panel bereit (periodGhost) und zieht mit, Stundenachse und
+  // Wochentagskopf stehen (CAL_SWIPE_AXIS).
   wirePeriodSwipe(bodyEl, {
     enabled: () => !searchActive && PERIOD_SWIPE_VIEWS.has(state.view),
     // Der Wisch gleitet selbst herein (period-swipe.js) - kein zweiter Uebergang.
-    onStep: (step) => navigate(step, { swap: false }),
+    onStep: (step) => stepFromSwipe(bodyEl, step),
+    neighbor: periodGhost,
+    axis: CAL_SWIPE_AXIS,
+    ghostMounted: alignPeriodGhost,
+    span: periodSpan,
   });
 
   if (initialEvent) {
@@ -2281,13 +2314,24 @@ function viewMenuLabel(current = state.view) {
   return `${t('calendar.viewSwitcher')}: ${VIEW_LABELS()[current] ?? ''}`;
 }
 
+/* DER KNOPF IST SO BREIT WIE SEIN LAENGSTES WORT (Critique R21, a3: der
+ * Weiter-Pfeil sprang mobil 26px zwischen den Ansichten). Das Label davor
+ * nimmt den Rest der Zeile (`flex: 1 1 0`), und der Rest hing an der Breite
+ * DIESES Worts: „Tag" 66px, „Agenda" 92px. Unter dem sichtbaren Wort liegen
+ * deshalb alle vier Woerter unsichtbar in derselben Rasterzelle - sie geben
+ * die Breite vor, das sichtbare Wort wechselt nur seinen Text
+ * (syncViewMenu), und die Pfeile stehen in jeder Ansicht und jeder Sprache
+ * an derselben Stelle. */
 function viewMenuHtml(current = state.view) {
   const label = viewMenuLabel(current);
   return `
         <button type="button" class="btn btn--secondary cal-toolbar__view-menu popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false" data-collapse-fold-menu
                 data-view="${esc(current)}" aria-label="${esc(label)}" title="${esc(label)}">
-          <span class="cal-toolbar__view-menu-label" aria-hidden="true">${esc(VIEW_LABELS()[current] ?? '')}</span>
+          <span class="cal-toolbar__view-menu-words" aria-hidden="true">
+            <span class="cal-toolbar__view-menu-label">${esc(VIEW_LABELS()[current] ?? '')}</span>
+            ${VIEWS.map((v) => `<span class="cal-toolbar__view-menu-sizer">${esc(VIEW_LABELS()[v] ?? '')}</span>`).join('')}
+          </span>
           <i data-lucide="chevrons-up-down" class="icon-sm" aria-hidden="true"></i>
         </button>
         <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">
@@ -2441,12 +2485,25 @@ const ONE_ROW_MEDIA = '(min-width: 1024px)';
 // auch in 152px mit Lupe und Polster ganz da.
 const SEARCH_MIN_PX = 152;
 let toolbarFitObserver = null;
+// Breite des Verwalten-Knopfs, gemessen, solange er steht: kompakt ist er aus
+// dem Bild, und die Rechnung darf nicht davon abhaengen, in welcher Form der
+// Kopf gerade steht (sonst pendelt sie).
+let calendarsBtnWidth = 0;
 
+/* DIE KOMPAKTE EINE ZEILE (Critique R21, D9: "Kalenderkopf bei 1280 einzeilig,
+ * Suche als Icon-Knopf"). Bei 1280 fehlten der einen Zeile 153px (de): sie
+ * brach in zwei Zeilen, 113px Kopf mit ~410px Leerraum in Zeile 1. Passt die
+ * volle Zeile nicht, versucht der Waechter die kompakte: die Suche in der
+ * Icon-Form der Shell (sie geht beim Tippen auf und nimmt dann den Platz der
+ * Ansichtswahl - die Treffer ersetzen die Ansicht ohnehin), und "Kalender
+ * verwalten" nur noch im Filterblatt, wo der Eintrag auf jeder Breite steht
+ * (calendarFilterParts) und wo er unter 1024px schon allein wohnt. Passt
+ * auch das nicht (uk, neben der Seitenleiste), bleiben es zwei Zeilen. */
 function syncToolbarFit(bar) {
   if (!bar?.isConnected) return;
   const wide = window.matchMedia?.(ONE_ROW_MEDIA).matches;
   if (!wide) {
-    bar.classList.remove('cal-toolbar--one-row');
+    bar.classList.remove('cal-toolbar--one-row', 'cal-toolbar--compact');
     return;
   }
   const cs = getComputedStyle(bar);
@@ -2456,11 +2513,25 @@ function syncToolbarFit(bar) {
     && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().width > 0);
   const views = bar.querySelector('.cal-toolbar__views');
   const filter = bar.querySelector('#cal-filters');
+  const manage = bar.querySelector('#cal-calendars');
+  const actionsGap = parseFloat(getComputedStyle(bar.querySelector(':scope > .page-toolbar__actions') ?? bar).columnGap) || 0;
+  if (manage && manage.getBoundingClientRect().width > 0) calendarsBtnWidth = manage.getBoundingClientRect().width;
+  // Kompakt steht der Knopf nicht da; die volle Rechnung zaehlt ihn trotzdem.
+  const manageFold = manage && bar.classList.contains('cal-toolbar--compact') ? calendarsBtnWidth + actionsGap : 0;
+  const manageFree = manage ? calendarsBtnWidth + actionsGap : 0;
   const toolsGap = parseFloat(getComputedStyle(bar.querySelector('.cal-toolbar__tools') ?? bar).columnGap) || 0;
   const barGap = parseFloat(getComputedStyle(bar.querySelector('.page-toolbar__bar') ?? bar).columnGap) || 0;
-  const barMin = (views?.scrollWidth ?? 0) + barGap + SEARCH_MIN_PX + toolsGap + (filter?.getBoundingClientRect().width ?? 0);
-  const need = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + barMin + gap * row.length;
-  bar.classList.toggle('cal-toolbar--one-row', need <= inner);
+  const barRest = (views?.scrollWidth ?? 0) + barGap + toolsGap + (filter?.getBoundingClientRect().width ?? 0);
+  const rowNeed = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + gap * row.length + manageFold;
+  const full = rowNeed + barRest + SEARCH_MIN_PX <= inner;
+  const compact = !full && rowNeed - manageFree + barRest + searchIconWidth(bar) <= inner;
+  bar.classList.toggle('cal-toolbar--one-row', full || compact);
+  bar.classList.toggle('cal-toolbar--compact', compact);
+}
+
+/** Breite der Such-Icon-Form (die Zielgroesse der Shell, --target-base). */
+function searchIconWidth(bar) {
+  return parseFloat(getComputedStyle(bar).getPropertyValue?.('--target-base')) || 44;
 }
 
 function watchToolbarFit(bar) {
@@ -2470,9 +2541,56 @@ function watchToolbarFit(bar) {
   // der Kopf-Knoten bleibt derselbe.
   if (toolbarFitObserver?.target === bar) return;
   toolbarFitObserver?.observer.disconnect();
-  const observer = new ResizeObserver(() => syncToolbarFit(bar));
+  // Aendert sich die Breite des Kopfs, misst auch das Label neu (fitPeriodLabel):
+  // mobil ist seine Breite der Rest der Zeile.
+  let lastWidth = 0;
+  const observer = new ResizeObserver(() => {
+    syncToolbarFit(bar);
+    const width = bar.clientWidth;
+    if (width !== lastWidth) {
+      if (lastWidth) updateLabel();
+      lastWidth = width;
+    }
+  });
   observer.observe(bar);
   toolbarFitObserver = { target: bar, observer };
+}
+
+/**
+ * DAS ZEITRAUM-LABEL WIRD NIE GEKAPPT (Critique R21, D9; Handoff 2).
+ *
+ * Das Label hat eine feste Breite, damit die Pfeile in allen vier Ansichten
+ * stillstehen (calendar.css). In langen Sprachen reichte sie nicht: mobil kappte
+ * uk "21.10. - 23.10.2026" um 24px (el/it 13, ru 11, vi 8, hu 6, fr 3) - der
+ * Knopf der Ansicht traegt dort "Порядок денний" -, am Desktop en "Wednesday,
+ * 21.10.2026" um 20px und de "Mittwoch, 21.10.2026" um 1px. Statt der Ellipse
+ * nimmt das Label die naechst kuerzere Fassung DESSELBEN Zeitraums, gemessen in
+ * der echten Breite:
+ *   - eine Spanne im laufenden Jahr verliert das Jahr ("21.10. - 23.10.") - wie
+ *     Apples Kalender das laufende Jahr nicht nennt; ein anderes Jahr bleibt;
+ *   - ein Tag nimmt den kurzen Wochentag ("Mi, 21.10.2026"), wie mobil.
+ * Passt auch das nicht, kuerzt die Ellipse wie bisher. Die Box bleibt, wie sie
+ * ist - kein Pfeil bewegt sich.
+ */
+function periodLabelFallbacks() {
+  const year = state.today.slice(0, 4);
+  if (state.view === 'day') return [formatDate(state.cursor, { weekday: true })];
+  const span = state.view === 'agenda'
+    ? getAgendaRange(state.cursor)
+    : state.view === 'week' && window.matchMedia(MOBILE_MEDIA_QUERY).matches
+      ? { from: mobileWeekDays(state.cursor)[0], to: mobileWeekDays(state.cursor)[2] }
+      : null;
+  if (!span || span.from.slice(0, 4) !== year || span.to.slice(0, 4) !== year) return [];
+  return [t('calendar.dayRangeLabel', { from: formatDayMonth(span.from), to: formatDayMonth(span.to) })];
+}
+
+function fitPeriodLabel(lbl) {
+  // Ohne Layout (verborgen, Test-Umgebung) gibt es nichts zu messen.
+  if (!(lbl?.clientWidth > 0) || lbl.scrollWidth <= lbl.clientWidth) return;
+  for (const text of periodLabelFallbacks()) {
+    lbl.textContent = text;
+    if (lbl.scrollWidth <= lbl.clientWidth) return;
+  }
 }
 
 function updateLabel() {
@@ -2506,6 +2624,7 @@ function updateLabel() {
     const { from, to } = getAgendaRange(state.cursor);
     lbl.textContent = t('calendar.dayRangeLabel', { from: formatDayMonth(from), to: formatPreferredDate(to) });
   }
+  fitPeriodLabel(lbl);
 
   syncPeriodArrows();
   syncTodayButton();
@@ -2567,20 +2686,26 @@ function syncViewPanel() {
  * `inert` ein fokussiertes Element ebenso blurred wie `display: none` es taete.
  *
  * Die Frage „ist heute zu sehen" beantwortet der ANGEZEIGTE BEREICH, nicht
- * eine Fallunterscheidung je Ansicht: `getRangeForView` kennt ihn fuer alle
- * vier, und eine zweite Rechnung daneben waere die naechste Stelle, an der
- * Monat und Agenda auseinanderlaufen.
+ * eine Fallunterscheidung je Ansicht - und zwar `visibleDayRange`, die eine
+ * Rechnung dafuer, die auch „+" fragt (newEventDate). NICHT `getRangeForView`:
+ * das ist die LADESPANNE, und sie ist zweimal groesser als das Bild.
  *
- * AUSNAHME TAG (PR #1673 Review): dort ist `getRangeForView` seit R16 die
- * LADESPANNE - der Tag plus die Folgetage fuer die Seitenspalte. Gezeigt wird
- * EIN Tag; die Spalte ist Ausblick und am Telefon gar nicht da. Mit dem Cursor
- * auf einem der sieben Tage vor heute lag heute in der Spanne, und der Reset
- * verschwand, obwohl heute nicht der angezeigte Tag war.
+ * TAG (PR #1673 Review): geladen werden der Tag plus die Folgetage fuer die
+ * Seitenspalte. Gezeigt wird EIN Tag; die Spalte ist Ausblick und am Telefon
+ * gar nicht da. Mit dem Cursor auf einem der sieben Tage vor heute lag heute
+ * in der Spanne, und der Reset verschwand, obwohl heute nicht der angezeigte
+ * Tag war.
+ *
+ * TELEFON-WOCHE (Critique R21, a3): geladen wird die ganze 7-Tage-Woche plus
+ * das 3-Tage-Fenster, gezeigt nur die drei Tage ab dem Cursor. Nach „Weiter"
+ * stand heute nicht mehr auf dem Schirm, lag aber in der Woche - der Reset
+ * blieb inert, und es gab keinen Weg zurueck zu heute.
  */
 function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#cal-today');
   if (!btn) return;
-  const { from, to } = getRangeForView(state.view, state.cursor);
+  // Dieselbe Telefonbreite, die renderWeekView das 3-Tage-Fenster zeichnen laesst.
+  const { from, to } = visibleDayRange(state.view, state.cursor, state.weekStart, { mobile: isMonthSplit() });
   // In der Tagesansicht und im geteilten Monat ist „heute" ein TAG, nicht der
   // Zeitraum: steht die Auswahl auf einem anderen Tag, führt der Reset zu heute
   // zurück und bleibt sichtbar.
@@ -2615,9 +2740,7 @@ async function navigate(dir, { swap = true } = {}) {
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
   const step = currentPeriodStep();
-  state.cursor = step.unit === 'month'
-    ? monthStepCursor(state.cursor, dir)
-    : addDays(state.cursor, dir * step.days);
+  state.cursor = neighborCursor(dir);
   await reloadForView();
   updateLabel();
   if (swap) swapPeriod(_container?.querySelector('#cal-body'), dir, renderView);
@@ -2996,6 +3119,7 @@ function renderView() {
   }
   if (window.lucide) lucide.createIcons({ el: body });
   updateOfflineNotice();
+  scheduleNeighborPrefetch();
   syncHeadToScrollport(body);
   renderSidebar();
 }
@@ -3027,6 +3151,284 @@ function syncHeadToScrollport(body) {
   requestAnimationFrame(() => {
     if (port.isConnected) port.dispatchEvent(new Event('scroll'));
   });
+}
+
+// --------------------------------------------------------
+// Blaettern per Wisch: der Nachbarzeitraum (Critique R21, D2)
+// --------------------------------------------------------
+//
+// Der Wisch zog bis hierher die ganze Ansicht samt Stundenachse ~110px weit
+// gedaempft mit, daneben stand leere Flaeche, und der neue Zeitraum kam erst
+// nach Loslassen und Laden. Jetzt liegen die Daten der beiden Nachbarn schon
+// bereit (nach jedem Zeichnen, nur an Touch-Geraeten), und zu Beginn der Geste
+// entsteht aus ihnen ein fertiges Panel desselben Renderers - der Nachbar, der
+// mit dem Finger hereinzieht. Er ist ein Bild: ohne ids, inert, aria-hidden;
+// nach dem Einrasten baut navigate() den Zeitraum wie bisher wirklich auf, an
+// derselben Stelle. Ohne vorgeladene Daten (erste Sekunde, Netzfehler) bleibt
+// es beim bisherigen Wisch.
+
+/** Was beim Blaettern steht: Stundenachse, Ecke ueber ihr, Ganztags-Beschriftung, Wochentage. */
+const CAL_SWIPE_AXIS = '.month-weekdays, .week-view__time-gutter, .calendar-all-day-label, .week-view__times, .day-view__times';
+/** Wie lange vorgeladene Nachbarn gelten (ms) - danach wird neu gefragt. */
+const NEIGHBOR_TTL_MS = 60_000;
+/** Bereichsschluessel `${from}|${to}` -> { at, data } */
+const _neighborData = new Map();
+let _neighborTimer = 0;
+
+/** Der Cursor einen Schritt weiter - EINE Regel fuer Pfeil, Kuerzel und Wisch. */
+function neighborCursor(dir) {
+  const step = currentPeriodStep();
+  return step.unit === 'month'
+    ? monthStepCursor(state.cursor, dir)
+    : addDays(state.cursor, dir * step.days);
+}
+
+function canPagePeriods() {
+  return Boolean(_container?.isConnected) && !searchActive && PERIOD_SWIPE_VIEWS.has(state.view)
+    && typeof navigator !== 'undefined' && (navigator.maxTouchPoints ?? 0) > 0;
+}
+
+/** Die Daten eines Zeitraums, wie loadRange() sie fragt - ohne den Zustand anzufassen. */
+async function fetchPeriodData(from, to) {
+  const win = fetchWindow(from, to);
+  const [evRes, holRes, scheduleRes, wasteRes] = await Promise.all([
+    api.get(`/calendar?from=${win.from}&to=${win.to}`),
+    api.get(`/calendar/holidays?from=${from}&to=${to}`).catch(() => ({ data: [] })),
+    scheduleEnabled()
+      ? api.get(`/schedule/entries?from=${from}&to=${to}`).catch(() => ({ data: { entries: [] } }))
+      : Promise.resolve({ data: { entries: [] } }),
+    wasteEnabled()
+      ? api.get(`/waste/occurrences?from=${win.from}&to=${win.to}`).catch(() => ({ data: [] }))
+      : Promise.resolve({ data: [] }),
+  ]);
+  return {
+    from, to,
+    events: (evRes.data ?? []).map(localizeBirthdayEvent),
+    holidays: holRes.data ?? [],
+    scheduleEntries: scheduleRes.data?.entries ?? [],
+    scheduleWarnings: scheduleRes.data?.warnings ?? [],
+    wasteOccurrences: wasteRes.data ?? [],
+  };
+}
+
+function freshNeighbor(key) {
+  const hit = _neighborData.get(key);
+  return hit && performance.now() - hit.at < NEIGHBOR_TTL_MS ? hit.data : null;
+}
+
+function scheduleNeighborPrefetch() {
+  clearTimeout(_neighborTimer);
+  // Jedes Zeichnen kann zeigen, was die Bilder zeigen (Filter, Titel, Zeitraum).
+  clearGhostCache();
+  if (!canPagePeriods()) return;
+  _neighborTimer = setTimeout(prefetchNeighbors, 150);
+}
+
+/**
+ * DIE BILDER ENTSTEHEN IM LEERLAUF, NICHT UNTER DEM FINGER. Am Beginn der
+ * Geste gebaut, kostete ein Nachbar am 4x gedrosselten Telefon 50-70ms - der
+ * erste Frame des Zugs kam zu spaet. Nach dem Vorladen baut der Leerlauf beide
+ * vor; die Geste nimmt sie, solange Ansicht, Zeitraum und Darstellung noch
+ * dieselben sind (ghostKey), sonst baut sie selbst.
+ */
+const _ghostCache = new Map();
+function ghostKey(dir) {
+  return [state.view, state.cursor, dir, _monthCollapsed, state.monthTitles, state.alldayExpanded, isMonthSplit()].join('|');
+}
+
+function prebuildGhosts() {
+  const idle = typeof requestIdleCallback === 'function'
+    ? (cb) => requestIdleCallback(cb, { timeout: 600 })
+    : (cb) => setTimeout(cb, 50);
+  for (const dir of [1, -1]) {
+    idle(() => {
+      if (!canPagePeriods()) return;
+      const key = ghostKey(dir);
+      if (_ghostCache.get(dir)?.key === key) return;
+      dropCachedGhost(dir);
+      const el = buildPeriodGhost(dir);
+      if (!el) return;
+      // GEPARKT, NICHT NUR GEBAUT (R21 S8): Stil, Layout und das Vermessen der
+      // Zellen fallen hier in den Leerlauf statt in den ersten Zugframe
+      // (parkPeriodGhost, utils/period-swipe.js).
+      const surface = _container?.querySelector('#cal-body');
+      const parked = surface ? parkPeriodGhost(surface, el, alignPeriodGhost) : false;
+      _ghostCache.set(dir, { key, el, parked });
+    });
+  }
+}
+
+/** Ein vorgebautes Bild verwerfen - ein geparktes geht dabei aus dem Traeger. */
+function dropCachedGhost(dir) {
+  const hit = _ghostCache.get(dir);
+  _ghostCache.delete(dir);
+  if (hit?.parked) hit.el.remove();
+}
+
+function clearGhostCache() {
+  for (const dir of [..._ghostCache.keys()]) dropCachedGhost(dir);
+}
+
+async function prefetchNeighbors() {
+  if (!canPagePeriods()) return;
+  // Der gezeigte Zeitraum ist nach dem naechsten Schritt selbst ein Nachbar.
+  if (!state.loadError && state.rangeFrom) {
+    _neighborData.set(`${state.rangeFrom}|${state.rangeTo}`, {
+      at: performance.now(),
+      data: {
+        from: state.rangeFrom, to: state.rangeTo, events: state.events, holidays: state.holidays,
+        scheduleEntries: state.scheduleEntries, scheduleWarnings: state.scheduleWarnings,
+        wasteOccurrences: state.wasteOccurrences,
+      },
+    });
+  }
+  // BEIDE NACHBARN IN EINEM ABRUF (Critique R21 S8). Je Nachbar fragte das
+  // Vorladen vier Quellen (Termine, Feiertage, Schichtplan, Abfall) - nach
+  // jedem Zeichnen am Telefon bis zu acht Anfragen fuer zwei Zeitraeume, neben
+  // den fuenf des gezeigten. Fehlen beide, fragt EIN Abruf ueber die Spanne vom
+  // vorigen bis zum naechsten Zeitraum; jeder Nachbar behaelt seine eigenen
+  // Grenzen (`from`/`to`), und buildDayIndex() klammert die Termine darauf -
+  // was ueber den Rand reicht, zeigt das Bild nicht.
+  const missing = [1, -1]
+    .map((dir) => getRangeForView(state.view, neighborCursor(dir)))
+    .filter(({ from, to }) => !freshNeighbor(`${from}|${to}`));
+  if (missing.length) {
+    const from = missing.reduce((min, r) => (r.from < min ? r.from : min), missing[0].from);
+    const to = missing.reduce((max, r) => (r.to > max ? r.to : max), missing[0].to);
+    try {
+      const data = await fetchPeriodData(from, to);
+      const at = performance.now();
+      for (const r of missing) _neighborData.set(`${r.from}|${r.to}`, { at, data: { ...data, from: r.from, to: r.to } });
+    } catch {
+      // Kein Nachbar - der Wisch faellt auf das Nachladen zurueck.
+    }
+  }
+  // Nur die juengsten Zeitraeume behalten.
+  while (_neighborData.size > 6) _neighborData.delete(_neighborData.keys().next().value);
+  prebuildGhosts();
+}
+
+/** Der Nachbar fuer die Geste: das vorgebaute Bild, wenn es noch stimmt, sonst ein frisches. */
+function periodGhost(dir) {
+  const hit = _ghostCache.get(dir);
+  _ghostCache.delete(dir);
+  if (hit && hit.key === ghostKey(dir) && canPagePeriods()) return hit.el;
+  if (hit?.parked) hit.el.remove();
+  return buildPeriodGhost(dir);
+}
+
+/**
+ * Der Nachbarzeitraum als fertiges Panel, gezeichnet vom Renderer der Ansicht
+ * mit SEINEN Daten - fuer die Dauer des Zeichnens stehen sie im Zustand, danach
+ * gilt wieder der gezeigte Zeitraum. `null`, solange keine Daten bereitliegen.
+ */
+function buildPeriodGhost(dir, host = document.createElement('div')) {
+  if (!canPagePeriods()) return null;
+  const cursor = neighborCursor(dir);
+  const { from, to } = getRangeForView(state.view, cursor);
+  const data = freshNeighbor(`${from}|${to}`);
+  if (!data) return null;
+  const keys = ['cursor', 'events', 'holidays', 'scheduleEntries', 'scheduleWarnings', 'wasteOccurrences', 'wasteLoadError', 'rangeFrom', 'rangeTo', 'loadError'];
+  const saved = Object.fromEntries(keys.map((k) => [k, state[k]]));
+  const liveObserver = _monthGridResizeObserver;
+  try {
+    Object.assign(state, {
+      cursor, events: data.events, holidays: data.holidays, scheduleEntries: data.scheduleEntries,
+      scheduleWarnings: data.scheduleWarnings, wasteOccurrences: data.wasteOccurrences, wasteLoadError: null,
+      rangeFrom: data.from, rangeTo: data.to, loadError: null,
+    });
+    applyPendingCalendarDeleteOverlay(state);
+    buildDayIndex();
+    if (state.view === 'month') renderMonthView(host);
+    else if (state.view === 'week') renderWeekView(host);
+    else renderDayView(host);
+  } finally {
+    _dayIndex.active = false;
+    Object.assign(state, saved);
+    // renderMonthView hat den Beobachter des lebenden Rasters abgehaengt und
+    // einen an das Bild gehaengt - zurueck an das lebende.
+    if (_monthGridResizeObserver !== liveObserver) {
+      _monthGridResizeObserver?.disconnect();
+      _monthGridResizeObserver = liveObserver;
+      const liveGrid = _container?.querySelector('#month-grid');
+      if (liveObserver && liveGrid) liveObserver.observe(liveGrid);
+    }
+  }
+  // Das Panel ist das erste Kind; die Tagesliste des Telefon-Monats steht und gehoert nicht dazu.
+  const panel = host.firstElementChild;
+  if (!panel) return null;
+  if (window.lucide) lucide.createIcons({ el: panel });
+  panel.removeAttribute('id');
+  for (const el of panel.querySelectorAll('[id]')) el.removeAttribute('id');
+  return panel;
+}
+
+/**
+ * Der Weg eines Blatts: in der Woche ohne die stehende Stundenachse, damit die
+ * Spalten des Nachbarn an die eigenen anschliessen statt eine leere
+ * Achsenbreite dazwischen zu lassen. Der Monat blaettert um seine ganze Breite.
+ *
+ * DER TAG BLAETTERT UM SEINE SPALTE (R21 S9a). Er stand auf der ganzen Breite
+ * ("eine Karte") - seine Stundenachse steht aber wie die der Woche
+ * (CAL_SWIPE_AXIS), und so zogen zwischen der alten und der neuen Tagesspalte
+ * der Kartenrand beider Karten und die leere Achsenflaeche des Nachbarn mit:
+ * im Einrastframe die Kartenluecke aus S2, gemessen 76px bei 390. Jetzt ist der
+ * Weg die Spaltenbreite, und alignPeriodGhost schneidet dem Nachbarn Rand und
+ * Achsenflaeche ab - die neue Spalte schliesst an die alte an.
+ */
+function periodSpan(live) {
+  const width = live.getBoundingClientRect().width;
+  if (state.view === 'day') return live.querySelector('.day-view__col')?.getBoundingClientRect().width ?? width;
+  if (state.view !== 'week') return width;
+  return width - (live.querySelector('.week-view__times')?.getBoundingClientRect().width ?? 0);
+}
+
+/**
+ * Der Nachbar steht im Dokument: dieselbe Uhrzeit auf derselben Hoehe wie im
+ * Panel (eine andere Ganztags-Zeile verschiebt sein Raster), und am Desktop-
+ * Monat vermessen die Zellen ihre Chips wie im lebenden Raster.
+ */
+function alignPeriodGhost(ghost, live) {
+  const lp = live.querySelector('.page-scrollport');
+  const gp = ghost.querySelector('.page-scrollport');
+  if (lp && gp && state.view !== 'month') {
+    gp.scrollTop = lp.scrollTop + (gp.getBoundingClientRect().top - lp.getBoundingClientRect().top);
+  }
+  // Im Tag zeigt der Nachbar nur seine Spalte (periodSpan): Kartenrand und
+  // Achsenflaeche davor sind abgeschnitten, sonst laege seine leere Achse ueber
+  // dem Ende der alten Spalte. Gemessen am Panel - der Nachbar hat dieselbe Form.
+  if (state.view === 'day') {
+    const col = live.querySelector('.day-view__col');
+    const inset = col ? Math.round(col.getBoundingClientRect().left - live.getBoundingClientRect().left) : 0;
+    ghost.style.clipPath = inset > 0 ? `inset(0 0 0 ${inset}px)` : '';
+  }
+  // Im Leerlauf geparkt, sind die Zellen schon vermessen - fuer genau diese
+  // Breite. Ein zweites Vermessen beim Aufdecken schriebe Klassen und Texte neu
+  // und kostete den ersten Zugframe wieder ein Layout.
+  const grid = ghost.querySelector('.month-grid');
+  if (!grid) return;
+  const width = Math.round(grid.getBoundingClientRect().width);
+  if (ghost._fittedWidth === width) return;
+  fitMonthDayCells(grid);
+  ghost._fittedWidth = width;
+}
+
+/**
+ * Der eingerastete Wisch baut den Zeitraum auf - und behaelt die Uhrzeit, die
+ * man zuletzt sah: der Nachbar stand auf der Hoehe des Panels, der Neuaufbau
+ * stellte das Raster sonst auf „jetzt" zurueck (scrollToHour), und das Bild
+ * sprang nach dem Einrasten.
+ */
+async function stepFromSwipe(bodyEl, step) {
+  // Der Nachbar unter dem Finger - nicht der fuer die Gegenrichtung, der noch geparkt steht.
+  const shown = bodyEl.querySelector('.period-swipe-ghost:not(.period-swipe-ghost--parked) .page-scrollport');
+  const keep = shown && state.view !== 'month'
+    ? { top: shown.scrollTop, y: shown.getBoundingClientRect().top }
+    : null;
+  await navigate(step, { swap: false });
+  if (!keep) return;
+  const port = bodyEl.querySelector('.page-scrollport');
+  if (port) port.scrollTop = keep.top + (port.getBoundingClientRect().top - keep.y);
 }
 
 // --------------------------------------------------------
@@ -3392,7 +3794,9 @@ function monthListHtml() {
           <button type="button" class="btn btn--icon month-list__tool" id="month-collapse" aria-controls="month-grid"></button>
         </div>
       </div>
-      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows"></div>
+      ${/* data-head-collapse="module": das Scrollen der Liste faltet den Kopf
+            nicht selbst - er folgt dem Raster (syncMonthCollapse, D9). */ ''}
+      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows" data-head-collapse="module"></div>
     </section>
   `;
 }
@@ -3445,6 +3849,10 @@ function syncMonthCollapse(view, list) {
   view.classList.toggle('month-view--collapsed', _monthCollapsed);
   // Eingeklappt gehen die Pfeile wochenweise (periodStepOf) - ihr Name folgt.
   syncPeriodArrows();
+  // DER KOPF FALTET MIT (Critique R21, D9): eingeklappt stand das Raster auf
+  // einer Woche, der Kopf darueber blieb zweizeilig (117px). Dieselbe Geste
+  // faltet jetzt beide; der Kopf gleitet wie beim Scrollen (utils/ux.js).
+  requestHeadCollapse(_container?.querySelector('#cal-toolbar'), _monthCollapsed);
   const btn = list.querySelector('#month-collapse');
   if (!btn) return;
   const label = t(_monthCollapsed ? 'calendar.monthShowMonth' : 'calendar.monthShowWeek');
@@ -3614,6 +4022,8 @@ function bindPageListeners() {
   if (_pageListenersBound) return;
   _pageListenersBound = true;
   document.addEventListener?.('yuvomi:calendar-command', onCalendarCommand);
+  // Jeder Schreibvorgang (api.js) verwirft die vorgeladenen Nachbarn (D2).
+  window.addEventListener?.('yuvomi:write', () => _neighborData.clear());
   _monthSplitQuery = window.matchMedia?.(MOBILE_MEDIA_QUERY) ?? null;
   _monthSplitQuery?.addEventListener?.('change', onPhoneQueryChange);
 }
@@ -4345,6 +4755,9 @@ function renderWeekView(container) {
 
   // Scrollen zu aktueller Zeit
   scrollToHour(container.querySelector('#week-scroll'), container.querySelector('.week-view__body'));
+  // Zwei Aufrufer (renderView, das Bild des Nachbarn beim Wisch): die Zeichen
+  // entstehen hier, nicht bei jedem Aufrufer.
+  if (window.lucide) lucide.createIcons({ el: container });
 }
 
 /**
@@ -5094,6 +5507,17 @@ function upNextWanted() {
   return state.view !== 'agenda';
 }
 
+/**
+ * DER MINI-MONAT GEHOERT NICHT NEBEN DEN MONAT (Critique R21, a3: bei 1920
+ * doppelte die 300px-Spalte das Raster daneben - dieselben 42 Tage zweimal).
+ * In Woche und Tag ist er die Uebersicht, aus der man springt; im Monat zeigt
+ * die Ansicht selbst, was er zeigen wuerde. Die Spalte bleibt (Filter, "Als
+ * Naechstes"), ihre Breite auch - nichts rueckt beim Ansichtswechsel.
+ */
+function miniMonthWanted() {
+  return state.view !== 'month';
+}
+
 /** Steht die Spalte (Container-Abfrage) - oder ist sie unter der Schwelle verborgen? */
 function sidebarShown(aside) {
   return Boolean(aside) && !aside.hidden && getComputedStyle(aside).display !== 'none';
@@ -5259,7 +5683,7 @@ function renderSidebar() {
     }
   }
   aside.replaceChildren();
-  aside.insertAdjacentHTML('beforeend', miniMonthHtml() + sidebarFiltersHtml() + (upNextWanted() ? upNextHtml() : ''));
+  aside.insertAdjacentHTML('beforeend', (miniMonthWanted() ? miniMonthHtml() : '') + sidebarFiltersHtml() + (upNextWanted() ? upNextHtml() : ''));
   window.lucide?.createIcons({ el: aside });
   if (refocus) aside.querySelector(refocus)?.focus();
 }
@@ -6599,12 +7023,19 @@ export const __test = {
   get upNext() { return _upNext; },
   resetUpNext() { _upNext = { events: null, loading: null, day: null, error: null }; },
   // Sonde 19 (#882): eine Zeile nur, wenn sie passt.
-  syncToolbarFit,
+  syncToolbarFit, periodLabelFallbacks, fitPeriodLabel, miniMonthWanted,
   // R17 Schritt 8: der Fokus nach der Suche, wenn ihr Knopf gefaltet ist.
   closeSearchForTest(container) { _container = container; searchActive = true; closeCalendarSearch({ restoreView: false }); },
   // #1504: der Wechsel ueber die Telefonschwelle, gemessen am echten Renderer.
   onPhoneQueryChange,
   setContainerForTest(container) { _container = container; },
+  // R21 D2: der Nachbar als Bild - gezeichnet mit SEINEN Daten, der Zustand bleibt.
+  buildPeriodGhost, neighborCursor, periodSpan, alignPeriodGhost, stepFromSwipe, CAL_SWIPE_AXIS,
+  setNeighborDataForTest(key, data) { _neighborData.set(key, { at: performance.now(), data }); },
+  clearNeighborDataForTest() { _neighborData.clear(); },
+  // R21 S8: beide Nachbarn in einem Abruf je Quelle.
+  prefetchNeighbors,
+  neighborDataForTest(key) { return _neighborData.get(key)?.data ?? null; },
   // test:initials: die Scheibe einer Person im Filterblatt.
   personFilterChipsHtml,
   viewSwapDirection, unbreakable,
@@ -7970,6 +8401,8 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
   openSharedModal({
     title: isEdit ? t('calendar.editEvent') : t('calendar.newEvent'),
     content,
+    // Erst die Buehne, dann das Formular (modal.js `staged`, Critique R21 a6).
+    staged: !isEdit,
     size: 'md',
     // Ein neuer Termin startet weiterhin mit dem Fokus im Titelfeld: Hier ist
     // Tippen die Absicht, hier ist der Autofokus richtig.
@@ -8485,7 +8918,7 @@ function eventAttachmentFieldHtml(event) {
         <span class="document-dropzone__icon">
           <i data-lucide="file-up" aria-hidden="true"></i>
         </span>
-        <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
+        <span class="document-dropzone__title"><span class="u-pointer-only">${t('documents.dropzoneTitle')}</span><span class="u-touch-only">${t('documents.dropzoneTitleTouch')}</span></span>
         <span class="document-dropzone__file" id="modal-selected-attachment" ${event?.attachment_name ? '' : 'hidden'}>
           ${event?.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
         </span>

@@ -1,12 +1,12 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { periodStepperHtml, swapPeriod } from '/utils/period-stepper.js';
+import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -1565,7 +1565,7 @@ function renderStatistics() {
   // Einstellungen dahinter. Sie bleiben auf diesem Tab, weil sie die Zahlen
   // betreffen (Wochenstunden -> Ueberstunden-Kachel).
   return '<section class="schedule-statistics">'
-    + '<form class="card card--padded schedule-stat-filters" data-form="statistics">'
+    + '<form class="card card--padded schedule-stat-filters" novalidate data-form="statistics">'
     // S-13 (UX-Audit, Entscheidung D-B): userOptions() statt der vollen
     // state.users-Liste - ein Nicht-Admin sieht hier nur sich selbst, ein
     // Admin weiterhin alle. Das ist eine reine Client-Einschraenkung der
@@ -2002,7 +2002,7 @@ function renderOverview() {
   if (!state.patterns.length && !state.overrides.length && !state.extras.length && !overview.loading && !overview.error && !overview.entries.length) {
     return `<section class="schedule-overview schedule-overview--start">${emptyPatternState()}</section>`;
   }
-  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel', 'schedule.overviewClearSelection');
+  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel');
   const weekDays = overviewVisibleDays();
   const showsToday = weekDays.includes(todayKey());
   const weekLabel = overview.viewMode === 'day'
@@ -2030,9 +2030,9 @@ function renderOverview() {
            steht nur, wenn der heutige Tag NICHT zu sehen ist - bis R16 2b stand
            es auch in der laufenden Woche, als einziger der fuenf Stepper. */ ''}
       <div class="schedule-overview__stepper">${periodStepperHtml({
-        prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
+        prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), keys: periodArrowKeys().prev, attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
         value: { className: `schedule-overview__week-label${showsToday ? '' : ' period-stepper__value--away'}`, text: weekLabel, live: true },
-        next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
+        next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), keys: periodArrowKeys().next, attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
         reset: { label: t('calendar.today'), current: showsToday, attrs: { 'data-action': 'overview-week', 'data-direction': 'today' } },
       })}
       </div>
@@ -2127,13 +2127,15 @@ function navigateToView(id) {
  * being destroyed along with a full-page reset.
  */
 /**
- * Kopf der Seite: Titel und Reiter. Unter 1024px SIND die Reiter der Titel
- * (`.page-toolbar--tabs-title`, das h1 tritt zurueck) - deshalb baut auch der
- * Ladefehler in render() diesen Kopf, statt die Seite ohne ihn zu zeigen.
+ * Kopf der Seite: Titel und Reiter. Zwischen 768 und 1023px stehen die Reiter
+ * in der Titelzeile (`.page-toolbar--tabs-title`), darunter wieder unter dem
+ * Titel - der Kopf nennt den Ort (R21, D7). Auch der Ladefehler in render()
+ * baut diesen Kopf, statt die Seite ohne ihn zu zeigen.
  */
 function scheduleHeadHtml(current = activeView) {
-  // DER PLAN ZUERST (Entscheidung R17, E1). "Vergleich" - die Woche als Raster -
-  // ist das, wofuer jemand den Schichtplan oeffnet; bis R17 stand er als
+  // DER PLAN ZUERST (Entscheidung R17, E1). Die Uebersicht - die Woche als Raster,
+  // bis R21 "Vergleich" (Critique a3: anders benannt als der erste Reiter jedes
+  // anderen Moduls) - ist das, wofuer jemand den Schichtplan oeffnet; bis R17 stand er als
   // letzter Reiter hinter drei Reitern Stammdaten und verlangte dort erst eine
   // Personenwahl. Die Adressen der Reiter bleiben (utils/schedule-tabs.js).
   const tabs = [
@@ -2254,12 +2256,21 @@ function renderPage() {
   // Leiste selbst nie angeklickt haben, z. B. den FAB oder "Heute" im
   // Uebersicht-Tab).
   scheduleTablist?.sync(activeView);
+  // KEIN LEERER REITER VORN (Critique R21, a3): ohne Schichtart gibt es nichts
+  // zu ueberblicken, und der Start liegt auf "Schichtarten" (render()). Die
+  // Uebersicht erscheint, sobald etwas angelegt ist - und bleibt sichtbar,
+  // solange sie selbst gewaehlt ist (eine Adresse /schedule/overview).
+  const overviewTab = root.querySelector('#schedule-tab-overview');
+  if (overviewTab) overviewTab.hidden = planningNeedsShiftTypes() && activeView !== 'overview';
   const locked = readOnly();
   const panel = activeView === 'shifts'
     // Der Quickstart bleibt erreichbar, auch nachdem der erste Typ existiert -
     // ein Haushalt kann durchaus "Arbeit" fuer ein Mitglied und spaeter
     // "Schule" fuer ein anderes brauchen, nicht nur beim allerersten Typ.
-    ? '<section class="schedule-library schedule-library--shifts"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.shiftTypes')) + '</h2>'
+    // DER TITEL WIEDERHOLTE DEN REITER (Critique R21, a3): unter "Schichtarten"
+    // stand "Schichtarten". Er bleibt die Ueberschrift des Abschnitts im Baum
+    // (neben "Eigene Felder"), sichtbar sagt es der aktive Reiter.
+    ? '<section class="schedule-library schedule-library--shifts"><div class="schedule-library__head"><h2 class="u-section-title sr-only">' + esc(t('schedule.shiftTypes')) + '</h2>'
       // App-weite UX-Durchsicht 2026-09-12 (Batch 4): `.segmented` bildet eine
       // Auswahl aus sich GEGENSEITIG AUSSCHLIESSENDEN Zustaenden ab (Statistik-
       // Zeitraum, Woche/Tag im Uebersicht-Tab, Muster/Ersetzen/Extra im
@@ -2298,6 +2309,8 @@ function renderPage() {
   if (activeView === 'overview') {
     bindUserMultiSelect(body, 'overview-people');
     wireScrollFade(body.querySelector('.schedule-overview__scroll'));
+    // Links/Rechts blaettern am Stepper (utils/period-stepper.js, Critique R21).
+    wirePeriodArrowKeys(body.querySelector('.schedule-overview__stepper'));
   }
   // Statistik-Zeitraum und Woche/Tag entstehen mit jedem renderPage() neu:
   // der Schluessel laesst die neue Kapsel von der Stelle der alten gleiten.
@@ -2403,7 +2416,7 @@ function updateScheduleFab() {
  */
 function openOverrideEditModal(group) {
   const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
-  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="override-edit">'
+  const content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="override-edit">'
     + '<input type="hidden" name="user_id" value="' + esc(String(group.user_id)) + '">'
     + '<input type="hidden" name="original_from" value="' + esc(group.from) + '">'
     + '<input type="hidden" name="original_to" value="' + esc(group.to) + '">'
@@ -2462,7 +2475,7 @@ function wireOccurrenceFieldReactivity(scope) {
  * das Anlegen fehl, bleiben hoechstens Duplikate statt eines Datenverlusts.
  */
 function openExtraGroupEditModal(group) {
-  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-edit-range">'
+  const content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="extra-edit-range">'
     + '<input type="hidden" name="ids" value="' + esc(group.ids.join(',')) + '">'
     + '<input type="hidden" name="user_id" value="' + esc(String(group.user_id)) + '">'
     + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(group.user_id)) + '">')
@@ -2494,7 +2507,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
   let content;
   if (view === 'shifts') {
     title = t('schedule.createShiftType');
-    content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="shift-create">'
+    content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="shift-create">'
       + formField(t('schedule.preset'), '<select class="form-input" name="shift_preset">' + shiftPresetOptions() + '</select>')
       + shiftFields()
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('common.add')) + '</button></div></form>';
@@ -2514,7 +2527,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
     // kann, um den Fehler zu zeigen.
     title = t('schedule.addEntry');
     const modes = [['pattern', 'schedule.pattern'], ['replace', 'schedule.override'], ['add', 'schedule.extraBadgeLabel']];
-    content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="pattern-create">'
+    content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="pattern-create">'
       + formField(t('schedule.owner'), '<select class="form-input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
       // data-dirty-ignore (S-14): merely switching the segmented Pattern/
       // Override/Extra control rewrites this hidden value - without the
@@ -2571,6 +2584,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('common.add')) + '</button></div></form>';
   }
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title,
     size: 'md',
     content,
@@ -2651,6 +2665,9 @@ function collectFieldValues(scope) {
 async function saveCreatedSchedule(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const data = formData(form);
   if (reportReversedRange(form, data)) return;
   // Der Dialog, aus dem gesendet wird - VOR der ersten Rueckfrage und Anfrage
@@ -2808,7 +2825,7 @@ function openCustomFieldModal(field = null) {
   openModal({
     title: isEdit ? t('schedule.editCustomField') : t('schedule.createCustomField'),
     size: 'sm',
-    content: '<form id="schedule-custom-field-form" class="form-stack schedule-modal-form">'
+    content: '<form id="schedule-custom-field-form" novalidate class="form-stack schedule-modal-form">'
       + formField(t('schedule.fieldName'), '<input class="form-input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t(isEdit ? 'schedule.save' : 'common.add')) + '</button></div></form>',
     onSave: (modal) => {
@@ -2819,7 +2836,11 @@ function openCustomFieldModal(field = null) {
 
 async function saveCustomField(event, fieldId) {
   event.preventDefault();
-  const data = formData(event.currentTarget);
+  const form = event.currentTarget;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
+  const data = formData(form);
   const modalContext = captureModalContext();
   try {
     if (fieldId) await api.put(`/schedule/custom-fields/${fieldId}`, data);
@@ -2964,7 +2985,7 @@ function syncPatternDayGroups(form) {
  */
 function openShiftTypeEditModal(type) {
   const fieldsEditor = state.customFields.length ? shiftTypeFieldsEditor(type) : '';
-  const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="shift-update" data-id="' + type.id + '">'
+  const content = '<form id="schedule-edit-form" novalidate class="form-stack schedule-modal-form" data-form="shift-update" data-id="' + type.id + '">'
     + shiftFields(type)
     + fieldsEditor
     + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
@@ -2985,6 +3006,9 @@ async function saveShiftTypeEdit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   if (readOnly()) return;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const id = form.dataset.id;
   // ZWEI Schreibvorgaenge hinter EINEM "Speichern": die Stammdaten und die
   // Felder. Scheitert der zweite (ein gewaehltes Feld wurde inzwischen
@@ -3023,7 +3047,7 @@ async function saveShiftTypeEdit(event) {
  */
 function openPatternEditModal(pattern) {
   const writable = canWrite(pattern.user_id);
-  const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
+  const content = '<form id="schedule-edit-form" novalidate class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
     + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(pattern.user_id)) + '">')
     + '<fieldset class="schedule-pattern-fields" data-field="pattern-fields"' + (writable ? '' : ' disabled') + '>' + patternFields(pattern) + '</fieldset>'
     + patternDaysEditorHtml(pattern, writable)
@@ -3078,6 +3102,9 @@ function patternSaveOrder(oldCycleLength, newCycleLength) {
 async function savePatternEdit(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const id = form.dataset.id;
   const pattern = state.patterns.find((item) => Number(item.id) === Number(id));
   if (!pattern || !canWrite(pattern.user_id)) return;
@@ -3146,6 +3173,9 @@ function formValue(form, name, fallback = '') {
 async function submitForm(event) {
   event.preventDefault();
   const form = event.target;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const data = formData(form);
   // Reserviert die Generation dieses Statistik-Ladevorgangs (siehe
   // refreshStatistics()/activateView()) - nur fuer den 'statistics'-Zweig
@@ -3307,7 +3337,12 @@ async function action(event) {
       const today = todayKey();
       const towards = days ? Math.sign(days) : (today === overview.weekCursor ? 0 : (today < overview.weekCursor ? -1 : 1));
       overview = { ...overview, weekCursor: days ? addLocalDays(overview.weekCursor, days) : today };
+      // Der Stepper entsteht mit dem Neuaufbau neu: wer per Tastatur blaettert
+      // (Pfeile oder Enter), behaelt den Fokus auf demselben Pfeil, statt auf
+      // <body> zu fallen (Critique R21, Persona Alex).
+      const keepFocus = document.activeElement === button && button.dataset.direction !== 'today';
       await activateView('overview', { step: towards });
+      if (keepFocus) root?.querySelector(`[data-action="overview-week"][data-direction="${button.dataset.direction}"]`)?.focus();
       return;
     }
     if (button.dataset.action === 'overview-view-mode') {

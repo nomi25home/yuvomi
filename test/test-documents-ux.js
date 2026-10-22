@@ -11,7 +11,7 @@ import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { eachRule } from './css-rules.js';
+import { eachRule, globalHiddenRule } from './css-rules.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(resolve(HERE, rel), 'utf8');
@@ -319,7 +319,8 @@ test('Mehrfachauswahl ist opt-in, und ihre Leiste ist die Pille der Shell (R11 H
   // `.btn` setzt ein eigenes display und schlaegt sonst das UA-`[hidden]
   // { display: none }` - der DMS-Button blieb dadurch sichtbar, obwohl kein
   // DMS-Konto existierte.
-  assert.match(css, /\.documents-dms-link-btn\[hidden\]\s*\{[^}]*display:\s*none/);
+  // Seit R21 S9a haelt das die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok(globalHiddenRule(), 'der ausgeblendete DMS-Knopf verschwindet');
   for (const fn of ['enterSelectMode', 'exitSelectMode', 'toggleSelectAll', 'moveSelected', 'archiveSelected', 'deleteSelected']) {
     assert.ok(page.includes(`function ${fn}`), `${fn} fehlt`);
   }
@@ -376,7 +377,7 @@ test('das Speichern referenziert den Submit-Button am Panel, nicht am Formular (
   // dann null, und submit.disabled würfe einen unbehandelten TypeError, der als
   // generischer Fehler-Toast erscheint, statt das Dokument zu speichern.
   assert.match(page, /async function saveDocument\(event, doc, panel\)/);
-  const save = page.slice(page.indexOf('async function saveDocument'), page.indexOf('async function saveDocument') + 900);
+  const save = page.slice(page.indexOf('async function saveDocument'), page.indexOf('async function saveDocument') + 1200);
   assert.match(save, /panel\.querySelector\('#document-submit'\)/);
   assert.doesNotMatch(save, /form\.querySelector\('#document-submit'\)/);
   // Der Submit-Handler reicht das Panel an saveDocument durch.
@@ -1215,12 +1216,13 @@ test('das Raster hat mobil zwei Spalten und bei 1280px drei statt zwei', () => {
   assert.match(grid.body, /gap:\s*var\(--space-4\)/);
 });
 
-test('die Karte: Blatt-Rahmen 3:4, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum, nicht gestreckt', () => {
+test('die Karte: Blatt-Rahmen mit fester Form, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum, nicht gestreckt', () => {
   const rules = topRules(css);
   const media = rules.find((rule) => rule.selector === '.document-card__media');
-  // R18 (2026-10-07): der Rahmen ist hochkant wie das Blatt, das ganz darin
-  // liegt (vorher 4:3 mit dem oberen Drittel als Ausschnitt).
-  assert.match(media.body, /aspect-ratio:\s*3\s*\/\s*4/, 'feste Form, hochkant wie ein Blatt');
+  // R18 (2026-10-07): das Blatt liegt ganz im Rahmen (vorher 4:3 mit dem
+  // oberen Drittel als Ausschnitt). Seit R21 S7 ist der Rahmen quadratisch
+  // (zwei Reihen bei 1440x900, Test "R21 S7" unten) - das Blatt bleibt ganz.
+  assert.match(media.body, /aspect-ratio:\s*1\s*\/\s*1/, 'feste Form, das Blatt ganz darin');
   // Und die Karten einer Reihe strecken sich nicht mehr: die Aktionszeile
   // schliesst an den Text an, statt unter einem Loch zu stehen.
   assert.match(rules.find((rule) => rule.selector === '.documents-list--grid').body, /align-items:\s*start/);
@@ -1532,18 +1534,22 @@ test('Fristen: der Ablauf-Chip steht VOR den Kategorien, abgesetzt, und heisst n
   }
 });
 
-test('kompakte Zeile: kein Auge, die Zeile oeffnet, und das Menue traegt Ansehen fuer die Tastatur', () => {
+test('Zeile: kein Auge (in jeder Breite), die Zeile oeffnet, und das Menue traegt Ansehen fuer die Tastatur', () => {
   // Re-Critique P2: mobil blieben dem Titel 153px, weil Auge und Kebab je 48px
-  // standen - und ein Tipp auf die Zeile oeffnet ohnehin den Betrachter.
-  const compact = [...eachRule(css)].filter((rule) => rule.at.some((a) => /@container list-rows \(max-width: 30rem\)/.test(a)));
-  const hides = compact.find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions:not([data-read-bar]) [data-action="view"]'));
+  // standen - und ein Tipp auf die Zeile oeffnet ohnehin den Betrachter. Seit
+  // R21 (D10 Zeilen-Endzone) auch in der breiten Liste: dort standen Auge,
+  // Herunterladen und Kebab, drei Icon-Aktionen statt [eine Handlung][Mehr].
+  const hides = [...eachRule(css)].find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions:not([data-read-bar]) [data-action="view"]'));
   // Seit #1265 nur dort, wo ein Kebab steht: ohne Verwaltungsrecht gibt es
   // kein Menue, das „Ansehen" fuehren koennte, also bleibt das Auge (`data-read-bar`).
-  assert.ok(hides, 'das Auge faellt unter 30rem weg - ausser in einer Leiste ohne Kebab');
+  assert.ok(hides, 'das Auge faellt in der Zeile weg - ausser in einer Leiste ohne Kebab');
   assert.match(hides.body, /display:\s*none/);
-  // Raster und breite Liste behalten es: sonst blendet es keine Regel aus.
-  const elsewhere = [...eachRule(css)].filter((rule) => /\[data-action="view"\]/.test(rule.selector)
-    && /display:\s*none/.test(rule.body) && !rule.at.some((a) => /list-rows \(max-width: 30rem\)/.test(a)));
+  assert.deepEqual(hides.at, [], 'in jeder Breite, nicht nur unter 30rem');
+  // Ohne Kebab bleibt das Auge die eine Handlung: das Herunterladen geht dort.
+  assert.ok(hides.selector.split(',').map((x) => x.trim()).includes('.document-row__actions[data-read-bar] a[download]'));
+  // Das Raster behaelt es (eine Karte ist keine Zeile): keine weitere Regel blendet es aus.
+  const elsewhere = [...eachRule(css)].filter((rule) => rule.selector !== hides.selector && /\[data-action="view"\]/.test(rule.selector)
+    && /display:\s*none/.test(rule.body));
   assert.deepEqual(elsewhere.map((rule) => rule.selector), []);
   assert.match(fnBody('handleDocumentAction', 'runDocumentAction'), /if \(doc\) openDocumentViewer\(doc\);/, 'die Zeile oeffnet den Betrachter');
   // Die Zeile ist kein Tab-Stopp. Wer per Tastatur kommt, landet auf dem Kebab
@@ -1649,8 +1655,10 @@ test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Au
   // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen
   // Ausloeser merkt (modal.js merkt document.activeElement). Mobil schliesst
   // der Betrachter animiert, und der Fokus stuende sonst auf einem Knopf, der
-  // gleich aus dem DOM faellt.
-  assert.match(viewer.slice(0, viewer.indexOf('openSharedModal({')), /const opener = document\.activeElement;/);
+  // gleich aus dem DOM faellt. Nach einem Blaetterschritt ist es der Ausloeser
+  // in der Liste, den der vorige Betrachter weiterreicht (Codex zu #2142; das
+  // Verhalten faehrt test-documents-viewer-focus.js).
+  assert.match(viewer.slice(0, viewer.indexOf('openSharedModal({')), /const trigger = document\.activeElement;\s*const opener = listOpener \?\? trigger;/);
   const edit = viewer.slice(viewer.indexOf("querySelector('[data-action=\"edit-document\"]')"));
   assert.match(edit, /if \(opener\?\.isConnected && opener !== document\.body\) opener\.focus\(\);\s*openDocumentModal\(doc\);/);
   assert.doesNotMatch(edit.slice(0, edit.indexOf('openDocumentModal(doc)')), /closeModal\(/, 'kein eigenes Schliessen: openModal ersetzt den Betrachter, EIN History-Marker');
@@ -1993,7 +2001,7 @@ test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile 
   const chip = spur.indexOf('id="documents-folder-toggle"');
   assert.ok(chip > -1, 'der Auslöser steht in der Chip-Spur');
   assert.ok(chip < spur.indexOf('id="documents-expiring-filter"') && chip < spur.indexOf('id="documents-category"'), 'und zwar als erster Chip');
-  assert.match(spur, /class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"\s+aria-expanded="false" aria-controls="documents-folder-browser">/,
+  assert.match(spur, /class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"\s+aria-expanded="false" aria-controls="documents-folder-browser(?: documents-category-browser)?">/,
     'Chip-Haut, Zustand und Ziel des Aufklappens');
   assert.equal((page.match(/id="documents-folder-toggle"/g) ?? []).length, 1, 'genau EIN Auslöser');
   assert.match(page, /toggleAttribute\('data-folder-active', Boolean\(state\.folderId\)\)/, 'ein gewaehlter Ordner zeigt sich am Chip');
@@ -2004,6 +2012,54 @@ test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile 
   assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-chip' && /display:\s*inline-flex/.test(r.body)));
   assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-browser:not(.documents-folder-browser--open)' && /display:\s*none/.test(r.body)),
     'zugeklappt belegt die Ordnerauswahl keine Zeile');
+});
+
+// R21 S9b (Critique a4, D7): am Telefon standen drei Filterachsen in EINER
+// Zeile - Status-Segment, Ordner-Chip und sechs Kategorie-Chips -, und bei
+// 390px war keine Kategorie ganz im Bild (Spur 775px ueber). D7: beide
+// Ordnungen bleiben, nur die Zeile ordnet sich. Unter 768px stehen die
+// Kategorien als zweite Gruppe in der Auswahl, die der Ordner-Chip aufklappt;
+// die Chips weichen dort, der Chip nennt die gewaehlte Kategorie.
+test('R21 S9b: am Telefon stehen die Kategorien in der Auswahl des Ordner-Chips', () => {
+  const aside = page.slice(page.indexOf('<aside class="documents-folder-browser"'), page.indexOf('</aside>'));
+  assert.match(aside, /<ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"><\/ul>/,
+    'die Kategorie-Gruppe steht in der Auswahl, unter den Ordnern');
+  assert.ok(aside.indexOf('id="documents-folder-browser"') < aside.indexOf('id="documents-category-browser"'), 'Ordner zuerst, dann Kategorien');
+  assert.match(page, /aria-controls="documents-folder-browser documents-category-browser"/, 'der Chip klappt beide Gruppen auf');
+  const fn = page.slice(page.indexOf('function renderCategoryBrowser()'), page.indexOf('function renderExpiringChip()'));
+  assert.match(fn, /data-category="\$\{esc\(row\.id\)\}"/, 'die Zeile traegt data-category wie der Chip');
+  assert.match(fn, /toggleAttribute\('data-category-active', Boolean\(state\.category\)\)/, 'eine gewaehlte Kategorie zeigt sich am Chip');
+  assert.match(page.slice(page.indexOf('function renderAll('), page.indexOf('function renderBreadcrumb(')), /renderCategoryBrowser\(\);/,
+    'jedes Zeichnen haelt die Gruppe aktuell');
+  const bind = page.slice(page.indexOf("querySelector('#documents-category-browser')?.addEventListener"), page.indexOf('folderBrowser?.addEventListener'));
+  assert.match(bind, /state\.category = row\.dataset\.category;[\s\S]*applyFilters\(\);[\s\S]*setFolderListOpen\(false\);/,
+    'die Wahl filtert wie der Chip und klappt zu');
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /max-width:\s*767px/.test(a));
+  assert.ok(rules.some((r) => r.at.length === 0 && /\.documents-category-browser(?![\w-])/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'ab 768px keine Kategorie-Gruppe - dort stehen die Chips');
+  assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '#documents-category' && /display:\s*none/.test(r.body)),
+    'am Telefon weichen die Kategorie-Chips');
+  assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '.documents-folder-browser--open .documents-category-browser' && /display:\s*block/.test(r.body)),
+    'aufgeklappt steht die Kategorie-Gruppe');
+});
+
+/* Codex-Review zu #2142: unter 768px blieben die Zaehler der Kategorie-Gruppe
+ * beim Suchen auf dem alten Stand. Suche und clearSearch() zeichnen die
+ * Facetten ueber renderFacets() (die Verdrahtung halten die Proben weiter
+ * oben), und das kannte die Gruppe nicht - nur renderAll() rief sie. EIN Leser
+ * fuer beide Seiten: jede Facette, die renderAll() zeichnet, zeichnet auch
+ * renderFacets(); eine morgen ergaenzte Facette faellt hier ebenso auf.
+ */
+test('R21 S9b: die Suche frischt die Zaehler der Kategorie-Gruppe mit auf', () => {
+  const calls = (body) => new Set([...body.matchAll(/^\s*(render\w+)\(/gm)].map((m) => m[1]));
+  const facetsOfAll = [...calls(fnBody('renderAll', 'renderBreadcrumb'))]
+    .filter((name) => name !== 'renderBreadcrumb' && name !== 'renderDocuments');
+  assert.ok(facetsOfAll.includes('renderCategoryBrowser') && facetsOfAll.includes('renderCategoryChips'),
+    'der Leser findet die Facetten in renderAll() nicht mehr - die Probe waere blind');
+  const facets = calls(fnBody('renderFacets', 'bindPageEvents'));
+  assert.deepEqual(facetsOfAll.filter((name) => !facets.has(name)), [],
+    'renderFacets() laesst eine Facette aus, die renderAll() zeichnet - beim Suchen bliebe sie auf dem alten Stand');
 });
 
 // Re-Critique 2026-10-17 (A4 P2-3, P3): im Raster klemmte die leere Suche in
@@ -2017,4 +2073,83 @@ test('R20: der Leerzustand nimmt im Raster die ganze Breite, und der Titel haelt
   const title = rules.find((r) => r.selector.trim() === '.documents-list--grid .document-card__title');
   assert.ok(title, 'keine Rasterregel fuer den Kartentitel');
   assert.match(title.body, /min-block-size:\s*2lh/, 'ein einzeiliger Titel haelt die zweite Zeile frei');
+});
+
+/* "DATEI HIER ABLEGEN" AUF DEM TELEFON (Critique R21, a4). Jede Ablage sagte
+ * auch auf Touch "ablegen" - dort gibt es nichts abzulegen, man tippt. Jede
+ * Ablage traegt jetzt ihren Satz fuer den Zeiger UND seinen Zwilling fuer den
+ * Finger; welcher steht, entscheidet `hover: none` (reset.css). */
+test('jede Ablage sagt auf Touch "tippen" statt "ablegen" - zwei Fassungen, eine Medienabfrage (Critique R21)', () => {
+  const sites = [
+    ['../public/pages/documents.js', 'documents.dropzoneTitle'],
+    ['../public/pages/calendar.js', 'documents.dropzoneTitle'],
+    ['../public/settings/pages/admin-backup.js', 'settings.backupDropzoneTitle'],
+    ['../public/settings/pages/modules-install.js', 'settings.installModuleDropzoneTitle'],
+  ];
+  for (const [file, key] of sites) {
+    const src = read(file);
+    const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(src, new RegExp(`<span class="u-pointer-only">\\$\\{(?:esc\\()?t\\('${esc}'\\)\\)?\\}</span><span class="u-touch-only">\\$\\{(?:esc\\()?t\\('${esc}Touch'\\)\\)?\\}</span>`),
+      `${file}: ${key} ohne Touch-Zwilling`);
+  }
+  const reset = read('../public/styles/reset.css');
+  const rules = [...eachRule(reset)];
+  const base = rules.find((r) => r.selector.trim() === '.u-touch-only' && r.at.length === 0);
+  assert.match(base?.body ?? '', /display:\s*none/, 'der Touch-Satz ist am Zeiger weg');
+  const touch = rules.filter((r) => r.at.some((a) => /\(hover:\s*none\)/.test(a)));
+  assert.match(touch.find((r) => r.selector.trim() === '.u-pointer-only')?.body ?? '', /display:\s*none/, 'der Zeiger-Satz ist am Finger weg');
+  assert.match(touch.find((r) => r.selector.trim() === '.u-touch-only')?.body ?? '', /display:\s*inline/, 'und der Touch-Satz steht da');
+  const de = JSON.parse(read('../public/locales/de.json'));
+  for (const key of ['documents.dropzoneTitleTouch', 'settings.backupDropzoneTitleTouch', 'settings.installModuleDropzoneTitleTouch']) {
+    const value = key.split('.').reduce((o, k) => o?.[k], de);
+    assert.match(value ?? '', /^Tippen/, `${key}: der Finger tippt`);
+    assert.doesNotMatch(value, /ablegen|ziehen|klicken/, `${key}: kein Wort des Zeigers`);
+  }
+});
+
+// R21 S7 (Critique a4): die Rasterkarte war 417px hoch (Rahmen 3:4), bei
+// 1440x900 stand die zweite Reihe nur halb im Bild. Quadratischer Rahmen, das
+// Blatt darin ganz (`contain`): Karte 357px, zwei Reihen (1920: 463 -> 393).
+test('R21 S7: die Vorschau der Rasterkarte hat einen quadratischen Rahmen, das Blatt bleibt ganz', () => {
+  const css = readFileSync(resolve(HERE, '../public/styles/documents.css'), 'utf8');
+  const rules = [...eachRule(css)];
+  const media = rules.find((r) => r.selector.trim() === '.document-card__media' && !r.at.length);
+  assert.match(media?.body ?? '', /aspect-ratio:\s*1 \/ 1/, 'quadratischer Rahmen');
+  const img = rules.find((r) => r.selector.trim() === '.document-thumb__img' && !r.at.length);
+  assert.match(img?.body ?? '', /object-fit:\s*contain/, 'das Blatt wird nicht beschnitten');
+});
+
+
+// --------------------------------------------------------
+// R21 S8 (Critique a4): die Vorschau zeigt sofort das Poster der Kachel
+
+test('R21 S8: der Betrachter zeigt sofort das Poster der Kachel und ein Ladezeichen, nie eine leere Buehne', () => {
+  const content = fnBody('renderViewerContent', 'renderViewerFallback');
+  const image = content.slice(content.indexOf("if (kind === 'image')"), content.indexOf("if (kind === 'text')"));
+  assert.match(image, /const poster = viewerPoster\(doc\);/, 'das Bild nimmt das Poster der Kachel');
+  assert.match(image, /class="document-viewer__stage" data-stage-loading/);
+  assert.match(image, /class="document-viewer__image document-viewer__poster" src="\$\{esc\(poster\)\}" alt="" aria-hidden="true"/,
+    'das Poster traegt die Masse des Bildes (dieselbe Klasse) und schweigt fuer den Screenreader');
+  assert.match(image, /\$\{viewerStageStatusHtml\(\)\}/);
+  assert.doesNotMatch(image, /loading="lazy"/);
+  // Das Poster kommt aus dem Seitenspeicher der Kacheln, nie aus einem Abruf.
+  const poster = fnBody('viewerPoster', 'viewerStageStatusHtml');
+  assert.match(poster, /_thumbs\?\.peek\(doc\)/);
+  assert.match(poster, /startsWith\('data:image\/'\)/, 'nur ein gerastertes Bild (data:-URL) ist ein Poster');
+  // Das PDF am Telefon zeigt seine erste Seite, bis pdf.js sie gezeichnet hat.
+  const pdf = content.slice(content.indexOf('const pdfPoster = viewerPoster(doc);'), content.indexOf("if (kind === 'image')"));
+  assert.match(pdf, /document-viewer__poster document-viewer__poster--page/);
+  const pages = page.slice(page.indexOf('function renderPdfPages('));
+  assert.match(pages, /const poster = content\.querySelector\('\.document-viewer__poster--page'\);/);
+  assert.match(pages, /if \(n === 1 && poster\) wrap\.appendChild\(poster\);/, 'das Poster zieht in den Platz der ersten Seite');
+  // Die Buehne ist eine Zelle: Poster, Bild und Ladezeichen liegen uebereinander.
+  const rules = [...eachRule(css)];
+  const cell = rules.find((r) => r.selector.trim() === '.document-viewer__stage > *');
+  assert.match(cell?.body ?? '', /grid-area:\s*1 \/ 1/);
+  const hide = rules.find((r) => r.selector.includes('.document-viewer__stage[data-stage-loading] > .document-viewer__image:not(.document-viewer__poster)'));
+  assert.match(hide?.body ?? '', /opacity:\s*0/, 'das noch leere Bild deckte das Poster zu');
+  assert.ok(hide.selector.includes('.document-viewer__stage:not([data-stage-loading]) > .document-viewer__poster'),
+    'nach dem Laden tritt das Poster zurueck (ein Bild mit Transparenz liesse es sonst durchscheinen)');
+  const status = rules.find((r) => r.selector.trim() === '.document-viewer__stage:not([data-stage-loading]) > .document-viewer__stage-status');
+  assert.match(status?.body ?? '', /display:\s*none/);
 });

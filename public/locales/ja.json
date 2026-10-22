@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "検索とフィルターに一致する項目はありません。",
         "searchReset": "検索をリセット",
         "passwordMinLength": "8文字以上。",
-        "savedReloadFailed": "変更は保存されましたが、表示を更新できませんでした。足りないものがあればページを再読み込みしてください。"
+        "savedReloadFailed": "変更は保存されましたが、表示を更新できませんでした。足りないものがあればページを再読み込みしてください。",
+        "fieldNumber": "数値を入力してください。",
+        "fieldMin": "{{min}}以上にしてください。",
+        "fieldMax": "{{max}}以下にしてください。",
+        "fieldWholeNumber": "整数を入力してください。",
+        "fieldStep": "{{step}}刻みで入力してください。",
+        "fieldInvalid": "この入力を確認してください。",
+        "errorCheckRolledBack": "「{{name}}」は未完了に戻りました - チェックできませんでした。もう一度お試しください。",
+        "errorUncheckRolledBack": "「{{name}}」はチェック済みに戻りました - 戻せませんでした。もう一度お試しください。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "ラベル（例：勤務先）",
         "mvRemove": "項目を削除",
         "birthdayLabel": "誕生日",
+        "showBirthday": "誕生日で表示",
         "birthdayHint": "誕生日のインポートでカレンダーにも表示されます。",
         "phonePlaceholder": "+81 …",
         "phonePreview": "プレビュー: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "家計のカテゴリーを読み込めませんでした。",
         "addCategory": "+ カテゴリー",
         "addSubcategory": "+ サブカテゴリー",
-        "moreDetails": "その他の項目",
         "newCategoryPrompt": "新しいカテゴリーの名前:",
         "newSubcategoryPrompt": "新しいサブカテゴリーの名前:",
         "categoryAddedToast": "カテゴリーを追加しました。",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "周期の設定を保存しました。",
         "healthCyclePersonalLabel": "周期を表示",
         "healthCyclePersonalHint": "自分の表示にだけ適用されます。オフにしても、世帯のほかのメンバーには周期が表示されたままです。",
+        "healthCycleSettingsHint": "周期の長さ、避妊方法、リマインダー、妊娠モードは周期ページで設定します。",
         "healthCyclePersonalHouseholdOff": "現在、周期は世帯全体でオフになっているため、誰にも表示されません。",
         "healthCyclePersonalSaved": "周期の表示を保存しました。",
         "pageRewardsModule": "ごほうび",
@@ -2038,7 +2047,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "親族",
         "familyRoleOther": "家族メンバー",
-        "childStartHint": "新しい子どものアカウントは予算と断食なしで始まり、家事サポートは閲覧のみで給与と支払いは表示されません。あとで「役割と権限」から変更できます。",
+        "childStartHint": "新しい子どものアカウントは予算と断食なしで始まり、家事サポートは閲覧のみで給与と支払いは表示されません。あとで「役割と権限」から変更できます。周期も非表示になります。子どもの個人設定で表示できます。",
         "systemAdminLabel": "システム管理者",
         "systemAdminHint": "システム管理者は設定、連携、APIトークン、家族アカウントを管理できます。",
         "systemAdminBadge": "システム管理者",
@@ -2068,7 +2077,8 @@
         "languageTitle": "言語",
         "dataLanguageLabel": "保存される項目の言語",
         "dataLanguageHint": "Yuvomi が自動生成した項目（誕生日の予定など）を保存するときの言語です。API、カレンダーフィード、同期に影響し、ここでの表示には影響しません。",
-        "dataLanguageAuto": "自動（{{language}}）",
+        "dataLanguageAuto": "自動",
+        "hintWithCurrent": "現在は{{value}}です。{{hint}}",
         "dataLanguageAdminOnly": "保存される項目の言語を設定できるのは管理者のみです。",
         "dataLanguageSaved": "保存される項目の言語を更新しました",
         "sectionMeals": "食事計画",
@@ -2863,6 +2873,7 @@
         "regionTitle": "地域 / 形式",
         "regionLabel": "地域",
         "regionHint": "地域に合わせて通貨・数値・日付・時刻の形式を設定します（例：スイス 1'234.50）。個別に設定するには「カスタム」を選択してください。",
+        "regionWithLanguage": "{{region}}（{{language}}）",
         "regionAdminOnly": "地域と通貨を変更できるのは管理者のみです。",
         "formatsHouseholdHint": "日付と時刻の形式は世帯全体に適用されます。どのメンバーでも変更できます。",
         "regionCustom": "カスタム",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "タイムゾーン",
         "timezoneLabel": "世帯のタイムゾーン",
         "timezoneHint": "時刻が独自のゾーンを持たないすべての場面に適用されます: リマインダー、カウントダウン、「今日」と呼ばれるカレンダー上の日付、エクスポートされたカレンダーフィード、Google や Outlook へ送られる予定。",
-        "timezoneAuto": "自動 ({{zone}})",
+        "timezoneAuto": "自動",
         "timezoneAdminOnly": "タイムゾーンを変更できるのは管理者のみです。",
         "timezoneSaved": "タイムゾーンを保存しました。",
         "timezoneMismatch": "ブラウザーは {{browser}}、世帯は {{household}} で計算しています。",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "通知設定を保存しました。",
         "healthVisibilityTitle": "既定の公開範囲",
         "healthVisibilityHint": "新しい記録の初期値です。記録ごとに変更できます。",
+        "healthVisibilityCaregivers": "あなたの代わりに記録できる人は、周期日記を除くあなたの非公開の記録も見られます。これは管理者がメンバーで設定します.",
         "healthVisibilityOther": "その他の領域",
         "healthVisibilityApply": "既存の記録も変更する",
         "healthVisibilityApplyHint": "保存しました。{{area}} の既存の記録も変更しますか？",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "2文字以上入力してください。",
         "weatherPlaceNotFound": "この名前の場所は見つかりませんでした。国名を付けてください（例: 「府中, 日本」）。",
         "weatherPlaceUnavailable": "現在、場所の検索に接続できません。少し待ってから再試行するか、座標を手動で入力してください。",
-        "weatherManualTitle": "座標を手動で入力"
+        "weatherManualTitle": "座標を手動で入力",
+        "backupDropzoneTitleTouch": "タップしてバックアップファイルを選択",
+        "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択"
     },
     "login": {
-        "tagline": "家族のプランナーへおかえりなさい。",
+        "tagline": "おかえりなさい。暮らしのことを一か所に。",
         "usernameLabel": "ユーザー名",
         "passwordLabel": "パスワード",
         "loginButton": "ログイン",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "変更を破棄しますか？",
         "unsavedChangesDetail": "このフォームに入力した内容は失われます。",
         "discardChanges": "破棄",
-        "moreSettings": "詳細設定",
         "moreDetails": "その他の項目"
     },
     "rrule": {
@@ -3468,7 +3481,9 @@
         "goTo": "移動",
         "newSection": "新規作成",
         "recentLabel": "最近開いた項目",
-        "createTaskNamed": "「{{title}}」をタスクとして作成"
+        "createTaskNamed": "「{{title}}」をタスクとして作成",
+        "hintMove": "選択",
+        "hintOpen": "開く"
     },
     "birthdays": {
         "inDays_one": "あと{{count}}日",
@@ -3487,6 +3502,7 @@
         "editTitle": "誕生日を編集",
         "nameLabel": "名前",
         "birthDateLabel": "生年月日",
+        "showContact": "連絡先を表示",
         "nameDay": "聖名祝日",
         "celebratesNameDay": "聖名祝日を祝います",
         "nameDayLabel": "聖名祝日（任意）",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "{{name}}へようこそ",
-        "step1Body": "あなただけの家族プランナー。タスク、カレンダー、買い物などを一か所にまとめます。",
+        "step1Body": "タスク、カレンダー、買い物など、暮らしのことを一か所に。ひとり暮らしでも、ふたりでも、家族でも。",
         "step2Title": "ナビゲーションとモジュール",
         "step2Body": "画面下部のバーから主要なエリアに直接移動できます。その他のモジュールは「もっと見る」にあります。",
         "step3Title": "さっそく始めよう",
@@ -3867,7 +3883,10 @@
         "errorDmsAccountGone": "この DMS アカウントはもう存在しません。",
         "errorDmsDocumentGone": "このドキュメントは DMS にもう存在しません。",
         "errorDmsAlreadyLinked": "この DMS ドキュメントはすでにリンクされています。",
-        "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。"
+        "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。",
+        "dropzoneTitleTouch": "タップしてファイルを選択",
+        "viewerPrevNamed": "前のドキュメント: {{name}}",
+        "viewerNextNamed": "次のドキュメント: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "キッチン",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "この訪問はもう存在しません。",
         "errorTaskGone": "このタスクはもう存在しません。",
         "errorAlreadyCheckedOut": "このハウスキーパーはすでにチェックアウトしています。",
-        "errorAlreadyCheckedIn": "このハウスキーパーはすでにチェックインしています。"
+        "errorAlreadyCheckedIn": "このハウスキーパーはすでにチェックインしています。",
+        "allVisitsInReport": "すべての訪問をレポートで見る"
     },
     "userMultiSelect": {
         "moreUsers": "他",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "検索は概要の虫めがね、または「その他」から開きます。",
         "mobileSettings": "設定は「その他」にあります。",
         "guideLink": "ユーザーガイド",
-        "guideHint": "コミュニティが別のリポジトリで管理しています。リリースより古い場合があります。"
+        "guideHint": "コミュニティが管理しています。新しいタブで開きます。"
     },
     "changelog": {
         "title": "変更履歴",
@@ -4379,8 +4399,9 @@
         "success": "パスワードを変更しました。ログインできます。",
         "mismatch": "パスワードが一致しません。",
         "tooShort": "パスワードは8文字以上にしてください。",
-        "invalidToken": "このリンクは無効か、期限切れです。",
-        "missingToken": "有効なトークンが見つかりませんでした。"
+        "invalidToken": "このリセット用リンクは無効か期限切れです - 新しいリンクをリクエストしてください。",
+        "missingToken": "このリセット用リンクは不完全です - 新しいリンクをリクエストしてください。",
+        "requestNew": "新しいリンクをリクエスト"
     },
     "email": {
         "host": "SMTP ホスト",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "次のリマインダー",
                 "empty": "本日の服薬はこれ以上ありません"
+            },
+            "brief": {
+                "changes": "前回の測定から: {{list}}。",
+                "latest": "最新の記録: {{list}}。",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} 変化なし"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "予測・カレンダー・統計を表示するには、最初の生理を記録してください。",
             "emptyCta": "最初の生理を記録",
             "personsLabel": "Person",
-            "add": "生理を記録",
+            "add": "過去の生理を追加",
             "loadError": "周期データを読み込めませんでした。",
             "loadErrorDesc": "後でもう一度お試しください。",
             "retry": "再試行",
@@ -5406,15 +5433,14 @@
                 "family": "家族"
             },
             "period": {
-                "add": "生理を記録",
+                "add": "過去の生理を追加",
                 "edit": "生理を編集",
                 "warningFuture": "開始日が未来の日付です - 予測は過去の周期のみに基づきます。",
                 "warningOverlap": "すでに記録済みの周期と重なっています。"
             },
             "dayLog": {
                 "title": "その日を記録",
-                "date": "日付",
-                "more": "その他の項目"
+                "date": "日付"
             },
             "export": {
                 "csv": "CSVでエクスポート"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "平均周期日数",
                 "periodLength": "平均生理日数",
                 "lutealLength": "黄体期の長さ",
+                "daysUnit": "日",
                 "trackFertility": "妊娠可能期間を表示",
-                "autoHint": "空欄のまま = 履歴から自動計算します。",
+                "autoHint": "どちらかの欄を空欄にすると、Yuvomi が記録された生理から値を計算します。",
                 "remindPeriodDaysBefore": "生理のリマインダー",
                 "remindOff": "オフ",
                 "remindSameDay": "当日",
@@ -5533,7 +5560,9 @@
                 "emptyError": "CSVファイルを選択するか、テキストを貼り付けてください。",
                 "error": "インポートに失敗しました。"
             },
-            "discoveryHint": "ヒント:予測される周期は<a href=\"/settings/modules/calendar?section=personal-feeds\">設定 → モジュール → カレンダー</a>でICSフィードとして購読できます。また、周期ウィジェットはカスタマイズモードから<a href=\"/\">ダッシュボード</a>に表示できます。"
+            "feedLink": "予測周期をカレンダーで購読",
+            "widgetHint": "周期のタイルは{{overview}}の「{{customize}}」から追加できます。",
+            "endBeforeStart": "終了を開始より前にはできません。"
         },
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",
@@ -5542,6 +5571,7 @@
             "unitH": "時間"
         },
         "careBanner": "{{name}} さんの記録を入力しています。",
+        "whoSees": "誰が見られますか?",
         "nutrition": {
             "title": "栄養",
             "emptyTitle": "まだ栄養の記録がありません",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "土",
         "weekdaySun": "日",
         "intervalLabelWeekly": "N週間ごと",
+        "intervalLabelMonthly": "Nか月ごと",
         "anchorDateLabel": "最初の収集日",
         "monthDayLabel": "毎月の日",
         "monthDayLastDay": "月末日",
@@ -6271,8 +6302,8 @@
         "success": "アカウントを作成しました。ログインできます。",
         "mismatch": "パスワードが一致しません。",
         "tooShort": "パスワードは8文字以上にしてください。",
-        "invalidToken": "この招待は無効か、期限切れか、すでに使用されています。",
-        "missingToken": "有効なトークンが見つかりませんでした。",
+        "invalidToken": "この招待は無効か、期限切れか、すでに使用されています - 新しいリンクを依頼してください。",
+        "missingToken": "この招待リンクは無効か期限切れです - 新しいリンクを依頼してください。",
         "usernameRequired": "ユーザー名を選んでください。",
         "usernameInvalid": "ユーザー名は3〜64文字で、英数字、ドット、ハイフン、アンダースコアのみ使用できます。",
         "usernameTaken": "このユーザー名はすでに使われています。",
@@ -6486,9 +6517,8 @@
         "templateWork": "仕事",
         "templateSchool": "学校",
         "templateUniversity": "大学",
-        "overview": "比較",
+        "overview": "概要",
         "overviewPeopleLabel": "メンバーを比較",
-        "overviewClearSelection": "選択をクリア",
         "continuesUntil": "…{{time}}まで継続",
         "overviewEmptyTitle": "比較するメンバーを選択",
         "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。",
@@ -6520,6 +6550,7 @@
         "labelLabel": "この端末の名前（任意）",
         "labelHint": "後でどの端末かを見分けるのに役立ちます。",
         "submit": "ペアリング",
-        "failed": "このペアリングコードは無効です。"
+        "failed": "このペアリングコードは無効です。",
+        "codeRequired": "設定に表示されているペアリングコードを入力してください。"
     }
 }

@@ -2,11 +2,14 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import {
   captureModalContext,
+  captureOpenContext,
   closeModal,
   confirmModal,
   isModalContextCurrent,
   openModal,
   refocusAfterRender,
+  reportFieldErrors,
+  constraintErrors,
 } from '/components/modal.js';
 import {
   createDisclosure,
@@ -189,8 +192,12 @@ function bindDefaultAssigneeBackfill(container) {
   };
 
   btn.addEventListener('click', async () => {
+    // loadPage() gibt ohne seinen Kontext schon null zurueck; die Frage, die
+    // aus der Antwort entsteht, prueft ihn hier noch einmal dort, wo der
+    // Scanner aus test/late-modal-close.js ihn sieht (#2134).
+    const context = captureOpenContext();
     let page = await loadPage(null);
-    if (!page) return;
+    if (!page || !isModalContextCurrent(context)) return;
     if (page.count === 0 && page.moved.length === 0) {
       showToast(t('settings.sync.backfillNone'));
       return;
@@ -1567,6 +1574,9 @@ function buildAppleProvider(appleStatus, user) {
 function buildAppleConnectForm() {
   const form = document.createElement('form');
   form.className = 'settings-form settings-form--compact';
+  // KEINE BROWSER-BLASEN (Critique R21): die Regeln des Markups melden sich
+  // am Feld (constraintErrors, components/modal.js).
+  form.noValidate = true;
   // EIN FORMULAR-DIALEKT (R19, Einstellungen B7): die drei Felder als Zeilen
   // der Gruppe, der Passwort-Hinweis unter seiner Zeile.
   form.insertAdjacentHTML('beforeend', `
@@ -1591,6 +1601,7 @@ function buildAppleConnectForm() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (reportFieldErrors(constraintErrors(form))) return;
     const errorEl = form.querySelector('#apple-connect-error');
     errorEl.hidden = true;
     const url = form.querySelector('#apple-caldav-url').value.trim();

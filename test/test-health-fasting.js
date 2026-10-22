@@ -296,9 +296,8 @@ test('the fasting ring is a real stroke with round ends whose trace moves by tra
   assert.match(reduced?.body ?? '', /transition:\s*none/, 'reduced motion: the trace jumps');
   // `hidden` muss gegen die display-Regeln der Traeger gewinnen, sonst bleibt
   // der Ruhezustand bei Nullen stehen, obwohl das Attribut gesetzt ist.
-  for (const sel of ['.fasting-clock-switch[hidden]', '[data-fasting-timer][hidden]', '[data-fasting-days][hidden]']) {
-    assert.ok(rules.some((r) => r.selector.split(',').map((s) => s.trim()).includes(sel) && /display:\s*none/.test(r.body)), `${sel} hides`);
-  }
+  // Seit R21 S9a die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok((await import('./css-rules.js')).globalHiddenRule(), '[hidden] hides the clock parts');
 });
 
 // ---------------------------------------------------------------------------
@@ -354,7 +353,7 @@ test('fasting picks the person with the shared health pill, not a full-width nat
   assert.doesNotMatch(fastingPage, /<select[^>]*data-fasting-person/, 'natives Personen-Select ist zurueck');
   assert.match(fastingPage, /personSwitcherMarkup\(view\.members, view\.subject, view\.self/,
     'das Fasten nutzt nicht die Pille der Gesundheit');
-  assert.match(fastingPage, /import \{ personSwitcherMarkup \} from '\/utils\/health-person-switcher\.js'/);
+  assert.match(fastingPage, /import \{ personSwitcherMarkup, wireWhoSees \} from '\/utils\/health-person-switcher\.js'/);
 });
 
 /* R14 P3 (A6 P2-1): FASTEN SPRICHT DEN DIALEKT DER GESUNDHEIT. Ohne je gefastet

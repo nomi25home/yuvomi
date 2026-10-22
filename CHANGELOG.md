@@ -15,10 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   were both waiting to move to the same list, the second PUT went out even after the first was
   rate-limited. An unreachable server (no HTTP status) also now pauses further carry attempts for
   that list, matching the behavior for rate-limit and outage responses.
-
-
-
-
 - **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
   client ID and secret in an HTTP Basic header, form-encoded as RFC 6749 asks. The library did
   that more strictly than the form format and also escaped `-`, `_` and `.`, so a provider that

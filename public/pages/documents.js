@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -433,9 +433,10 @@ export async function render(container, context = {}) {
                `aria-label` - Begruendung am alten Ort, siehe unten. Am Desktop
                ist er ausgeblendet; dort steht die Ordnerspalte. */ ''}
           <button class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"
-                  aria-expanded="false" aria-controls="documents-folder-browser">
-            <i data-lucide="folders" class="icon-md" aria-hidden="true"></i>
+                  aria-expanded="false" aria-controls="documents-folder-browser documents-category-browser">
+            <i data-lucide="folders" class="icon-md documents-folder-chip__icon" aria-hidden="true"></i>
             <span class="documents-folder-browser__toggle-label">${esc(t('documents.allDocuments'))}</span>
+            <span class="documents-folder-chip__facet" id="documents-folder-chip-facet"></span>
             <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
           </button>
           <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
@@ -465,6 +466,17 @@ export async function render(container, context = {}) {
             </button>`}
           </div>
           <ul class="documents-folder-browser__list row-carrier" id="documents-folder-browser"></ul>
+          ${/* WO UND WAS IN EINER AUSWAHL (R21 S9b, Critique a4/D7). Am Telefon
+               standen drei Filterachsen in einer Zeile - Status, Ordner und
+               die Kategorie-Chips -, und von den sechs Kategorien war bei 390px
+               keine ganz im Bild (die Spur lief 775px ueber). Unter 768px
+               stehen die Kategorien deshalb als zweite Gruppe in der Auswahl,
+               die der Ordner-Chip aufklappt, wie Orte und Tags in einer
+               Dateien-App; die Chips weichen dort. Beide Ordnungen bleiben
+               (D7), nur die Zeile ordnet sich. Ab 768px steht alles wie
+               vorher (documents.css). */ ''}
+          <h2 class="documents-folder-browser__title documents-category-browser__title" id="documents-category-browser-title">${t('documents.categoryLabel')}</h2>
+          <ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"></ul>
         </aside>
         <div class="documents-browser-main">
           ${/* Der Pfad, in dem man steht (#785). Er steht ueber der Liste und
@@ -497,6 +509,7 @@ export async function render(container, context = {}) {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
+  renderCategoryBrowser();
   renderDocuments();
 }
 
@@ -506,6 +519,7 @@ function renderAll({ motion = false } = {}) {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
+  renderCategoryBrowser();
   renderBreadcrumb();
   renderDocuments({ motion });
 }
@@ -845,11 +859,16 @@ function bindToolsMenu() {
   });
 }
 
-/** Zaehler an Kategorien, Ablauf-Chip und Ordnern - sie haengen alle an der Suche. */
+/**
+ * Zaehler an Kategorien, Ablauf-Chip und Ordnern - sie haengen alle an der
+ * Suche. Dazu die Kategorie-Gruppe der Auswahl unter 768px: sie zaehlt wie die
+ * Chips, und ohne sie blieben ihre Zahlen beim Suchen stehen (Codex zu #2142).
+ */
 function renderFacets() {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
+  renderCategoryBrowser();
 }
 
 function bindPageEvents() {
@@ -964,6 +983,18 @@ function bindPageEvents() {
   };
   folderToggle?.addEventListener('click', () => {
     setFolderListOpen(folderToggle.getAttribute('aria-expanded') !== 'true');
+  });
+  // Die Kategorie-Gruppe der Auswahl (unter 768px): derselbe Filter wie der
+  // Chip, danach zu wie nach der Wahl eines Ordners.
+  _container.querySelector('#documents-category-browser')?.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-category]');
+    if (!row) return;
+    if (row.dataset.category !== state.category) {
+      state.category = row.dataset.category;
+      applyFilters();
+      renderAll();
+    }
+    setFolderListOpen(false);
   });
   folderBrowser?.addEventListener('click', (e) => {
     const menuBtn = e.target.closest('[data-folder-menu]');
@@ -1359,6 +1390,59 @@ function renderCategoryChips() {
     </button>`).join('')}
   `);
   if (window.lucide) lucide.createIcons({ el: host });
+}
+
+/**
+ * Die Kategorien als zweite Gruppe der aufklappbaren Auswahl (unter 768px, die
+ * Regeln in documents.css). Dieselben Kategorien und Zaehler wie die Chips,
+ * dieselbe Zeilen-Grammatik wie die Ordner darueber; die Zeile traegt
+ * `data-category` wie der Chip, und die Wahl laeuft ueber denselben Weg.
+ */
+function renderCategoryBrowser() {
+  const host = _container?.querySelector('#documents-category-browser');
+  if (!host) return;
+  const counts = categoryCounts();
+  const present = presentCategories();
+  const labels = categoryLabels();
+  const showCounts = state.allDocuments.length > 0;
+  const treeHasFolders = visibleFolderRows().length > 0;
+  const lead = folderRowLead({ managed: false }, treeHasFolders) === 'none'
+    ? '' : '<span class="documents-folder-item__twisty documents-folder-item__twisty--leaf" aria-hidden="true"></span>';
+  const rows = [
+    { id: '', name: t('documents.allCategories'), icon: 'shapes' },
+    ...CATEGORIES.filter((category) => present.get(category) || category === state.category)
+      .map((category) => ({ id: category, name: labels[category], icon: CATEGORY_ICONS[category] || 'folder' })),
+  ];
+  host.replaceChildren();
+  host.insertAdjacentHTML('beforeend', rows.map((row) => {
+    const active = (state.category || '') === row.id;
+    return `
+    <li class="list-row documents-folder-item${active ? ' documents-folder-item--active' : ''}">
+      ${lead}
+      <button class="documents-folder-item__select list-row__main--interactive" type="button" data-category="${esc(row.id)}" aria-current="${active ? 'true' : 'false'}">
+        <span class="documents-folder-item__icon"><i data-lucide="${esc(row.icon)}" aria-hidden="true"></i></span>
+        <span class="list-row__name documents-folder-item__name">${esc(row.name)}</span>
+        ${showCounts ? `<span class="documents-folder-item__count">${counts.get(row.id) || 0}</span>` : ''}
+      </button>
+    </li>`;
+  }).join(''));
+  if (window.lucide) lucide.createIcons({ el: host });
+  // Der Chip nennt am Telefon auch die gewaehlte Kategorie - die Chips, die
+  // es sonst sagten, stehen dort nicht. Ohne gewaehlten Ordner steht sie
+  // allein ("Schule" statt "Alle Dokumente · Schule"), sonst hinter dem Ordner.
+  // Mit dem Zeichen der Kategorie: "Schule" heisst im Seed auch ein Ordner.
+  const name = state.category ? (labels[state.category] ?? state.category) : '';
+  const facet = _container.querySelector('#documents-folder-chip-facet');
+  if (facet) {
+    facet.replaceChildren();
+    if (name) {
+      facet.insertAdjacentHTML('beforeend', `${state.folderId ? '<span aria-hidden="true">·</span>' : ''}<i data-lucide="${esc(CATEGORY_ICONS[state.category] || 'folder')}" class="icon-md" aria-hidden="true"></i><span class="documents-folder-chip__facet-name">${esc(name)}</span>`);
+      if (window.lucide) lucide.createIcons({ el: facet });
+    }
+  }
+  const toggle = _container.querySelector('#documents-folder-toggle');
+  toggle?.toggleAttribute('data-category-active', Boolean(state.category));
+  toggle?.toggleAttribute('data-category-only', Boolean(state.category) && !state.folderId);
 }
 
 // Ein einzelner Umschalt-Chip, gleiches Muster wie renderCategoryChips - nur ein
@@ -1757,6 +1841,9 @@ function folderDeleteChoice(folder, impact) {
 async function deleteFolder(folder) {
   if (readOnly()) return;
   const owner = _container;
+  // Die Frage entsteht erst aus der Vorschau (#2134): wer inzwischen einen
+  // Dialog geoeffnet oder die Seite verlassen hat, bekommt sie nicht daruebergelegt.
+  const context = captureOpenContext();
   let impact;
   try {
     const response = await api.get(`/documents/folders/${folder.id}/delete-impact`);
@@ -1765,6 +1852,7 @@ async function deleteFolder(folder) {
     reportError(err, { owner });
     return;
   }
+  if (!isModalContextCurrent(context)) return;
 
   let choice;
   if (impact.documents > 0 || !impact.can_delete_documents) {
@@ -2658,7 +2746,7 @@ function openDocumentModal(doc = null) {
             <span class="document-dropzone__icon">
               <i data-lucide="file-up" aria-hidden="true"></i>
             </span>
-            <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
+            <span class="document-dropzone__title"><span class="u-pointer-only">${t('documents.dropzoneTitle')}</span><span class="u-touch-only">${t('documents.dropzoneTitleTouch')}</span></span>
             <span class="document-dropzone__file" id="document-selected-file" hidden></span>
           </label>
           <input class="sr-only" id="document-folder-input" type="file" webkitdirectory tabindex="-1"
@@ -2678,10 +2766,11 @@ function openDocumentModal(doc = null) {
         </div>`;
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('documents.editTitle') : t('documents.newTitle'),
     size: 'lg',
     content: `
-      <form id="document-form" class="document-form">
+      <form id="document-form" class="document-form" novalidate>
         ${isEdit ? '' : fileFieldHtml}
         <div class="modal-grid modal-grid--2">
           <div class="form-group">
@@ -3284,6 +3373,8 @@ async function saveFolderUpload(panel, payload) {
 async function saveDocument(event, doc, panel) {
   if (doc ? !mayManage(doc) : readOnly()) { event?.preventDefault?.(); return; }
   event.preventDefault();
+  // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+  if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
   // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
   const modalContext = captureModalContext();
   const owner = _container;
@@ -3415,7 +3506,7 @@ function openFolderModal({ parentId = null } = {}) {
     title: t('documents.newFolderTitle'),
     size: 'sm',
     content: `
-      <form id="document-folder-form" class="document-form">
+      <form id="document-folder-form" class="document-form" novalidate>
         <div class="form-group">
           <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}${REQUIRED_MARK}</label>
           <input class="input" id="document-folder-name" required maxlength="200" autocomplete="off">
@@ -3437,6 +3528,8 @@ function openFolderModal({ parentId = null } = {}) {
     onSave(panel) {
       panel.querySelector('#document-folder-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const error = panel.querySelector('#document-folder-error');
         const input = panel.querySelector('#document-folder-name');
         const parentSelect = panel.querySelector('#document-folder-parent');
@@ -3908,7 +4001,32 @@ function viewerDetailsHtml(doc) {
   return rows.trim() ? `<div class="document-viewer__details detail-view__rows">${rows}</div>` : '';
 }
 
-function openDocumentViewer(doc) {
+/**
+ * Die Nachbarn eines Dokuments in der SICHTBAREN Liste (Filter, Suche,
+ * Sortierung - dieselbe Folge wie drawDocuments). Kein Umlauf am Ende: ein
+ * stiller Sprung vom letzten zum ersten Beleg laese sich als "die Liste ist
+ * kuerzer, als ich dachte".
+ */
+function viewerNeighbours(doc) {
+  const docs = filteredDocuments();
+  const index = docs.findIndex((item) => String(item.id) === String(doc.id));
+  if (index < 0) return { prev: null, next: null };
+  return { prev: docs[index - 1] ?? null, next: docs[index + 1] ?? null };
+}
+
+/** Die Pfeiltaste, die auf "zurueck" zeigt - in RTL rechts (wie die Zeitraum-Stepper). */
+function viewerStepKeys() {
+  const rtl = typeof document !== 'undefined' && document.documentElement?.dir === 'rtl';
+  return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
+}
+
+/**
+ * @param {object} doc
+ * @param {object} [carry]
+ * @param {Element|null} [carry.opener] - beim Blaettern der Ausloeser in der
+ *   Liste, den der vorige Betrachter weiterreicht
+ */
+function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
   const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
   const downloadUrl = `/api/v1/documents/${doc.id}/download`;
@@ -3937,13 +4055,34 @@ function openDocumentViewer(doc) {
   const shareSupport = fileShareSupport(doc);
   const shareAbort = new AbortController();
   let shareFile = null;
-  // Der Ausloeser des Betrachters - fuer den Wechsel nach "Bearbeiten" (unten).
-  const opener = document.activeElement;
+  // Der Ausloeser des Betrachters - fuer den Wechsel nach "Bearbeiten" und das
+  // Blaettern (unten). Nach einem Schritt ist der fokussierte Knopf einer des
+  // VORIGEN Betrachters, der mit ihm verschwindet; dann gilt der Ausloeser in
+  // der Liste, den der vorige Betrachter weiterreicht (Codex zu #2142).
+  const trigger = document.activeElement;
+  const opener = listOpener ?? trigger;
   // Per Tastatur geoeffnet? Der Browser weiss es: er zeigt den Fokusring am
   // Ausloeser nur dann. Ein alter Browser ohne den Selektor wirft - dann gilt
-  // "nein", und der Fokus-Waechter des PDFs nimmt nichts zurueck.
+  // "nein", und der Fokus-Waechter des PDFs nimmt nichts zurueck. Beim
+  // Blaettern zaehlt der Knopf oder die Taste des Schritts, nicht die Liste.
   let openedByKeyboard = false;
-  try { openedByKeyboard = opener?.matches?.(':focus-visible') === true; } catch { /* Selektor unbekannt */ }
+  try { openedByKeyboard = trigger?.matches?.(':focus-visible') === true; } catch { /* Selektor unbekannt */ }
+
+  // VOR UND ZURUECK IM BETRACHTER (Critique R21, Persona Alex): wer zehn
+  // Belege durchsieht, musste je Dokument schliessen und das naechste oeffnen.
+  // Die Nachbarn sind die der sichtbaren Liste (Filter, Suche, Sortierung).
+  const { prev: prevDoc, next: nextDoc } = viewerNeighbours(doc);
+  const stepKeys = viewerStepKeys();
+
+  // NACH EINEM SCHRITT DEN FOKUS VORHER AN DEN AUSLOESER IN DER LISTE (Codex
+  // zu #2142) - derselbe Weg wie "Bearbeiten" unten: openModal() merkt sich
+  // document.activeElement als Ausloeser des neuen Dialogs, und das waere
+  // sonst der Knopf des vorigen Betrachters, der mit ihm verschwindet; nach
+  // dem Schliessen stuende der Fokus auf der Seitenwurzel statt in der Liste.
+  // Es ist die Zeile, aus der der ERSTE Betrachter kam, nicht die des zuletzt
+  // gezeigten Dokuments: hinter dem modalen Dialog ist die Liste inert und
+  // nimmt keinen neuen Fokus an - das braeuchte einen Rueckgabe-Weg in modal.js.
+  if (listOpener?.isConnected && listOpener !== document.body) listOpener.focus();
 
   openSharedModal({
     title: doc.name,
@@ -3972,6 +4111,11 @@ function openDocumentViewer(doc) {
           <span>${formatFileSize(doc.file_size)}</span>
           ${expiryViewerHtml(doc)}
           <span class="document-viewer__actions">
+            ${prevDoc || nextDoc ? `
+            <span class="document-viewer__pager">
+              ${prevDoc ? rowActionHtml({ icon: 'chevron-left', action: 'viewer-prev', label: t('documents.viewerPrevNamed', { name: prevDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.prev, title: t('documents.viewerPrevNamed', { name: prevDoc.name }) } }) : '<span class="document-viewer__pager-gap" aria-hidden="true"></span>'}
+              ${nextDoc ? rowActionHtml({ icon: 'chevron-right', action: 'viewer-next', label: t('documents.viewerNextNamed', { name: nextDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.next, title: t('documents.viewerNextNamed', { name: nextDoc.name }) } }) : '<span class="document-viewer__pager-gap" aria-hidden="true"></span>'}
+            </span>` : ''}
             ${externalUrl ? `
             <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
@@ -4025,6 +4169,24 @@ function openDocumentViewer(doc) {
       panel.querySelector('[data-action="edit-document"]')?.addEventListener('click', () => {
         if (opener?.isConnected && opener !== document.body) opener.focus();
         openDocumentModal(doc);
+      });
+      wireViewerStage(panel);
+      // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
+      // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
+      // - dort gehoeren die Pfeile dem Element.
+      // Der Schritt reicht den Ausloeser in der Liste weiter (Codex zu #2142,
+      // der Fokus geht vor dem naechsten Dialog an ihn - siehe dort).
+      const step = (target) => { if (target) openDocumentViewer(target, { opener }); };
+      panel.querySelector('[data-action="viewer-prev"]')?.addEventListener('click', () => step(prevDoc));
+      panel.querySelector('[data-action="viewer-next"]')?.addEventListener('click', () => step(nextDoc));
+      panel.addEventListener('keydown', (e) => {
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+        if (e.key !== stepKeys.prev && e.key !== stepKeys.next) return;
+        if (e.target?.closest?.('input, textarea, select, [contenteditable="true"], [data-pdf-pages], [role="toolbar"]')) return;
+        const target = e.key === stepKeys.prev ? prevDoc : nextDoc;
+        if (!target) return;
+        e.preventDefault();
+        step(target);
       });
       // PDFs ohne nativen Inline-Viewer (mobile Browser): mit pdf.js auf Canvas rendern
       if (previewKind(doc.mime_type) === 'pdf' && !canRenderPdfNatively()) {
@@ -4092,6 +4254,39 @@ function openDocumentViewer(doc) {
 
 const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=Fit&zoom=page-fit';
 
+/**
+ * Das Poster des Betrachters: die Vorschau, die die Kachel schon gerastert hat
+ * (data:-URL aus dem Seitenspeicher, nie ein Abruf). `null`, wenn es keine gibt -
+ * dann steht nur das Ladezeichen da.
+ */
+function viewerPoster(doc) {
+  const url = _thumbs?.peek(doc);
+  return typeof url === 'string' && url.startsWith('data:image/') ? url : null;
+}
+
+/** Ladezeichen ueber der Buehne; die Ansage liest der Screenreader. */
+function viewerStageStatusHtml() {
+  return `<span class="document-viewer__stage-status" role="status">
+      <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
+      <span class="sr-only">${t('common.loading')}</span>
+    </span>`;
+}
+
+/**
+ * Sobald das Bild da ist (oder scheitert), geht die Buehne aus dem Ladezustand:
+ * das Bild blendet ueber das Poster, Poster und Ladezeichen treten zurueck.
+ * Ein Bild aus dem Cache ist beim Verdrahten schon `complete`.
+ */
+function wireViewerStage(panel) {
+  const stage = panel.querySelector('.document-viewer__stage[data-stage-loading]');
+  const img = stage?.querySelector('img.document-viewer__image:not(.document-viewer__poster)');
+  if (!stage || !img) return;
+  const done = () => stage.removeAttribute('data-stage-loading');
+  if (img.complete && img.naturalWidth > 0) { done(); return; }
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', done, { once: true });
+}
+
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   const kind = previewKind(doc.mime_type);
   if (kind === 'pdf') {
@@ -4121,21 +4316,37 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
     // Ehrliche Semantik: der Canvas-Render ist grafisch (keine Textebene) -> ein sr-only-Hinweis
     // verweist auf den vorlesbaren Weg (Meta-Leiste: "In neuem Tab öffnen"/Download), die
     // Seiten-Canvases selbst sind aria-hidden. data-pdf-live kündigt Ladeende/Fehler an.
+    // Die erste Seite steht als Poster da, bis pdf.js sie gezeichnet hat (wie beim Bild).
+    const pdfPoster = viewerPoster(doc);
     return `<div class="document-viewer__pdf-pages" data-pdf-pages tabindex="0" role="region" aria-label="${esc(doc.name)}">
       <p class="sr-only" data-pdf-note>${t('documents.viewerPdfA11yNote')}</p>
       <span class="sr-only" role="status" aria-live="polite" data-pdf-live></span>
       <div class="document-viewer__pdf-indicator" data-pdf-indicator aria-hidden="true" hidden></div>
       <div class="document-viewer__pdf-content" data-pdf-content>
-        <div class="document-viewer__loading" role="status">
-          <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
-          <span data-pdf-loading-text>${t('documents.viewerPdfLoading')}</span>
+        <div class="document-viewer__stage document-viewer__stage--page${pdfPoster ? ' document-viewer__stage--poster' : ''}" data-stage-loading>
+          ${pdfPoster ? `<img class="document-viewer__poster document-viewer__poster--page" src="${esc(pdfPoster)}" alt="" aria-hidden="true">` : ''}
+          <div class="document-viewer__loading" role="status">
+            <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
+            <span data-pdf-loading-text>${t('documents.viewerPdfLoading')}</span>
+          </div>
         </div>
       </div>
     </div>`;
   }
   if (kind === 'image') {
-    return `<img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}"`
-      + ` loading="lazy">`;
+    // DIE BUEHNE IST NIE LEER (Critique R21, a4): mobil stand der Betrachter
+    // 300-400 ms ohne Bild und ohne Ladezeichen da, bis die volle Datei kam.
+    // Die Kachel hat ihre Vorschau schon gerastert (utils/document-thumbs.js,
+    // nur im Seitenspeicher) - sie steht als Poster in derselben Zelle, das
+    // Ladezeichen darueber, und das Bild blendet darueber, sobald es da ist
+    // (wireViewerStage). Ohne Lazy-Laden: im offenen Dialog ist das Bild
+    // immer im Blick, und das Lazy-Attribut wartete dafuer erst ein Layout ab.
+    const poster = viewerPoster(doc);
+    return `<div class="document-viewer__stage" data-stage-loading>
+        ${poster ? `<img class="document-viewer__image document-viewer__poster" src="${esc(poster)}" alt="" aria-hidden="true">` : ''}
+        <img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}" decoding="async">
+        ${viewerStageStatusHtml()}
+      </div>`;
   }
   if (kind === 'text') {
     // Inhalt wird asynchron in onSave geladen; Platzhalter anzeigen
@@ -4344,12 +4555,16 @@ function renderPdfPages(container, previewUrl, doc, downloadUrl) {
       const visible = new Set();
       const order = [];
 
+      // Das Poster der ersten Seite zieht in ihren Platzhalter um und bleibt,
+      // bis die Seite gezeichnet ist (renderPage ersetzt den Inhalt).
+      const poster = content.querySelector('.document-viewer__poster--page');
       content.replaceChildren();
       for (let n = 1; n <= pdf.numPages; n += 1) {
         const wrap = document.createElement('div');
         wrap.className = 'document-viewer__pdf-page';
         wrap.dataset.page = String(n);
         wrap.style.aspectRatio = String(defaultRatio);
+        if (n === 1 && poster) wrap.appendChild(poster);
         // Rein grafisch (kein Textlayer) -> aria-hidden; die vorlesbare Alternative liegt im
         // sr-only-Hinweis + Meta-Leiste. Der sichtbare Seitenindikator übernimmt "n von total".
         wrap.setAttribute('aria-hidden', 'true');

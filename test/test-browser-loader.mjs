@@ -233,6 +233,13 @@ const STUBS = {
       }
       return any;
     };
+    // Die Regeln des Markups (components/modal.js, Critique R21): das Original
+    // liest den ValidityState der Felder - die Attrappen-Panels der Suiten
+    // haben keinen, also meldet der Stub nichts. Wer den Weg messen will,
+    // setzt globalThis.__constraintErrors.
+    export const constraintErrors = (...args) => (
+      typeof globalThis.__constraintErrors === 'function' ? globalThis.__constraintErrors(...args) : []
+    );
     export const mountFooter = () => null;
     // Wer sehen will, WOHIN ein Formular sich legt (R19, Bearbeiten in der
     // Detailspalte), setzt globalThis.__dockNextModal.
@@ -302,6 +309,8 @@ const STUBS = {
       return { update: () => true, isOpen: () => true };
     };
     export const closeDetailView = () => {};
+    // R21 D7: Sprung aus der Leseansicht in ein anderes Modul - hier nur Merker.
+    export const leaveDetailTo = (url) => { globalThis.__leftDetailTo = url; };
     // Dieselbe Regel wie im Original (R19): Bearbeiten als der eine
     // Primaerknopf am Ende, andere Primaerknoepfe treten zurueck.
     export const withPrimaryEdit = (actions = [], edit = null) => {
@@ -358,6 +367,9 @@ const STUBS = {
     export const drawChartOnce = () => 0;
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
+    // Den Kopf mit der Flaeche falten (Telefon-Monat): ohne Shell-Kopf nichts zu tun.
+    // Wer pruefen will, OB die Seite fragt, setzt globalThis.__headCollapse.
+    export const requestHeadCollapse = (toolbar, collapsed) => { globalThis.__headCollapse?.(toolbar, collapsed); };
     // Reine Pruefung ohne DOM - der Stub rechnet wie das Original.
     export const isImeComposing = (event) => Boolean(event?.isComposing || event?.keyCode === 229);
   `,

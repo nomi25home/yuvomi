@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Nothing matches your search and filters.",
         "searchReset": "Reset search",
         "passwordMinLength": "At least 8 characters.",
-        "savedReloadFailed": "Your change is saved, but the view could not be refreshed. Reload the page if something is missing."
+        "savedReloadFailed": "Your change is saved, but the view could not be refreshed. Reload the page if something is missing.",
+        "fieldNumber": "Enter a number.",
+        "fieldMin": "At least {{min}}.",
+        "fieldMax": "At most {{max}}.",
+        "fieldWholeNumber": "Enter a whole number.",
+        "fieldStep": "Enter a value in steps of {{step}}.",
+        "fieldInvalid": "Check this entry.",
+        "errorCheckRolledBack": "“{{name}}” is open again - ticking it off didn't go through. Try again.",
+        "errorUncheckRolledBack": "“{{name}}” is ticked off again - bringing it back didn't go through. Try again."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Label (e.g. work)",
         "mvRemove": "Remove entry",
         "birthdayLabel": "Birthday",
+        "showBirthday": "Show in birthdays",
         "birthdayHint": "Also appears in the calendar via the birthday import.",
         "phonePlaceholder": "+1 …",
         "phonePreview": "Preview: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "Budget categories could not be loaded.",
         "addCategory": "+ category",
         "addSubcategory": "+ subcategory",
-        "moreDetails": "More details",
         "newCategoryPrompt": "Name of the new category:",
         "newSubcategoryPrompt": "Name of the new subcategory:",
         "categoryAddedToast": "Category added.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Cycle setting saved.",
         "healthCyclePersonalLabel": "Show cycle",
         "healthCyclePersonalHint": "Applies to your own view only. Turning it off leaves the cycle visible for everyone else in the household.",
+        "healthCycleSettingsHint": "Cycle length, contraception, reminders and pregnancy mode are set on the cycle page.",
         "healthCyclePersonalHouseholdOff": "The cycle is currently switched off for the whole household, so it appears for nobody.",
         "healthCyclePersonalSaved": "Cycle view saved.",
         "pageRewardsModule": "Rewards",
@@ -2149,7 +2158,7 @@
         "familyRoleGrandparent": "Grandparent",
         "familyRoleRelative": "Relative",
         "familyRoleOther": "Family member",
-        "childStartHint": "New child accounts start without Budget and fasting and see Housekeeping read-only, without wages and payments. You can change this afterwards under \"Roles & permissions\".",
+        "childStartHint": "New child accounts start without Budget and fasting and see Housekeeping read-only, without wages and payments. You can change this afterwards under \"Roles & permissions\". The cycle is hidden too; it can be shown again in the child's personal settings.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "System admins can manage application settings, integrations, API tokens and family accounts.",
         "systemAdminBadge": "System admin",
@@ -2179,7 +2188,8 @@
         "languageTitle": "Language",
         "dataLanguageLabel": "Language of stored entries",
         "dataLanguageHint": "Language Yuvomi uses when it stores entries it creates itself, such as birthday events. Affects the API, calendar feed and synchronisation, not the display here.",
-        "dataLanguageAuto": "Automatic ({{language}})",
+        "dataLanguageAuto": "Automatic",
+        "hintWithCurrent": "Currently {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Only administrators can set the language of stored entries.",
         "dataLanguageSaved": "Language of stored entries updated",
         "sectionMeals": "Meal Plan",
@@ -2900,6 +2910,7 @@
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Sets currency, number, date and time format to match the region (e.g. Switzerland: 1'234.50). Choose “Custom” to configure them individually.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Only administrators can change region and currency.",
         "formatsHouseholdHint": "Date and time format apply to the whole household. Every member can change them.",
         "regionCustom": "Custom",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Time zone",
         "timezoneLabel": "Household time zone",
         "timezoneHint": "Applies wherever a time carries no zone of its own: reminders, countdowns, the calendar day called \"today\", the exported calendar feed, and events pushed to Google or Outlook.",
-        "timezoneAuto": "Automatic ({{zone}})",
+        "timezoneAuto": "Automatic",
         "timezoneAdminOnly": "Only administrators can change the time zone.",
         "timezoneSaved": "Time zone saved.",
         "timezoneMismatch": "Your browser is in {{browser}}, the household runs on {{household}}.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Notification setting saved.",
         "healthVisibilityTitle": "Default visibility",
         "healthVisibilityHint": "What new entries start as. You can still change it on every entry.",
+        "healthVisibilityCaregivers": "Anyone allowed to record for you also sees your private entries, except the cycle diary. An admin sets this under members.",
         "healthVisibilityOther": "Other areas",
         "healthVisibilityApply": "Move existing entries too",
         "healthVisibilityApplyHint": "Saved. Should the existing entries under {{area}} be changed as well?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "Enter at least two characters.",
         "weatherPlaceNotFound": "No place found with this name. Add the country, e.g. “Springfield, USA”.",
         "weatherPlaceUnavailable": "Place search is not reachable right now. Try again in a moment or enter the coordinates by hand.",
-        "weatherManualTitle": "Coordinates by hand"
+        "weatherManualTitle": "Coordinates by hand",
+        "backupDropzoneTitleTouch": "Tap to choose a backup file",
+        "installModuleDropzoneTitleTouch": "Tap to choose a ZIP file"
     },
     "login": {
-        "tagline": "Welcome back to your family planner.",
+        "tagline": "Welcome back. Your home in one place.",
         "usernameLabel": "Username",
         "passwordLabel": "Password",
         "loginButton": "Log in",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "Discard changes?",
         "unsavedChangesDetail": "Your entries in this form will be lost.",
         "discardChanges": "Discard",
-        "moreSettings": "More settings",
         "moreDetails": "More details"
     },
     "rrule": {
@@ -3448,6 +3461,7 @@
         "editTitle": "Edit birthday",
         "nameLabel": "Name",
         "birthDateLabel": "Birth date",
+        "showContact": "Show contact",
         "nameDay": "Name day",
         "celebratesNameDay": "celebrates their name day",
         "nameDayLabel": "Name day (optional)",
@@ -3577,11 +3591,13 @@
         "goTo": "Go to",
         "newSection": "Create new",
         "recentLabel": "Recently opened",
-        "createTaskNamed": "Create “{{title}}” as a task"
+        "createTaskNamed": "Create “{{title}}” as a task",
+        "hintMove": "Select",
+        "hintOpen": "Open"
     },
     "onboarding": {
         "step1Title": "Welcome to {{name}}",
-        "step1Body": "Your personal family planner. Tasks, calendar, shopping and more - all in one place.",
+        "step1Body": "Tasks, calendar, shopping and more for your household - whether you live alone, as a couple or as a family. All in one place.",
         "step2Title": "Navigation & Modules",
         "step2Body": "The bar at the bottom takes you straight to the most important areas. You will find all other modules under “More”.",
         "step3Title": "Get started quickly",
@@ -3931,7 +3947,10 @@
         "errorDmsAccountGone": "This DMS account no longer exists.",
         "errorDmsDocumentGone": "This document no longer exists in the DMS.",
         "errorDmsAlreadyLinked": "This DMS document is already linked.",
-        "errorDmsAlreadyStored": "This document is already stored in a DMS."
+        "errorDmsAlreadyStored": "This document is already stored in a DMS.",
+        "dropzoneTitleTouch": "Tap to choose a file",
+        "viewerPrevNamed": "Previous document: {{name}}",
+        "viewerNextNamed": "Next document: {{name}}"
     },
     "housekeeping": {
         "title": "Housekeeping",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "This visit no longer exists.",
         "errorTaskGone": "This task no longer exists.",
         "errorAlreadyCheckedOut": "This housekeeper is already checked out.",
-        "errorAlreadyCheckedIn": "This housekeeper is already checked in."
+        "errorAlreadyCheckedIn": "This housekeeper is already checked in.",
+        "allVisitsInReport": "All visits in the report"
     },
     "userMultiSelect": {
         "moreUsers": "more",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Open search with the magnifier on the overview or via “More”.",
         "mobileSettings": "Find settings under “More”.",
         "guideLink": "User guide",
-        "guideHint": "Community-maintained, in its own repository - it can lag behind a release."
+        "guideHint": "Maintained by the community. Opens in a new tab."
     },
     "changelog": {
         "title": "Changelog",
@@ -4379,8 +4399,9 @@
         "success": "Your password has been changed. You can now sign in.",
         "mismatch": "The passwords do not match.",
         "tooShort": "The password must be at least 8 characters long.",
-        "invalidToken": "This link is invalid or has expired.",
-        "missingToken": "No valid token was found."
+        "invalidToken": "This reset link is invalid or has expired - request a new one.",
+        "missingToken": "This reset link is incomplete - request a new one.",
+        "requestNew": "Request a new link"
     },
     "email": {
         "host": "SMTP host",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Upcoming reminders",
                 "empty": "No more doses today"
+            },
+            "brief": {
+                "changes": "Since the last measurement: {{list}}.",
+                "latest": "Last recorded: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} unchanged"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Log your first period to see predictions, calendar and statistics.",
             "emptyCta": "Log first period",
             "personsLabel": "Person",
-            "add": "Log period",
+            "add": "Add past period",
             "loadError": "Cycle data could not be loaded.",
             "loadErrorDesc": "Please try again later.",
             "retry": "Try again",
@@ -5406,15 +5433,14 @@
                 "family": "Family"
             },
             "period": {
-                "add": "Log period",
+                "add": "Add past period",
                 "edit": "Edit period",
                 "warningFuture": "Start date is in the future - predictions are based only on past periods.",
                 "warningOverlap": "Overlaps with an already logged period."
             },
             "dayLog": {
                 "title": "Log day",
-                "date": "Date",
-                "more": "More details"
+                "date": "Date"
             },
             "export": {
                 "csv": "Export as CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Average cycle length",
                 "periodLength": "Average period length",
                 "lutealLength": "Luteal phase length",
+                "daysUnit": "days",
                 "trackFertility": "Show fertile window",
-                "autoHint": "Leave empty to calculate automatically from your history.",
+                "autoHint": "Leave either field empty and Yuvomi works out the value from the periods you have logged.",
                 "remindPeriodDaysBefore": "Period reminder",
                 "remindOff": "Off",
                 "remindSameDay": "On the day",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Please choose a CSV file or paste text.",
                 "error": "Import failed."
             },
-            "discoveryHint": "Tip: subscribe to the predicted cycle as an ICS feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Settings → Modules → Calendar</a>, or show the cycle widget on the <a href=\"/\">Overview</a> via its customize mode."
+            "feedLink": "Subscribe to the predicted cycle in your calendar",
+            "widgetHint": "Add the cycle tile to the {{overview}} under “{{customize}}”.",
+            "endBeforeStart": "The end can't be before the start."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -5542,6 +5571,7 @@
             "unitH": "h"
         },
         "careBanner": "You are recording for {{name}}.",
+        "whoSees": "Who can see this?",
         "nutrition": {
             "title": "Nutrition",
             "emptyTitle": "No nutrition logged yet",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "Sat",
         "weekdaySun": "Sun",
         "intervalLabelWeekly": "Every N weeks",
+        "intervalLabelMonthly": "Every N months",
         "anchorDateLabel": "First pickup",
         "monthDayLabel": "Day of month",
         "monthDayLastDay": "Last day of the month",
@@ -6271,8 +6302,8 @@
         "success": "Your account has been created. You can sign in now.",
         "mismatch": "The passwords do not match.",
         "tooShort": "The password must be at least 8 characters long.",
-        "invalidToken": "This invitation is invalid, expired, or has already been used.",
-        "missingToken": "No valid token was found.",
+        "invalidToken": "This invitation is invalid, has expired or was already used - ask for a new link.",
+        "missingToken": "This invitation link is invalid or has expired - ask for a new one.",
         "usernameRequired": "Please choose a username.",
         "usernameInvalid": "The username must be 3 to 64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.",
         "usernameTaken": "This username is already taken.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Work",
         "templateSchool": "School",
         "templateUniversity": "University",
-        "overview": "Compare",
+        "overview": "Overview",
         "overviewPeopleLabel": "Compare people",
-        "overviewClearSelection": "Clear selection",
         "continuesUntil": "…continues until {{time}}",
         "overviewEmptyTitle": "Pick people to compare",
         "overviewEmptyDescription": "Select at least one household member above to see their weekly timetables side by side.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Name of this device (optional)",
         "labelHint": "Helps you recognise later which device this is.",
         "submit": "Pair",
-        "failed": "This pairing code is not valid."
+        "failed": "This pairing code is not valid.",
+        "codeRequired": "Enter the pairing code shown in Settings."
     }
 }

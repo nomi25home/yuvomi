@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Không có mục nào khớp với tìm kiếm và bộ lọc của bạn.",
         "searchReset": "Đặt lại tìm kiếm",
         "passwordMinLength": "Ít nhất 8 ký tự.",
-        "savedReloadFailed": "Thay đổi đã được lưu nhưng không thể làm mới chế độ xem. Hãy tải lại trang nếu thiếu thứ gì đó."
+        "savedReloadFailed": "Thay đổi đã được lưu nhưng không thể làm mới chế độ xem. Hãy tải lại trang nếu thiếu thứ gì đó.",
+        "fieldNumber": "Hãy nhập một số.",
+        "fieldMin": "Tối thiểu {{min}}.",
+        "fieldMax": "Tối đa {{max}}.",
+        "fieldWholeNumber": "Hãy nhập một số nguyên.",
+        "fieldStep": "Hãy nhập giá trị theo bước {{step}}.",
+        "fieldInvalid": "Hãy kiểm tra mục này.",
+        "errorCheckRolledBack": "\"{{name}}\" đã mở lại - chưa đánh dấu được. Hãy thử lại.",
+        "errorUncheckRolledBack": "\"{{name}}\" đã được đánh dấu lại - chưa hoàn tác được. Hãy thử lại."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Nhãn (vd: cơ quan)",
         "mvRemove": "Xóa mục",
         "birthdayLabel": "Sinh nhật",
+        "showBirthday": "Xem trong sinh nhật",
         "birthdayHint": "Cũng xuất hiện trong lịch qua tính năng nhập sinh nhật.",
         "phonePlaceholder": "+84 …",
         "phonePreview": "Xem trước: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "Không thể tải danh mục ngân sách.",
         "addCategory": "+ danh mục",
         "addSubcategory": "+ danh mục phụ",
-        "moreDetails": "Thông tin thêm",
         "newCategoryPrompt": "Tên của danh mục mới:",
         "newSubcategoryPrompt": "Tên của danh mục phụ mới:",
         "categoryAddedToast": "Danh mục đã được thêm.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Đã lưu cài đặt chu kỳ.",
         "healthCyclePersonalLabel": "Hiện chu kỳ",
         "healthCyclePersonalHint": "Chỉ áp dụng cho chế độ xem của bạn. Nếu tắt, chu kỳ vẫn hiển thị với những người khác trong gia đình.",
+        "healthCycleSettingsHint": "Độ dài chu kỳ, biện pháp tránh thai, nhắc nhở và chế độ mang thai được đặt trên trang chu kỳ.",
         "healthCyclePersonalHouseholdOff": "Chu kỳ hiện đang tắt cho cả gia đình nên không hiển thị với ai.",
         "healthCyclePersonalSaved": "Đã lưu hiển thị chu kỳ.",
         "pageRewardsModule": "Phần thưởng",
@@ -2149,7 +2158,7 @@
         "familyRoleGrandparent": "Ông bà",
         "familyRoleRelative": "Họ hàng",
         "familyRoleOther": "Thành viên gia đình",
-        "childStartHint": "Tài khoản trẻ em mới bắt đầu không có Ngân sách và nhịn ăn, chỉ xem Người giúp việc ở chế độ đọc, không có tiền công và thanh toán. Bạn có thể đổi sau trong “Vai trò và quyền”.",
+        "childStartHint": "Tài khoản trẻ em mới bắt đầu không có Ngân sách và nhịn ăn, chỉ xem Người giúp việc ở chế độ đọc, không có tiền công và thanh toán. Bạn có thể đổi sau trong “Vai trò và quyền”. Chu kỳ cũng bị ẩn; có thể hiện lại trong cài đặt cá nhân của trẻ.",
         "systemAdminLabel": "Quản trị hệ thống",
         "systemAdminHint": "Quản trị hệ thống có thể quản lý cài đặt ứng dụng, tích hợp, mã API và tài khoản gia đình.",
         "systemAdminBadge": "Quản trị hệ thống",
@@ -2179,7 +2188,8 @@
         "languageTitle": "Ngôn ngữ",
         "dataLanguageLabel": "Ngôn ngữ của mục đã lưu",
         "dataLanguageHint": "Ngôn ngữ Yuvomi dùng khi lưu các mục do chính nó tạo, ví dụ sự kiện sinh nhật. Ảnh hưởng đến API, nguồn cấp lịch và đồng bộ hóa, không ảnh hưởng đến hiển thị ở đây.",
-        "dataLanguageAuto": "Tự động ({{language}})",
+        "dataLanguageAuto": "Tự động",
+        "hintWithCurrent": "Hiện tại: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Chỉ quản trị viên mới có thể đặt ngôn ngữ của mục đã lưu.",
         "dataLanguageSaved": "Đã cập nhật ngôn ngữ của mục đã lưu",
         "sectionMeals": "Kế hoạch Bữa ăn",
@@ -2863,6 +2873,7 @@
         "regionTitle": "Khu vực / Định dạng",
         "regionLabel": "Khu vực",
         "regionHint": "Đặt tiền tệ, định dạng số, ngày và giờ theo khu vực (ví dụ: Thụy Sĩ 1'234.50). Chọn “Tùy chỉnh” để cấu hình riêng.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Chỉ quản trị viên mới có thể thay đổi khu vực và tiền tệ.",
         "formatsHouseholdHint": "Định dạng ngày và giờ áp dụng cho cả gia đình. Mọi thành viên đều có thể thay đổi.",
         "regionCustom": "Tùy chỉnh",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Múi giờ",
         "timezoneLabel": "Múi giờ của gia đình",
         "timezoneHint": "Áp dụng ở mọi nơi mà một thời điểm không mang múi giờ riêng: lời nhắc, đếm ngược, ngày lịch được gọi là \"hôm nay\", nguồn cấp lịch đã xuất và các sự kiện gửi sang Google hoặc Outlook.",
-        "timezoneAuto": "Tự động ({{zone}})",
+        "timezoneAuto": "Tự động",
         "timezoneAdminOnly": "Chỉ quản trị viên mới có thể thay đổi múi giờ.",
         "timezoneSaved": "Đã lưu múi giờ.",
         "timezoneMismatch": "Trình duyệt của bạn ở {{browser}}, gia đình tính theo {{household}}.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Đã lưu cài đặt thông báo.",
         "healthVisibilityTitle": "Hiển thị mặc định",
         "healthVisibilityHint": "Giá trị khởi đầu của mục mới. Bạn vẫn có thể đổi ở từng mục.",
+        "healthVisibilityCaregivers": "Người được phép ghi thay bạn cũng xem được các mục riêng tư của bạn, trừ nhật ký chu kỳ. Quản trị viên thiết lập điều này trong thành viên.",
         "healthVisibilityOther": "Khu vực khác",
         "healthVisibilityApply": "Đổi cả các mục hiện có",
         "healthVisibilityApplyHint": "Đã lưu. Có đổi cả các mục hiện có trong {{area}} không?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "Nhập ít nhất hai ký tự.",
         "weatherPlaceNotFound": "Không tìm thấy địa điểm nào có tên này. Hãy thêm tên nước, ví dụ “Tân An, Việt Nam”.",
         "weatherPlaceUnavailable": "Hiện không thể tìm địa điểm. Hãy thử lại sau ít phút hoặc nhập tọa độ thủ công.",
-        "weatherManualTitle": "Nhập tọa độ thủ công"
+        "weatherManualTitle": "Nhập tọa độ thủ công",
+        "backupDropzoneTitleTouch": "Chạm để chọn tệp sao lưu",
+        "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP"
     },
     "login": {
-        "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",
+        "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",
         "usernameLabel": "Tên người dùng",
         "passwordLabel": "Mật khẩu",
         "loginButton": "Đăng nhập",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "Bỏ qua các thay đổi?",
         "unsavedChangesDetail": "Nội dung bạn đã nhập trong biểu mẫu này sẽ bị mất.",
         "discardChanges": "Bỏ qua",
-        "moreSettings": "Cài đặt khác",
         "moreDetails": "Thông tin thêm"
     },
     "rrule": {
@@ -3448,6 +3461,7 @@
         "editTitle": "Sửa sinh nhật",
         "nameLabel": "Tên",
         "birthDateLabel": "Ngày sinh",
+        "showContact": "Xem liên hệ",
         "nameDay": "Ngày tên thánh",
         "celebratesNameDay": "mừng ngày tên thánh",
         "nameDayLabel": "Ngày tên thánh (không bắt buộc)",
@@ -3577,11 +3591,13 @@
         "goTo": "Đi tới",
         "newSection": "Tạo mới",
         "recentLabel": "Mở gần đây",
-        "createTaskNamed": "Tạo “{{title}}” thành việc cần làm"
+        "createTaskNamed": "Tạo “{{title}}” thành việc cần làm",
+        "hintMove": "Chọn",
+        "hintOpen": "Mở"
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",
-        "step1Body": "Bảng kế hoạch gia đình cá nhân của bạn. Nhiệm vụ, lịch, mua sắm và hơn thế nữa - tất cả ở cùng một nơi.",
+        "step1Body": "Nhiệm vụ, lịch, mua sắm và hơn thế nữa cho ngôi nhà của bạn - dù bạn sống một mình, hai người hay cả gia đình. Tất cả ở cùng một nơi.",
         "step2Title": "Điều hướng & Các mô-đun",
         "step2Body": "Thanh bên dưới đưa bạn thẳng đến những khu vực quan trọng nhất. Các mô-đun còn lại nằm trong “Thêm”.",
         "step3Title": "Bắt đầu nhanh chóng",
@@ -3931,7 +3947,10 @@
         "errorDmsAccountGone": "Tài khoản DMS này không còn tồn tại.",
         "errorDmsDocumentGone": "Tài liệu này không còn tồn tại trong DMS.",
         "errorDmsAlreadyLinked": "Tài liệu DMS này đã được liên kết.",
-        "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS."
+        "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS.",
+        "dropzoneTitleTouch": "Chạm để chọn tệp",
+        "viewerPrevNamed": "Tài liệu trước: {{name}}",
+        "viewerNextNamed": "Tài liệu tiếp theo: {{name}}"
     },
     "housekeeping": {
         "title": "Dọn dẹp",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "Lượt đến này không còn nữa.",
         "errorTaskGone": "Nhiệm vụ này không còn nữa.",
         "errorAlreadyCheckedOut": "Người dọn dẹp này đã trả ca.",
-        "errorAlreadyCheckedIn": "Người dọn dẹp này đã vào ca."
+        "errorAlreadyCheckedIn": "Người dọn dẹp này đã vào ca.",
+        "allVisitsInReport": "Tất cả lượt đến trong báo cáo"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Mở tìm kiếm bằng kính lúp trên trang tổng quan hoặc qua “Thêm”.",
         "mobileSettings": "Bạn tìm thấy cài đặt trong “Thêm”.",
         "guideLink": "Hướng dẫn sử dụng",
-        "guideHint": "Do cộng đồng duy trì, trong kho riêng - có thể chậm hơn một bản phát hành."
+        "guideHint": "Do cộng đồng duy trì. Mở trong thẻ mới."
     },
     "changelog": {
         "title": "Nhật ký thay đổi",
@@ -4379,8 +4399,9 @@
         "success": "Mật khẩu của bạn đã được thay đổi. Bây giờ bạn có thể đăng nhập.",
         "mismatch": "Mật khẩu không khớp.",
         "tooShort": "Mật khẩu phải dài ít nhất 8 ký tự.",
-        "invalidToken": "Liên kết này không hợp lệ hoặc đã hết hạn.",
-        "missingToken": "Không tìm thấy mã hợp lệ."
+        "invalidToken": "Liên kết đặt lại này không hợp lệ hoặc đã hết hạn - hãy yêu cầu liên kết mới.",
+        "missingToken": "Liên kết đặt lại này không đầy đủ - hãy yêu cầu liên kết mới.",
+        "requestNew": "Yêu cầu liên kết mới"
     },
     "email": {
         "host": "Máy chủ SMTP",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Nhắc nhở tiếp theo",
                 "empty": "Hôm nay không còn lần dùng thuốc nào"
+            },
+            "brief": {
+                "changes": "Kể từ lần đo trước: {{list}}.",
+                "latest": "Ghi nhận gần nhất: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} không đổi"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Ghi lại kỳ kinh đầu tiên để xem dự đoán, lịch và thống kê.",
             "emptyCta": "Ghi kỳ kinh đầu tiên",
             "personsLabel": "Person",
-            "add": "Ghi kỳ kinh",
+            "add": "Thêm kỳ kinh trước đó",
             "loadError": "Không thể tải dữ liệu chu kỳ.",
             "loadErrorDesc": "Vui lòng thử lại sau.",
             "retry": "Thử lại",
@@ -5406,15 +5433,14 @@
                 "family": "Gia đình"
             },
             "period": {
-                "add": "Ghi kỳ kinh",
+                "add": "Thêm kỳ kinh trước đó",
                 "edit": "Sửa kỳ kinh",
                 "warningFuture": "Ngày bắt đầu nằm trong tương lai - dự đoán chỉ dựa trên các chu kỳ trong quá khứ.",
                 "warningOverlap": "Trùng với một chu kỳ đã được ghi lại."
             },
             "dayLog": {
                 "title": "Ghi lại ngày",
-                "date": "Ngày",
-                "more": "Thông tin thêm"
+                "date": "Ngày"
             },
             "export": {
                 "csv": "Xuất ra CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Độ dài chu kỳ trung bình",
                 "periodLength": "Độ dài kỳ kinh trung bình",
                 "lutealLength": "Độ dài giai đoạn hoàng thể",
+                "daysUnit": "ngày",
                 "trackFertility": "Hiển thị cửa sổ dễ thụ thai",
-                "autoHint": "Để trống = tự động tính từ lịch sử của bạn.",
+                "autoHint": "Nếu để trống một trong hai ô, Yuvomi sẽ tính giá trị từ các kỳ kinh bạn đã ghi.",
                 "remindPeriodDaysBefore": "Nhắc nhở kỳ kinh",
                 "remindOff": "Tắt",
                 "remindSameDay": "Vào đúng ngày",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Vui lòng chọn tệp CSV hoặc dán văn bản.",
                 "error": "Nhập không thành công."
             },
-            "discoveryHint": "Mẹo: bạn có thể đăng ký chu kỳ dự đoán dưới dạng feed ICS tại <a href=\"/settings/modules/calendar?section=personal-feeds\">Cài đặt → Mô-đun → Lịch</a>, hoặc hiển thị tiện ích chu kỳ trên <a href=\"/\">Tổng quan</a> qua chế độ tùy chỉnh."
+            "feedLink": "Đăng ký chu kỳ dự đoán trong lịch",
+            "widgetHint": "Thêm ô chu kỳ vào {{overview}} trong “{{customize}}”.",
+            "endBeforeStart": "Thời điểm kết thúc không thể trước thời điểm bắt đầu."
         },
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",
@@ -5542,6 +5571,7 @@
             "unitH": "giờ"
         },
         "careBanner": "Bạn đang ghi cho {{name}}.",
+        "whoSees": "Ai xem được?",
         "nutrition": {
             "title": "Dinh dưỡng",
             "emptyTitle": "Chưa ghi nhận dinh dưỡng nào",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "T7",
         "weekdaySun": "CN",
         "intervalLabelWeekly": "Mỗi N tuần",
+        "intervalLabelMonthly": "Mỗi N tháng",
         "anchorDateLabel": "Lần thu gom đầu tiên",
         "monthDayLabel": "Ngày trong tháng",
         "monthDayLastDay": "Ngày cuối cùng của tháng",
@@ -6271,8 +6302,8 @@
         "success": "Tài khoản của bạn đã được tạo. Bây giờ bạn có thể đăng nhập.",
         "mismatch": "Mật khẩu không khớp.",
         "tooShort": "Mật khẩu phải dài ít nhất 8 ký tự.",
-        "invalidToken": "Lời mời này không hợp lệ, đã hết hạn hoặc đã được dùng.",
-        "missingToken": "Không tìm thấy mã hợp lệ.",
+        "invalidToken": "Lời mời này không hợp lệ, đã hết hạn hoặc đã được dùng - hãy xin liên kết mới.",
+        "missingToken": "Liên kết mời này không hợp lệ hoặc đã hết hạn - hãy xin liên kết mới.",
         "usernameRequired": "Hãy chọn một tên đăng nhập.",
         "usernameInvalid": "Tên đăng nhập phải dài từ 3 đến 64 ký tự và chỉ gồm chữ cái, chữ số, dấu chấm, dấu gạch ngang và gạch dưới.",
         "usernameTaken": "Tên đăng nhập này đã được dùng.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Công việc",
         "templateSchool": "Trường học",
         "templateUniversity": "Đại học",
-        "overview": "So sánh",
+        "overview": "Tổng quan",
         "overviewPeopleLabel": "So sánh mọi người",
-        "overviewClearSelection": "Xóa lựa chọn",
         "continuesUntil": "…tiếp tục đến {{time}}",
         "overviewEmptyTitle": "Chọn người để so sánh",
         "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Tên thiết bị này (không bắt buộc)",
         "labelHint": "Giúp nhận ra sau này đây là thiết bị nào.",
         "submit": "Ghép nối",
-        "failed": "Mã ghép nối này không hợp lệ."
+        "failed": "Mã ghép nối này không hợp lệ.",
+        "codeRequired": "Nhập mã ghép nối hiển thị trong Cài đặt."
     }
 }

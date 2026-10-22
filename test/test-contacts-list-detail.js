@@ -424,3 +424,77 @@ test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie
     else delete globalThis.navigator;
   }
 });
+
+/* D7 (Critique R21): KONTAKT UND GEBURTSTAG KENNEN EINANDER. Ein importierter
+ * Geburtstag traegt seit Migration 90 seinen Kontakt (`contact_id`), die
+ * Kontaktseite bekommt den Rueckweg (`birthday_id`, routes/contacts.js). Die
+ * Geburtstagszeile der Leseansicht fuehrt dann "In Geburtstagen anzeigen" -
+ * ein Schritt statt Modulwechsel, Suche und Antippen. Ohne Verknuepfung, oder
+ * ohne Zugang zum Geburtstagsmodul, gibt es den Knopf nicht. */
+test('R21 D7: die Geburtstagszeile eines verknuepften Kontakts fuehrt zum Geburtstag', () => {
+  const rows = contacts.renderContactDetail({ id: 7, name: 'Tante', birthday: '1970-05-04', birthday_year_unknown: 0, birthday_id: 42 });
+  const row = rows.find((r) => r.icon === 'cake');
+  assert.ok(row?.action, 'die Zeile traegt eine Folgeaktion');
+  assert.equal(row.action.label, 'contacts.showBirthday');
+  assert.equal(contacts.birthdayHref(42), '/birthdays?open=42');
+  const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
+  assert.equal(lose.find((r) => r.icon === 'cake')?.action ?? null, null, 'ohne Verknuepfung kein Weg');
+});
+
+// R21 S7 (Critique a3): zwei Kanten im Kontakt. Im Leseblatt stand der erste
+// antippbare Wert mit dem halben Ueberstand seines 44px-Ziels unter dem Label
+// (Label -> Wert 15px, bei Kategorie 3px); im Formular endete der Platzhalter
+// des Labelfelds mobil als "Label (z. B. A" (122 von 162px).
+test('R21 S7: Label und Wert stehen dicht, das Labelfeld steht schmal unter dem Wert', () => {
+  const css = readFileSync(new URL('../public/styles/contacts.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const pull = rules.find((r) => r.selector.trim() === '.contact-detail__value:first-child > .contact-detail__link');
+  assert.match(pull?.body ?? '', /margin-block-start:\s*calc\(\(var\(--line-height-base\) \* 1em - var\(--target-base\)\) \/ 2\)/,
+    'der erste Wert zieht den Ueberstand seines Ziels zurueck');
+  const list = rules.find((r) => r.selector.trim() === '.contact-mv-list');
+  assert.match(list?.body ?? '', /container:\s*contact-mv \/ inline-size/);
+  const label = rules.find((r) => r.selector.trim() === '.contact-mv-row > .contact-mv-row__label' && r.at.some((a) => /@container contact-mv \(max-width:/.test(a)));
+  assert.match(label?.body ?? '', /grid-row:\s*2/, 'schmal steht das Label in einer eigenen Zeile');
+});
+
+// R21 S9b (Critique a3): Liste und Detail zeigten dieselbe Nummer verschieden -
+// die Zeile formatiert (enhancePhones), der Link der Detailansicht behielt den
+// Rohwert, weil der A-Zweig nur das Ziel setzte. Jetzt bekommt ein Link, der die
+// Nummer selbst traegt, dieselbe Anzeige; ein Aktionslink ("Anrufen") behaelt
+// sein Wort.
+test('Liste und Detail zeigen eine Telefonnummer in derselben Form', async () => {
+  const { __primePhoneLib } = await import('../public/utils/phone.js');
+  __primePhoneLib({
+    parse: (value) => ({
+      country: 'DE', number: '+492314452210',
+      formatNational: () => '0231 4452210', formatInternational: () => '+49 231 4452210',
+    }),
+    AsYouType: class {}, isPossible: () => true, metadata: {},
+  });
+  try {
+    contacts.state.defaultCountry = 'AT';
+    const raw = '+49 231 445 2210';
+    const el = (tag, text) => {
+      const node = document.createElement(tag);
+      // mini-dom fuehrt den Tag klein; der Browser (und enhancePhones) gross.
+      node.tagName = tag.toUpperCase();
+      node.dataset.phoneRaw = raw;
+      node.textContent = text;
+      if (tag === 'a') node.href = 'tel:x';
+      return node;
+    };
+    const zeile = el('span', raw);
+    const detail = el('a', raw);
+    const aktion = el('a', 'Anrufen');
+    const root = { querySelectorAll: () => [zeile, detail, aktion] };
+    await contacts.enhancePhones(root);
+    assert.equal(zeile.textContent, '+49 231 4452210', 'die Zeile formatiert');
+    assert.equal(detail.textContent, zeile.textContent, 'der Link der Detailansicht zeigt dieselbe Form');
+    assert.equal(detail.getAttribute('dir'), 'ltr');
+    assert.match(detail.href, /^tel:\+492314452210$/, 'und waehlt E.164');
+    assert.equal(aktion.textContent, 'Anrufen', 'ein Aktionslink behaelt sein Wort');
+    assert.match(aktion.href, /^tel:\+492314452210$/);
+  } finally {
+    __primePhoneLib(null);
+  }
+});

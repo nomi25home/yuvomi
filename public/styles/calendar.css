@@ -63,6 +63,40 @@
   touch-action: pan-y pinch-zoom;
 }
 
+/* ECHTES UMBLAETTERN (Critique R21, D2). Waehrend des Wischs steht der
+ * vorgeladene Nachbarzeitraum als Bild neben der Ansicht (`.period-swipe-ghost`,
+ * absolut im Traeger) und zieht mit dem Finger herein; Stundenachse, die Ecke
+ * darueber, die Ganztags-Beschriftung und die Wochentage stehen (period-swipe.js
+ * haelt sie gegen den Zug). Der Inhalt gleitet UNTER ihnen durch: sie liegen
+ * eine Ebene hoeher und tragen die Flaeche, auf der sie sonst stehen - die
+ * Seite in der Woche, die Karte im Tag. Waagerecht scrollt das Raster dabei
+ * nicht mit (die gehaltene Achse ragte sonst als Ueberlauf hinaus). */
+#cal-body {
+  position: relative;
+}
+
+/* Ueber allem, was im Raster liegt (Termine bis z-index 3, der Jetzt-Punkt 3):
+ * die Achse klebt, solange geblaettert wird - `--z-sticky`. */
+#cal-body.is-period-paging .week-view__time-gutter,
+#cal-body.is-period-paging .week-view .calendar-all-day-label,
+#cal-body.is-period-paging .week-view__times {
+  position: relative;
+  z-index: var(--z-sticky);
+  background-color: var(--color-bg);
+}
+
+#cal-body.is-period-paging .day-view .calendar-all-day-label,
+#cal-body.is-period-paging .day-view__times {
+  position: relative;
+  z-index: var(--z-sticky);
+  background-color: var(--color-surface);
+}
+
+#cal-body.is-period-paging .week-view__scroll,
+#cal-body.is-period-paging .day-view__scroll {
+  overflow-x: hidden;
+}
+
 /* Das Hereingleiten des neuen Zeitraums (`.period-swipe-in--next/--prev`) steht
  * in layout.css: der Wisch (utils/period-swipe.js) blaettert seit R17 auch den
  * Monat im Budget, und dieses Stylesheet laedt nur mit dem Kalender. */
@@ -496,6 +530,60 @@
   .page-toolbar.cal-toolbar.cal-toolbar--one-row > .page-toolbar__actions {
     order: 1;
   }
+
+  /* DIE KOMPAKTE EINE ZEILE (Critique R21, D9 - calendar.js `syncToolbarFit`).
+   * Wo die volle Zeile nicht passt (1280: 153px zu wenig), steht der Kopf
+   * trotzdem in einer Zeile: "Kalender verwalten" wohnt dann nur im
+   * Filterblatt (dort steht der Eintrag auf jeder Breite), und die Suche nimmt
+   * die Icon-Form der Shell - dieselbe Haut wie unter 768px (layout.css,
+   * "Die Suche wechselt in ihre Icon-Form"): Quadrat in Zielgroesse, Ring,
+   * Lupe im Akzent, das Feld darin unsichtbar. Mit Fokus oder Begriff geht sie
+   * zum Feld auf und nimmt den Platz der Ansichtswahl - die Treffer ersetzen
+   * die Ansicht ohnehin, und die Zeile bricht nicht um. */
+  .page-toolbar.cal-toolbar--compact > .page-toolbar__actions > .cal-toolbar__calendars-btn {
+    display: none;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
+    flex: 0 0 auto;
+    width: var(--target-base);
+    min-width: var(--target-base);
+    max-width: var(--target-base);
+    block-size: var(--target-base);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__input {
+    min-height: 0;
+    block-size: calc(var(--target-base) - 2 * 1.5px);
+    padding-inline: 0;
+    border-color: transparent;
+    background: transparent;
+    color: transparent;
+  }
+
+  /* Ohne `:has()`: ein Platzhalter steht nur im leeren Feld (Begruendung und
+   * Messung an der gleichen Regel in layout.css). */
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within) .page-search__input::placeholder {
+    color: transparent;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__icon {
+    inset-inline: 0;
+    margin-inline: auto;
+    color: var(--color-accent);
+  }
+
+  .page-toolbar.cal-toolbar--compact:has(.cal-toolbar__search:focus-within) .cal-toolbar__views,
+  .page-toolbar.cal-toolbar--compact:has(.cal-toolbar__search input:not(:placeholder-shown)) .cal-toolbar__views {
+    display: none;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:is(:focus-within, :has(input:not(:placeholder-shown))) {
+    flex: 1 1 auto;
+    max-width: none;
+  }
 }
 
 /* TABLET (768-1023px): ZWEI ZEILEN STATT DREI (Critique 2026-10-16: 182px in
@@ -625,11 +713,29 @@
     min-height: var(--target-base);
   }
 
-  .cal-toolbar__view-menu-label {
+  /* DIE BREITE GIBT DAS LAENGSTE WORT VOR, NICHT DAS GEZEIGTE (Critique R21,
+   * a3: der Weiter-Pfeil sprang 26px zwischen „Tag" und „Agenda"). Alle vier
+   * Woerter liegen in EINER Rasterzelle, nur das der aktiven Ansicht ist zu
+   * sehen; die Zelle ist so breit wie das breiteste. Die Obergrenze des Knopfs
+   * (oben) und die Ellipse gelten weiter: `minmax(0, 1fr)` laesst die Zelle
+   * darunter schrumpfen. */
+  .cal-toolbar__view-menu-words {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .cal-toolbar__view-menu-label,
+  .cal-toolbar__view-menu-sizer {
+    grid-area: 1 / 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .cal-toolbar__view-menu-sizer {
+    visibility: hidden;
   }
 
   /* DER RESET LIEGT AUF DEM WERT (Muster Budget, layout.css `--period-inline`):
@@ -693,6 +799,13 @@
    * "17.10. - 16.11.2026" ungekuerzt (gemessen 158px Text in 154px). */
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu {
     padding-inline: var(--space-2);
+  }
+
+  /* Eingeklappt gibt es keine Pfeile, die stehen muessten (R21): der Knopf
+   * nimmt dort nur sein eigenes Wort, und das Label behaelt die Breite
+   * (320px, Tag: 92 -> 118px). Die Platzhalter verlassen nur den Fluss. */
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu-sizer {
+    position: absolute;
   }
 }
 
@@ -920,7 +1033,7 @@
   gap: var(--space-1);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
-  padding: var(--space-0h) var(--space-1);
+  padding: var(--cal-chip-pad-block) var(--space-1);
   border-radius: var(--radius-xs);
   margin-bottom: var(--space-0h);
   white-space: nowrap;
@@ -1411,12 +1524,6 @@
   margin-top: var(--space-2);
 }
 
-/* `display: flex` schlaegt das UA-`[hidden]`: ohne Anhang stand der leere
- * Vorschaublock im Termin-Modal (#1340). */
-.event-attachment-preview[hidden] {
-  display: none;
-}
-
 .event-attachment-preview img {
   width: 100%;
   max-height: 180px;
@@ -1440,10 +1547,6 @@
   margin: 0 0 var(--space-2);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-}
-
-#modal-remove-attachment[hidden] {
-  display: none;
 }
 
 /* --------------------------------------------------------
@@ -1817,6 +1920,23 @@
   margin-bottom: var(--space-4);
 }
 
+/* LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST - wie Aufgaben, Kontakte und
+ * Rezepte (Critique R21 S8; Guide defer-rendering-heavy-content). Die Agenda
+ * ist die laengste Liste der App: im Seed 26 Tage, rund 800 Knoten unter der
+ * Falz, und jeder Dialog (Inertheit des Hintergrunds) berechnete ihren Stil
+ * mit. Ab dem zweiten Tag - der erste steht immer in der Falz - ueberspringt
+ * der Browser Tage ausser Sicht; `auto` merkt sich danach die echte Hoehe.
+ * `overflow-clip-margin` laesst Schatten und Fokusring des Traegers ueber die
+ * Gruppenkante, die die Paint-Containment sonst abschnitte (im Browser
+ * geprueft). Der klebende Tageskopf bleibt in seinem Tag, wie bisher. */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .agenda-day + .agenda-day {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 160px;
+    overflow-clip-margin: var(--space-2);
+  }
+}
+
 
 /* Der Kopf fluchtet mit dem Träger der Tageszeilen (.row-carrier aus
  * list-row.css, mit dem app-weit einen Lesemaß) - sonst stünde das Datum
@@ -1843,8 +1963,10 @@
  * Scrollen oben, nennt einen relativen Tag und das volle Datum („Heute ·
  * Freitag, 16. Oktober") und traegt die Heute-Farbe. Ein Datum in Versalien
  * mit Tracking liest sich als Ruf, und der Wochentag wuerde zur Abkuerzung
- * gezwungen. Darum Satzschreibung, 14px fett + sekundaer - eine Stufe ueber
- * dem Mikro-Label, unter dem Abschnittstitel (20px).
+ * gezwungen. Darum Satzschreibung in Subheadline 15, halbfett - das relative
+ * Wort in der Textfarbe, der volle Tag sekundaer -, eine Stufe ueber dem Mikro-Label und der
+ * Metazeile (13), unter dem Abschnittstitel (20px). Bis R21 stand er bei
+ * 14/700: 14 ist die Stufe der Bedienelemente, 700 die der Titel (D4, S9b).
  *
  * Die Schriftgroesse steht auch am Kopf selbst, nicht nur an seinen zwei
  * Spans: er ist ein h2/h3, und dessen Rolle (24px) bestimmte die Hoehe der
@@ -1853,7 +1975,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  font-size: var(--text-sm);
+  font-size: var(--type-secondary);
   padding: var(--space-2) 0 var(--space-1);
   /* 1px, nicht 2: der Tageskopf war die einzige 2px-Trennung neben lauter
    * 1px-Linien, und über einem randlosen Träger las sie als zweite Trennung.
@@ -1887,13 +2009,13 @@
 }
 
 .agenda-day__date {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
 .agenda-day__weekday {
-  font-size: var(--text-sm);
+  font-size: var(--type-secondary);
   color: var(--color-text-secondary);
 }
 
@@ -2155,10 +2277,6 @@
 /* Der Kein-Treffer-Zustand der Icon-Suche ist seit Block 2 die geteilte
  * .empty-state--compact (layout.css). */
 
-.event-icon-picker__grid[hidden] {
-  display: none !important;
-}
-
 .event-icon-picker__option {
   height: 42px;
   display: inline-flex;
@@ -2208,7 +2326,6 @@
  * nicht (drei 20px-Avatare, feste Breite), der ORT gibt nach. Er ist die
  * einzige Angabe der Zeile, von der ein Anfang schon nützt. */
 .agenda-event__meta {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;
@@ -2713,7 +2830,7 @@
  * `is-clipped` und zaehlt ins „+N". Die Schicht nimmt keine Zeiger an, nur
  * ihre Baender - ein Klick daneben trifft die Zelle darunter. */
 .month-grid {
-  --month-band-h: calc(var(--text-xs) * 1.4 + 2 * var(--space-0h));
+  --month-band-h: calc(var(--text-xs) * 1.4 + 2 * var(--cal-chip-pad-block));
 }
 
 .month-grid__row--bands {
@@ -2902,7 +3019,45 @@
 .month-day .cal-task-chip {
   border: none;
   box-shadow: none;
-  padding: var(--space-0h) var(--space-1);
+  padding: var(--cal-chip-pad-block) var(--space-1);
+}
+
+/* TABLET: DER TITEL DARF ZWEI ZEILEN NEHMEN (R21, Critique 2026-10-21, D4).
+ * Gemessen bei 834px: Zellen 118x170, 51 Chips, 40 davon gekuerzt, im Mittel
+ * 12,6 Zeichen sichtbar - "Klavierstun...", "Fussballtrain...". Die Zelle hat
+ * die Hoehe, die ihr an Breite fehlt. fitMonthDayCells misst die echte Hoehe
+ * und zaehlt, was nicht mehr passt, ins "+N" - zwei Zeilen kosten keine
+ * Zusage, nur Platz. Darunter (Telefon) gelten Punkt und Titelfassung, ab
+ * 1024px haben die Spalten die Breite fuer eine Zeile. Die Baender
+ * (`.month-bands`) bleiben einzeilig: sie stehen in Spuren fester Hoehe ueber
+ * mehrere Zellen. Ein langes Wort trennt an der Silbe (W1). */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .month-day .month-day__event,
+  .month-day .cal-task-chip {
+    align-items: flex-start;
+    white-space: normal;
+  }
+
+  .month-day .month-day__event > span:last-child,
+  .month-day .cal-task-chip > span:last-child {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    hyphenate-limit-chars: 6 4 4;
+    -webkit-hyphenate-limit-before: 4;
+    -webkit-hyphenate-limit-after: 4;
+  }
+
+  /* Glyphe und Rangpunkt stehen an der ERSTEN Zeile, nicht in der Mitte von
+   * zweien: die Zeilenhoehe des Chips (1.4 bzw. 1.3) ist ihre Hoehe. */
+  .month-day .month-day__event > :not(:last-child),
+  .month-day .cal-task-chip > :not(:last-child) {
+    margin-block-start: calc((1lh - 1em) / 2);
+  }
 }
 
 /* Aufgaben-Sektion in Agenda-Ansicht (und in der Tagesliste des
@@ -2946,6 +3101,10 @@
   position: relative;
   min-height: var(--space-6);
   overflow: visible;
+  /* In der Liste ist der Chip eine Aufgabenzeile, kein Etikett: sein Titel
+   * steht in der Metazeilen-Stufe (Footnote 13) neben den Terminzeilen, nicht
+   * in der 12px-Caption der Badges (R21, D4). Das Raster behaelt seine 12. */
+  font-size: var(--type-caption);
 }
 
 .agenda-tasks .cal-task-chip::before {
@@ -3304,8 +3463,16 @@
    *     Polsterung unten 2, Rahmen 1                          = 45
    * und damit zugleich die Zielgroesse am Finger. 80px in der Titelfassung:
    *     4 + Ziffer 20 + 2, drei Zeilen 3 x 16, 2 + 1           = 77. */
+  /* DAS RASTER HAT IN JEDEM MONAT DIESELBE HOEHE (Critique R21, a3: die Liste
+   * darunter sprang beim Monatswechsel 48px - fuenf gegen sechs Wochen).
+   * Wie die Titelfassung darunter teilen sich die Wochen ein festes Budget:
+   * sechs Zeilen zu 48px. Sechs Wochen behalten 48px, fuenf bekommen 57,6px,
+   * vier 72px - nie weniger als die Zielgroesse am Finger. Die Zahl der
+   * Wochen bleibt, was der Monat braucht (test:calendar, „vier bis sechs
+   * Wochenzeilen"); die Tagesliste beginnt in jedem Monat an derselben
+   * Stelle. */
   .month-view--split .month-day {
-    --month-row-h: var(--space-12);
+    --month-row-h: calc(var(--space-12) * 6 / var(--month-weeks, 5));
     height: var(--month-row-h);
     min-height: 0;
     padding: var(--space-1) var(--space-0h) var(--space-0h);
@@ -3339,6 +3506,18 @@
     height: 0;
     padding-block: 0;
     border-bottom-width: 0;
+  }
+
+  /* Eingeklappt geht der Schritt wochenweise ueber Monatsgrenzen (periodStepOf)
+   * - die eine Woche traegt deshalb die Hoehe ihres INHALTS, nicht ihren Anteil
+   * am Budget, sonst spraenge die Liste an jeder Grenze um die Differenz:
+   * 48px fuer Ziffer und Punkte, 80px fuer drei Titel. */
+  .month-view--split.month-view--collapsed .month-day--selweek {
+    --month-row-h: var(--space-12);
+  }
+
+  .month-view--split.month-view--titles.month-view--collapsed .month-day--selweek {
+    --month-row-h: calc(var(--space-16) + var(--space-4));
   }
 
   /* Die Punkte sagen nur noch, WO etwas ist: zentriert unter der Ziffer wie

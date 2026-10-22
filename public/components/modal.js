@@ -8,7 +8,9 @@
  *
  * API:
  *   openModal({ title, content, onSave, onDelete, onClose, size,
- *               initialFocus, headerAction }) → void
+ *               initialFocus, headerAction, staged }) → void
+ *               (`staged`: Buehne zuerst, Formular nach dem ersten Bild;
+ *               `content` darf dann eine Funktion sein - siehe _canStage)
  *   closeModal({ force }) → Promise<void>
  *   confirmModal(message, opts) → Promise<boolean>       (ersetzt ein offenes Modal)
  *   confirmOverModal(message, opts) → Promise<boolean>   (parkt es und gibt es zurück)
@@ -24,7 +26,7 @@
  *   updateHeaderAction(panel, …)   → Beschriftung/Handler des Kopf-Buttons tauschen
  */
 
-import { t } from '/i18n.js';
+import { t, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
@@ -352,10 +354,24 @@ function trapFocus(container, initialFocus = 'first-field') {
   container.addEventListener('keydown', focusTrapHandler);
 
   // Virtual Keyboard: Focused Input in sichtbaren Bereich scrollen
+  //
+  // NUR WAS NICHT SCHON OBEN IM BILD STEHT (R21 S7, Critique a3). Ein hohes
+  // Feld - der Notiztext mit 300px Mindesthoehe - laesst sich nicht
+  // zentrieren: der Koerper rollte beim Wechsel in den Editor 54px hoch, und
+  // der Umschalter Lesen/Bearbeiten stand 38 von 48px unter dem Blattkopf.
+  // Steht die Oberkante des Felds schon in der oberen Haelfte seines
+  // Scrollports, bleibt alles stehen; tiefer liegende Felder (die die
+  // Tastatur verdecken wuerde) ruecken wie bisher in die Mitte.
   function onInputFocus(e) {
     const tag = e.target.tagName;
     if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
     setTimeout(() => {
+      const port = e.target.closest('.modal-panel__body');
+      if (port) {
+        const top = e.target.getBoundingClientRect().top;
+        const box = port.getBoundingClientRect();
+        if (top >= box.top && top < box.top + box.height / 2) return;
+      }
       e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 300);
   }
@@ -1938,14 +1954,77 @@ function _dockOverlay(overlay, dock) {
   };
 }
 
+/**
+ * DAS ERSTE BLATT IN ZWEI FRAMES: ERST DIE BUEHNE, DANN DIE FELDER (Critique
+ * R21, a6 P3 "Erstes Blatt kalt").
+ *
+ * Gemessen am Telefon (390px, 4x CPU, Seed): FAB -> "Neue Aufgabe" kostete
+ * einen Handler von 95-105 ms und eine INP von 152-176 ms; das erste Bild kam
+ * erst, als Formular, Datumsfelder und Verdrahtung fertig waren. Davon waren
+ * rund 60 ms Stil und Layout, die `showModal()` und das Lesen von
+ * `innerWidth` mitten im Aufbau erzwangen, der Rest das Formular selbst.
+ *
+ * `staged: true` teilt das Oeffnen: im Tipp steht nur die Buehne - Dialog in
+ * der Top-Layer, Abdunklung, Kopf -, die Tafel bleibt unsichtbar und ohne
+ * Einfahrt (`.modal-panel--pending`, layout.css). Nach dem ersten Bild kommen
+ * Formular, Fusszeile, Fokus, Dirty-Basis und `onSave`, und erst dann faehrt
+ * die Tafel ein - mit ihrer ganzen Feder, weil keine Arbeit mehr in ihre
+ * ersten Frames faellt. Eine leere Tafel, die waechst, zeigt sich nie.
+ *
+ * Nur fuer Aufrufer, die nach `openModal()` nicht synchron ins Formular
+ * greifen (alles Verdrahten steht in `onSave`): die FAB-Blaetter der Module.
+ * `content` darf dann eine Funktion sein, die das Markup erst im zweiten
+ * Schritt baut. Ersetzt der Aufruf ein offenes Modal (Leseansicht ->
+ * Bearbeiten) oder fehlt `requestAnimationFrame` / ist das Dokument verborgen,
+ * laeuft alles wie immer in einem Schritt.
+ */
+function _canStage() {
+  return typeof requestAnimationFrame === 'function' && typeof setTimeout === 'function'
+    && typeof document !== 'undefined' && document.visibilityState !== 'hidden';
+}
+
+/** Netz, falls nie ein Frame kommt: dann fuellt der Timer, wie frueher in einem Schritt. */
+const STAGE_FALLBACK_MS = 120;
+
+/**
+ * Laeuft nach dem naechsten Bild: rAF liegt vor dem Malen, die Aufgabe danach
+ * dahinter. `scheduler.postTask` (user-blocking) zieht sie vor andere wartende
+ * Aufgaben; ohne Scheduler-API (Safari, aeltere Browser) setTimeout 0.
+ * @param {() => void} fn
+ */
+function _afterNextPaint(fn) {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    fn();
+  };
+  requestAnimationFrame(() => {
+    const sched = typeof window !== 'undefined' ? window.scheduler : null;
+    if (sched && typeof sched.postTask === 'function') {
+      sched.postTask(run, { priority: 'user-blocking' }).catch(() => run());
+    } else {
+      setTimeout(run, 0);
+    }
+  });
+  setTimeout(run, STAGE_FALLBACK_MS);
+}
+
 export function openModal({
   title, content, onSave, onDelete, onClose, size = 'md',
   initialFocus = 'first-field', headerAction = null, dirtyGuard = true,
-  pointerDeadTime = false,
+  pointerDeadTime = false, staged = false,
 } = {}) {
   // Die Anmeldung gilt diesem Aufruf - auch wenn er gleich ein voriges Modal
   // ablöst, und auch wenn die Spalte nicht (mehr) steht.
   const dock = _takeDockIntent();
+
+  // VOR JEDER DOM-AENDERUNG LESEN. `innerWidth` nach dem Scroll-Lock und dem
+  // Einfuegen erzwang eine Stilberechnung des ganzen Dokuments (gemessen 4x
+  // CPU: 13-16 ms mitten im Tipp) - die Breite ist vorher dieselbe.
+  const narrow = window.innerWidth < 768;
+  // Zwei Schritte nur, wenn kein Modal abgeloest wird (siehe _canStage).
+  const stage = Boolean(staged) && !activeOverlay && _canStage();
 
   // Vorheriges Modal schließen (kein Stacking).
   if (activeOverlay) {
@@ -1971,9 +2050,10 @@ export function openModal({
     ? `<button type="button" class="modal-panel__action" id="${esc(headerAction.id ?? 'modal-header-action')}">${esc(headerAction.label)}</button>`
     : '';
 
+  const markup = () => (typeof content === 'function' ? content() : content);
   const html = `
     <dialog class="modal-overlay" id="shared-modal-overlay" aria-labelledby="shared-modal-title">
-      <div class="modal-panel${sizeClass}">
+      <div class="modal-panel${sizeClass}${stage ? ' modal-panel--pending' : ''}">
         <div class="modal-panel__header">
           <h2 class="modal-panel__title" id="shared-modal-title">${esc(title)}</h2>
           <div class="modal-panel__header-actions">
@@ -1984,7 +2064,7 @@ export function openModal({
           </div>
         </div>
         <div class="modal-panel__body">
-          ${content}
+          ${stage ? '' : markup()}
         </div>
       </div>
     </dialog>`;
@@ -2014,7 +2094,7 @@ export function openModal({
   // Focus-Trap
   const panel = activeOverlay.querySelector('.modal-panel');
 
-  mountFooter(panel);
+  if (!stage) mountFooter(panel);
 
   // IN DIE TOP-LAYER, BEVOR DER ERSTFOKUS GEPLANT WIRD (D7). `showModal()`
   // fokussiert synchron das erste Bedienelement (das Schliessen-X); trapFocus
@@ -2037,7 +2117,7 @@ export function openModal({
     actionBtn.addEventListener('click', () => actionBtn._onAction?.());
   }
 
-  trapFocus(panel, initialFocus);
+  if (!stage) trapFocus(panel, initialFocus);
 
   // Snapshot für Dirty-Check: sofort den Ist-Zustand aufnehmen (meist die
   // leeren Vorgabewerte), sonst wertet der Dirty-Guard ein schnelles
@@ -2055,7 +2135,7 @@ export function openModal({
   _initialFormTimeout = setTimeout(_snapshotNow, 150);
 
   // Swipe-to-Close auf Mobile
-  if (window.innerWidth < 768) {
+  if (narrow) {
     _wireSheetSwipe(panel);
   }
 
@@ -2089,8 +2169,42 @@ export function openModal({
   // Escape (nur einmal binden)
   bindEscape();
 
+  // „Weitere Angaben" klappt ins Bild, nicht unter den Fuss (Critique R21).
+  _wireAdvancedReveal(panel);
+
   // Callback für Aufrufer
-  if (typeof onSave === 'function') onSave(panel);
+  if (!stage && typeof onSave === 'function') onSave(panel);
+
+  // Gestuft: Formular, Fusszeile, Fokus, Dirty-Basis und `onSave` nach dem
+  // ersten Bild, in derselben Reihenfolge wie oben - dann faehrt die Tafel ein.
+  // Ist der Dialog bis dahin zu oder abgeloest, bleibt es bei der Buehne.
+  if (stage) {
+    const overlay = activeOverlay;
+    _afterNextPaint(() => {
+      if (overlay !== activeOverlay || !overlay.isConnected || modalState !== 'open') return;
+      const body = panel.querySelector('.modal-panel__body');
+      body.insertAdjacentHTML('beforeend', markup());
+      if (window.lucide) window.lucide.createIcons({ el: body });
+      mountFooter(panel);
+      trapFocus(panel, 'none');
+      if (_initialFormTimeout) clearTimeout(_initialFormTimeout);
+      _snapshotNow();
+      _initialFormTimeout = setTimeout(_snapshotNow, 150);
+      // Sichtbar VOR `onSave`: wer dort selbst fokussiert, braucht eine Tafel,
+      // die Fokus annimmt. Gemalt wird ohnehin erst nach dieser Aufgabe.
+      panel.classList.remove('modal-panel--pending');
+      // Der Erstfokus kommt hier sofort, nicht 50 ms spaeter: seit dem Tipp
+      // konnte ihn niemand waehlen (die Tafel war unsichtbar), und ein spaeter
+      // Fokus erzwang Stil und Layout mitten in der Einfahrt. Was `onSave`
+      // selbst fokussiert, gilt als Wahl und bleibt (_focusInitialUnlessClaimed).
+      const planned = document.activeElement;
+      const target = initialFocus === 'none' ? null
+        : initialFocus && typeof initialFocus.focus === 'function' ? initialFocus
+          : panel.querySelector(FIRST_FIELD) ?? panel.querySelector(FOCUSABLE);
+      if (typeof onSave === 'function') onSave(panel);
+      if (target) _focusInitialUnlessClaimed(panel, target, planned);
+    });
+  }
 
   // Loading-State
   panel.addEventListener('submit', (e) => {
@@ -2112,6 +2226,55 @@ export function openModal({
   }
 
   modalState = 'open';
+}
+
+/**
+ * „WEITERE ANGABEN" KLAPPT INS BILD, NICHT UNTER DEN FUSS (Critique R21, a4).
+ *
+ * Der Aufklapper steht in langen Dialogen am unteren Rand des Scrollbereichs.
+ * Am Telefon ging er auf, und alles, was er zeigte, lag unter der festen
+ * Fusszeile: gemessen im Buchungsdialog 0 von 5 neuen Zeilen sichtbar, die
+ * erste 8px unter der Kante des Fusses. Wer ihn antippt, bekommt jetzt so viel
+ * vom Neuen zu sehen, wie hineinpasst - die Beschriftung bleibt dabei im Bild,
+ * damit klar ist, was da aufging.
+ *
+ * Nur auf den Klick hin: ein Aufklapper, der schon offen geladen wird (beim
+ * Bearbeiten, sobald dahinter ein Wert steht) oder den ein Feldfehler aufmacht
+ * (constraintErrors), feuert dasselbe `toggle` und darf den Dialog nicht
+ * verschieben. `toggle` steigt nicht auf - deshalb die Capture-Phase.
+ */
+function _wireAdvancedReveal(panel) {
+  let clicked = null;
+  panel.addEventListener('click', (event) => {
+    const summary = event.target instanceof Element ? event.target.closest('details.form-advanced > summary') : null;
+    clicked = summary ? summary.parentElement : null;
+  }, true);
+  panel.addEventListener('toggle', (event) => {
+    const details = event.target;
+    if (details !== clicked) return;
+    clicked = null;
+    if (!details.open) return;
+    requestAnimationFrame(() => _revealOpenedSection(panel, details));
+  }, true);
+}
+
+function _revealOpenedSection(panel, details) {
+  const body = details.querySelector('.form-advanced__body') ?? details;
+  const scroller = details.closest('.modal-panel__body') ?? panel;
+  if (typeof scroller.scrollBy !== 'function') return;
+  const view = scroller.getBoundingClientRect();
+  // Die Fusszeile steht fest ueber dem Scrollbereich oder klebt in ihm: was
+  // hinter ihr liegt, ist nicht zu sehen.
+  const footer = panel.querySelector('.modal-panel__footer');
+  const footerTop = footer ? footer.getBoundingClientRect().top : view.bottom;
+  const visibleBottom = Math.min(view.bottom, footerTop > view.top ? footerTop : view.bottom);
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-4')) || 16;
+  const need = body.getBoundingClientRect().bottom + gap - visibleBottom;
+  const summary = details.querySelector('summary') ?? details;
+  const room = summary.getBoundingClientRect().top - view.top;
+  const delta = Math.min(need, room);
+  if (delta <= 1) return;
+  scroller.scrollBy({ top: delta, behavior: _reducedMotion() ? 'auto' : 'smooth' });
 }
 
 // --------------------------------------------------------
@@ -2578,6 +2741,8 @@ export const askOverModal = createAskOverModal();
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   serializeForm,
+  // Critique R21: „Weitere Angaben" klappt ins Bild (der Zuhoerer am Panel).
+  wireAdvancedReveal: (panel) => _wireAdvancedReveal(panel),
   // #1784: die Dirty-Basis als Programm - ein Overlay ohne openModal() zum
   // offenen Formular erklaeren (Basis sofort, ohne den 150-ms-Nachlauf), den
   // Waechter fragen und wieder aufraeumen.
@@ -2892,6 +3057,58 @@ export function reportFieldErrors(errors) {
   return true;
 }
 
+/**
+ * DIE REGELN DES MARKUPS, IN DER STIMME DER APP (Critique R21, a5).
+ *
+ * Ein Formular mit `novalidate` zeigt keine Browser-Blasen mehr - aber dann
+ * prueft auch niemand mehr `required`, `min`, `max`, `step` und den Zahltyp,
+ * die im Markup stehen. Statt sie im Handler ein zweites Mal von Hand
+ * nachzurechnen, liest diese Funktion den ValidityState jedes Feldes (Guide
+ * `forms`: "use ValidityState interfaces") und macht daraus Eintraege fuer
+ * `reportFieldErrors()`: die Regel bleibt im Markup, die Meldung steht am Feld.
+ *
+ * Ausgenommen: Felder, die gerade nicht gezeichnet sind (`display: none` am
+ * Feld oder einem Vorfahren - ihr Wert geht nicht mit), und die inneren Felder
+ * des Datumsfelds, das seine Eingabe selbst prueft. Ein Feld in einem
+ * zugeklappten „Weitere Angaben" zaehlt: der Aufklapper geht dafuer auf.
+ *
+ * @param {HTMLFormElement|null|undefined} form
+ * @returns {Array<[Element, string]>}
+ */
+export function constraintErrors(form) {
+  const out = [];
+  for (const el of Array.from(form?.elements ?? [])) {
+    if (!el.willValidate || el.validity?.valid !== false) continue;
+    if (el.closest?.('yuvomi-datepicker')) continue;
+    const folded = el.closest?.('details:not([open])');
+    if (folded) folded.open = true;
+    if (typeof el.getClientRects === 'function' && el.getClientRects().length === 0) {
+      // Auch aufgeklappt nicht gezeichnet: kein Feld, das jemand sieht.
+      if (folded) folded.open = false;
+      continue;
+    }
+    out.push([el, constraintMessage(el)]);
+  }
+  return out;
+}
+
+function constraintMessage(el) {
+  const v = el.validity;
+  const num = (raw) => {
+    const n = Number(raw);
+    return Number.isFinite(n) ? getNumberFormat({ maximumFractionDigits: 6 }).format(n) : String(raw);
+  };
+  if (v.valueMissing) return t('common.required');
+  if (v.badInput) return t('common.fieldNumber');
+  if (v.rangeUnderflow) return t('common.fieldMin', { min: num(el.min) });
+  if (v.rangeOverflow) return t('common.fieldMax', { max: num(el.max) });
+  if (v.stepMismatch) {
+    const step = Number(el.step);
+    return Number.isInteger(step) && step === 1 ? t('common.fieldWholeNumber') : t('common.fieldStep', { step: num(el.step) });
+  }
+  return t('common.fieldInvalid');
+}
+
 export function btnSuccess(btn, originalLabel) {
   btn.classList.remove('btn--loading');
   const label = originalLabel ?? btn.textContent;
@@ -2955,7 +3172,8 @@ export function btnError(btn) {
  *
  * @param {string} innerHtml        - Markup der Sekundärfelder (bereits esc-sicher)
  * @param {Object} [opts]
- * @param {string} [opts.label]     - Aufklapper-Beschriftung (Default: t('modal.moreSettings'))
+ * @param {string} [opts.label]     - Aufklapper-Beschriftung (Default: t('modal.moreDetails') -
+ *   EIN Wort fuer diesen Baustein in jedem Modul, Critique R21 D15)
  * @param {boolean} [opts.open=false] - Initial geöffnet (z. B. wenn Sekundärfelder bereits befüllt sind)
  * @param {string} [opts.hint]      - Zweite Zeile unter der Beschriftung: was hinter dem
  *   Aufklapper liegt (Klartext, wird escaped). Ohne sie findet ein Feld dort nur, wer
@@ -2963,7 +3181,7 @@ export function btnError(btn) {
  * @returns {string} HTML-String
  */
 export function advancedSection(innerHtml, { label, open = false, hint = '' } = {}) {
-  const text = esc(label ?? t('modal.moreSettings'));
+  const text = esc(label ?? t('modal.moreDetails'));
   const labelHtml = hint
     ? `<span class="form-advanced__label"><span>${text}</span><span class="form-advanced__hint">${esc(hint)}</span></span>`
     : `<span>${text}</span>`;

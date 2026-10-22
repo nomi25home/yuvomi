@@ -28,7 +28,7 @@
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-web.webp">
-    <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Budget und Geburtstage" width="820">
+    <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Geburtstage und Belohnungen" width="820">
   </picture>
 
   <sub><b>20</b> Module&nbsp;&nbsp;·&nbsp; <b>26</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung</sub>
@@ -65,7 +65,7 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-wall-dark-web.webp">
-    <img src="docs/screenshots/de/dashboard-wall-light-web.webp" alt="Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, die Aufgaben und Dosen des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp" width="720">
+    <img src="docs/screenshots/de/dashboard-wall-light-web.webp" alt="Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp" width="720">
   </picture>
 </div>
 

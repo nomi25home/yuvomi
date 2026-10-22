@@ -28,7 +28,7 @@
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-web.webp">
-    <img src="docs/screenshots/dashboard-light-web.webp" alt="The Yuvomi overview: today's events, tasks and shopping for the whole family, with the family, budget and birthdays below" width="820">
+    <img src="docs/screenshots/dashboard-light-web.webp" alt="The Yuvomi overview: today's events, tasks and shopping for the whole family, with the family, birthdays and rewards below" width="820">
   </picture>
 
   <sub><b>20</b> modules&nbsp;&nbsp;·&nbsp; <b>26</b> languages&nbsp;&nbsp;·&nbsp; <b>0</b> trackers&nbsp;&nbsp;·&nbsp; optional&nbsp;<b>AES&#8209;256</b>&nbsp;database&nbsp;encryption</sub>
@@ -65,7 +65,7 @@ This is the part a folder full of separate apps cannot do:
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-wall-dark-web.webp">
-    <img src="docs/screenshots/dashboard-wall-light-web.webp" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers" width="720">
+    <img src="docs/screenshots/dashboard-wall-light-web.webp" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" width="720">
   </picture>
 </div>
 

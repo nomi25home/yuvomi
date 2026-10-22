@@ -113,6 +113,13 @@ typography:
     fontSize: "0.8125rem"
     fontWeight: 500
     lineHeight: 1.21
+  # Metazeile: was unter dem Namen einer Zeile, Karte oder Kachel steht
+  # (Datum, Ort, Anzahl, Betrag, Stand). Footnote in regular, Zeilenhoehe
+  # erbt die Zeile (R21, 2026-10-21, D4, test:typography).
+  meta-line:
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 400
   micro-label:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif"
     fontSize: "0.75rem"
@@ -512,8 +519,12 @@ Ausschalter (in reduced-transparency und prefers-contrast auf 0):
   Opakes darueber liegt. Ohne Filter, ohne Animation. Kein Text steht direkt darauf
   (Sekundaertext fiele im Kern auf 2,96:1): auf den Zugangsseiten steht alles auf der
   Tafel, der Schriftzug des Ladebilds in Label-Farbe. Das Ladebild ist seit R20 eine stehende
-  Skizze der Shell (Kopf mit Siegel, drei leere Kartenflaechen, Kapsel bzw. Seitenleiste), ohne
-  Puls; `role="progressbar"` mit dem Markennamen, die Ansage kommt vom Screenreader.
+  Skizze der Shell (Kopf mit Siegel, Kapsel bzw. Seitenleiste), ohne Puls; `role="progressbar"`
+  mit dem Markennamen, die Ansage kommt vom Screenreader. Seit R21 S9b skizziert es die
+  Uebersicht, wo sie gleich steht: Balken fuer Gruss, Wetter und "Heute wichtig", EINE hohe
+  Programmkarte, am Desktop ohne Kopf (die Schiene traegt die Marke) und mit der Kachelreihe
+  darunter. Oberkante der Programmkarte gegen den ersten Schirm: 390px 84 -> 223 (Programm 226),
+  1280px 80 -> 158 (166), Kachelreihe 482 (486); `test:material`.
 
 **Die App selbst hat keinen Backdrop mehr.** Bis R18 liefen hinter dem Inhalt vier
 driftende, weichgezeichnete Farbfelder (`.lg-blob`) und ein Akzentverlauf auf der Shell -
@@ -804,13 +815,25 @@ bleibt fuer das, was wirklich eine Handlung verlangt: ein Konto im Minus, ein ne
 Saldo, ein ueberschrittener Plan. Ein Zustand steht nie NUR in der Farbe
 (`test:budget-ui`).
 
+Seit R21 (D8) gilt das auch fuer Veraenderungen und Schulden: ein Delta ("+25,00 € ggue.
+Sep", je Kategorie und auf den Kennzahlkarten) steht in der Sekundaerfarbe mit Vorzeichen
+und Pfeil - `trendMarkup` ohne `betterWhen`; die Valenzfarbe bleibt Metriken mit fester
+guter Richtung ausserhalb des Geldes vorbehalten. Der ueberschrittene Plan traegt sein Rot
+am "von 80 €" der Statistik (`.budget-bar-row__of--over`). Eine Kreditkarte im ueblichen
+Minus ist Textfarbe, rot erst ueber ihrem Rahmen (`available_limit` unter null). Eine
+offene Schuld in der Aufteilung - Karte, Kurzzeile, Kachel der Uebersicht - ist Textfarbe;
+"Du bekommst" darf gruen bleiben wie eine Einnahme (`test:budget-ui`,
+`test:dashboard-split-balance`).
+
 **Die Eine-Stimme-Regel (2026-08-10).** Die App hat GENAU EINE Akzentfarbe, und das ist
 das Violett der Bildmarke. Sie traegt alles, was in jedem Modul dasselbe tut: die
 Tab-Leiste und die Sidebar samt Aktiv-Pille, den FAB, den Primaer- und Sekundaerknopf,
 Umschalter und Checkboxen, den Fokusring, den Datepicker, die Suche und jedes
 Shell-Overlay. Der MODULTON traegt, was sagt, wo man ist: das Siegel im Kopf, die Leisten
-und Segmente INNERHALB des Moduls, seine Chips und Sektionsmarken, seine Zeilen-Hover,
-sein Widget auf dem Dashboard, sein Zeichen in der Sidebar-Legende.
+und Segmente INNERHALB des Moduls, seine Chips und Sektionsmarken, seine Zeilen-Hover und
+die ausgewaehlte Zeile der Spaltenform (seit R21 S9b; vorher Violett wie die Seitenleisten-
+Pille, neben einem Filter-Chip im Modulton - zwei Auswahlfarben auf einem Schirm,
+`test:master-detail`), sein Widget auf dem Dashboard, sein Zeichen in der Sidebar-Legende.
 
 **Das Kriterium ist die Frage, die das Element beantwortet** - "was tut das hier" oder "wo
 bin ich". Die Shell beantwortet nie die zweite: sie ist in jedem Modul dieselbe.
@@ -994,9 +1017,35 @@ Subheadline 15, Footnote 13, Caption 2 11.
   Regel in typography.css; vorher vier (einzeilig, unbegrenzt, mobil anders als Desktop).
   Kein Modulblatt setzt dort `nowrap` oder eine andere Zeilenzahl (Guard `test:typography`).
 - **Body** (regular, 17px, lh 1.47 = Apples 17/25): Fliesstext, Listenzellen.
-- **Subheadline** (regular, 15px): Sekundaerzeilen.
-- **Footnote** (medium, 13px, lh 1.21): Metazeilen, Label ueber Feldern, das Versal-Datum
-  ueber dem Gruss.
+- **Subheadline** (regular, 15px): Sekundaertext - freistehender Lesetext neben dem
+  Hauptinhalt (Erklaerung eines Leerzustands, Beschreibung einer Karte, Untertitel eines
+  Kontaktkopfs). `.u-meta` traegt die Rolle, Bestandsklassen sind in typography.css
+  registriert; bis R21 standen sie bei 14, der Stufe der Bedienelemente. Guard
+  `test:typography` "Sekundaertext ist Subheadline 15".
+- **Footnote** (13px): in regular die **Metazeile**, in medium das Label ueber Feldern und das
+  Versal-Datum ueber dem Gruss. **Eine Zeile ist Titel 16 + Metazeile 13** (R21, D4): was
+  unter dem Namen einer Zeile, Karte oder Kachel steht - Datum, Ort, Anzahl, Betrag,
+  Kategorie, Stand, Veraenderung -, nimmt die EINE Metazeilen-Rolle in typography.css.
+  Gemessen standen dort drei Groessen (Aufgaben 12, Budget/Inventar/Kontakte/Agenda 14,
+  Dashboard 12 neben 13). Das Modulblatt traegt Farbe, Layout und Hervorhebung
+  (Ueberfaellig halbfett), keine Groesse; ein Chip IN der Zeile bleibt Caption 1. Guard
+  `test:typography` "die Metazeile ist eine Rolle": er liest jede `__meta`-Klasse aus
+  Stylesheets UND Markup und verlangt sie registriert oder als benannte Ausnahme (heute
+  `.day-event__meta`, Mikrotext im Zeitraster: die Zeile lebt in einem Block, dessen Hoehe die
+  Dauer ist, und erscheint erst, wenn der Block sie fasst - R21 S9b hat das geprueft und
+  bewusst bei 12 gelassen).
+  **Das Feld spricht in Footnote 13** (R21 S9b): Label (medium), Hinweis darunter, Feldfehler
+  und die Legende einer Feldgruppe; vorher 14 (Labels, die meisten Hinweise) neben 12 (Hinweise
+  in Aufgaben, Dokumenten, Belohnungen, Zyklus). Das Feld selbst bleibt 16. Die Beschreibung
+  unter einer Einstellungszeile und die Nebenwerte der mobilen Kurzzeile (Ein/Aus) sind
+  Metazeile. Guard `test:typography` "Label, Hinweis und Fehler am Feld sind Footnote 13"; er
+  liest jede Klasse auf `-hint`/`__hint` und fuehrt Hinweise, die nicht unter einem Feld
+  stehen, als benannte Ausnahmen.
+- **Der Tageskopf der Agenda** ist Subheadline 15 halbfett (das relative Wort in der Textfarbe,
+  der volle Tag sekundaer) - bis R21 14/700, eine Stufe ausserhalb der Rollen.
+- **Caption 1** (12px, `--text-xs`): nur Badges, Zaehler, Chips, Nav-Labels und
+  Mikro-Labels - nie eine Lesezeile (R21, D4). Die dichte Monatszelle des Kalenders ist
+  Mikrotext und bleibt bei 12, darf aber am Tablet zwei Zeilen nehmen.
 - **Versal-Mikro-Label** (semibold, 12px, Tracking 0.05em, uppercase): der Sektionskopf
   einer Grouped-Liste. 0.05em (`--tracking-label`) ist der EINE Tracking-Wert und hat sechs
   gestreute Werte abgeloest.
@@ -1103,7 +1152,7 @@ ohnehin das Signal, der Name steht im `title`. Vorher stand hier eine 9px-Unterg
 die Kalender-Gitter riefen mit `size` 14-16 genau hinein (Sonde `undersized-ui-text`, 13
 Fundstellen). Ein 9px-Text sagt weniger als ein sauberer Punkt. Wo der Stapel neben
 Fliesstext steht statt in einem Chip, hebt `minFont` die Untergrenze (Agenda-Zeile seit
-2026-09-24: 12px auf 22px Scheibe, neben der 14px-Metazeile) - die Scheibe waechst mit, damit
+2026-09-24: 12px auf 22px Scheibe, neben der Metazeile - damals 14px, seit R21 13px) - die Scheibe waechst mit, damit
 das Verhaeltnis haelt.
 
 ## Layout
@@ -1118,6 +1167,15 @@ das Verhaeltnis haelt.
   >=1024 Desktop (Sidebar, mehrspaltig), >=1440 Wide; dazu die zweite Achse <500px Hoehe
   (kompakte Hoehe, siehe „Die Chrome-Regel"). Komponenten-interne Umbrueche gehoeren in
   @container-Queries, nicht in neue Viewport-Breakpoints.
+- **Lange Listen rechnen nur, was in Sicht ist (`content-visibility: auto`):** Aufgaben (ab der
+  zweiten Gruppe), Kontakte und Rezepte (je Zeile) seit R20, seit R21 S8 auch die Agenda (ab dem
+  zweiten Tag), Vorrat und Inventar (ab der zweiten Gruppe), die Buchungen des Budgets (je
+  Zeile) und der Einkauf in der einen Spalte. Immer unter `@supports` mit
+  `contain-intrinsic-size: auto none auto <gemessene Hoehe>` (sonst springt der Bildlaufbalken),
+  und `overflow-clip-margin` fuer Schatten und Fokusring des Traegers, die die
+  Paint-Containment an der Gruppenkante sonst abschnitte. Nicht dort, wo Spalten oder Masonry
+  nach Hoehe verteilen (Notizen; Einkauf ab 60rem): Platzhalterhoehen liessen Gruppen beim
+  Scrollen die Spalte wechseln. Guard `test:frontend-audit`.
 - **Fensterhoehe in einer Rechnung:** `var(--viewport-height)`, nie `100dvh` direkt
   (#1276). Der Token steht auf `100vh` und kippt per `@supports (height: 100dvh)` auf dvh.
   Ein vh-Zwilling davor rettet nur Deklarationen OHNE `var()`/`env()`: mit `var()` gilt
@@ -1152,6 +1210,9 @@ das Verhaeltnis haelt.
   safe-area; die Bar-Zone selbst ist transparent, das Glas traegt die Kapsel), die UEBER dem
   Inhalt liegt - der Scrollport reicht bis zur Unterkante (Kopfregel mobil). Ab 1024px
   Glas-Sidebar (56px kollabiert / 220px expandiert) mit gleitender Aktiv-Pille.
+  `--nav-bottom-height` enthaelt den Home-Indikator schon; wer mit der Zone rechnet, addiert
+  `--safe-area-inset-bottom` nie ein zweites Mal (Toast-Stapel bis R21: 58 statt 24px Luft,
+  `test:mobile-chrome`).
 - **Touch-Targets:** `--target-base` 44px auf Zeigergeraeten, waechst via
   `@media (hover: none)` auf 48px. Das Kriterium ist die Zeigerfaehigkeit, nicht die Breite;
   die 44pt der iOS-HIG sind ein Minimum, kein Ziel.
@@ -1178,7 +1239,12 @@ das Verhaeltnis haelt.
   und auf der Kachel Funkeln (`sparkles`). Jetzt gibt es `MODULE_ICON`, und die Koepfe
   bekommen ihre WIDGET-ID statt eines Icon-Namens: die Abweichung ist nicht mehr schreibbar.
 - **Die Strichstaerke ist die Handschrift, nicht ein Zufall** (`--icon-stroke`, 1.5 gerenderte
-  px plus `vector-effect: non-scaling-stroke` auf Siegel- und Nav-Zeichen). Der eigene Satz
+  px plus `vector-effect: non-scaling-stroke`). **Seit R21 (D4) fuer JEDES Zeichen**: Lucide
+  (`.lucide`), der eigene Satz und die eigenen Terminzeichen zeichnen in jeder Groesse 1,5px;
+  vorher standen 9 bis 12 Strichstaerken (1,0-4,7px) nebeneinander. `vector-effect` steht an
+  den STRICHEN (`.lucide *`), nicht am `<svg>`: die Eigenschaft erbt nicht, und an der Wurzel,
+  wo sie bis R21 stand, wirkte sie nie - die Modulzeichen zeichneten skaliert (1.5 bei 16px =
+  1,0px). Guard `test:frontend-audit` "Strich der Modulzeichen". Der eigene Satz
   zeichnet mit 1.6 auf viewBox 24, Lucide mit 2; bei 20px bzw. 16px ergab beides zufaellig
   1,333px - die Uebereinstimmung hing an den GROESSEN, nicht an einer Regel, und fiel, sobald
   ein eigenes Zeichen bei 16px stand. CSS schlaegt das `stroke-width`-Attribut, deshalb gilt
@@ -1189,7 +1255,10 @@ das Verhaeltnis haelt.
   `test:frontend-audit` rechnet die Mitte aus `--icon-md`/`--icon-lg`, statt die Zahl festzunageln.
 - **Motion:** Dauern kanonisch 80-400ms (`--duration-2xs..2xl`), immer in ms. `--ease-out`
   cubic-bezier(0.16,1,0.3,1) fuer Einblendungen; Feder mit Overshoot `--ease-glass`
-  cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente; die Sidebar-Pille bekommt die sanftere
+  cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente - seit R21 dort, wo der Browser `linear()`
+  kennt, als gedaempfte Feder (`@supports` in tokens.css): gleicher Gipfel (1,095), gleiche Dauer,
+  aber in Ruhe ab 57 % statt 91 % der Zeit (Blatt-Einfahrt gemessen: Ueberschwinger 117 -> 67ms
+  sichtbar, Gipfel bei +100 statt +162ms; Guard `test:motion` "Glasfeder D1"); die Sidebar-Pille bekommt die sanftere
   Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst.
   Hoehenwechsel (Zeile oder Gruppe klappt ein/auf, `collapseOut`/`expandIn` in `utils/ux.js`,
   samt Gruppenwinkel) laufen auf der symmetrischen `--ease-in-out` cubic-bezier(0.42,0,0.58,1):
@@ -1199,7 +1268,17 @@ das Verhaeltnis haelt.
   (`flipPlayElements` in `utils/flip.js`) nur mit `transform` nach - keine Hoehe, kein Abstand
   je Frame (am 4x gedrosselten Telefon sprang die Hoehenanimation in Stufen). Unter reduzierter
   Bewegung blendet die Zeile aus und die Nachbarn blenden an ihrer neuen Stelle ein, statt um
-  die Zeilenhoehe zu springen. **`expandIn` spiegelt das seit R19:** das Element steht sofort in
+  die Zeilenhoehe zu springen. **Seit R21 (D3) erst gleiten, dann schliessen:** fiel die Zeile
+  sofort auf null, schrumpfte ihre Karte (`.row-carrier`) im selben Frame, waehrend die Zeilen
+  darunter noch heranglitten - die letzte stand bis zu 64px abgeschnitten, und unter der Karte
+  lag ein leeres Band derselben Hoehe. Jetzt misst Schritt 2 die geschlossene Lage nur (nie
+  gemalt), die Nachbarn gleiten per `transform` dorthin, jede Karte, die eine Flaeche malt,
+  kuerzt ihre Unterkante im selben Takt per `clip-path: inset(... round ...)`, und erst dann
+  faellt die Zeile auf null - nach einem gemalten Inline-Halt, damit die Layout-Messung nichts
+  zaehlt (CLS 0,048 -> 0). Zeilen, die im selben Moment gehen, schliessen gemeinsam. Der Zaehler
+  der Gruppe wechselt im Frame, in dem die Zeile ausblendet (Aufgaben @913 -> @497ms, Einkauf
+  @1680 -> @1257ms); die Verweildauer davor bleibt. Guard `test:motion` "collapseOut R21 (D3)".
+  **`expandIn` spiegelt das seit R19:** das Element steht sofort in
   voller Hoehe und blendet mit 3 % Skalierung ein, die Nachbarn gleiten per FLIP aus der Lage,
   die ein Frame mit `display: none` am Element misst (damit faellt auch der `gap` des Traegers
   weg - die Option `absorbGap` ist entfallen). `interpolate-size` waere wieder Layout je Frame.
@@ -1216,6 +1295,16 @@ das Verhaeltnis haelt.
   in `test:motion` (`MOTION_EXCEPTIONS`, jede mit Grund). Eintritt darf federn, Austritt ist
   kuerzer und ohne Ueberschwinger; im Arbeitsfluss laeuft nichts laenger als 300ms. Unter
   reduzierter Bewegung gilt EINE "aus"-Konvention: `0s` aus `reset.css`, kein `0.01ms` daneben.
+  **Spinner (R21, D12):** EINE Statusdrehung (`@keyframes status-spin`, layout.css) in EINEM
+  Tempo (`--spin-period`, 700ms) - vorher Knopf 550, Anmeldung 700, Dokumentvorschau 800ms. Ein
+  Spinner ist Statusbewegung und dreht unter reduzierter Bewegung weiter (Abmeldung per
+  `--motion-blend: var(--spin-period)` in reset.css); ein stehender sah aus wie ein haengender
+  Vorgang. Dekor (Wetter-Strahlen) bleibt aus. Guard: `test:motion` ("Spinner D12").
+- **Die Titelkante im Blatt steht (R21):** ein Kopf mit Knoepfen richtet die ERSTE Titelzeile
+  mittig an ihnen aus (`align-items: flex-start` plus `(--target-base - Zeilenhoehe) / 2` am
+  Titel), weitere Zeilen wachsen nach unten. Vorher zentrierte er: ein zweizeiliger Titel
+  rutschte an die Polsterkante, die Titelkante sprang von Aufgabe zu Aufgabe um 12px (25 gegen
+  13px). Guard: `test:mobile-chrome`.
 - **Blatt von unten - ein Paar:** Dialog-Sheet, Mehr-Blatt und die mobile Suche fahren aus
   `--sheet-in` (`--duration-xl` + `--ease-glass`) und `--sheet-out` (`--duration-md` +
   `--ease-out`), mit dem kurzen Hub `--sheet-lift` (24px) und einer Blende. Vorher drei
@@ -1223,6 +1312,24 @@ das Verhaeltnis haelt.
   Vollhub). Der Vollhub ist entfallen, weil die Feder ihn nicht traegt: ueber die volle Hoehe
   wirft sie das Blatt sichtbar ueber seine Ruhelage. Geschlossen sind Mehr-Blatt und Suche
   durchsichtig, nehmen keinen Zeiger und sind `inert`.
+- **Das Anlegen-Blatt in zwei Frames (R21 S8):** die FAB-Blaetter der Module oeffnen gestuft
+  (`openModal({ staged: true })`): im Tipp stehen Dialog, Abdunklung und Kopf, die Tafel ist
+  unsichtbar und faehrt nicht ein (`.modal-panel--pending`); nach dem ersten Bild kommen
+  Formular, Fusszeile, Fokus und `onSave`, und erst dann beginnt die Einfahrt - mit der ganzen
+  Feder, weil keine Arbeit mehr in ihre ersten Frames faellt. Eine leere Tafel, die waechst, zeigt
+  sich nie. Gemessen 390px, 4x CPU, Aufgaben: INP 160 -> 72 ms, Abdunklung 135 -> 66 ms nach dem
+  Tipp, Tafel 135 -> 159 ms (ein Frame spaeter, dafuer ohne Luecke in der Feder). Gestuft nur fuer
+  Aufrufer, die nach `openModal()` nicht synchron ins Formular greifen; wer ein offenes Modal
+  abloest (Leseansicht -> Bearbeiten), fuellt sofort. Guard: `test:modal-dialog`.
+- **Die Dokumentvorschau ist nie eine leere Buehne (R21 S8):** der Betrachter stellt die Vorschau,
+  die die Kachel schon gerastert hat (data:-URL nur im Seitenspeicher,
+  `utils/document-thumbs.js`), als Poster in dieselbe Rasterzelle wie das Bild, darueber ein
+  Ladezeichen in seiner Kapsel; das Bild blendet darueber (`--duration-sm`), sobald es da ist oder
+  scheitert, und das Poster tritt zurueck (Deckkraft, damit ein Bild mit Transparenz es nicht
+  durchscheinen laesst). Gleiches Seitenverhaeltnis, also gleiche Groesse - nichts springt. Am
+  Telefon zieht das Poster beim PDF in den Platz der ersten Seite, bis pdf.js sie gezeichnet hat.
+  Ohne Kachel-Vorschau steht nur das Ladezeichen. Guards: `test:documents-ux`,
+  `test:documents-viewer-focus`.
 - **Menue-Ausgang:** Popover-Menues (`.popover-menu`, Dokument-Kontextmenue) blenden aus und
   nehmen die 4 % Wachstum zurueck (`overlay`/`display` diskret, `--duration-xs` gegen
   `--duration-md` der Einfahrt). Zwei `transition`-Deklarationen, die erste ohne
@@ -1268,7 +1375,12 @@ das Verhaeltnis haelt.
   Budget-Reiter mit Zeitachse (`TAB_CAPS.month`: Budget, Plan, Berichte) blaettern per
   waagerechtem Wisch ueber denselben Stepper wie die Pfeile. Senkrecht gewinnt das Scrollen;
   was selbst waagerecht arbeitet (`.u-scroll-fade`, die Diagrammflaeche der Berichte,
-  Eingabefelder), behaelt seinen Finger. Das Hereingleiten steht in layout.css.
+  Eingabefelder), behaelt seinen Finger. Das Hereingleiten steht in layout.css. Im Kalender
+  seit R21 echtes Umblaettern mit vorgeladenem Nachbarn und stehender Achse (D2, siehe
+  „Der Zeitraum-Wisch" unter Wischbedienung). Der Weg eines Blatts ist, was neben der Achse
+  zieht: in der Woche die Spalten, im Tag (eine Karte) seine Spalte - dem Nachbarn sind Rand und
+  Achsenflaeche abgeschnitten, sonst zog zwischen den Spalten eine 76px-Luecke mit (S9a,
+  `periodSpan`/`alignPeriodGhost`, `test:calendar`).
 - **Titel im Kopf:** der Groessenwechsel des Large Title faellt weiter in einen Frame (keine
   `font-size`-Transition); der Titel blendet an der neuen Stelle ein (`opacity`,
   `--duration-xs`), ebenso der angedockte Titel der scrollenden Seiten (ein und aus).
@@ -1279,6 +1391,11 @@ das Verhaeltnis haelt.
   gestartete Compositor-Animation zaehlt die Layout-Shift-Messung nicht. Gemessen 390px: CLS
   Kalender 0,061 -> 0,001, Budget 0,059 -> 0, Einkauf 0,058 -> 0,001 (`holdThenGlide`,
   utils/ux.js). Unter reduzierter Bewegung steht der Wechsel; der Titel blendet (`--motion-blend`).
+  **Gemessen wird nach dem Gleiten (R21):** der ResizeObserver mass die Zeilen sonst an ihrer
+  gehaltenen alten Lage, nahm dem Kopf die Lead-Zone, und er klappte nach dem ersten Ausklappen
+  nie wieder ein. **Ein Modul kann den Kopf mit seiner Flaeche falten (R21, D9):** ein Port mit
+  `data-head-collapse="module"` urteilt nicht selbst, das Modul ruft `requestHeadCollapse()` -
+  der Telefon-Monat faltet ihn mit dem Raster (Guard `test:ux-utils` "R21").
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
   der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
   Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
@@ -1294,6 +1411,21 @@ das Verhaeltnis haelt.
   Blende bricht sie ab UND kommt an (R19): Chromium trifft ihn auf `<html>`, `swapPage` haelt
   seinen `click` dort an und reicht ihn nach dem Ende der Blende und der Navigation an das
   Element an derselben Stelle (vorher ging er verloren, gemessen 0 von 12 Doppeltipps).
+  **Die Blende laeuft in den Inhalt, nicht ins Skelett (R21, D1):** der Update-Callback wartet
+  auf den Render der Zielseite, hoechstens `FIRST_RENDER_WAIT_MS` (150 ms); so lange steht das
+  alte Bild. Vorher zeigte das neue Bild 0 von 6 Mal Inhalt, der echte Inhalt sprang 45-123 ms
+  (4x CPU: bis 245 ms) spaeter mitten in die Blende; jetzt 6 von 6 auf 390 und 1280, 1x und 4x.
+  Was waehrenddessen laeuft (die Pille seit dem Tipp), setzt danach an seiner Stelle fort
+  (`holdRunningAnimations`, der Start ruckt um die Wartezeit - `pause()` wirkt dort nicht, die
+  Zeitleiste steht). Der Router gibt dazu Scrollstand des Rueckwegs und Nachzuegler-FAB in
+  denselben Render. Ein blendendes Bild unter einer stehenden Gruppe (`animation: none`) traegt
+  `animation-fill-mode: both`, sonst steht es im letzten Frame wieder deckend (Geisterframe des
+  Kopfes, R21). Guards: `test:motion`. **Rueckweg zur Uebersicht ohne Netz:** ein voller Stand,
+  der juenger als eine Minute ist (dieselbe Regel wie beim Zurueckkehren in den Tab), zeichnet
+  sofort und fragt danach still nach (stale-while-revalidate, neu gebaut nur bei anderer
+  Antwort); jeder geglueckte Schreibvorgang (`yuvomi:write` aus `api.js`) verwirft ihn, die Wand
+  nimmt nie einen. Neues Bild mobil +26-32 ms statt +108 (4x: +84 statt +141). Guards:
+  `test:dashboard-clarity`, `test:api`.
 - **Bewegung haengt an der Beruehrung, nicht am Zustand (R18):** eine Zustandsklasse
   (`--checked`, `--done`, `.is-*`) traegt Aussehen, nie eine `animation` - sie spielte bei jedem
   Neuzeichnen auf Zeilen, die niemand beruehrt hat. Die Quittung eines Hakens startet der
@@ -1316,7 +1448,12 @@ das Verhaeltnis haelt.
   Seitenwechsel. Reduzierte Bewegung: nur Blende (`--duration-sm`). Ohne
   `:active-view-transition-type()` faellt es auf `swapContent` zurueck. Nutzer: Einstellungen
   (Uebersicht <-> Blatt) und der Kalender-Ansichtswechsel (Richtung nach der Leiste Monat ->
-  Woche -> Tag -> Agenda; vorher eine richtungslose Blende). Die Gesundheit bleibt bei
+  Woche -> Tag -> Agenda; vorher eine richtungslose Blende). **Seit R21 wie der Seitenwechsel
+  (D1):** gibt `update` ein Promise zurueck, wartet das neue Bild darauf (hoechstens 150 ms);
+  die Gruppe schneidet nur waagerecht (`overflow: clip visible`), und ein Kopf ohne gleitende
+  Kapsel blendet per `fade` als `page-toolbar` an Ort und Stelle. Der Einstellungs-Drill zeigte
+  vorher im ersten Frame "< Einstellungen" ueber der auf zwei Zeilen gekappten Uebersicht; die
+  Marke `settings-page--leaf` setzt er jetzt erst im Wechsel. Guard: `test:motion`. Die Gesundheit bleibt bei
   `swapContent` (ihr Wechsel ist synchron in `activateArea` verankert).
 - **Druck und Hover (R18):** Zeilen und Karten, die als Ganzes ein Ziel sind, teilen EINEN
   Press-Baustein (`list-row.css`): `--color-surface-hover`, hinein `--duration-2xs`, heraus die
@@ -1394,6 +1531,13 @@ Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
 1920 auf allen Seiten (`test:dashboard-clarity`).
 
+**Die Detailspalte ist so hoch wie ihr Inhalt** (R21 S7, D9). Sie reichte als Karte bis an den
+Fensterrand, und ein kurzes Detail trug seinen Fuss dort - gemessen 1920: Geburtstag 528px leer
+ueber dem Fuss, Rezept 419, Kontakt 285, Aufgabe 210, Inventar 194. Jetzt endet sie unter ihrem
+Inhalt (`align-self: start`, Obergrenze die Zeile bzw. bei den klebenden Spalten von Geburtstagen
+und Inventar die Luft ueber dem Fensterrand); laengerer Inhalt scrollt, Kopf und Fuss kleben wie
+bisher. Guard: `test:master-detail`, `test:inventory-list-detail`, `test:birthday-localization`.
+
 **Bearbeiten geschieht in der Detailspalte** (R19, 2026-10-16). Ab der Schwelle legt sich das
 Formular deckungsgleich auf die Spalte (gleiche Flaeche, Radius `--radius-lg`, leiser Schatten,
 als Grund nur ein Hauch - die halbe leichte Abdunklung, `--color-overlay-light` zu
@@ -1430,7 +1574,9 @@ Gesundheit und bei den Vitalwerten schoben sich Ziffern und Kennzahlen mit eigen
 beim Scrollen ueber den Kopf. Statt
 eines z-index-Wettlaufs bekommt alles hinter `.split-view__detail-head` einen eigenen
 Stapelkontext (`isolation: isolate`, layout.css) - fuer jede Split-Detailspalte
-(`test:master-detail`).
+(`test:master-detail`). Wo die Spalte selbst keine Karte traegt (Gesundheit: die Bereiche
+bringen ihre Karten mit), ist der Kopf die Karte - Radius `--radius-lg`, leiser Schatten, keine
+Trennlinie (R21 S7, D9: vorher ein weisser eckiger Balken ohne Traeger; `test:health-cycle`).
 
 **Eine Aussenkante je Modul, kurze Listen zweispaltig** (R16, 2026-10-05). Die Messmatrix
 vom 05.10. fand die 720px-Spalte weiter in leerer Flaeche: Haushaltshilfe (Aufgaben, Berichte,
@@ -1465,7 +1611,11 @@ sie: Plan mit Kategorien links und Sparziel in der Seitenleiste, Darlehen mit Fi
 und Transaktionen links und den drei Kennzahlen rechts (vorher vier Kanten), Konten mit dem
 Nettovermoegen als Leistenkarte NEBEN den Konten (R17, E14: `.budget-accounts`, die Karte
 `.metric-grid--rail`; die Konten je Zeile eines auf dem Lesemass - vorher EINE Karte ueber
-981 / 1124px), Aufteilung mit den Ausgaben in der breiten Spalte,
+981 / 1124px), Abonnements mit der Liste auf dem Lesemass und Kennzahlen samt Diagrammen in
+der Seitenleiste (R21 S7, D9: vorher die Liste ueber 1124px, Name -> Betrag 1004px, jetzt 600px;
+`test:budget-ui`), Aufteilung mit den Ausgaben in der breiten Spalte (die Kennzahlen der gewaehlten Gruppe in
+deren Spalte ueber ihrem Kopf, die Gruppenliste beginnt oben; mobil Gruppenwahl vor Kennzahl;
+Hover ist nicht Auswahl - R21 S7, D9),
 Statistik mit dem Anteilsring in Zeile 1 neben dem Verlauf, darunter Ausgaben und Einnahmen
 NEBENEINANDER (R17: zwei Bloecke je ~480-550px, der Name 14px, der Betrag am Balkenende - vorher
 ein 830px-Balken zwischen Name und Betrag); der Verlauf laeuft ab heute punktiert weiter und
@@ -1535,6 +1685,33 @@ Apple Health "Durchsuchen"). Jeder Bereich hat eine Pfad-Adresse `/health/<berei
 `?tab=`-Adressen leiten um. Mobil schiebt ein Bereich sich mit "< Gesundheit" und dem
 Bereichsnamen als Titel auf; ab der Split-Schwelle stehen links Uebersicht und Bereiche
 (`--layout-nav-list`), rechts der Bereich (Baustein mit `address`).
+
+**Zwei Heimaten, je ein Weg (R21, D7; Critique a5 P2).** Die Zyklusvorgaben bleiben im Dialog
+der Zyklusseite, das Gesundheitsblatt der Einstellungen fuehrt mit "Zyklus-Einstellungen"
+dorthin (`/health/cycle?open=settings` oeffnet den Dialog und verlaesst die Adresse), und die
+Suche findet den Weg ueber den Satz, der die Vorgaben aufzaehlt. Der Dialog spricht die Sprache
+der Dialoge (Zeilen im Traeger, Zahl mit "Tage" als `formCompositeHtml`-Einheit, An/Aus als
+`formSwitchRowHtml`), ein Hinweis steht unter dem Feld, das er meint. Freigaben: das Menue der
+Personenwahl endet in der eigenen Ansicht mit "Wer sieht das?" (`?option=` auf die
+Standard-Sichtbarkeit), und dort steht, dass Betreuende auch Privates sehen - fuer Admins mit dem
+Weg zu den Mitgliedern. Ein Tipp mit Ziel ist ein Link mit eigenem Text, nie HTML aus einem
+Locale-String (`test:health-cycle`, `test:settings-navigation`).
+
+**Gesundheit als Briefing (R21, Critique 2026-10-21, D6).** Ueber den Karten der Uebersicht steht
+EIN Satz aus vorhandenen Daten (`.health-brief`, Body 17): was sich seit der letzten Messung
+veraendert hat, die drei zuletzt gemessenen Messarten ("Seit der letzten Messung: Gewicht -0,2 kg,
+Schlaf +30 Min. und ..."), ohne Vorwert der letzte Wert, ohne Messung kein Satz. Er nennt Richtung
+und Betrag, nie eine Bewertung - die Zahl gehoert der Person, das Urteil ihrer Aerztin. Mobil zieht er
+mit Personenwahl und "Heute faellig" vor die Bereichsliste. **Was nicht gemessen ist, bekommt keine
+Kachel:** keine grauen Felder mit "-" (ein Kind ohne Messung hatte neun, 145.200px² am Laptop), sondern
+EINE ruhige Zeile "Noch keine Messwerte" mit der Erfassen-Aktion (`.health-overview__empty-row`); die
+Vitalwerte-Seite listet leere Messarten auf jeder Breite in "Weitere Messwerte". **Die Kurven sind
+ablesbar:** Mindestspanne je Messart (`minSpan` in utils/health-vitals.js, z. B. Blutzucker 40 mg/dL -
+drei Werte zwischen 88 und 90 standen vorher auf einer 0,5er-Achse), die Einheit am obersten
+Achsenwert ("120 mmHg", `chartGridMarkup({ unit })`), der Puls auf eigener Achse unter dem Blutdruck
+(`axes`), die Reihen direkt an ihrer Kurve beschriftet statt einer Farblegende. Die Aktivitaetsachse
+nennt Minuten; eine fehlende Bewertung im Laborbefund bleibt eine leere Zelle statt "-".
+Guards: `test:health-vitals` ("R21 D6"), `test:health-nav` (Umzugsplan).
 
 Guard: PAGE-017 bis PAGE-019 in `test/test-frontend-audit.js` - jede Seite steht genau einmal in
 dieser Tabelle, keine Kernseite fuehrt `data`, eine Lesemass-Seite fuehrt `reading`/`form`, eine
@@ -1609,7 +1786,10 @@ war es die kleinste Fassung seiner selbst.
 backdrop-filter steht drin (mit webkit-Zwilling fuer Safari < 18). prefers-reduced-
 transparency kippt alle Glas-Tokens auf `--color-surface`-Werte und alle Blur-Stufen auf 0;
 prefers-contrast: more haertet Kanten auf Textfarben, schaltet Blur und beide Lichtfelder
-ab und hebt den Notes-Tint auf 6.3:1.
+ab und hebt den Notes-Tint auf 6.3:1. Seit R21 (D4) hebt es auch den Metatext: Sekundaer- und
+Tertiaertext stehen eine Rampenstufe naeher an der Textfarbe (`--neutral-700`, hell 9,3:1
+statt 6,2 auf Weiss) - die kleinste Schrift des Schirms war bis dahin die einzige, die
+unveraendert blieb. Guard `test:typography` "prefers-contrast: more hebt".
 
 **Die Ausweich-Regel des Toast-Stapels (#1421, 2026-09-22).** Der untere Shell-Stapel
 (Toasts, Sammelpille) liegt UEBER Dialogen (`--z-toast` 300 ueber `--z-modal` 200), damit
@@ -1635,7 +1815,15 @@ liegen Ausstieg und Timer-Knoepfe. **Sperrzonen ohne Dialog (#1917):** was `data
 traegt, haelt der Stapel frei wie eine Bedienleiste, auch wenn kein Dialog offen ist - er nimmt
 dann die naechste freie Kante, in seiner eigenen Breite und Mitte. Die Regel haengt am Attribut,
 nicht an einer Seite; gesetzt ist es an Uhrzeit, Datum und Fuss der Wand, wo der Hinweis beim
-Einschalten bis rund 834px Breite acht Sekunden auf der Uhr lag.
+Einschalten bis rund 834px Breite acht Sekunden auf der Uhr lag. **Weichen ganz (R21):** vor einer
+offenen Flaeche mit `data-toast-yield` nimmt der Stapel alle Toasts zurueck (`inert`) und haelt
+ihre Frist an (`toast:hold`/`toast:release`); mit dem Schliessen kommen sie mit der Restfrist
+wieder. Gesetzt am Mehr-Blatt: es steht fast bildhoch, es gab keine freie Lage, und der
+Rueckgaengig-Toast lag auf Griff und Suche (390x844: Toast 12-66, Suche ab 62). **Gleiches steht
+einmal da (R21 S9a):** derselbe Satz desselben Typs ohne Aktion, waehrend er noch steht, wird kein
+zweiter Toast - die Frist beginnt von vorn, eine ruhige Zahl (`.toast__count`, `aria-hidden`)
+zaehlt mit, die Ansage kommt trotzdem (stille Ansage). Vorher stapelten sich drei gleiche und
+verdraengten zwei andere. Toasts mit Aktion bleiben einzeln (`test:toast-show`).
 
 ## Shapes
 
@@ -1680,9 +1868,9 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 
 | Frage | Die EINE Antwort | Baustein | Nicht mehr |
 |---|---|---|---|
-| Bearbeiten/Loeschen/Mehr an einer Zeile | **Zeilenaktionen (Entscheidung Ulas, 2026-10-07; ersetzt die Lesart "alles sichtbar" aus ignore.md):** je Zeile HOECHSTENS ZWEI dauerhaft sichtbare Icon-Aktionen (`.row-action`); alles Weitere und alles Destruktive steht als Eintrag mit Icon UND Wort hinter EINEM dauerhaft sichtbaren Mehr-Knopf. Nichts wird hinter Hover oder Geste versteckt; Wischen bleibt Zusatzweg; Loeschen bleibt widerrufbar bzw. fragt nach wie vorher. Der Zieh-Griff und sein Auf/Ab-Paar zaehlen nicht. Keine Textkapsel ("Bearbeiten"/"Loeschen" als `.btn`) in einer Listenzeile. Benannte Ausnahmen: die Mahlzeit-Karte (kein Papierkorb, Loeschen im Dialog der Karte), die Werkzeugleiste im Kopf des Dokumentbetrachters (keine Listenzeile). Guards: `test:control-dialect` `row-action-count`, `row-text-capsule`, `row-danger-visible` (Ratchet) | `rowActionHtml()` / `rowActionEl()` und `rowMenuHtml({ id, label, items })` (utils/row-action.js; baut auf `popoverMenuHtml`) | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
+| Bearbeiten/Loeschen/Mehr an einer Zeile | **Zeilenaktionen (Entscheidung Ulas, 2026-10-07; ersetzt die Lesart "alles sichtbar" aus ignore.md):** je Zeile HOECHSTENS ZWEI dauerhaft sichtbare Icon-Aktionen (`.row-action`; seit R21: EINE Handlung plus Mehr-Knopf, Reihenfolge und Griff siehe **D10 Zeilen-Endzone**); alles Weitere und alles Destruktive steht als Eintrag mit Icon UND Wort hinter EINEM dauerhaft sichtbaren Mehr-Knopf. Nichts wird hinter Hover oder Geste versteckt; Wischen bleibt Zusatzweg; Loeschen bleibt widerrufbar bzw. fragt nach wie vorher. Der Zieh-Griff und sein Auf/Ab-Paar zaehlen nicht. Keine Textkapsel ("Bearbeiten"/"Loeschen" als `.btn`) in einer Listenzeile. Benannte Ausnahmen: die Mahlzeit-Karte (kein Papierkorb, Loeschen im Dialog der Karte), die Werkzeugleiste im Kopf des Dokumentbetrachters (keine Listenzeile). Guards: `test:control-dialect` `row-action-count`, `row-text-capsule`, `row-danger-visible` (Ratchet) | `rowActionHtml()` / `rowActionEl()` und `rowMenuHtml({ id, label, items })` (utils/row-action.js; baut auf `popoverMenuHtml`) | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld, nachkommende Treffer lassen sie an ihrer Zeile), Enter oeffnet sie (`utils/palette-combobox.js`, R16). Reihenfolge seit R20: Gehe zu, Daten, Neu anlegen; ein Namensanfang schlaegt ein Teilstueck (`paletteRank`), das Verb holt Anlege-Befehle erst ab drei Zeichen, gemischte Sektionen tragen das Modulsiegel an der Zeile, und ohne Treffer steht der Befehl, die Eingabe als Aufgabe anzulegen | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld, nachkommende Treffer lassen sie an ihrer Zeile), Enter oeffnet sie (`utils/palette-combobox.js`, R16). Reihenfolge seit R20: Gehe zu, Daten, Neu anlegen; ein Namensanfang schlaegt ein Teilstueck (`paletteRank`), das Verb holt Anlege-Befehle erst ab drei Zeichen, gemischte Sektionen tragen das Modulsiegel an der Zeile, und ohne Treffer steht der Befehl, die Eingabe als Aufgabe anzulegen. Seit R21 nennt eine Fusszeile die Tasten (Pfeile, Enter, Esc; nur mit feinem Zeiger, `aria-hidden`), und Termine stehen kommend vorn, Vergangenes dahinter (juengstes zuerst; `upcomingEventsFirst`, server/services/search.js, `test:search`) | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
 | Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
 | Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, am Anfangsrand] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select). **Das Verb (R17, E6): Anlegen = "Hinzufuegen" (`common.add`), Bearbeiten = "Speichern" (`common.save`), in jedem Dialog;** eine benannte Handlung behaelt ihr Verb (Hochladen, Einloesen, Freigeben, Zahlung eintragen). Neben einem absendenden Primaerknopf steht immer Abbrechen; ein Blatt, dessen Schalter sofort wirken (Teilnehmer der Belohnungen), schliesst mit "Fertig" allein, ein Leseblatt mit "Schliessen" vor der Handlung. Gehalten in `test:frontend-audit` ueber `test/dialog-grammar.js` (liest das Markup der oeffnenden Funktion, beurteilt die Beschriftung am deutschen Locale-Wert). Den Anfangsrand haelt EINE Regel in layout.css an `.modal-panel__delete` (setzt `decorateFooterDelete`, RTL gespiegelt), kein `margin` je Modul (R16) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon; "Erstellen"/"Aufgabe erstellen"/"Darlehen erstellen" neben "Hinzufuegen"; ein Primaerknopf ohne Abbrechen (Belohnungen bis R17); `btn--primary` linksbuendig im Formular (Haushaltshilfe bis R17) |
@@ -1703,12 +1891,12 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Abschnitt als Auszug eines Reiters | der Abschnittstitel IST der Weg: Knopf im `h2.u-section-title` mit Pfeil | `.section-title-link` (layout.css) | "Alle anzeigen"-Knopf daneben, Nachbau je Modul |
 | Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
 | Betrag in Zeile oder Karte | semibold, `tabular-nums`; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Fett bleibt der Kennzahl (`.metric-card__value`, Title 1) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
-| Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Die Pfeile stehen neutral (R19)**, kein Modul faerbt sie um (der Essensplan trug sie im Akzent; Guard `test:frontend-audit`). Im Essensplan bleibt der Stepper in der Zeile UNTER der Kuechen-Leiste - die Leiste ist der gemeinsame Kopf von vier Reitern. **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
+| Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Seit R21 blaettern Links/Rechts, solange der Fokus auf dem Stepper steht** (Pfeil, Wert oder Reset; RTL gespiegelt, `aria-keyshortcuts` an den Pfeilen): `wirePeriodArrowKeys()` am Traeger der Pfeile, nie am Seitencontainer - im Kalender gelten die Pfeile seitenweit (router.js). Derselbe Griff blaettert im Dokumentbetrachter durch die sichtbare Liste (Vor/Zurueck-Paar vorn in der Leiste). **Die Pfeile stehen neutral (R19)**, kein Modul faerbt sie um (der Essensplan trug sie im Akzent; Guard `test:frontend-audit`). Im Essensplan bleibt der Stepper in der Zeile UNTER der Kuechen-Leiste - die Leiste ist der gemeinsame Kopf von vier Reitern. **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
 | Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`). Seit R18 FUEHRT je Geld-Reiter eine Zahl: `lead: true` in der Kurzzeile, `.metric-card--lead` in der Reihe `.metric-grid--led` (Display-Stufe in der Seitenspalte, sonst treten die uebrigen zurueck) | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js, utils/metric-card.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
 | Reiter-Skelett im Budget (R16) | Kennzahlen (s. o.), dann je Abschnitt `.u-section-title` AUF DER BUEHNE mit den Werkzeugen rechts (`.section-toolbar`), darunter der Zeilentraeger (`.row-carrier`). Karten nur, wo ein OBJEKT eine Karte ist (Darlehen, Gruppe, Konto). Statistik: Verlauf und Anteilsring teilen Zeile 1, die Balken nehmen darunter die Bahn; mobil steht der Ring als Kopf der Kategorieliste | budget.js, subscriptions.js, split-expenses.js, budget-stats.js | Titel in der Karte (`.subscriptions-list-section`, `.split-card`), Kartentitel 17px als Abschnittstitel, Ring in einer Leiste, die unter ihm leer bleibt |
 | Pflichtfeld | der Stern ist EIN Element hinter dem Label: `${REQUIRED_MARK}` (`.required-marker`, aus dem Baum genommen); die Pflicht sagt das Feld (`required`) - IMMER, auch wo kein Stern steht. Stern an jedem Pflichtfeld; ein Formular aus EINEM Feld (2FA-Code, Display koppeln) und die Anmeldeseiten tragen keinen, dort ist die Pflicht offensichtlich. Zeilen-Bausteine tragen ihn per `labelExtra` (2026-10-18, Guard in `test:frontend-audit`) | utils/html.js | " *" im Locale-Text, handgebauter Span je Seite |
 | Vor der Anmeldung | EIN Kopf mit Marke (`authHeroHtml()`; ueber einer Karte mit eigener h1 als Absatz, `heading: false`), EIN Auge an JEDEM Passwortfeld (`wirePasswordToggle()`), EIN Fehlerfeld (`authErrorHtml()`: `role="alert"` + `tabindex="-1"`, kein `aria-live` daneben) | utils/auth-ui.js; `test:auth-pages-ui` | Marke nur auf der Anmeldung, Auge nur auf zwei von vier Seiten, drei Fehlerfeld-Fassungen |
-| Option in den Einstellungen (R17, E9) | **Eine Zeile in einem Traeger je Abschnitt** (`.row-carrier.settings-group`), wie "Aktive Module": Label links, Bedienelement rechts (Schalter, Auswahl, Kurzfeld), in JEDER Breite zweispaltig - das Label bricht um, das Bedienelement ist bei der halben Traegerbreite gedeckelt (`50cqi`), ein einzelnes Textfeld (Text, E-Mail, Telefon, Adresse, Passwort) FUELLT diese Haelfte statt bei seinen 20 Zeichen zu bleiben (Re-Kritik 2026-10-17: E-Mail 201px in 680px), die Zeile ist mindestens `--target-lg` hoch. Ein Segment oder eine Chip-Gruppe steht unter dem Label (`--stacked`). Der Hinweis zu EINER Zeile ist ihre Sekundaerzeile und laeuft unter beiden Spalten; der Hinweis zur Gruppe ist ihr Fuss auf dem Grund (`.settings-group__footer`). Eine einzelne Zeile traegt keine eigene Ueberschrift. Eine Karte (`.settings-card`) bleibt dem Formular: mehrere Felder und ein Knopf (Konto, Passwort, CalDAV, SMTP, Token). Mehrfachauswahl in einer Zeile = `.filter-chip` mit `aria-pressed` (Standard-Erinnerungen) | `settingRowHtml()`, `settingSwitchRowHtml()` (settings/components.js), settings.css "Gruppierte Zeilen"; `test:settings-navigation` rendert jeden Abschnitt und haelt "keine Karte mit genau einem Bedienelement" | eine Karte je Option (Darstellung: zehn Einstellungen in acht Karten, 1714px), Kartentitel + Hinweis UEBER einem einzelnen Schalter, ein vollbreites Auswahlfeld fuer "5 Minuten", 16px-Checkbox in einer Pille neben `role="switch"` |
+| Option in den Einstellungen (R17, E9) | **Eine Zeile in einem Traeger je Abschnitt** (`.row-carrier.settings-group`), wie "Aktive Module": Label links, Bedienelement rechts (Schalter, Auswahl, Kurzfeld), in JEDER Breite zweispaltig - das Label bricht um, das Bedienelement ist bei der halben Traegerbreite gedeckelt (`50cqi`), ein einzelnes Textfeld (Text, E-Mail, Telefon, Adresse, Passwort) FUELLT diese Haelfte statt bei seinen 20 Zeichen zu bleiben (Re-Kritik 2026-10-17: E-Mail 201px in 680px), die Zeile ist mindestens `--target-lg` hoch. Ein Segment oder eine Chip-Gruppe steht unter dem Label (`--stacked`). Der Hinweis zu EINER Zeile ist ihre Sekundaerzeile und laeuft unter beiden Spalten; der Hinweis zur Gruppe ist ihr Fuss auf dem Grund (`.settings-group__footer`). Eine einzelne Zeile traegt keine eigene Ueberschrift. Eine Karte (`.settings-card`) bleibt dem Formular: mehrere Felder und ein Knopf (Konto, Passwort, CalDAV, SMTP, Token). Mehrfachauswahl in einer Zeile = `.filter-chip` mit `aria-pressed` (Standard-Erinnerungen). Der Wert einer Auswahl ist KURZ ("Automatisch", "Deutschland"), weil die Bedienspalte mobil rund 180px hat; was er gerade bedeutet, steht vorn in ihrer Hinweiszeile ("Gerade Englisch.", `settings.hintWithCurrent`) und geht mit, wenn Auswahl oder Automatik wechseln. Eine Region heisst nach ihrem Land, mit Sprache nur, wo das Land allein nicht unterscheidet (Kanada, Philippinen) oder die Sprache das Format bestimmt (Schweiz) (R21 S9c) | `settingRowHtml()`, `settingSwitchRowHtml()` (settings/components.js), settings.css "Gruppierte Zeilen"; `test:settings-navigation` rendert jeden Abschnitt und haelt "keine Karte mit genau einem Bedienelement", dazu "R21 S9c": kurzer Wert, Detail vorn im Hinweis, Regionen unterscheidbar | das Detail in Klammern im Wert ("Automatisch (Englisch)", "Deutsch (Deutschland)" - bei 390px als "Automatisch (Engl…" gekappt), eine Karte je Option (Darstellung: zehn Einstellungen in acht Karten, 1714px), Kartentitel + Hinweis UEBER einem einzelnen Schalter, ein vollbreites Auswahlfeld fuer "5 Minuten", 16px-Checkbox in einer Pille neben `role="switch"` |
 | Ueberschriften im Einstellungsblatt | EINE Stufenleiter, die Groesse folgt der Tiefe: Blatt 22/700, Reichweite ("Fuer mich"/"Fuer den Haushalt") 20/600, Abschnitt 17/600, Karte 16/500; ohne Reichweite eine Stufe kuerzer (22/20/17). Die Ebene im Baum zieht `levelScopedHeadings()` per `aria-level` nach | typography.css, settings/shell.js | Reichweite als kleinste Stufe (16px sekundaer), "Termine" zweimal auf der Ebene der Reichweite; seit R17 auch zweimal dieselbe ABSCHNITTSueberschrift in einem Blatt ("Termine" fuer mich und fuer den Haushalt - der persoenliche Abschnitt heisst "Termin-Vorgaben"), drei Stufen vor dem ersten Feld (Kartentitel ueber einer einzelnen Zeile) |
 | Antippbarer Wert in einem Leseblatt | Wert in Textfarbe, das Zeichen der Zeile im Modulton, Unterstreichung unter dem Zeiger | `.contact-detail__link`, `.detail-row:has(...) > .detail-row__icon` (contacts.css) | Link im Modul-Rot neben "Loeschen" in Warnrot |
 | Kurze Angaben in einem Leseblatt, schmal (R19) | **Info-Listen-Form:** Label vorn, Wert am Ende, EINE Zeile; ein langer Wert bricht unter das Label. Nur Textwerte, Fliesstext und Knoten bleiben untereinander; opt-in je Ansicht (`rowLayout: 'inline'`, heute Inventar: 12 Zeilen 565 -> 371px bei 390px) | `detailBodyEl` / `.detail-view--inline-rows` (detail-view.css) | Label als Caption ueber jedem Wert, 45px je Feld |
@@ -1718,10 +1906,11 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | **D3 Unternavigation** | Hoechstens sieben Bereiche = Text-Reiter (`.sub-tab`, OHNE Icons); mehr = Liste mit Drill-down | `renderSubTabs({ indicator })` | Icon-Reiter, eigene Bereichsspalte, Segment + Chips als Navigation |
 | **D4 Formulare** | Zwei Dialekte nach ZWECK: Label-ueber-Feld fuer Text und Stammdaten, Inset-Zeile fuer Messwerte. Datum/Uhrzeit sieht in beiden wie ein Feld aus. Pflichtfeld/Name zuerst und fokussiert, Seltenes hinter "Weitere Angaben" | `.form-group`/`.form-input`, `<yuvomi-datepicker>` | Dialekt nach Modul, nacktes Datum als Text |
 | **D5 Anlegen** | Der FAB ist der eine Weg (benannte Ausnahme: Quick-Add im Einkauf, Felder in Kapsel+Fill wie die Suche). Ein Leerzustand neben dem FAB hat keine zweite Primaeraktion; das Planer-"+" nur in leeren Zellen. **Abschnittsaktion:** genau EINE `btn--secondary btn--sm` (Icon + Wort) rechts neben dem Abschnittstitel; seltene Nebenaktionen hinter einem `btn--secondary btn--icon btn--sm <modul>-section-tools popover-menu__trigger` (kein `pageToolsMenuHtml`). Guard: `test:control-dialect` `section-action` | `createPageFab()` (utils/fab.js); `popoverMenuHtml({ triggerClass: 'btn btn--secondary btn--icon btn--sm <modul>-section-tools' })` (utils/popover-menu.js) | `btn--primary` im Leerzustand neben dem FAB; mehr als eine `btn--secondary btn--sm` im Abschnittskopf; `btn--ghost` neben `btn--secondary` |
-| **D6 Zeilen** (R18) | Hoechstens zwei dauerhaft sichtbare Icon-Aktionen, alles Weitere hinter EINEM sichtbaren Mehr-Knopf (`ellipsis`), auch auf Touch; Zeilenkoerper oeffnet, Chevron nur bei Navigation | `rowMenuHtml()`; `test:control-dialect` | Aktion nur per Geste oder Hover, Stift neben oeffnendem Koerper |
+| **D6 Zeilen** (R18; seit R21 geschaerft durch D10) | Alles Weitere hinter EINEM sichtbaren Mehr-Knopf (`ellipsis`), auch auf Touch; Zeilenkoerper oeffnet, Chevron nur bei Navigation. Wie viel sichtbar bleibt und in welcher Reihenfolge, sagt D10 | `rowMenuHtml()`; `test:control-dialect` | Aktion nur per Geste oder Hover, Stift neben oeffnendem Koerper |
 | **D7 Modale** | Das geteilte Modal laeuft auf `<dialog>.showModal()` (Top-Layer, inerter Hintergrund, Esc) | modal.js | eigener Fokusfang ueber einem `div` |
 | **D8 Typo** | Gruppenueberschrift in Listen = EIN Stil (Micro-Label, ohne Icon). Die Titelzeile hat eine feste Mindesthoehe (`min-block-size: var(--target-base)`, Titel mittig): der Large Title steht in jedem Modul am selben Ort (vorher 8 gegen 11px). Die Einstellungen tragen am Desktop den Modulkopf wie jedes Modul; eine Abschnittsueberschrift, die das Blatt wiederholt ("Mein Konto" unter "Konto"), steht nur in der Gliederung | `.list-group__title`; layout.css Large-Title-Zone; `test:mobile-chrome` (D8) | Icon vor der Gruppenueberschrift, springender Titel, Einstellungen ohne Kopf |
 | **D9 Farbe** | Datenidentitaet (Budget-Kategorie) behaelt EINE Farbe ueberall; Zustand sagen Text und Icon, nicht Umfaerben | Kategorie-Token | Kategorie, die je Zustand die Farbe wechselt |
+| **D10 Zeilen-Endzone** (Critique R21, 2026-10-21; EINE Spezifikation fuer alle Module) | **Am Zeilenende in dieser Reihenfolge: [hoechstens EINE sichtbare Handlung] [Mehr-Knopf] [Griff, ganz rechts, nur in sortierbaren Listen].** Hoechstens zwei sichtbare Icon-Ziele je Zeile (Handlung + Mehr). Destruktives steht immer im Mehr-Knopf (`rowMenuHtml`, `danger: true`); dorthin wanderten in R21 auch Ueberspringen einer Dosis, Plan und Schliessen eines Taschengeldkontos, Einzahlen und in der Dokumentzeile das Auge (das Menue fuehrt dann "Ansehen"). Ein Chevron steht nur an reiner Navigation (Gesundheitsbereiche, Einstellungen), nie an einer Zeile, die ein Objekt oeffnet und einen Mehr-Knopf traegt. **Die ganze Zeile oeffnet:** der Oeffner (`.u-row-title` oder `.list-row__main--interactive`) streckt sein `::after` ueber die Zeile, Steuerelemente stehen darueber (`z-index: 1`, Spezifitaet null), die Zeile ist ihr eigener Stapelkontext; der Oeffner selbst bleibt `position: static`. Wo die Textspalte knapp ist, steht der Mehr-Knopf schmal, aber hoch wie der Griff (`.row-action--slim`; Dosis, Aufgaben mit eigener Rasterregel). Gemessen vorher (Seed, 390/1280): 29/24 Zeilen ausserhalb der Folge ohne den Vorrat (Einkauf Griff vor Mehr 22, Rezepte Chevron + Mehr 6 mobil, Dosis zwei Knoepfe 1, Taschengeld drei Knoepfe 1 am Laptop), freie Zeilenflaeche, die auf einen Tipp oeffnet: Aufgaben 29 % (Laptop 33 %), Geburtstage 68, Inventar 75, Vorrat 79, Haushaltshilfe 82, Kontakte 85, Rezepte 89 %; nachher 0 Zeilen und ueberall 100 %. **Benannte Ausnahmen:** der VORRAT - der Mengen-Stepper ist die Wertsteuerung der Zeile, und bei knappen und leeren Artikeln steht davor der Warenkorb, weil "mit einem Tipp auf die Liste" das Versprechen von README und Website ist (`test:docs-landing`, `test:readme-consistency`); so stehen dort drei Ziele, und es gibt keinen Mehr-Knopf (Loeschen per Wisch und im Dialogfuss). Karten folgen ihrer Kartenleiste, nicht der Zeile (Notiz: Anheften in der Ecke; Mahlzeit; Dokument im Raster: Auge, Herunterladen, Mehr; Praemie; Darlehen). Verwalter-Dialoge (Auf/Ab-Paar, Stift, Papierkorb) laufen als Ratchet aus. Die Einkaufszeile hakt als Ganzes ab statt zu oeffnen (R16) | list-row.css (Strecke, `.row-action--slim`); `rowMenuHtml()`; Guards `test:control-dialect` `row-endzone-order`, `row-primary-count`, `row-chevron-with-menu`, "D10: der Oeffner ...", "D10: kein Modul stellt den Oeffner ..." | Griff vor dem Mehr-Knopf, zwei Knoepfe mit Wort je Zeile, Chevron neben dem Mehr-Knopf, tote Metazeile neben einem Titel-Knopf |
 
 **Wege und Eingaben (R16 Schritt 3, Critique 2026-10-05).** Neun Regeln, je mit ihrem Ort:
 - **Eine Abkuerzung hat einen dauerhaften Ort.** Die Sammel-Pille des Einkaufs steht fuenf
@@ -1764,7 +1953,10 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
   `object-fit: cover` (beschneiden, nie stauchen), ohne Bild kein Platzhalterblock.
 - **Ein langes Blatt beginnt mit dem Weg zu seinen Teilen.** Einstellungen: ab vier
   Abschnitten Sprungmarken als eine scrollende Zeile von Links auf `?section=`
-  (`settingsSheetJumpTargets`), mobil zwei Zeilen Blattbeschreibung. Eine Marke heisst wie
+  (`settingsSheetJumpTargets`), mobil zwei Zeilen Blattbeschreibung. Die Marken sind
+  TEXTLINKS im App-Akzent, keine Chips (R21): in Chip-Optik sahen sie aus wie die Auswahl
+  darunter (Erinnerungs-Chips im Kalender-Blatt) - eine Marke springt, sie waehlt nichts
+  (`test:settings-navigation`). Eine Marke heisst wie
   die Ueberschrift, an die sie springt (`syncJumpLabels`, R17): der Registry-Name des
   Abschnitts ist nur der Rueckfall und bleibt der Suchbegriff. Gesundheit mobil: nach
   der Bereichsliste zwei Vitalkennzahlen (Titel = Weg zu allen) und EINE Zeile "Alle Werte
@@ -1805,11 +1997,13 @@ ueber alle Module, kein Nomen); Filterblaetter (Kalender, Aufgaben) behalten die
 von `toggleRowHtml()` - ob auch dort Schalter stehen, ist offen; Auswahllisten
 `modal-actions--stack` (Serien-Umfang) sind kein Fuss.
 
-**Offen: die Optik von "Abbrechen".** Der Brief dieser Runde setzt `btn--ghost` (wie Kalender und
-Aufgaben); seit der Critique 2026-07-30 haelt `test:frontend-audit` fuer die drei geteilten
-Rueckfragen das Gegenteil fest (`btn--secondary`, "im Loeschen-Confirm, wo Abbrechen am
-wichtigsten ist, am unauffaelligsten"), und 61 Seiten-Dialoge folgen ihm, 27 dem Kalender. Bis
-das entschieden ist, zaehlt `cancel-ghost` nur.
+**Die Optik von "Abbrechen" ist entschieden (Runde 5, 2026-09-26): `btn--secondary`, nie
+`btn--ghost`.** Der Brief dieser Runde setzte `btn--ghost` (wie Kalender und Aufgaben); seit der
+Critique 2026-07-30 hielt `test:frontend-audit` fuer die drei geteilten Rueckfragen das Gegenteil
+fest (`btn--secondary`, "im Loeschen-Confirm, wo Abbrechen am wichtigsten ist, am
+unauffaelligsten"), und 61 Seiten-Dialoge folgten ihm, 27 dem Kalender. Hier stand bis R21
+"Offen ... bis das entschieden ist, zaehlt `cancel-ghost` nur"; `test:control-dialect` fuehrt
+`cancel-ghost` laengst als Regel mit leerer Ratsche.
 
 **Gehalten als Ratchet** (`test:control-dialect`): sechzehn Scanner zaehlen je Datei die
 Abweichler; die Ausnahmeliste `PENDING` (Stand 2026-09-26, fuer die sechs Regeln der Runde 7
@@ -1912,6 +2106,13 @@ seinen Innenabstand zusammen und blieb als 50x48-Oval in einer Form zurueck, die
 nirgends gibt, `.perm-seg__opt` stand als Icon-Segment auf 34x30, und allein
 `.documents-dms-link-btn` machte es richtig. Alle messen `--target-base`
 (auf Touch `--target-lg`).
+
+Die Rechte-Matrix hat das Label seit R21 in JEDER Breite: am Zeiger Icon und Wort
+nebeneinander, am Finger untereinander, gleich breite Stufen fuer den gleitenden Daumen.
+Die Legende ueber der Matrix, die am Zeiger die Icons erklaerte, entfiel - wer bei jedem
+Schalter nachschlagen muss, was ein durchgestrichenes Auge heisst, setzt Rechte fuer Kinder
+nach Gefuehl. Reicht die Zeile nicht (Mitglieds-Modus mit "Erben"), rueckt das Segment
+unter den Namen (`test:permissions`).
 
 **Der erste der vier ist seit 2026-08-28 GESCHICHTE, und sein Ende ist die staerkere Lesart
 derselben Regel.** `.cal-toolbar__mine-btn` und die vier Ebenen-Chips daneben sind aus dem
@@ -2057,8 +2258,9 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   (`--_seg-active-bg` #443E37 auf #37332E, 1.19:1) - mit `--color-surface` lag er im Dark
   als Mulde in seiner Bahn (R18). Die Modulton-Tinte haelt darauf AA (knappster Wert
   Gesundheit 4.51:1). Dasselbe gilt fuer den Schalterknopf: `--color-switch-knob` ist in
-  beiden Themes Weiss, die An-Bahn traegt `--color-btn-primary`. Innenradius konzentrisch
-  (`calc(var(--radius-sm) - 2px)`). Kein 3px-Akzentstreifen unter aktiven Tabs.
+  beiden Themes Weiss, die An-Bahn traegt `--color-btn-primary`. Innenradius konzentrisch:
+  `--radius-sm` (10px) im `--radius-md`-Traeger (12px) mit 2px Polster (panel.css,
+  `.segmented__item`). Kein 3px-Akzentstreifen unter aktiven Tabs.
 - **EINE BEHANDLUNG PRO KONTROLLTYP.** Der Modulton erscheint genau einmal als FLAECHE
   (aktiver Filter-Chip, getoent) und einmal als TINTE (aktives Segment). Bis 2026-08-12
   war das Segment deckend gefuellt; auf `/tasks` standen dadurch vier Gruen-Behandlungen
@@ -2076,8 +2278,10 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   ausgeschrieben; zusammengehalten wird sie vom Guard, nicht von der Kaskade.
 
 ### Chips
-- **Form:** Kapsel (`--radius-full`), Kante wie ein Bedienelement. Kalender-Layer-Chips
-  tragen die User-Farbe als Border mit ~60 % Deckung (>=3:1), nie als Textfarbe; alle
+- **Form:** Kapsel (`--radius-full`) mit 1.5px-Kante in `--color-border` (filter-chip.css).
+  Eine Nutzerfarbe steht nie als Textfarbe, sondern als Scheibe (`.filter-chip__swatch`, Personen);
+  die Kalender-Ebenen-Chips mit ~60-%-Nutzerfarbkante sind seit 2026-08-28 entfallen (ihre
+  Schalter stehen im Filterblatt, siehe die Label-Verlust-Regel). Alle
   Labels stehen inaktiv in Sekundaertext - auch der Mir-zugewiesen-Chip (Beschluss
   2026-08-17, umgesetzt 2026-08-27: seine dauerhaft getoente Schrift las sich als
   „Filter ist an"; die Farbe erscheint erst mit der Aktivierung). Ein aktiver
@@ -2104,8 +2308,11 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   Trennung leistet der Schatten, nicht eine Kante.
 - **Shadow:** shadow-sm in Ruhe; Hover-Anhebung nur fuer interaktive Karten.
 - **Inset-Grouped-Liste:** die Kernform der neuen Welt. "Heute wichtig" auf dem Dashboard ist
-  EINE Inset-Grouped-Liste (ein Traeger, Zeilen mit Haarlinien, getoente Icon-Kachel plus
-  Titel plus Modul-Untertitel plus trailing Count), nicht viele Einzelkarten.
+  EINE Inset-Grouped-Liste (ein Traeger, Zeilen mit Haarlinien, Vollton-Siegel plus Titel plus
+  Untertitel plus trailing Uhrzeit), nicht viele Einzelkarten. Als wichtigster Block der Seite
+  traegt der Traeger eine Stufe mehr als die Karten darunter: `--radius-xl` und `--shadow-lg`
+  (`.today-cockpit__grid`, dashboard.css). Hier stand bis R21 "getoente Icon-Kachel ... plus
+  trailing Count".
 - **Internal Padding:** 16px (`--space-4`), kompakt 12px.
 - **Gruppen-Traeger (R20):** eine Karte je Gruppe (Abfallart mit ihren Terminen) traegt
   dieselbe Haut wie `.row-carrier` - Flaeche, `--radius-lg`, shadow-sm, keine Kontur; den
@@ -2188,6 +2395,15 @@ Sie loest das Loch nicht allein: dazu gehoert, dass eine Listen-Kachel ihre Zeil
 ihrer HOEHE nimmt statt aus einer Konstante, die fuer eine und fuer zwei Rasterzeilen
 dieselbe war. Ueber das Standard-Board gemessen bleiben 3px Leerraum pro Karte.
 
+**Das Raster der Uebersicht hat im Normalmodus kein Loch - rechts, dann unten** (R10 L9, R21 D5).
+Nach der dichten Packung waechst jede Kachel erst nach rechts in den Rest ihrer Zeile
+(`rowFillSpans`), dann nach unten in freie Zellen, die von links niemand erreicht
+(`columnFillSpans`): eine 1x1-Kachel neben zwei hohen liess darunter 305x185px leer (1440px,
+vier Spalten) bzw. 319x201px (Kinderkonto, drei Spalten). Beides ist Darstellung
+(`data-row-fill`/`data-col-fill`), gespeichert bleibt die gewaehlte Groesse; im Anpassen-Modus
+waechst nichts. Die Kennzahlreihe (`align-self: start`) waechst nicht nach unten. Gemessen nachher:
+0 Loecher bei 2, 3 und 4 Spalten, Erwachsene und Kind (`test:dashboard`, „R21 D5").
+
 **Und eine Fusszeile ist eine Auskunft, kein Griff.** Die Tagesbilanz des Haushalts schliesst
 ihre Karte als hairline-getrennte Zeile ab, exakt wie der Fuss der Budgetkarte - ein
 getoentes Well haette dieselbe Form gehabt wie „1 zu bestaetigen" in den Belohnungen, und das
@@ -2211,8 +2427,8 @@ steht statt untereinander. Guard: `row lists sit in exactly one carrier` liest A
 Stylesheets und haelt jede Haarlinien-Zeile frei von Karten-Merkmalen (Schatten, Radius,
 Surface-Fuellung).
 
-**Die Traegergrammatik steht zweimal, und sie ist nicht zweimal dieselbe (offener Befund,
-2026-08-11).** Geteilt liegt sie als `.row-carrier` (list-row.css) - genau die vier
+**Die Traegergrammatik stand zweimal, und sie war nicht zweimal dieselbe (Befund vom
+2026-08-11, aufgeloest mit #1478 und #1492, siehe den Schluss dieses Abschnitts).** Geteilt liegt sie als `.row-carrier` (list-row.css) - genau die vier
 Deklarationen oben, samt der Ausnahme, dass ein Traeger, der nur einen Leerzustand enthaelt,
 seine Karte abgibt. Daneben steht `.list-rows`, der Traeger der gruppierten Listen (Einkauf,
 Vorrat, Rezepte, Aufgaben, Agenda); `tokens.css` nennt ihn „dieselbe Grammatik plus dem
@@ -2254,6 +2470,12 @@ der die Traeger-Regel den Well vom Grouped-Grund verbannt hat. Der Guard kann es
 weil er die ZEILE prueft (sie darf keine Karte sein), nie den Traeger. Was daraus folgt -
 `.list-rows` bekommt Schatten und 16px, oder die Regel nennt zwei Traegerformen samt
 Kriterium -, ist offen und gehoert an das gerenderte Material, nicht in diesen Absatz.
+
+**Aufgeloest durch die Kanon-Runde (#1478, 2026-09-27; der letzte Rest mit #1492):** kein
+Markup traegt `.list-rows` mehr - die gruppierten Listen (Einkauf, Vorrat, Rezepte, Aufgaben,
+Agenda) stehen in `.row-carrier`, also in EINER Traegerform mit Schatten. Die Klasse lebt nur
+noch als Regel in list-row.css; die Kanon-Tabelle fuehrt sie als "laeuft aus, danach faellt
+die Regel".
 
 **Die Wischsemantik-Regel.** Dieselbe Geste bedeutet in jeder Liste dasselbe. Der
 Zeilenanfang traegt die primaere positive Aktion, das Zeilenende das Destruktive oder
@@ -2317,7 +2539,9 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   (`padding-inline-end: var(--space-8)`) plus `text-overflow: ellipsis`, damit ein langer
   Optionstext vor dem Zeichen endet. `[multiple]`/`[size]` behalten ihr natives Bild.
   Zahlfelder zeigen keine nativen Spin-Pfeile. Das ist app-weiter Kanon, kein Modul-Detail.
-- **Focus:** Akzentkante plus 3px Glow in `--color-accent-light`; interaktive Nicht-Felder
+- **Focus:** Akzentkante plus 3px Glow aus `color-mix(--color-accent, --tint-shadow)` und die
+  Glas-Innenkante `--glass-inset-input` (glass.css; die `--color-accent-light`-Fassung in
+  layout.css wird davon ueberschrieben); interaktive Nicht-Felder
   tragen den app-weiten 2px-Ring. **Der Fokus eines Feldes ist immer die eine Stimme
   (Violett), nie ein Modulton** - die Schnellzeile des Einkaufs war bis 2026-10-07 orange.
 - **Formularzeile (Entscheidung Ulas, 2026-10-07):** Ziel fuer Erfassungsdialoge und
@@ -2372,8 +2596,8 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Regel als `.pantry-form-row` in pantry.css und kopiert als `.inventory-form-row`; der
   Artikel-Dialog des Einkaufs benutzte die Vorratsklasse, deren Blatt dort nicht laedt (Dialog
   mobil 748 -> 563px). Kein Modulblatt kopiert die Zeile (`test:frontend-audit`).
-- **Feldsatz in Dialogen (R17, E6):** `<label class="form-field">` mit `.form-label` (14px
-  sekundaer) + `.form-input`; Pflichtfeld = `${REQUIRED_MARK}` am Label; ein Geldbetrag traegt
+- **Feldsatz in Dialogen (R17, E6):** `<label class="form-field">` mit `.form-label` (Footnote
+  13 medium, sekundaer; bis R21 S9b 14px) + `.form-input`; Pflichtfeld = `${REQUIRED_MARK}` am Label; ein Geldbetrag traegt
   `.budget-amount-input` (48px/20/600), sein Nachbar in der Zeile dieselbe Hoehe. Die Dialoge der
   Aufteilung folgen dem seit R17 (vorher `<label>Text<input class="input">`, Label 16px primaer,
   Betrag 42px/16/500, kein Stern), der Schichtplan schreibt die Kanon-Klassen. Wochentage sind
@@ -2389,7 +2613,16 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   sichtbaren Traeger und fokussieren selbst: die Ablage der Dokumente (`reportDropzoneError`,
   Meldung hinter der Ablage, `aria-invalid`/`aria-describedby` am Datei-Input, der den Fokus
   bekommt) und die Wochentags-Chips der Entsorgung (Fokus auf den ersten Tag). Eine Absage des
-  Servers mit `reason` (`wrong_password`, `email_port_invalid`) geht an dasselbe Feld.
+  Servers mit `reason` (`wrong_password`, `email_port_invalid`) geht an dasselbe Feld. Die Regeln
+  des Markups (`required`, `min`, `max`, `step`, Zahltyp) bleiben im Markup: `constraintErrors(form)`
+  (components/modal.js) liest ihren ValidityState und gibt `reportFieldErrors()` die Meldung in
+  der Stimme der App ("Mindestens 15.") - kein zweites Nachrechnen im Handler. Seit R21 halten das
+  alle zwoelf Gesundheitsformulare (`test:health-errors`); Beispielwerte sind keine Platzhalter
+  (ein leeres Blutdruckfeld zeigte "120 / 80" wie eine Messung). Seit R21 S9a gilt es fuer JEDES
+  Formular mit Feldregeln (`maxlength` zaehlt nicht, es laesst sich nicht verletzen): 28 von 59
+  hatten noch kein `novalidate` (Schichtplan, Aufteilung, Haushaltshilfe, Abos, Dokumente, Fasten,
+  Einstellungen, Tablet-Kopplung), jetzt 0; Guard `test:control-dialect` `form-novalidate`. Die
+  Seiten vor der Anmeldung melden ueber ihr EINES Fehlerfeld (`flagField`, utils/auth-ui.js).
 - **Nachfragen ohne Sperre (R19):** `.form-hint--warning` (Tinte `--color-warning-ink`) fuer
   ungewoehnliche, aber speicherbare Werte (Vitalwerte: 650 kg). Unmoegliches ist ein
   Feldfehler, nicht diese Zeile.
@@ -2401,7 +2634,10 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Bestandsstimme der Aufgaben und Erinnerungen.
 - **„Weitere Einstellungen" nennt, was dahinter liegt:** `advancedSection(..., { hint })` setzt
   unter die Beschriftung eine Caption-Zeile mit den Feldnamen. Ein Feld, das nur hinter dem
-  Aufklapper steht, findet sonst nur, wer schon weiss, dass es existiert.
+  Aufklapper steht, findet sonst nur, wer schon weiss, dass es existiert. Nach dem Tipp rollt
+  der Dialog das Aufgeklappte ueber die feste Fusszeile, die Beschriftung bleibt im Bild
+  (openModal, R21; vorher 0 von 5 neuen Zeilen sichtbar am Telefon). Was fast jede Buchung
+  braucht, gehoert nicht dahinter: das Konto steht vor dem Aufklapper, sobald es Konten gibt.
 
 ### Nur lesen: das Zeichen statt des Knopfs (#1252, #1265)
 Wer ein Modul nur lesen darf, sieht den ZUSTAND, aber keine Handlung. Der Server weist
@@ -2438,6 +2674,9 @@ Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
 (`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
 Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
 Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
+Seit R21 (D6) startet es ausserdem ohne Zyklus-Tab (`CHILD_START_PREFERENCES`): keine Rechte-Zeile,
+sondern die persoenliche Abwahl aus #760, die das Kind in seinen Einstellungen selbst umschaltet -
+geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6").
 
 - **Betraege fehlen am Server, nicht nur im Bild.** Ohne `housekeeping_view_amounts` kommen
   Satz, Summen, Zahlstatus und offener Lohn als `null`; die Seite zeigt dann statt
@@ -2557,7 +2796,13 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   Treffer, das aktive gleitet per `translate` an den Anfang, die Tab-Pille blendet aus. Die Tabs
   bleiben minimiert und auf dem Rueckweg auf ihrer gemessenen Breite (`navPillGeometry`, gemessen
   an der ausgefahrenen Kapsel), beide Raender stehen explizit - kein Layout-Shift. Ein Tipp auf die
-  Pille faehrt sie aus, ohne zu navigieren.
+  Pille faehrt sie aus, ohne zu navigieren. **Seit R21 flacher per `scale`, nicht per Hoehe:** die
+  `min-height` zog die Zone mit, ihre Oberkante wanderte - gemessen doch ein Layout-Shift je Frame
+  (0,0013 je Ein- und Ausfahren, unter reduzierter Bewegung 0,017 je Wechsel). Die Kapsel behaelt
+  ihre Layout-Hoehe und staucht sich von der Unterkante (`--nav-flat-scale`, gemessen von
+  `measureNavPill` gegen einen Messfuehler fuer `--nav-height-minimized`), die Ziele strecken sich
+  zurueck (`--nav-flat-unscale`). Danach 0,00015 bzw. 0,00003. Ohne `scale` (@supports) bleibt die
+  Hoehe der Rueckfall. Guard: `test:mobile-chrome`.
 - **Die Tabs stehen in jedem Modul auf denselben Koordinaten (R19, Persona Casey).** Ohne
   FAB verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei 390px) - ein
   Budget-Reiterwechsel nach „Statistik", Belohnungen, Haushaltshilfe oder die Einstellungen
@@ -2568,6 +2813,9 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   je Reiter springen (382 -> 334px bei 390) und stand linksbuendig vor einem Loch.
 - Labels mobil in 11px (`--type-micro`, Caption 2 - der iOS-Wert fuer Tab-Bar-Titel; Begruendung
   an `.nav-bottom .nav-item__label`); lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
+  **Ab 640px Caption 1 (12px, R21, D4):** die 11px sind die Antwort auf 58px je Slot am
+  375er-Telefon; am Tablet hat jeder Slot ueber 100px, und das Label war dort die kleinste
+  Schrift des Schirms (Guard `test:typography` "R21 Inge").
 - **"Mehr" ist kein Modul (Nav-Polish 2026-10-15):** in Ruhe steht sein Zeichen tertiaer wie
   beim Aufbau (`--color-text-tertiary`, hell #6B675F); vorher setzte der Zustand nach jeder
   Navigation den App-Akzent, und der Ueberlauf sah aus wie der aktive Tab. Liegt die aktive
@@ -2585,9 +2833,12 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   Seitenleiste eine eingelassene Liste (`.more-sheet__list`): Zeile >= `--target-base`, Siegel
   32px, Name in `--type-body` einzeilig, Zaehlbadge und Pfeil am Ende, Trennlinie ab der
   Textkante. Vorher je Sektion ein Vierer-Raster mit 1-2 Kacheln je Gruppe (724px, Luecken).
-  Die System-Reihe darunter bleibt eine volle Reihe aus vier monochromen Zielen. Die Listen
-  dunkel eine Stufe ueber dem Blatt (`--sheet-tile-bg` = `--color-surface-raised` #37332E auf
-  #2B2825, 1,00 -> 1,17:1); hell bleiben sie Surface, dort trennt `--shadow-xs`.
+  Die System-Reihe darunter bleibt eine volle Reihe aus vier monochromen Zielen und ist der
+  **feste Fuss** des Blatts (`.more-sheet__foot`, R21 S7, D7): nur die Module scrollen, Einstellungen,
+  Hilfe, Neuigkeiten und Abmelden sind immer zu sehen (vorher bei 390x844 unter dem Blattende).
+  Das Blatt traegt den **gruppierten Grund** (`--color-bg`), die Listen ihre Flaeche
+  (`--sheet-tile-bg`) ohne Schatten - keine Karte auf einer Karte (R21 S7, Detektor nested-cards).
+  Guard: `test:mobile-chrome`.
 - **Navigations-Ordnung (R19, Ulas 2026-10-16):** Planen = Kalender, Aufgaben, Belohnungen,
   Notizen, Schichtplan; Haushalt = Kueche, Haushaltshilfe, Entsorgung, Dokumente, Inventar;
   Menschen = Kontakte, Geburtstage, Gesundheit; Budget. **Eine Sektion mit nur einem Eintrag
@@ -2624,7 +2875,9 @@ dort bleibt es beim Inline-Titel, wie in Apples regulaerer Groessenklasse.
 
 **Die Werkzeugzeilen-Regel (Critique 2026-08-27, P1).** Die Werkzeug-Leiste eines Modulkopfs
 (Tab-Leiste, Ansichts-Segment) ist die BAR-ZEILE: eine eigene, volle Zeile unter Titel,
-Center und Aktionen (`.page-toolbar__bar`, order 4), auf ALLEN Viewports. Der Slot stand
+Center und Aktionen (`.page-toolbar__bar`, order 4), auf allen Viewports bis auf zwei
+benannte Ausnahmen der Kopfregel mobil: die Reiter als Titelzeile zwischen 768 und 1023px
+(`page-toolbar--tabs-title`, R19) und die einzeilige Kalenderleiste ab 1024px (R21 S7). Der Slot stand
 seit Runde 6 als Zusage im Shell-Kommentar („eine Tab-Leiste im Kopf ist eine eigene,
 horizontal scrollende Zeile") - die Regel darunter gab aber nur das Scrollen, nie die Zeile,
 und die Einzeilen-Doktrin aus #882 zwang jede Leiste in die Titelzeile, wo sie ihre eigenen
@@ -2691,6 +2944,17 @@ Die vier Kuechen-Koepfe bleiben siegellos: sie teilen einen Tint, weil sie ein R
 zwei von ihnen tragen gar keinen Seitentitel. `renderSubTabs` weist ein Siegel deshalb
 zurueck, wenn die Leiste das Modul nicht wechselt (`semantics: 'tabs'`, Gesundheit) - dort
 liegt sie IM Kopf, und der traegt seinen Absender bereits.
+
+**Die Kapsel ist nicht die Trefferflaeche (R21, D11).** Mobil war die aktive Kuechen-Kapsel
+ein 58x48-Fast-Kreis mit rund 3px Luft ums Wort, "Vorrat11" klebte. Die Leiste gibt der
+geteilten Kapsel (`utils/segment-indicator.js`) per CSS eine eigene Form: `--seg-pill-block`
+(`--target-md`, 40px, mittig im 48px-Ziel) und `--seg-pill-outset` (4px ueber den Tab hinaus,
+in dessen 8px Polster) - 12px Luft ums Wort, 16px zwischen zwei Worten, und die Leiste passt
+bei 375px weiter ohne Scrollen. Der Zaehler steht 4px neben dem Wort mit 4px Innenpolster.
+Andere Leisten setzen die Eigenschaften nicht und messen den Eintrag wie bisher. Zwischen zwei
+Kuechen-Reitern blendet nur der Koerper (Typ `kitchen` am Seitenwechsel): die Kontextzeile
+wechselt mit dem Tipp, statt doppelt belichtet zu blenden. Guards: `test:kitchen-tabs`,
+`test:motion`.
 
 **Andocken kann nur ein Kopf mit Lead-Zone** - und eine hat nur, wessen Inhalt auf mehr als
 einer Zeile steht. Wo keine ist, traegt die Leiste ihre Linie durchgehend und markiert
@@ -2852,8 +3116,11 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    **Nie ein Kopf ohne Ortsangabe.** Angedockt wandert Zeile 1 aus dem Bild, und der Titel
    kommt als kleiner Inline-Titel zurueck (`wireCollapsingHeader`, utils/ux.js): in die
    Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9). Eine
-   Tab-Leiste als Bar-Zeile gibt es unter 1024px nicht mehr: seit R19 stehen die Reiter in
-   der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Die dritte Bauart dafuer (Band,
+   Tab-Leiste als Bar-Zeile gibt es zwischen 768 und 1023px nicht: seit R19 stehen die
+   Reiter dort in der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Unter 768px
+   nennt der Kopf seit R21 (D7) wieder den Ort - Siegel und Name, die Reiter darunter; angedockt
+   steht der Inline-Titel VOR den Reitern in ihrer Zeile (`--dock-tabs`, R21 S7), die Leiste
+   nimmt den Rest und scrollt. Die dritte Bauart dafuer (Band,
    R11 H1) ist seit R20 entfallen - gemessen erreichte sie keine Route mehr. Kopfhoehe und
    Klebekante haengen in keinem Weg am Andock-Zustand.
    **1a. Werkzeuge in der Titelzeile.** (R16, Critique 2026-10-05 P1 mobil.) Traegt die
@@ -2879,6 +3146,12 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Ansicht unter 768px als Einfachauswahl im Kopf-Menue (wie im Kalender), der Umschalter ab
    768px. Damit entfaellt in Notizen und Dokumenten die Zeile ueber der Chipreihe: Notizen
    erste Karte y 232 -> 183, Dokumente 249 -> 200 (vier Baender -> drei).
+   Seit R21 S9b ordnet sich die Filterzeile der Dokumente unter 768px nach Achsen: Status als
+   Segment, Ordner UND Kategorie in EINER Auswahl hinter dem Ordner-Chip (zwei Gruppen,
+   wie Orte und Tags einer Dateien-App), dazu hoechstens der Fristen-Chip. Die Kategorie-Chips
+   stehen ab 768px; beide Ordnungen bleiben (D7). Der Chip nennt die gewaehlte Kategorie mit
+   ihrem Zeichen. Gemessen 390px: Kategorien ganz im Bild 0/6 (Spur 775px ueber) -> alle sechs
+   nach einem Tipp, Spur 0px ueber (`test:documents-ux`).
    Seit D1 (Critique 2026-10-16) traegt auch der Aufgabenkopf seine Werkzeuge in der
    Titelzeile: Lupe, Filter als Icon mit Zaehler (D2) und „...", die Ansicht Liste/Brett
    unter 768px als Einfachauswahl im Menue. Gemessen 390px: Kopf 120 -> 65px, erste
@@ -3018,13 +3291,23 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
 **Variante: die Reiter sind die Titelzeile (R19, Critique 2026-10-16 P2).** Schichtplan,
 Belohnungen und Haushaltshilfe trugen unter 1024px den Large Title ueber ihrer Reiterleiste:
 121/121/129px bei 390px, 118-130px bei 834px. `page-toolbar--tabs-title` stellt die Leiste in
-die Titelzeile, wie iOS ein Segment als Titel der Navigationsleiste fuehrt. Ab 768px stehen
-Large Title und Reiter nebeneinander (Titel gibt nach, Leiste scrollt mit Fade); unter 768px
-weicht der Titel samt Siegel aus dem Bild, nicht aus dem Baum - wie die Kuechen-Leiste seit R9:
-die vier Reiter der Haushaltshilfe brauchen 351 der 358px, mit Titel oder Siegel davor lief der
-vierte in den Fade („Hau..."). Den Ort sagen die Reiter, ihr Segment im Modulton und der
-Mehr-Tab in derselben Farbe. Gemessen: 65px (390) und 69px (834) auf jedem Reiter. Am Desktop
-bleibt die Bar-Zeile eine eigene Zeile. Guard: `test:mobile-chrome`.
+die Titelzeile, wie iOS ein Segment als Titel der Navigationsleiste fuehrt - zwischen 768 und
+1023px: Large Title und Reiter nebeneinander (Titel gibt nach, Leiste scrollt mit Fade),
+gemessen 69px (834). UNTER 768px NENNT DER KOPF DEN ORT (R21, D7; Critique a2 P2): bis dahin
+wich dort der Titel samt Siegel aus dem Bild, und "Besuche | Arbeiten | Berichte" sagte nicht,
+dass man in der Haushaltshilfe steht - die Kapsel markierte "Mehr". Dort gilt jetzt der Kopf
+aller Module mit Reitern (Budget): Siegel und Name, die Reiter als Bar-Zeile darunter, beim
+Scrollen wandert die Titelzeile aus dem Bild und die Reiter kleben (121/121/121px ruhend statt
+65px - der Preis des Ortsnamens). ANGEDOCKT BLEIBT DER ORT IN DER REITER-ZEILE (R21 S7, Leitlinie
+"mobil mehr Platz fuer Inhalt"): der Kopf ist dann so hoch wie die Leiste (65px; die Haushaltshilfe
+trug bis dahin 73px, ihre Leiste die feste Kuechenhoehe), vorn steht der Inline-Titel (hoechstens
+45 %, Ellipse), die Leiste nimmt den Rest und scrollt mit Fade, der gewaehlte Reiter bleibt im
+Bild; die Reiter gleiten per FLIP an ihre neue Stelle (`wireCollapsingHeader`, `--dock-tabs`).
+Am Desktop bleibt die Bar-Zeile eine eigene Zeile. Guard: `test:mobile-chrome`, `test:ux-utils`.
+Der erste Reiter des Schichtplans heisst seit R21 "Uebersicht" wie in Budget und Gesundheit
+(vorher "Vergleich") und fehlt, solange es keine Schichtart gibt - kein leerer Reiter vorn.
+Ein Abschnittstitel, der den aktiven Reiter wiederholt ("Schichtarten" unter "Schichtarten"),
+steht nur im Baum (`test:schedule`).
 Was hier NICHT umgezogen ist und warum, steht in der Messmatrix der Umsetzung: Vorrat (die
 Kuechen-Leiste hat keine Titelzeile, die Werkzeugzeile faltet beim Scrollen), Rezepte
 (ebenso), Gesundheit-Startseite, Einstellungsblaetter, Budget/Statistik.
@@ -3046,6 +3329,21 @@ und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: cont
 aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
 die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
 eine Ausnahmekarte.
+**Der Kopf steht vor den Daten (R21):** render() baut ihn im synchronen Teil, bis zum ersten
+Laden `inert` - kam die Zeitraum-Zeile mit den Daten, rutschte die Flaeche 52px (CLS 0,057
+mobil, 0,026 laptop -> 0). **Der Ansichtsknopf ist so breit wie sein laengstes Wort (R21):** alle
+vier Woerter liegen unsichtbar in einer Rasterzelle unter dem sichtbaren, sonst sprang der
+Weiter-Pfeil zwischen „Tag" und „Agenda" 26px (Guard `test:calendar` "R21").
+**Das Zeitraum-Label wird nie gekappt (R21 S7, D9):** passt der Text nicht in seine feste Box,
+nimmt es die kuerzere Fassung desselben Zeitraums - eine Spanne im laufenden Jahr ohne Jahr
+(„21.10. - 23.10."), ein Tag mit kurzem Wochentag; ein anderes Jahr bleibt stehen
+(`fitPeriodLabel`). Gemessen vorher: mobil uk 24px, el/it 13, ru 11; Desktop en 20px - danach 0.
+**Ab 1024px eine Zeile, notfalls kompakt (R21 S7, D9):** passt die volle Zeile nicht (1280:
+153px zu wenig), steht sie kompakt (`cal-toolbar--compact`, `syncToolbarFit`): die Suche in
+der Icon-Form der Shell, die mit Fokus oder Begriff aufgeht und dann den Platz der
+Ansichtswahl nimmt; „Kalender verwalten" nur im Filterblatt. 1280: 113 -> 69px. Erst wenn
+auch das nicht passt (uk bei 1280), bricht die Bar-Zeile um. Im Monat zeigt die Seitenleiste
+keinen Mini-Monat - die Ansicht ist der Monat (`miniMonthWanted`).
 **Das Menue zeigt die aktive Ansicht (R17, E11).** Der Ausloeser traegt statt „..." die Glyphe
 der offenen Ansicht (dieselbe wie ihr Menue-Eintrag: Monat `calendar-days`, Woche
 `calendar-range`, Tag `calendar-1`, Agenda `list`) und nennt sie im Namen („Ansicht: Woche");
@@ -3055,7 +3353,8 @@ Ansicht offen ist - das Segment, das es am Desktop sagt, ist unter 640px ausgebl
 Gemessen 390x844 mass er ausgeklappt wie eingeklappt 117px: Titel und Siegel gingen, aber die
 Werkzeuge hielten Zeile 1 offen (drei Icons neben 206px Leerraum) und der Stepper blieb in
 Zeile 2. Eingeklappt rueckt der Stepper jetzt in Zeile 1 vor das Menue: 117 -> 65px, Port
-719 -> 771px, in Woche, Tag und Agenda (der Monat scrollt nicht und klappt nie ein). Suche,
+719 -> 771px, in Woche, Tag und Agenda; der Telefon-Monat faltet ihn seit R21 (D9) mit seinem
+Raster, wenn die Tagesliste es auf die Woche einklappt (117 -> 65px, Liste ab y 144 statt 196). Suche,
 Filter und "Heute" falten dafuer ins Ansichtsmenue - als Eintraege mit demselben Namen, die das
 Original klicken (`data-collapse-fold` am Werkzeug, `data-collapse-fold-menu` am Menue; die
 Stellvertreter baut `wireCollapsingHeader` beim Oeffnen, wie bei der Faltung der scrollenden
@@ -3282,8 +3581,8 @@ in `@media (min-width: 1024px)` - also genau dort, wo mit der Maus gezogen wird 
 Wischgeste einspringt, und der Fade darunter galt als Ersatz. Er beantwortete eine andere
 Frage.
 
-**Drei Traeger, drei angepasste Kopien - es gibt keine gemeinsame Basis, und das ist
-benannt, nicht uebersehen:**
+**Vier Traeger, vier angepasste Kopien - es gibt keine gemeinsame Basis, und das ist
+benannt, nicht uebersehen** (hier stand bis R21 "Drei"; die Notizen-Reihe kam 2026-09-13 dazu):
 
 - `.budget-list` samt `.budget-loans__list` und den beiden Tab-Panels (budget.css) ist das
   Vorbild und stand vor der Regel da; seit #904 scrollt das Budget-Panel selbst und gehoerte
@@ -3293,17 +3592,29 @@ benannt, nicht uebersehen:**
 - `.nav-sidebar__items` (layout.css, seit #970) mischt gegen `--color-border` statt gegen
   `--module-accent`: **die Seitenleiste gehoert keinem Modul und darf nicht die Farbe des
   gerade offenen annehmen.**
+- `.notes-filters` (notes.css) ist die einzige WAAGERECHTE Kopie: die Kategorie-Reihe der
+  Notizen laeuft mit vielen Kategorien ueber, und am Desktop wischt niemand. Sie holt den
+  Balken gegen das `display: none` des Chip-Reihen-Bausteins zurueck (`display: block`,
+  `height: 10px`), sonst dieselbe Rezeptur ohne Hover.
 
 **Zwei Abweichungen teilen die Kopien nicht, und beide stehen hier ungeglaettet.** Erstens
 gibt es den Hover-Zustand nur an `.list-scroller`
 (`calc(var(--tint-hint) + var(--tint-state))`, gerechnet auf zwei bestehenden Stufen statt
 auf einer neuen Zahl): eine reine `--tint-hint`-Kante traegt laut tokens.css nie allein, ein
-Zustand auf ihr braucht denselben Bezug. Budget und Seitenleiste haben ihn nicht. Zweitens
-nennt `scrollbar-color` in Budget und Listen-Scroller den `--module-accent` in VOLLER
-Saettigung, waehrend der WebKit-Daumen daneben auf `--tint-hint` mischt - Firefox zeichnet
-den Daumen dort also kraeftiger als Chromium. Das steht in beiden Dateien zeichengleich, ist
-damit die Rezeptur und kein Ausrutscher; die Seitenleiste ist die einzige, die beide Seiten
-gleich toent.
+Zustand auf ihr braucht denselben Bezug. Budget, Seitenleiste und Notizen haben ihn nicht.
+Der Hover setzt nur `background-color`: bis R21 stand dort die Kurzschreibweise `background`,
+die `background-clip` auf `border-box` zuruecksetzt, und der Daumen wuchs unter Hover von 4
+auf die vollen 10px der Spur (gemessen auf dem `::-webkit-scrollbar`-Pfad; Guard
+`test:shopping`, "Der Listen-Scroller traegt einen duennen, getoenten Scrollbalken").
+Zweitens nennt `scrollbar-color` in Budget, Listen-Scroller und Notizen den `--module-accent`
+in VOLLER Saettigung, waehrend der WebKit-Daumen daneben auf `--tint-hint` mischt. Das steht
+in allen drei Dateien zeichengleich, ist damit die Rezeptur und kein Ausrutscher; die
+Seitenleiste ist die einzige, die beide Seiten gleich toent. **Welche Seite ein Browser
+zeichnet, entscheiden die Standard-Eigenschaften:** seit Chromium 121 und Safari 26.2 gewinnen
+`scrollbar-width`/`scrollbar-color`, und die `::-webkit-scrollbar`-Regeln greifen nicht mehr
+(gemessen in Chrome 155: mit `scrollbar-width: thin` entfaellt die 10px-Spur ganz). Den
+`--tint-hint`-Daumen samt Hover sieht heute nur noch Safari vor 26.2. Hier stand bis R21
+"Firefox zeichnet den Daumen dort also kraeftiger als Chromium" - das galt vor Chromium 121.
 
 **Offen, und bewusst nicht behauptet:** die `mask-image`-Fades liegen auf DEMSELBEN Element
 wie der Balken, und eine Maske erfasst die Elementbox samt Scrollbalken. Auf Plattformen mit
@@ -3351,7 +3662,10 @@ waere ein schneller 404 vorbei, bevor jemand zuhoert.
 
 - `.recipe-row__thumb` (recipes.css) ist das Vorbild aus der Mealie-Anbindung: `--target-md`
   (40px), `--radius-sm`, Platzhalter auf `--color-surface-2` mit Tertiaertinte. Die
-  Rezeptliste zeigt den Rahmen IMMER, notfalls als Platzhalter.
+  Rezeptliste zeigt den Rahmen, wo die Zeile ein Bild hat oder das Rezept gespiegelt ist (dort
+  notfalls als Platzhalter); ein eigenes Rezept ohne Bild bleibt eine Textzeile
+  (`rowShowsThumb()`, R16). Hier stand bis R21 "IMMER" - die Frage ist "hat es ein Bild", nicht
+  "woher kommt es".
 - `.meal-card__thumb` (meals.css): `--target-sm` (32px), `--radius-sm`, derselbe Platzhalter.
   **Nur die bebilderte Karte wird zum Grid** (`.meal-card__open--with-thumb`), jede andere
   bleibt die Spalten-Flex, die sie war. Die erste Fassung gab jeder Karte einen Bildslot und
@@ -3466,6 +3780,34 @@ aus der er geholt wurde; unter reduzierter Bewegung beides nicht, die Geste blei
 Pfeilknoepfe bleiben der Weg fuer Maus und Tastatur. Die Flaeche traegt
 `touch-action: pan-y pinch-zoom` - ohne `pinch-zoom` verwirft Chromium das Aufziehen.
 
+**Im Kalender blaettert der Wisch echt um (R21, D2).** Vorher zog der Finger die ganze Ansicht
+samt Stundenachse ~110px gedaempft mit, daneben stand leere Flaeche (29 % der Breite), und der
+neue Zeitraum kam erst nach Loslassen und Laden mit einer Blende. Jetzt liegen die Daten beider
+Nachbarn nach jedem Zeichnen bereit (nur an Touch-Geraeten, ein Schreibvorgang verwirft sie),
+der Leerlauf baut daraus ihr Bild mit demselben Renderer, und die Geste stellt es neben die
+Ansicht (`neighbor` an `wirePeriodSwipe`): der Inhalt folgt dem Finger 1:1, der Nachbar zieht
+mit, Stundenachse, Ganztags-Beschriftung und Wochentagskopf STEHEN (`axis`, gegen den Zug
+gehalten, eine Ebene ueber dem Raster). In der Woche ist ein Blatt so breit wie die Spalten
+neben der Achse (`span`) - die Spalten des Nachbarn schliessen nahtlos an; Tag (eine Karte) und
+Monat blaettern um ihre ganze Breite. Losgelassen rastet er ab 80px oder mit Schwung ein
+(Flick: ab 0,35 px/ms und 24px, `periodSwipeCommit`), sonst federt alles zurueck; erst wenn der
+Nachbar steht, baut `navigate()` den Zeitraum wirklich auf - an derselben Stelle, mit derselben
+Uhrzeit auf derselben Hoehe (`stepFromSwipe`). Ohne vorgeladene Daten bleibt es beim alten
+Weg. Reduzierte Bewegung: kein Zug, der neue Zeitraum blendet ein (`period-swipe-in--fade`).
+Gemessen 390/834px, 1x und 4x: Achse 112 -> 0px Drift, Abdeckung 71 -> 100 %, CLS 0. Guard
+`test:calendar` "R21 D2". **Das Vorladen fragt beide Nachbarn in EINEM Abruf je Quelle (R21
+S8):** fehlen beide, reicht die Spanne vom vorigen bis zum naechsten Zeitraum, und jeder
+Nachbar behaelt seine eigenen Grenzen (`buildDayIndex()` klammert, was ueber den Rand reicht);
+fehlt einer, wird nur er gefragt. Vorher je Nachbar vier Quellen - nach jedem Zeichnen bis zu
+acht Anfragen fuer zwei Zeitraeume, jetzt hoechstens vier. Guard `test:calendar` "R21 S8".
+**Der Nachbar wird im Leerlauf geparkt, nicht unter dem Finger eingesetzt (R21 S8):** das
+vorgebaute Bild steht schon im Traeger, mit der Box des Panels, unsichtbar
+(`.period-swipe-ghost--parked`) und nach dem Ausrichten ruhend (`--rest`,
+`content-visibility: hidden` - das Layout bleibt, Stilrunden der Seite rechnen es nicht mit);
+die Geste nimmt beide Klassen ab, haengt es nicht neu ein und schreibt seine Box nicht neu
+(`parkPeriodGhost`, `placeGhostBox`). Der Monat vermisst seine Zellen dabei nur einmal je Breite.
+Guard `test:calendar` "R21 S8".
+
 **Geprueft auf zwei Ebenen, weil jede etwas anderes sehen kann.** Ebene 3 (statisch, in
 `test-frontend-audit.js`) folgt von jeder Wischrichtung mit `--delete` der Kante zu der
 Funktion, die sie ruft, und verlangt dort den Rueckweg. Ebene 4 (`test:document-guards`,
@@ -3531,8 +3873,11 @@ Modul. Das Mehr-Sheet traegt Siegel, weil es ein VERZEICHNIS von Raeumen ist - d
 Unterschied bleibt nur lesbar, solange die Leiste keine traegt. (Entscheidung von Ulas am
 2026-08-10, am gerenderten Material getroffen.)
 
-**Zwei Groessenrollen:** Listenzeile `--sm` (24px, Icon 16px) und Modulkopf (32/24px je nach
-Rang seines Titels, siehe Modulkopf).
+**Drei Groessenrollen, dazu die Wand:** Listenzeile `--sm` (24px, Icon 16px), die Basis (32px,
+`--target-sm`, Icon 16px - die Zeilen von "Heute wichtig" und das Mehr-Blatt) und Modulkopf
+(32/24px je nach Rang seines Titels, siehe Modulkopf). Die Wand fuehrt ihr Siegel auf
+Distanz in 48px (`.wall-row__seal`, `--target-lg`, Icon `--icon-xl`). Hier stand bis R21 "Zwei
+Groessenrollen" ohne die Basis.
 
 **Das Siegel hat EIN Gesicht, und es ist der Vollton** (2026-08-17). Hier standen zwei: eine
 16-%-Toenung fuer den Regelfall und `--vivid` fuer die eine umgekehrte Flaeche (den Toast),
@@ -3575,8 +3920,8 @@ die Sprache des Nutzers. Die beiden Karten liegen beidseits der Schichtgrenze un
 Seit 2026-08-17 (Widget-Kopf-Kur, Etappe 2 der Modernisierung) ist der Kopf einer
 Dashboard-Karte eine TITELZEILE DIREKT AUF DER KARTENFLAECHE: davor das Markensiegel im
 Vollton (Ton = Flaeche, Tinte = `--color-ink-on-vivid`), Titel in
-Text-Primary, Zaehler als getoenter Badge, „Alle" als neutraler Textlink mit Ton erst im
-Hover. Kein Band, keine getoente Trennlinie, keine 2px-Oberkante: der Absender einer Karte
+Text-Primary, Zaehler als neutraler Badge (Well-Grund, Sekundaertext, `.widget__badge`),
+„Alle" als neutraler Textlink mit Ton erst im Hover. Kein Band, keine getoente Trennlinie, keine 2px-Oberkante: der Absender einer Karte
 ist GENAU EIN Element, und es traegt den Modulton zu 100 %. Die Kachelreihe
 (`metric-card--tile`) fuehrt dasselbe Siegel - zwei Siegel-Gesichter auf einem Board
 waeren zwei Wahrheiten.
@@ -3600,7 +3945,8 @@ sagen will, sagt sie im Vollton eines kleinen Elements, nicht in der Beimischung
 grossen Flaeche.**
 
 **Den Ton setzt die Karte, nicht die Seite.** Jede `.widget--*`-Klasse legt `--widget-accent`
-auf ihren Modulton (fuer Badge, Link-Hover und Fehlerkante); das Siegel selbst bekommt
+auf ihren Modulton (fuer den Link-Hover, die Aktivierung im Leerzustand und Hervorhebungen im
+Inhalt wie den naechsten Abfalltermin; der Zaehler-Badge ist neutral); das Siegel selbst bekommt
 `--seal-accent` aus dem Slug seiner Route. Der Fallback ist die Stimme. Ein
 `--active-module-accent` an dieser Stelle loeste auf dem Dashboard den Akzent der UEBERSICHT
 auf, also bekaemen alle Widgets dieselbe Farbe - ausgerechnet in dem Raster, in dem siebzehn
@@ -3648,6 +3994,25 @@ verlaesst das Blatt** zur Endzeit, ohne Neuladen; die Termin-Kachel behaelt es z
 darueber. **Ab 720px Blattbreite laufen die Zeilen in zwei Spalten** (spaltenweise, per
 Container-Abfrage) - ein Programm von sechs Zeilen soll auf einem breiten Schirm nicht
 halbleer eine Spalte hinunterlaufen.
+
+**Die Uebersicht ist ein Briefing, kein Kachel-Board** (R21, Critique 2026-10-21, D5). Das Blatt
+steht vor allen Kacheln und ist ihr Inhalt; die Kacheln sind Zusatz. **Auf dem Telefon traegt das
+Blatt so viele Zeilen, wie in den ersten Schirm passen** (bis zur Kapsel, mindestens zwei):
+`measurePhoneProgram` misst nach dem Zeichnen im selben Task und zeichnet nur das Blatt neu, der
+naechste Aufbau rechnet mit dem gemessenen Wert. Vorher ein fester Deckel von zwei Zeilen
+(gemessen 390x844: 2 von 9 Punkten, darunter Familie und Budget im ersten Schirm; jetzt 8 von 9,
+das Programm fuellt 77 % statt 29 % der Flaeche bis zur Kapsel). „+N weitere" ist Footnote 13.
+Was unter den Zeilen bleibt, zaehlt mit (R21 S7): passt die Einkaufszeile nicht mehr ueber die
+Kapsel, faltet sie mit der letzten Zeile in „+N weitere"; ein zweiter Blick nach dem Neuzeichnen
+darf nur verringern (Decke je Fensterhoehe). Drehung und Fensterhoehe messen neu
+(`createPhoneProgramFit`, ein Bild spaeter gebuendelt); ein Wechsel zwischen Telefon und breit
+baut die Uebersicht neu.
+**Geld steht ab Werk nicht auf der Uebersicht:** das Budget-Widget ist ein Opt-in
+(`DEFAULT_HIDDEN_WIDGETS`), und die Kennzahlreihe fuehrt keinen Saldo - ein Kontostand ist keine
+Kennzahl fuer den Morgen und gehoert nicht auf den Schirm, den jeder im Haushalt sieht. Die offene
+Forderung der geteilten Ausgaben bleibt in der Reihe: sie verlangt eine Handlung. Gespeicherte
+Layouts behalten ihre Sichtbarkeit (keine Migration). Guards: `test:dashboard` („R21 D5"),
+`test:typography` („R21 S5": das Innenleben der Kacheln liest in den D4-Rollen).
 
 ### Das Wetter-Widget (Signature Component)
 
@@ -3888,7 +4253,10 @@ Liste weisse Zeile mit 8px-Farbpunkt. Die Monatsbalken sind die Referenz, alle a
   `--cal-event-edge` im Vollton an Inline-Start; kein Rahmen, `--radius-xs`. Gemessen ueber
   die zwoelf Seed-/Kalenderfarben (Amber, Cyan, Teal eingeschlossen): Ruhe mindestens 7,22:1
   light / 6,96:1 dark, Hover 6,83 / 6,47. Die 38 % der Woche waren naeher an der Nutzerfarbe,
-  also nie der bessere Kontrast.
+  also nie der bessere Kontrast. Der Monatschip haelt ueber und unter dem Titel 3px
+  (`--cal-chip-pad-block`, R21 S9b): mit 2px lag die Zeile buendig an Kante und Flaeche
+  (Detektor cramped-padding, 16 Treffer bei 1280). Die Spur der Monatsbaender
+  (`--month-band-h`) rechnet mit demselben Token (`test:calendar`).
 - **Titel oben, Zeit darunter, wenn Platz ist.** Zeitbloecke richten den Titel an der
   Oberkante aus (klebend, wenn der Block oben aus dem Scrollport ragt), halbfett; die Zeitzeile
   tritt ueber das Gewicht zurueck, nie ueber Opacity. Ob sie Platz hat, fragt eine
@@ -3981,8 +4349,11 @@ einen Tag in die Tagesansicht - wer lesen wollte, was am Dienstag steht, verlies
   haetten die Aufgaben der Liste zu Quadraten ohne Titel geschrumpft. Ein freier Tag sagt es
   ruhig (kompakter Leerzustand, Aktion `btn--secondary`) - er ist kein Fehlerfall.
 - **Die Punkte sagen nur noch, wo.** Zentriert unter der Ziffer, hoechstens vier, ohne „+N" -
-  wie viel es ist, sagt die Liste. Zeilen fest 48px (Punkte), damit das Einklappen eine
-  animierbare Strecke hat. **Die Titelfassung hat ein Budget von 320px, nicht 80px je Woche**
+  wie viel es ist, sagt die Liste. Zeilen mit fester Hoehe (Punkte), damit das Einklappen eine
+  animierbare Strecke hat - **seit R21 ein Budget von sechs Zeilen zu 48px** (sechs Wochen 48px,
+  fuenf 57,6px, vier 72px): mit 48px je Woche sprang die Liste beim Monatswechsel 48px.
+  Eingeklappt traegt die eine Woche die Hoehe ihres Inhalts (48px Punkte, 80px Titel), damit
+  der Wochenschritt ueber Monatsgrenzen nicht springt. **Die Titelfassung hat ein Budget von 320px, nicht 80px je Woche**
   (vier Wochen 80px, fuenf 64px, sechs 53px): mit 80px fest blieben der Liste bei 375x812
   81px, im Sechs-Wochen-Monat nichts; jetzt ist sie in jedem Monat gleich hoch (170px Zeilen).
   Was nicht passt, zeigt die Zelle als nackte Zahl („+2") - „+2 weitere" brach auf ~50px um
@@ -4069,6 +4440,12 @@ nichts mehr auseinander, und „In Maps öffnen" rutschte allein in eine zweite 
 `edit.primary` gilt jetzt auch dort: Aufruferaktionen zuerst, Bearbeiten primaer am Ende. In
 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten steht unten am Ende -
 dasselbe Bild wie im Sheet, und kein Aktionsknopf verliert seine Beschriftung.
+**Ein Weg in ein anderes Modul ist eine Folgeaktion der Zeile, die ihn begruendet** (R21, D7):
+die Geburtstagszeile eines Kontakts fuehrt "In Geburtstagen anzeigen", die Datumszeile eines
+importierten Geburtstags "Kontakt anzeigen" (`birthday_id` / `contact_id`, Migration 90) - nur
+mit Zugang zum Zielmodul. `leaveDetailTo()` (detail-view.js) schliesst Blatt oder Popover vor
+dem Sprung; der Router schliesst kein geteiltes Modal (`test:contacts-list-detail`,
+`test:birthday-localization`, `test:contacts-routes`).
 
 
 **Im Formular eines Leseblatts gibt es EINEN Rueckweg (R19, Critique 2026-10-16, Heuristik 3).**
@@ -4106,7 +4483,9 @@ Zeile des Aufklappers nennt sie.
   Anhang. Farbe und Icon zeigt der Termin selbst. Eine Warnung, die im zugeklappten Teil
   erscheint, oeffnet ihn - aufklappen, nie zuklappen.
 - **„Niemand" ist ein ruhiger Eintrag, keine Person:** kein Avatar, keine Striche um das Wort
-  (`.user-ms__option--none`, gilt fuer jede Personenwahl). Doppelte Initialen (Leo und Linda
+  (`.user-ms__option--none`). Und er steht NUR in einer Einzelwahl (der Koch einer
+  Mahlzeit), nie in einer Mehrfachwahl (R21): dort heisst „niemand" kein Chip gewaehlt -
+  als erster Chip zwischen den Personen sah er aus wie eine weitere (`test:people-pickers`). Doppelte Initialen (Leo und Linda
   Johnson, beide „LJ") loest die EINE geteilte Funktion auf (`public/utils/initials.js`,
   #1464): wer seine Zeichen teilt, bekommt den naechsten freien Buchstaben seines Vornamens
   („LE", „LI"), aus der Liste aller Konten, also in jeder Ansicht gleich.
@@ -4426,6 +4805,10 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   (`.page-toolbar__bar`): eine eigene, volle Zeile unter Titel, Center und Aktionen, auf
   allen Viewports, scrollend mit Peek-Fade statt buendigem Ende (Werkzeugzeilen-Regel).
   Ein Zwei-Optionen-Scope-Schalter bleibt in der Titelzeile.
+- **Do** ausblenden mit `hidden` und sonst nichts (D13, R21): EINE Regel in reset.css,
+  `[hidden]:not([hidden="until-found"]) { display: none !important }`, schlaegt jede Klasse mit
+  `display`. Keine Rettungsregel je Klasse mehr, und nie ein `display` ungleich `none` mit
+  `!important` - das allein koennte sie schlagen (`test:hidden-cascade`).
 
 ### Don't:
 - **Don't** einem Nur-lesen-Nutzer einen `disabled`-Knopf hinstellen, wo ein Zustand
@@ -4514,3 +4897,10 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   vorsorglich in jeder Zelle einen Bildslot geben. Ein Vorschaubild steht in einem festen
   Rahmen mit `object-fit: cover`, und im Wochenplaner wird nur die bebilderte Karte zum Grid;
   ein fehlendes Bild ist eine ruhige Luecke, keine Layout-Aenderung (siehe „Das Vorschaubild").
+- **Don't** hinter ein `:has()`, das nicht im Subjekt steht, einen Universalselektor (`> *`)
+  oder ein `::placeholder` setzen (R21 S8). Chrome fuehrt die Reste aller solchen Regeln in
+  EINER Invalidierungsmenge; ein `*` oder `::placeholder` darin macht sie zum ganzen
+  Teilbaum, und jedes Einfuegen unter `<html>` - ein Dialog, ein Toast, ein Feld - rechnete
+  den Stil des ganzen Dokuments neu (gemessen /tasks 1x, Einfuegen + Stil 2,7 -> 1,3 ms).
+  Die Kinder beim Namen (`> :is(.a, .b)`), eine Bedingung, die sich selbst erfuellt, oder
+  das `:has()` ins Subjekt. Guard `test:frontend-audit`.

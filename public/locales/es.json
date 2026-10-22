@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Nada coincide con tu búsqueda y los filtros.",
         "searchReset": "Restablecer búsqueda",
         "passwordMinLength": "Al menos 8 caracteres.",
-        "savedReloadFailed": "El cambio se ha guardado, pero no se pudo actualizar la vista. Recarga la página si falta algo."
+        "savedReloadFailed": "El cambio se ha guardado, pero no se pudo actualizar la vista. Recarga la página si falta algo.",
+        "fieldNumber": "Introduce un número.",
+        "fieldMin": "Como mínimo {{min}}.",
+        "fieldMax": "Como máximo {{max}}.",
+        "fieldWholeNumber": "Introduce un número entero.",
+        "fieldStep": "Introduce un valor en pasos de {{step}}.",
+        "fieldInvalid": "Revisa este dato.",
+        "errorCheckRolledBack": "«{{name}}» vuelve a estar pendiente - no se pudo marcar. Inténtalo de nuevo.",
+        "errorUncheckRolledBack": "«{{name}}» vuelve a estar marcado - no se pudo desmarcar. Inténtalo de nuevo."
     },
     "kitchen": {
         "noShoppingLists": "Todavía no hay lista de la compra.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Etiqueta (p. ej. trabajo)",
         "mvRemove": "Quitar entrada",
         "birthdayLabel": "Cumpleaños",
+        "showBirthday": "Ver en cumpleaños",
         "birthdayHint": "También aparece en el calendario mediante la importación de cumpleaños.",
         "phonePlaceholder": "+34 …",
         "phonePreview": "Vista previa: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "No se pudieron cargar las categorías del presupuesto.",
         "addCategory": "+ categoría",
         "addSubcategory": "+ subcategoría",
-        "moreDetails": "Más datos",
         "newCategoryPrompt": "Nombre de la nueva categoría:",
         "newSubcategoryPrompt": "Nombre de la nueva subcategoría:",
         "categoryAddedToast": "Categoría añadida.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Ajuste de ciclo guardado.",
         "healthCyclePersonalLabel": "Mostrar ciclo",
         "healthCyclePersonalHint": "Solo afecta a tu propia vista. Si lo desactivas, el ciclo sigue visible para el resto del hogar.",
+        "healthCycleSettingsHint": "La duración del ciclo, la anticoncepción, los recordatorios y el modo embarazo se ajustan en la página del ciclo.",
         "healthCyclePersonalHouseholdOff": "El ciclo está desactivado para todo el hogar, así que no aparece para nadie.",
         "healthCyclePersonalSaved": "Vista del ciclo guardada.",
         "pageRewardsModule": "Recompensas",
@@ -2038,7 +2047,7 @@
         "familyRoleGrandparent": "Abuelo/a",
         "familyRoleRelative": "Familiar",
         "familyRoleOther": "Miembro de la familia",
-        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto ni ayuno y ven la Ayuda doméstica solo en lectura, sin sueldos ni pagos. Puedes cambiarlo después en «Roles y permisos».",
+        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto ni ayuno y ven la Ayuda doméstica solo en lectura, sin sueldos ni pagos. Puedes cambiarlo después en «Roles y permisos». El ciclo también está oculto; se puede mostrar en los ajustes personales del niño.",
         "systemAdminLabel": "Administrador del sistema",
         "systemAdminHint": "Los administradores del sistema pueden gestionar ajustes, integraciones, tokens de API y cuentas familiares.",
         "systemAdminBadge": "Admin del sistema",
@@ -2068,7 +2077,8 @@
         "languageTitle": "Idioma",
         "dataLanguageLabel": "Idioma de las entradas guardadas",
         "dataLanguageHint": "Idioma en el que Yuvomi guarda las entradas que crea automáticamente, como los eventos de cumpleaños. Afecta a la API, al feed de calendario y a la sincronización, no a la visualización aquí.",
-        "dataLanguageAuto": "Automático ({{language}})",
+        "dataLanguageAuto": "Automático",
+        "hintWithCurrent": "Ahora: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Solo los administradores pueden definir el idioma de las entradas guardadas.",
         "dataLanguageSaved": "Idioma de las entradas guardadas actualizado",
         "sectionMeals": "Plan de comidas",
@@ -2863,6 +2873,7 @@
         "regionTitle": "Región / Formato",
         "regionLabel": "Región",
         "regionHint": "Define la moneda y los formatos de número, fecha y hora según la región (p. ej., Suiza: 1'234.50). Elige «Personalizado» para configurarlos por separado.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Solo los administradores pueden cambiar la región y la moneda.",
         "formatsHouseholdHint": "El formato de fecha y hora se aplica a todo el hogar. Cualquier miembro puede cambiarlo.",
         "regionCustom": "Personalizado",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Zona horaria",
         "timezoneLabel": "Zona horaria del hogar",
         "timezoneHint": "Se aplica siempre que una hora no lleve su propia zona: recordatorios, cuentas atrás, el día del calendario llamado «hoy», el feed de calendario exportado y los eventos enviados a Google u Outlook.",
-        "timezoneAuto": "Automática ({{zone}})",
+        "timezoneAuto": "Automática",
         "timezoneAdminOnly": "Solo los administradores pueden cambiar la zona horaria.",
         "timezoneSaved": "Zona horaria guardada.",
         "timezoneMismatch": "Tu navegador está en {{browser}}, el hogar calcula en {{household}}.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Ajuste de notificaciones guardado.",
         "healthVisibilityTitle": "Visibilidad predeterminada",
         "healthVisibilityHint": "Con qué valor se crean las entradas nuevas. Puedes cambiarlo en cada entrada.",
+        "healthVisibilityCaregivers": "Quien puede registrar por ti también ve tus entradas privadas, salvo el diario del ciclo. Lo define un administrador en los miembros.",
         "healthVisibilityOther": "Otras áreas",
         "healthVisibilityApply": "Cambiar también las existentes",
         "healthVisibilityApplyHint": "Guardado. ¿Cambiar también las entradas existentes de {{area}}?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "Escribe al menos dos caracteres.",
         "weatherPlaceNotFound": "No se encontró ningún lugar con este nombre. Añade el país, p. ej. «Mérida, España».",
         "weatherPlaceUnavailable": "La búsqueda de lugares no está disponible ahora. Inténtalo de nuevo en un momento o introduce las coordenadas a mano.",
-        "weatherManualTitle": "Coordenadas a mano"
+        "weatherManualTitle": "Coordenadas a mano",
+        "backupDropzoneTitleTouch": "Toca para elegir un archivo de copia de seguridad",
+        "installModuleDropzoneTitleTouch": "Toca para elegir un archivo ZIP"
     },
     "login": {
-        "tagline": "Bienvenido de nuevo a tu planificador familiar.",
+        "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
         "usernameLabel": "Nombre de usuario",
         "passwordLabel": "Contraseña",
         "loginButton": "Iniciar sesión",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "¿Descartar cambios?",
         "unsavedChangesDetail": "Tus datos introducidos en este formulario se perderán.",
         "discardChanges": "Descartar",
-        "moreSettings": "Más ajustes",
         "moreDetails": "Más datos"
     },
     "rrule": {
@@ -3468,7 +3481,9 @@
         "goTo": "Ir a",
         "newSection": "Crear nuevo",
         "recentLabel": "Abiertos recientemente",
-        "createTaskNamed": "Crear «{{title}}» como tarea"
+        "createTaskNamed": "Crear «{{title}}» como tarea",
+        "hintMove": "Seleccionar",
+        "hintOpen": "Abrir"
     },
     "birthdays": {
         "inDays_one": "en {{count}} día",
@@ -3487,6 +3502,7 @@
         "editTitle": "Editar cumpleaños",
         "nameLabel": "Nombre",
         "birthDateLabel": "Fecha de nacimiento",
+        "showContact": "Ver contacto",
         "nameDay": "Onomástica",
         "celebratesNameDay": "celebra su onomástica",
         "nameDayLabel": "Onomástica (opcional)",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "Bienvenido a {{name}}",
-        "step1Body": "Tu planificador familiar personal. Tareas, calendario, compras y más - todo en un solo lugar.",
+        "step1Body": "Tareas, calendario, compras y más para tu hogar - tanto si vives solo como en pareja o en familia. Todo en un solo lugar.",
         "step2Title": "Navegación y módulos",
         "step2Body": "La barra inferior te lleva directamente a las áreas más importantes. Encontrarás el resto de módulos en «Más».",
         "step3Title": "Empieza rápido",
@@ -3867,7 +3883,10 @@
         "errorDmsAccountGone": "Esta cuenta de DMS ya no existe.",
         "errorDmsDocumentGone": "Este documento ya no existe en el DMS.",
         "errorDmsAlreadyLinked": "Este documento del DMS ya está vinculado.",
-        "errorDmsAlreadyStored": "Este documento ya está guardado en un DMS."
+        "errorDmsAlreadyStored": "Este documento ya está guardado en un DMS.",
+        "dropzoneTitleTouch": "Toca para elegir un archivo",
+        "viewerPrevNamed": "Documento anterior: {{name}}",
+        "viewerNextNamed": "Documento siguiente: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Cocina",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "Este servicio ya no existe.",
         "errorTaskGone": "Esta tarea ya no existe.",
         "errorAlreadyCheckedOut": "Esta persona de limpieza ya registró su salida.",
-        "errorAlreadyCheckedIn": "Esta persona de limpieza ya registró su entrada."
+        "errorAlreadyCheckedIn": "Esta persona de limpieza ya registró su entrada.",
+        "allVisitsInReport": "Todas las visitas en el informe"
     },
     "userMultiSelect": {
         "moreUsers": "más",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Abre la búsqueda con la lupa de la vista general o desde «Más».",
         "mobileSettings": "Encuentras los ajustes en «Más».",
         "guideLink": "Manual de usuario",
-        "guideHint": "Mantenido por la comunidad, en su propio repositorio: puede ir por detrás de una versión."
+        "guideHint": "Mantenido por la comunidad. Se abre en una pestaña nueva."
     },
     "changelog": {
         "title": "Novedades",
@@ -4379,8 +4399,9 @@
         "success": "Tu contraseña se ha cambiado. Ya puedes iniciar sesión.",
         "mismatch": "Las contraseñas no coinciden.",
         "tooShort": "La contraseña debe tener al menos 8 caracteres.",
-        "invalidToken": "Este enlace no es válido o ha caducado.",
-        "missingToken": "No se ha encontrado ningún token válido."
+        "invalidToken": "Este enlace para restablecer no es válido o ha caducado - solicita uno nuevo.",
+        "missingToken": "Este enlace para restablecer está incompleto - solicita uno nuevo.",
+        "requestNew": "Solicitar un enlace nuevo"
     },
     "email": {
         "host": "Servidor SMTP",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Próximos recordatorios",
                 "empty": "Hoy no hay más tomas"
+            },
+            "brief": {
+                "changes": "Desde la última medición: {{list}}.",
+                "latest": "Último registro: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} sin cambios"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Registra tu primer periodo para ver predicciones, calendario y estadísticas.",
             "emptyCta": "Registrar primer periodo",
             "personsLabel": "Person",
-            "add": "Registrar periodo",
+            "add": "Añadir periodo anterior",
             "loadError": "No se pudieron cargar los datos del ciclo.",
             "loadErrorDesc": "Inténtalo de nuevo más tarde.",
             "retry": "Reintentar",
@@ -5406,15 +5433,14 @@
                 "family": "Familia"
             },
             "period": {
-                "add": "Registrar periodo",
+                "add": "Añadir periodo anterior",
                 "edit": "Editar periodo",
                 "warningFuture": "La fecha de inicio está en el futuro - las predicciones solo se basan en periodos pasados.",
                 "warningOverlap": "Se solapa con un periodo ya registrado."
             },
             "dayLog": {
                 "title": "Registrar día",
-                "date": "Fecha",
-                "more": "Más datos"
+                "date": "Fecha"
             },
             "export": {
                 "csv": "Exportar como CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Duración media del ciclo",
                 "periodLength": "Duración media del periodo",
                 "lutealLength": "Duración de la fase lútea",
+                "daysUnit": "días",
                 "trackFertility": "Mostrar ventana fértil",
-                "autoHint": "Déjalo vacío = se calcula automáticamente a partir de tu historial.",
+                "autoHint": "Si dejas uno de los dos campos vacío, Yuvomi calcula el valor a partir de los periodos que has registrado.",
                 "remindPeriodDaysBefore": "Recordatorio de periodo",
                 "remindOff": "Desactivado",
                 "remindSameDay": "El mismo día",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Elige un archivo CSV o pega texto.",
                 "error": "Error al importar."
             },
-            "discoveryHint": "Consejo: suscríbete al ciclo previsto como feed ICS en <a href=\"/settings/modules/calendar?section=personal-feeds\">Ajustes → Módulos → Calendario</a>, o muestra el widget del ciclo en el <a href=\"/\">Inicio</a> desde su modo de personalización."
+            "feedLink": "Suscribirse al ciclo previsto en el calendario",
+            "widgetHint": "Añade la tarjeta del ciclo a {{overview}} en «{{customize}}».",
+            "endBeforeStart": "El final no puede ser anterior al inicio."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -5542,6 +5571,7 @@
             "unitH": "h"
         },
         "careBanner": "Estás registrando para {{name}}.",
+        "whoSees": "¿Quién lo ve?",
         "nutrition": {
             "title": "Nutrición",
             "emptyTitle": "Aún no hay registros de nutrición",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "sáb",
         "weekdaySun": "dom",
         "intervalLabelWeekly": "Cada N semanas",
+        "intervalLabelMonthly": "Cada N meses",
         "anchorDateLabel": "Primera recogida",
         "monthDayLabel": "Día del mes",
         "monthDayLastDay": "Último día del mes",
@@ -6271,8 +6302,8 @@
         "success": "Tu cuenta se ha creado. Ya puedes iniciar sesión.",
         "mismatch": "Las contraseñas no coinciden.",
         "tooShort": "La contraseña debe tener al menos 8 caracteres.",
-        "invalidToken": "Esta invitación no es válida, ha caducado o ya se ha utilizado.",
-        "missingToken": "No se ha encontrado ningún token válido.",
+        "invalidToken": "Esta invitación no es válida, ha caducado o ya se ha utilizado - pide un enlace nuevo.",
+        "missingToken": "Este enlace de invitación no es válido o ha caducado - pide uno nuevo.",
         "usernameRequired": "Elige un nombre de usuario.",
         "usernameInvalid": "El nombre de usuario debe tener entre 3 y 64 caracteres y solo puede contener letras, números, puntos, guiones y guiones bajos.",
         "usernameTaken": "Ese nombre de usuario ya está en uso.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Trabajo",
         "templateSchool": "Colegio",
         "templateUniversity": "Universidad",
-        "overview": "Comparativa",
+        "overview": "Resumen",
         "overviewPeopleLabel": "Comparar personas",
-        "overviewClearSelection": "Borrar la selección",
         "continuesUntil": "…continúa hasta las {{time}}",
         "overviewEmptyTitle": "Elige personas para comparar",
         "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Nombre de este dispositivo (opcional)",
         "labelHint": "Ayuda a reconocer más tarde de qué dispositivo se trata.",
         "submit": "Vincular",
-        "failed": "Este código de vinculación no es válido."
+        "failed": "Este código de vinculación no es válido.",
+        "codeRequired": "Introduce el código de emparejamiento que aparece en Ajustes."
     }
 }

@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Aramanız ve filtrelerinizle eşleşen bir şey yok.",
         "searchReset": "Aramayı sıfırla",
         "passwordMinLength": "En az 8 karakter.",
-        "savedReloadFailed": "Değişiklik kaydedildi ancak görünüm yenilenemedi. Eksik bir şey varsa sayfayı yeniden yükleyin."
+        "savedReloadFailed": "Değişiklik kaydedildi ancak görünüm yenilenemedi. Eksik bir şey varsa sayfayı yeniden yükleyin.",
+        "fieldNumber": "Bir sayı girin.",
+        "fieldMin": "En az {{min}}.",
+        "fieldMax": "En fazla {{max}}.",
+        "fieldWholeNumber": "Bir tam sayı girin.",
+        "fieldStep": "{{step}} adımlarla bir değer girin.",
+        "fieldInvalid": "Bu girişi kontrol edin.",
+        "errorCheckRolledBack": "\"{{name}}\" yeniden açık - işaretleme gerçekleşmedi. Tekrar deneyin.",
+        "errorUncheckRolledBack": "\"{{name}}\" yeniden işaretli - geri alma gerçekleşmedi. Tekrar deneyin."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Etiket (örn. iş)",
         "mvRemove": "Girdiyi kaldır",
         "birthdayLabel": "Doğum günü",
+        "showBirthday": "Doğum günlerinde göster",
         "birthdayHint": "Doğum günü içe aktarımıyla takvimde de görünür.",
         "phonePlaceholder": "+90 …",
         "phonePreview": "Önizleme: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "Bütçe kategorileri yüklenemedi.",
         "addCategory": "+ kategori",
         "addSubcategory": "+ alt kategori",
-        "moreDetails": "Diğer bilgiler",
         "newCategoryPrompt": "Yeni kategorinin adı:",
         "newSubcategoryPrompt": "Yeni alt kategorinin adı:",
         "categoryAddedToast": "Kategori eklendi.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Döngü ayarı kaydedildi.",
         "healthCyclePersonalLabel": "Döngüyü göster",
         "healthCyclePersonalHint": "Yalnızca kendi görünümünüz için geçerlidir. Kapatırsanız döngü evdeki diğer kişilerde görünmeye devam eder.",
+        "healthCycleSettingsHint": "Döngü uzunluğu, doğum kontrolü, hatırlatıcılar ve gebelik modu döngü sayfasında ayarlanır.",
         "healthCyclePersonalHouseholdOff": "Döngü şu anda ev geneli için kapalı, bu yüzden kimsede görünmüyor.",
         "healthCyclePersonalSaved": "Döngü görünümü kaydedildi.",
         "pageRewardsModule": "Ödüller",
@@ -2038,7 +2047,7 @@
         "familyRoleGrandparent": "Büyükanne/Büyükbaba",
         "familyRoleRelative": "Akraba",
         "familyRoleOther": "Aile üyesi",
-        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz.",
+        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz. Döngü de gizlidir; çocuğun kişisel ayarlarından gösterilebilir.",
         "systemAdminLabel": "Sistem yöneticisi",
         "systemAdminHint": "Sistem yöneticileri ayarları, entegrasyonları, API tokenlarını ve aile hesaplarını yönetebilir.",
         "systemAdminBadge": "Sistem yöneticisi",
@@ -2068,7 +2077,8 @@
         "languageTitle": "Dil",
         "dataLanguageLabel": "Kaydedilen girişlerin dili",
         "dataLanguageHint": "Yuvomi'nin kendi oluşturduğu girişleri, örneğin doğum günü etkinliklerini, hangi dilde kaydedeceği. API'yi, takvim akışını ve eşitlemeyi etkiler, buradaki görünümü değil.",
-        "dataLanguageAuto": "Otomatik ({{language}})",
+        "dataLanguageAuto": "Otomatik",
+        "hintWithCurrent": "Şu anda: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Kaydedilen girişlerin dilini yalnızca yöneticiler belirleyebilir.",
         "dataLanguageSaved": "Kaydedilen girişlerin dili güncellendi",
         "sectionMeals": "Yemek Planı",
@@ -2863,6 +2873,7 @@
         "regionTitle": "Bölge / Biçim",
         "regionLabel": "Bölge",
         "regionHint": "Para birimini, sayı, tarih ve saat biçimini bölgeye göre ayarlar (örn. İsviçre: 1'234.50). Bunları ayrı ayrı yapılandırmak için „Özel“ seçeneğini seçin.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Bölgeyi ve para birimini yalnızca yöneticiler değiştirebilir.",
         "formatsHouseholdHint": "Tarih ve saat biçimi tüm ev için geçerlidir. Her üye değiştirebilir.",
         "regionCustom": "Özel",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Saat dilimi",
         "timezoneLabel": "Hanenin saat dilimi",
         "timezoneHint": "Bir saatin kendi dilimi olmadığı her yerde geçerlidir: hatırlatıcılar, geri sayımlar, \"bugün\" denen takvim günü, dışa aktarılan takvim akışı ve Google ya da Outlook’a gönderilen etkinlikler.",
-        "timezoneAuto": "Otomatik ({{zone}})",
+        "timezoneAuto": "Otomatik",
         "timezoneAdminOnly": "Saat dilimini yalnızca yöneticiler değiştirebilir.",
         "timezoneSaved": "Saat dilimi kaydedildi.",
         "timezoneMismatch": "Tarayıcınız {{browser}} diliminde, hane {{household}} ile hesaplıyor.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Bildirim ayarı kaydedildi.",
         "healthVisibilityTitle": "Varsayılan görünürlük",
         "healthVisibilityHint": "Yeni kayıtların hangi değerle başlayacağı. Her kayıtta değiştirebilirsin.",
+        "healthVisibilityCaregivers": "Senin yerine kayıt girebilen kişi, döngü günlüğü dışındaki özel kayıtlarını da görür. Bunu bir yönetici üyeler bölümünde belirler.",
         "healthVisibilityOther": "Diğer alanlar",
         "healthVisibilityApply": "Mevcut kayıtları da değiştir",
         "healthVisibilityApplyHint": "Kaydedildi. {{area}} altındaki mevcut kayıtlar da değiştirilsin mi?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "En az iki karakter gir.",
         "weatherPlaceNotFound": "Bu adla bir yer bulunamadı. Ülkeyi ekle, örn. “Ereğli, Türkiye”.",
         "weatherPlaceUnavailable": "Yer arama şu anda erişilemiyor. Birazdan yeniden dene ya da koordinatları elle gir.",
-        "weatherManualTitle": "Koordinatları elle gir"
+        "weatherManualTitle": "Koordinatları elle gir",
+        "backupDropzoneTitleTouch": "Yedek dosyası seçmek için dokunun",
+        "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun"
     },
     "login": {
-        "tagline": "Aile planlayıcına tekrar hoş geldin.",
+        "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
         "usernameLabel": "Kullanıcı adı",
         "passwordLabel": "Şifre",
         "loginButton": "Giriş yap",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "Değişiklikler atılsın mı?",
         "unsavedChangesDetail": "Bu formdaki girişlerin kaybolacak.",
         "discardChanges": "At",
-        "moreSettings": "Diğer ayarlar",
         "moreDetails": "Diğer bilgiler"
     },
     "rrule": {
@@ -3468,7 +3481,9 @@
         "goTo": "Git",
         "newSection": "Yeni oluştur",
         "recentLabel": "Son açılanlar",
-        "createTaskNamed": "“{{title}}” görevini oluştur"
+        "createTaskNamed": "“{{title}}” görevini oluştur",
+        "hintMove": "Seç",
+        "hintOpen": "Aç"
     },
     "birthdays": {
         "inDays_one": "{{count}} gün sonra",
@@ -3487,6 +3502,7 @@
         "editTitle": "Doğum gününü düzenle",
         "nameLabel": "Ad",
         "birthDateLabel": "Doğum tarihi",
+        "showContact": "Kişiyi göster",
         "nameDay": "İsim günü",
         "celebratesNameDay": "isim gününü kutlar",
         "nameDayLabel": "İsim günü (isteğe bağlı)",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "{{name}} uygulamasına hoş geldiniz",
-        "step1Body": "Kişisel aile planlayıcın. Görevler, takvim, alışveriş ve daha fazlası - hepsi tek yerde.",
+        "step1Body": "Hanen için görevler, takvim, alışveriş ve daha fazlası - ister yalnız, ister çift, ister aile olarak yaşa. Hepsi tek yerde.",
         "step2Title": "Gezinme ve Modüller",
         "step2Body": "Alttaki çubuk sizi doğrudan en önemli alanlara götürür. Diğer tüm modülleri “Daha Fazla” altında bulursunuz.",
         "step3Title": "Hızlıca başlayın",
@@ -3867,7 +3883,10 @@
         "errorDmsAccountGone": "Bu DMS hesabı artık yok.",
         "errorDmsDocumentGone": "Bu belge artık DMS'de yok.",
         "errorDmsAlreadyLinked": "Bu DMS belgesi zaten bağlı.",
-        "errorDmsAlreadyStored": "Bu belge zaten bir DMS'de saklanıyor."
+        "errorDmsAlreadyStored": "Bu belge zaten bir DMS'de saklanıyor.",
+        "dropzoneTitleTouch": "Dosya seçmek için dokunun",
+        "viewerPrevNamed": "Önceki belge: {{name}}",
+        "viewerNextNamed": "Sonraki belge: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Mutfak",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "Bu ziyaret artık yok.",
         "errorTaskGone": "Bu görev artık yok.",
         "errorAlreadyCheckedOut": "Bu yardımcının çıkışı zaten yapıldı.",
-        "errorAlreadyCheckedIn": "Bu yardımcının girişi zaten yapıldı."
+        "errorAlreadyCheckedIn": "Bu yardımcının girişi zaten yapıldı.",
+        "allVisitsInReport": "Tüm ziyaretler raporda"
     },
     "userMultiSelect": {
         "moreUsers": "daha",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Aramayı genel bakıştaki büyüteçle ya da „Daha fazla” ile açın.",
         "mobileSettings": "Ayarları „Daha fazla” altında bulursunuz.",
         "guideLink": "Kullanıcı kılavuzu",
-        "guideHint": "Toplulukça, ayrı bir depoda tutuluyor - bir sürümün gerisinde kalabilir."
+        "guideHint": "Topluluk tarafından sürdürülür. Yeni sekmede açılır."
     },
     "changelog": {
         "title": "Değişiklikler",
@@ -4379,8 +4399,9 @@
         "success": "Parolan değiştirildi. Artık giriş yapabilirsin.",
         "mismatch": "Parolalar eşleşmiyor.",
         "tooShort": "Parola en az 8 karakter olmalı.",
-        "invalidToken": "Bu bağlantı geçersiz ya da süresi dolmuş.",
-        "missingToken": "Geçerli bir belirteç bulunamadı."
+        "invalidToken": "Bu sıfırlama bağlantısı geçersiz veya süresi dolmuş - yenisini isteyin.",
+        "missingToken": "Bu sıfırlama bağlantısı eksik - yenisini isteyin.",
+        "requestNew": "Yeni bağlantı iste"
     },
     "email": {
         "host": "SMTP sunucusu",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Sonraki hatırlatmalar",
                 "empty": "Bugün başka kullanım yok"
+            },
+            "brief": {
+                "changes": "Son ölçümden bu yana: {{list}}.",
+                "latest": "Son kayıt: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} değişmedi"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Tahminleri, takvimi ve istatistikleri görmek için ilk adet dönemini kaydet.",
             "emptyCta": "İlk adeti kaydet",
             "personsLabel": "Person",
-            "add": "Adeti kaydet",
+            "add": "Geçmiş adet ekle",
             "loadError": "Döngü verileri yüklenemedi.",
             "loadErrorDesc": "Lütfen daha sonra tekrar deneyin.",
             "retry": "Tekrar dene",
@@ -5406,15 +5433,14 @@
                 "family": "Aile"
             },
             "period": {
-                "add": "Adeti kaydet",
+                "add": "Geçmiş adet ekle",
                 "edit": "Adeti düzenle",
                 "warningFuture": "Başlangıç tarihi gelecekte - tahminler yalnızca geçmiş döngülere dayanır.",
                 "warningOverlap": "Zaten kaydedilmiş bir döngüyle çakışıyor."
             },
             "dayLog": {
                 "title": "Günü kaydet",
-                "date": "Tarih",
-                "more": "Diğer bilgiler"
+                "date": "Tarih"
             },
             "export": {
                 "csv": "CSV olarak dışa aktar"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Ortalama döngü uzunluğu",
                 "periodLength": "Ortalama adet süresi",
                 "lutealLength": "Luteal faz uzunluğu",
+                "daysUnit": "gün",
                 "trackFertility": "Doğurgan pencereyi göster",
-                "autoHint": "Boş bırak = geçmişinden otomatik hesaplanır.",
+                "autoHint": "İki alandan birini boş bırakırsan Yuvomi değeri kaydettiğin regl dönemlerinden hesaplar.",
                 "remindPeriodDaysBefore": "Adet hatırlatıcısı",
                 "remindOff": "Kapalı",
                 "remindSameDay": "Gününde",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Lütfen bir CSV dosyası seçin veya metin yapıştırın.",
                 "error": "İçe aktarma başarısız oldu."
             },
-            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/modules/calendar?section=personal-feeds\">Ayarlar → Modüller → Takvim</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin."
+            "feedLink": "Tahmini döngüye takviminden abone ol",
+            "widgetHint": "Döngü kutucuğunu {{overview}} içinde “{{customize}}” ile ekle.",
+            "endBeforeStart": "Bitiş başlangıçtan önce olamaz."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",
@@ -5542,6 +5571,7 @@
             "unitH": "sa"
         },
         "careBanner": "{{name}} için kayıt giriyorsun.",
+        "whoSees": "Bunu kim görür?",
         "nutrition": {
             "title": "Besin değerleri",
             "emptyTitle": "Henüz besin değeri kaydı yok",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "Cmt",
         "weekdaySun": "Paz",
         "intervalLabelWeekly": "Her N haftada bir",
+        "intervalLabelMonthly": "Her N ayda bir",
         "anchorDateLabel": "İlk alım",
         "monthDayLabel": "Ayın günü",
         "monthDayLastDay": "Ayın son günü",
@@ -6271,8 +6302,8 @@
         "success": "Hesabın oluşturuldu. Artık giriş yapabilirsin.",
         "mismatch": "Parolalar eşleşmiyor.",
         "tooShort": "Parola en az 8 karakter olmalı.",
-        "invalidToken": "Bu davet geçersiz, süresi dolmuş ya da zaten kullanılmış.",
-        "missingToken": "Geçerli bir belirteç bulunamadı.",
+        "invalidToken": "Bu davet geçersiz, süresi dolmuş ya da zaten kullanılmış - yeni bir bağlantı isteyin.",
+        "missingToken": "Bu davet bağlantısı geçersiz veya süresi dolmuş - yenisini isteyin.",
         "usernameRequired": "Bir kullanıcı adı seç.",
         "usernameInvalid": "Kullanıcı adı 3 ile 64 karakter arasında olmalı ve yalnızca harf, rakam, nokta, tire ve alt çizgi içerebilir.",
         "usernameTaken": "Bu kullanıcı adı zaten alınmış.",
@@ -6486,9 +6517,8 @@
         "templateWork": "İş",
         "templateSchool": "Okul",
         "templateUniversity": "Üniversite",
-        "overview": "Karşılaştırma",
+        "overview": "Genel bakış",
         "overviewPeopleLabel": "Kişileri karşılaştır",
-        "overviewClearSelection": "Seçimi temizle",
         "continuesUntil": "…{{time}} saatine kadar sürüyor",
         "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
         "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Bu cihazın adı (isteğe bağlı)",
         "labelHint": "Daha sonra hangi cihaz olduğunu anlamana yardımcı olur.",
         "submit": "Eşleştir",
-        "failed": "Bu eşleştirme kodu geçerli değil."
+        "failed": "Bu eşleştirme kodu geçerli değil.",
+        "codeRequired": "Ayarlarda gösterilen eşleştirme kodunu girin."
     }
 }

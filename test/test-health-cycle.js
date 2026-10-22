@@ -2142,7 +2142,9 @@ test('R17 E10: Blutung, Symptome und Gefuehle stehen oben, vier Angaben hinter "
   }
   assert.ok(oben.indexOf('<!--mehr-->') > oben.indexOf('id="cycle-log-note"'), 'der Aufklapper steht als Letztes vor dem Fuss');
   assert.ok(oben.indexOf('<!--mehr-->') < oben.indexOf('modal-panel__footer'));
-  assert.equal(mehr.options.label, 'health.cycle.dayLog.more');
+  // EIN Wort fuer den Baustein (Critique R21, D15): der Dialog nimmt die
+  // Beschriftung des Aufklappers selbst ("Weitere Angaben"), keine eigene.
+  assert.equal(mehr.options.label, undefined);
   assert.equal(mehr.options.open, false, 'ohne Werte startet er geschlossen');
   for (const key of ['health.cycle.bbt.label', 'health.cycle.mucus.label', 'health.cycle.test.label', 'health.cycle.intimacy.label']) {
     assert.ok(mehr.options.hint.includes(key), `der Aufklapper nennt, was er birgt (${key})`);
@@ -2163,10 +2165,12 @@ test('R17 E10: "Weitere Angaben" startet offen, sobald dort ein Wert steht - und
 test('R17: die Heute-Karte steht schmal vor den Kennzahlen, breit bleibt sie unter der Legende', () => {
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   const shell = src.match(/function renderCycleShell\(\)[\s\S]*?\n\}\n/)?.[0] ?? '';
-  const hero = shell.match(/<div class="cycle-hero">[\s\S]*?\$\{cycleRingLegendMarkup\(prediction\)\}\n[^\n]*\n/)?.[0] ?? '';
-  assert.match(hero, /\$\{cycleRingMarkup\(prediction\)\}\s*\$\{darf && todayLeads \? cycleTodayActionsMarkup\(\) : ''\}\s*<div class="cycle-hero__side">/,
-    'schmal: Ring, Heute-Karte, Kennzahlen - in dieser Reihenfolge im Markup (Tab-Folge = Bild)');
-  assert.match(hero, /\$\{cycleRingLegendMarkup\(prediction\)\}\s*\$\{darf && !todayLeads \? cycleTodayActionsMarkup\(\) : ''\}/,
+  // Seit R21 S7 steht schmal die Legende zwischen Ring und Heute-Karte (sie
+  // erklaert den Ring), breit bleibt sie unter dem Kopfbereich.
+  const hero = shell.match(/<div class="cycle-hero">[\s\S]*?\$\{todayLeads \? '' : cycleRingLegendMarkup\(prediction\)\}\n[^\n]*\n/)?.[0] ?? '';
+  assert.match(hero, /\$\{cycleRingMarkup\(prediction\)\}[\s\S]{0,700}?\$\{todayLeads \? cycleRingLegendMarkup\(prediction\) : ''\}\s*\$\{darf && todayLeads \? cycleTodayActionsMarkup\(\) : ''\}\s*<div class="cycle-hero__side">/,
+    'schmal: Ring, Legende, Heute-Karte, Kennzahlen - in dieser Reihenfolge im Markup (Tab-Folge = Bild)');
+  assert.match(hero, /\$\{todayLeads \? '' : cycleRingLegendMarkup\(prediction\)\}\s*\$\{darf && !todayLeads \? cycleTodayActionsMarkup\(\) : ''\}/,
     'breit: unter der Legende, wo sie stand');
   assert.match(src, /const CYCLE_TODAY_LEADS_QUERY = '\(max-width: 639px\)'/, 'dieselbe Schwelle wie die Spaltenform des Kopfbereichs');
   const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
@@ -2174,3 +2178,91 @@ test('R17: die Heute-Karte steht schmal vor den Kennzahlen, breit bleibt sie unt
   assert.match(css, /\.cycle-hero > \.cycle-today \{\s*align-self: stretch;/, 'in der Spalte nimmt die Karte die volle Breite');
 });
 
+
+/* ZWEI KNOEPFE, ZWEI AUFGABEN (Critique R21, a5). "+ Periode" und "Periode
+ * gestartet" lasen sich wie dieselbe Handlung. "Periode gestartet" neben
+ * "Heute" erfasst heute mit einem Tipp; der Dialog hinter dem FAB ist fuer
+ * Daten - also heisst er "Periode nachtragen", als Aktion und als Titel. */
+test('Zyklus: der FAB-Dialog heisst "Periode nachtragen", die Heute-Aktion bleibt der eine Tipp (Critique R21)', () => {
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).health.cycle;
+  assert.equal(de.add, 'Periode nachtragen');
+  assert.equal(de.period.add, de.add, 'Knopf und Dialogtitel sagen dasselbe');
+  assert.notEqual(de.add, de.today.startPeriod, 'und etwas anderes als die Heute-Aktion');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /label: t\('health\.cycle\.add'\), dockLabel: t\('newLabel\.healthCycle'\), onClick: \(\) => openPeriodModal\(null\)/);
+});
+
+// ── R21 (Critique a5, clarify + D7) ───────────────────────────────────────────
+
+/* DER ZYKLUS-DIALOG SPRICHT DIE SPRACHE DER APP. Native Checkboxen zwischen
+ * Zahlenfeldern ohne Einheit, und der Hinweis "Leer lassen = automatisch"
+ * stand unter "Fruchtbares Fenster anzeigen" statt unter den Feldern, die er
+ * meint. Jetzt: Zahlenfeld mit "Tage" dahinter (form-composite wie der
+ * Messwert), der Hinweis direkt unter Zyklus- und Periodenlaenge, An/Aus als
+ * Schalterzeilen (formSwitchRowHtml) wie im Mitglieder-Dialog. */
+test('R21: der Zyklus-Dialog traegt Schalter, die Einheit Tage und den Hinweis an seinen Feldern', async () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function openCycleSettingsModal('), src.indexOf("    onSave(panel) {", src.indexOf('function openCycleSettingsModal(')));
+  assert.doesNotMatch(fn, /class="cycle-toggle"/, 'keine nativen Haken-Zeilen mehr');
+  for (const id of ['cs-fertility', 'cs-perimenopause', 'cs-show-pms', 'cs-remind-log', 'cs-pregnancy']) {
+    assert.match(fn, new RegExp(`cycleSwitchRow\\(\\{[^}]*id: '${id}'`), `${id} ist eine Schalterzeile`);
+  }
+  for (const id of ['cs-cycle', 'cs-period', 'cs-luteal']) {
+    assert.match(fn, new RegExp(`daysField\\(\\{[^}]*id: '${id}'`), `${id} traegt die Einheit Tage`);
+  }
+  assert.match(src, /function daysField\([\s\S]*?formCompositeHtml\(\{[\s\S]*?unit: t\('health\.cycle\.settings\.daysUnit'\)/, 'die Einheit als Suffix des Felds');
+  const at = (needle) => fn.indexOf(needle);
+  assert.ok(at("id: 'cs-period'") < at('id="cs-auto-hint"') && at('id="cs-auto-hint"') < at("id: 'cs-luteal'"),
+    'der Hinweis steht zwischen Perioden- und Lutealphasenlaenge - unter den Feldern, die er meint');
+});
+
+/* DER ZYKLUS-TIPP IST EIN LINK (R21). Er stand als Satz mit zwei Links aus
+ * einem Locale-String mit rohem HTML, und der erste fuehrte in ein
+ * aufgeloestes Blatt (Kalender > Feed-Abos); der Zyklus-Feed steht seit R14 im
+ * Gesundheitsblatt. Jetzt ein Link mit eigenem Text dorthin. */
+test('R21: der Zyklus-Tipp ist ein Link in den Zyklus-Feed, kein HTML aus dem Locale', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /t\('health\.cycle\.discoveryHint'\)/, 'kein Locale-HTML mehr');
+  assert.match(src, /<a class="cycle-discovery-hint__link" href="\/settings\/modules\/health\?section=feed-cycle" data-cycle-feed-link>/);
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.equal(de.health.cycle.discoveryHint, undefined);
+  assert.ok(de.health.cycle.feedLink && !/</.test(de.health.cycle.feedLink));
+});
+
+/* "WER SIEHT DAS?" AN DER PERSONENWAHL (D7, a5 P2). Freigaben standen drei
+ * Tipps tief in den Einstellungen, ohne Weg aus der Gesundheit. Das Menue der
+ * Personenwahl fuehrt in der eigenen Ansicht zur Standard-Sichtbarkeit. */
+test('R21 D7: das Menue der Personenwahl fuehrt zur Frage "Wer sieht das?"', async () => {
+  const { personSwitcherMarkup } = await import('../public/utils/health-person-switcher.js');
+  const members = [{ id: 1, display_name: 'Linda' }, { id: 2, display_name: 'Alex' }];
+  const own = personSwitcherMarkup(members, 1, 1, { menuId: 'm', label: 'Person' });
+  assert.match(own, /<a role="menuitem" class="popover-menu__item health-person-switcher__who" href="\/settings\/modules\/health\?option=settings\.healthVisibilityTitle" data-health-who>/);
+  assert.match(own, /health\.whoSees/);
+  const foreign = personSwitcherMarkup(members, 2, 1, { menuId: 'm', label: 'Person' });
+  assert.doesNotMatch(foreign, /data-health-who/, 'in einer fremden Ansicht nicht - die Frage gilt den eigenen Eintraegen');
+});
+
+test('R21 D7: /health/cycle?open=settings oeffnet die Zyklus-Einstellungen', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('async function mountCycle('), src.indexOf('async function loadCycle('));
+  assert.match(mount, /openCycleSettingsFromQuery\(\)/);
+  assert.match(src, /function openCycleSettingsFromQuery\(\{ loc = window\.location \} = \{\}\) \{/);
+});
+
+// R21 S7 (Critique a5, D9): drei Stellen der Zyklus-Flaeche. Gemessen vorher:
+// die Legende stand mobil 486px unter dem Ring, "Tag 7" lag ab 640px 5px auf
+// der Kennzahlkarte, und der Kopf des Bereichs war ein weisser eckiger Balken.
+test('R21 S7: Legende am Ring, Luft fuer die Tagesmarke, ein Traeger fuer den Bereichskopf', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /\$\{cycleRingMarkup\(prediction\)\}[\s\S]{0,700}\$\{todayLeads \? cycleRingLegendMarkup\(prediction\) : ''\}/,
+    'schmal steht die Legende im Markup direkt hinter dem Ring');
+  assert.match(src, /\$\{todayLeads \? '' : cycleRingLegendMarkup\(prediction\)\}/, 'breit bleibt sie unter dem Kopfbereich');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const ring = rules.find((r) => r.selector.trim() === '.cycle-ring' && r.at.some((a) => /min-width:\s*640px/.test(a)));
+  assert.match(ring?.body ?? '', /margin-inline:\s*var\(--space-4\)/, 'neben den Kennzahlen hat der Ring Rand fuer die Tagesmarke');
+  const head = rules.find((r) => r.selector.trim() === '.health-split > .split-view__detail .split-view__detail-head');
+  assert.match(head?.body ?? '', /border-radius:\s*var\(--radius-lg\)/, 'der Bereichskopf ist eine Karte');
+  assert.match(head.body, /box-shadow:\s*var\(--shadow-sm\)/);
+});

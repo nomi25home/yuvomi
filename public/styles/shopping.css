@@ -621,15 +621,6 @@
   gap: var(--space-1);
 }
 
-/* EINE GRUPPE OHNE ZEILEN STEHT IM DOM UND NICHT IM BILD (#1816). Abgehaktes
- * wandert in den Abschnitt am Listenende; die Kategorie, die dabei leer wird,
- * behaelt ihren Traeger fuer den Rueckweg, und der Abschnitt selbst wartet
- * leer auf den ersten Haken. `.list-group` setzt `display: grid` und schluege
- * das UA-`[hidden]` (test:hidden-cascade). */
-.shopping-page .list-group[hidden] {
-  display: none;
-}
-
 /* DER KOPF VON „ABGEHAKT" IST EIN VOLLES ZIEL (#1816, DESIGN.md: --target-base).
  * Der geteilte Gruppenkopf ist so hoch wie seine Schrift, 24px, und im engen
  * Rhythmus dieser Seite (12px darueber, 4px darunter) ist kein Platz, die
@@ -678,6 +669,21 @@
  * Raster des Scrollers und erben dessen Abstand. */
 .items-lanes {
   display: contents;
+}
+
+/* Lange Listen rechnen nur, was in Sicht ist (Critique R21 S8; dieselbe Regel
+ * wie die Agenda in calendar.css) - NUR in der einen Spalte. Ab 60rem verteilen
+ * Spalten bzw. Masonry die Kategorien nach ihrer Hoehe, und Platzhalterhoehen
+ * liessen Gruppen beim Scrollen die Spalte wechseln (derselbe Grund, aus dem
+ * die Notizen ohne die Regel bleiben). */
+@container shopping-surface (width < 60rem) {
+  @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+    .shopping-page .items-lanes > .list-group + .list-group {
+      content-visibility: auto;
+      contain-intrinsic-size: auto none auto 125px;
+      overflow-clip-margin: var(--space-2);
+    }
+  }
 }
 
 @container shopping-surface (min-width: 60rem) {

@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "没有与你的搜索和筛选条件匹配的内容。",
         "searchReset": "重置搜索",
         "passwordMinLength": "至少 8 个字符。",
-        "savedReloadFailed": "更改已保存，但无法刷新视图。如有缺失，请重新加载页面。"
+        "savedReloadFailed": "更改已保存，但无法刷新视图。如有缺失，请重新加载页面。",
+        "fieldNumber": "请输入数字。",
+        "fieldMin": "至少为 {{min}}。",
+        "fieldMax": "最多为 {{max}}。",
+        "fieldWholeNumber": "请输入整数。",
+        "fieldStep": "请按 {{step}} 的步长输入。",
+        "fieldInvalid": "请检查此项输入。",
+        "errorCheckRolledBack": "“{{name}}”已恢复为未完成 - 勾选未成功。请重试。",
+        "errorUncheckRolledBack": "“{{name}}”已恢复为已勾选 - 撤销未成功。请重试。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "标签（如：工作）",
         "mvRemove": "移除条目",
         "birthdayLabel": "生日",
+        "showBirthday": "在生日中查看",
         "birthdayHint": "通过生日导入也会显示在日历中。",
         "phonePlaceholder": "+86 …",
         "phonePreview": "预览：{{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "无法加载预算分类。",
         "addCategory": "+ 类别",
         "addSubcategory": "+ 子分类",
-        "moreDetails": "更多信息",
         "newCategoryPrompt": "新分类的名称：",
         "newSubcategoryPrompt": "新子分类的名称：",
         "categoryAddedToast": "已添加分类。",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "周期设置已保存。",
         "healthCyclePersonalLabel": "显示周期",
         "healthCyclePersonalHint": "仅适用于你自己的视图。关闭后，家庭中的其他成员仍可看到周期。",
+        "healthCycleSettingsHint": "周期长度、避孕方式、提醒和怀孕模式在周期页面中设置。",
         "healthCyclePersonalHouseholdOff": "周期目前已对整个家庭关闭，因此不会对任何人显示。",
         "healthCyclePersonalSaved": "已保存周期视图设置。",
         "pageRewardsModule": "奖励",
@@ -2038,7 +2047,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "亲属",
         "familyRoleOther": "家庭成员",
-        "childStartHint": "新的儿童账户开始时没有预算和断食功能，家政只能查看，不显示工资和付款。之后可在“角色与权限”中更改。",
+        "childStartHint": "新的儿童账户开始时没有预算和断食功能，家政只能查看，不显示工资和付款。之后可在“角色与权限”中更改。周期也会隐藏，可在孩子的个人设置中重新显示。",
         "systemAdminLabel": "系统管理员",
         "systemAdminHint": "系统管理员可以管理应用设置、集成、API 令牌和家庭账户。",
         "systemAdminBadge": "系统管理员",
@@ -2068,7 +2077,8 @@
         "languageTitle": "语言",
         "dataLanguageLabel": "已保存条目的语言",
         "dataLanguageHint": "Yuvomi 保存自动创建的条目（例如生日日程）时使用的语言。影响 API、日历订阅和同步，不影响此处的显示。",
-        "dataLanguageAuto": "自动（{{language}}）",
+        "dataLanguageAuto": "自动",
+        "hintWithCurrent": "当前为{{value}}。{{hint}}",
         "dataLanguageAdminOnly": "只有管理员可以设置已保存条目的语言。",
         "dataLanguageSaved": "已保存条目的语言已更新",
         "sectionMeals": "饮食计划",
@@ -2863,6 +2873,7 @@
         "regionTitle": "地区 / 格式",
         "regionLabel": "地区",
         "regionHint": "根据地区设置货币、数字、日期和时间格式（例如瑞士：1'234.50）。选择“自定义”可单独配置。",
+        "regionWithLanguage": "{{region}}（{{language}}）",
         "regionAdminOnly": "只有管理员可以更改地区和货币。",
         "formatsHouseholdHint": "日期和时间格式适用于整个家庭。任何成员都可以更改。",
         "regionCustom": "自定义",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "时区",
         "timezoneLabel": "家庭时区",
         "timezoneHint": "适用于时间本身不带时区的所有场合：提醒、倒计时、称为“今天”的日历日、导出的日历订阅源，以及推送到 Google 或 Outlook 的日程。",
-        "timezoneAuto": "自动 ({{zone}})",
+        "timezoneAuto": "自动",
         "timezoneAdminOnly": "只有管理员可以更改时区。",
         "timezoneSaved": "已保存时区。",
         "timezoneMismatch": "你的浏览器位于 {{browser}}，家庭按 {{household}} 计算。",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "通知设置已保存。",
         "healthVisibilityTitle": "默认可见范围",
         "healthVisibilityHint": "新记录的初始值。每次记录时仍可更改。",
+        "healthVisibilityCaregivers": "可以代你记录的人也能看到你的私密记录，周期日记除外。这由管理员在成员中设置。",
         "healthVisibilityOther": "其他板块",
         "healthVisibilityApply": "同时修改已有记录",
         "healthVisibilityApplyHint": "已保存。是否也修改 {{area}} 中的已有记录？",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "请至少输入两个字符。",
         "weatherPlaceNotFound": "未找到此名称的地点。请加上国家，例如“朝阳, 中国”。",
         "weatherPlaceUnavailable": "地点搜索暂时无法访问。请稍后重试，或手动输入坐标。",
-        "weatherManualTitle": "手动输入坐标"
+        "weatherManualTitle": "手动输入坐标",
+        "backupDropzoneTitleTouch": "点按以选择备份文件",
+        "installModuleDropzoneTitleTouch": "点按以选择 ZIP 文件"
     },
     "login": {
-        "tagline": "欢迎回到您的家庭计划工具。",
+        "tagline": "欢迎回来。您的家，尽在一处。",
         "usernameLabel": "用户名",
         "passwordLabel": "密码",
         "loginButton": "登录",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "放弃更改？",
         "unsavedChangesDetail": "你在此表单中的输入将丢失。",
         "discardChanges": "放弃",
-        "moreSettings": "更多设置",
         "moreDetails": "更多信息"
     },
     "rrule": {
@@ -3468,7 +3481,9 @@
         "goTo": "前往",
         "newSection": "新建",
         "recentLabel": "最近打开",
-        "createTaskNamed": "将“{{title}}”创建为任务"
+        "createTaskNamed": "将“{{title}}”创建为任务",
+        "hintMove": "选择",
+        "hintOpen": "打开"
     },
     "birthdays": {
         "inDays_one": "{{count}}天后",
@@ -3487,6 +3502,7 @@
         "editTitle": "编辑生日",
         "nameLabel": "姓名",
         "birthDateLabel": "出生日期",
+        "showContact": "查看联系人",
         "nameDay": "命名日",
         "celebratesNameDay": "庆祝命名日",
         "nameDayLabel": "命名日（可选）",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "欢迎使用{{name}}",
-        "step1Body": "你的专属家庭计划助手。任务、日历、购物等等，全都在一处。",
+        "step1Body": "任务、日历、购物等等，为你的家而设 - 无论独居、两人还是一家人。全都在一处。",
         "step2Title": "导航与模块",
         "step2Body": "底部栏可直接进入最重要的区域。其他模块都在“更多”中。",
         "step3Title": "快速开始",
@@ -3867,7 +3883,10 @@
         "errorDmsAccountGone": "此 DMS 账户已不存在。",
         "errorDmsDocumentGone": "此文档在 DMS 中已不存在。",
         "errorDmsAlreadyLinked": "此 DMS 文档已关联。",
-        "errorDmsAlreadyStored": "此文档已存储在 DMS 中。"
+        "errorDmsAlreadyStored": "此文档已存储在 DMS 中。",
+        "dropzoneTitleTouch": "点按以选择文件",
+        "viewerPrevNamed": "上一个文档：{{name}}",
+        "viewerNextNamed": "下一个文档：{{name}}"
     },
     "shortcuts": {
         "goKitchen": "厨房",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "该上门记录已不存在。",
         "errorTaskGone": "该任务已不存在。",
         "errorAlreadyCheckedOut": "该家政人员已签退。",
-        "errorAlreadyCheckedIn": "该家政人员已签到。"
+        "errorAlreadyCheckedIn": "该家政人员已签到。",
+        "allVisitsInReport": "在报告中查看所有访问"
     },
     "userMultiSelect": {
         "moreUsers": "更多",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "在概览页点放大镜，或通过“更多”打开搜索。",
         "mobileSettings": "设置在“更多”中。",
         "guideLink": "用户手册",
-        "guideHint": "由社区在独立仓库维护，可能落后于某个版本。"
+        "guideHint": "由社区维护。在新标签页中打开。"
     },
     "changelog": {
         "title": "更新日志",
@@ -4379,8 +4399,9 @@
         "success": "你的密码已更改，现在可以登录了。",
         "mismatch": "两次输入的密码不一致。",
         "tooShort": "密码至少需要 8 个字符。",
-        "invalidToken": "此链接无效或已过期。",
-        "missingToken": "未找到有效的令牌。"
+        "invalidToken": "此重置链接无效或已过期 - 请重新申请一个。",
+        "missingToken": "此重置链接不完整 - 请重新申请一个。",
+        "requestNew": "申请新链接"
     },
     "email": {
         "host": "SMTP 主机",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "接下来的提醒",
                 "empty": "今日没有更多服药"
+            },
+            "brief": {
+                "changes": "自上次测量以来：{{list}}。",
+                "latest": "最近记录：{{list}}。",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}}无变化"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "记录你的第一次月经，即可查看预测、日历和统计。",
             "emptyCta": "记录第一次月经",
             "personsLabel": "Person",
-            "add": "记录月经",
+            "add": "补记月经",
             "loadError": "无法加载周期数据。",
             "loadErrorDesc": "请稍后重试。",
             "retry": "重试",
@@ -5406,15 +5433,14 @@
                 "family": "家庭"
             },
             "period": {
-                "add": "记录月经",
+                "add": "补记月经",
                 "edit": "编辑月经",
                 "warningFuture": "开始日期在未来 - 预测仅基于过去的周期。",
                 "warningOverlap": "与已记录的周期重叠。"
             },
             "dayLog": {
                 "title": "记录当天",
-                "date": "日期",
-                "more": "更多信息"
+                "date": "日期"
             },
             "export": {
                 "csv": "导出为 CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "平均周期长度",
                 "periodLength": "平均经期长度",
                 "lutealLength": "黄体期长度",
+                "daysUnit": "天",
                 "trackFertility": "显示易孕期",
-                "autoHint": "留空 = 根据历史记录自动计算。",
+                "autoHint": "两个字段任一留空时，Yuvomi 会根据你记录的经期计算该值。",
                 "remindPeriodDaysBefore": "经期提醒",
                 "remindOff": "关闭",
                 "remindSameDay": "当天提醒",
@@ -5533,7 +5560,9 @@
                 "emptyError": "请选择 CSV 文件或粘贴文本。",
                 "error": "导入失败。"
             },
-            "discoveryHint": "提示:可以在<a href=\"/settings/modules/calendar?section=personal-feeds\">设置 → 模块 → 日历</a>中以 ICS 订阅源的形式订阅预测周期,也可以通过自定义模式在<a href=\"/\">概览</a>中显示周期小组件。"
+            "feedLink": "在日历中订阅预测周期",
+            "widgetHint": "可在{{overview}}的“{{customize}}”中添加周期卡片。",
+            "endBeforeStart": "结束不能早于开始。"
         },
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",
@@ -5542,6 +5571,7 @@
             "unitH": "小时"
         },
         "careBanner": "你正在为 {{name}} 记录。",
+        "whoSees": "谁能看到？",
         "nutrition": {
             "title": "营养",
             "emptyTitle": "尚未记录营养数据",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "六",
         "weekdaySun": "日",
         "intervalLabelWeekly": "每 N 周一次",
+        "intervalLabelMonthly": "每 N 个月一次",
         "anchorDateLabel": "首次收运",
         "monthDayLabel": "每月第几天",
         "monthDayLastDay": "每月最后一天",
@@ -6271,8 +6302,8 @@
         "success": "账户已创建，现在可以登录了。",
         "mismatch": "两次输入的密码不一致。",
         "tooShort": "密码至少需要 8 个字符。",
-        "invalidToken": "此邀请无效、已过期或已被使用。",
-        "missingToken": "未找到有效的令牌。",
+        "invalidToken": "此邀请无效、已过期或已被使用 - 请索取新链接。",
+        "missingToken": "此邀请链接无效或已过期 - 请索取新链接。",
         "usernameRequired": "请选择一个用户名。",
         "usernameInvalid": "用户名需为 3 到 64 个字符，且只能包含字母、数字、点、连字符和下划线。",
         "usernameTaken": "该用户名已被占用。",
@@ -6486,9 +6517,8 @@
         "templateWork": "工作",
         "templateSchool": "学校",
         "templateUniversity": "大学",
-        "overview": "对比",
+        "overview": "概览",
         "overviewPeopleLabel": "比较成员",
-        "overviewClearSelection": "清除选择",
         "continuesUntil": "…持续到 {{time}}",
         "overviewEmptyTitle": "选择要比较的成员",
         "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。",
@@ -6520,6 +6550,7 @@
         "labelLabel": "这台设备的名称（可选）",
         "labelHint": "有助于以后辨认是哪一台设备。",
         "submit": "配对",
-        "failed": "此配对码无效。"
+        "failed": "此配对码无效。",
+        "codeRequired": "请输入设置中显示的配对码。"
     }
 }

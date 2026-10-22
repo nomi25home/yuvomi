@@ -23,6 +23,11 @@
  *          sheet-drag          ein Blatt zieht ueber utils/sheet-drag.js, nicht per Eigenbau
  *        Runde 14 (Re-Critique 2026-09-28, A6 P2-5):
  *          native-date         ein Datumsfeld ist `yuvomi-datepicker`, kein `<input type="date">`
+ *        R21 (Critique 2026-10-21, D10 Zeilen-Endzone):
+ *          row-endzone-order   [eine Handlung][Mehr-Knopf][Griff], der Griff zuletzt
+ *          row-primary-count   hoechstens EINE sichtbare Handlung je Zeile
+ *          row-chevron-with-menu  Chevron nur an reiner Navigation
+ *          form-novalidate     ein Formular mit Feldregeln traegt novalidate
  *
  * DAS IST EIN RATCHET, KEINE ALLOWLIST. `PENDING` ist der Bestand vom
  * 2026-09-26 (Datei -> Anzahl), fuer die sechs Regeln der Runde 7 der vom
@@ -239,7 +244,37 @@ function rowActionsOf(src) {
     out.push({ index: m.index, kind: more ? 'more' : reorder ? 'reorder' : 'action', what: icon || m[1],
       danger: m[1] !== 'rowMenuHtml' && (/\btone:\s*['"]danger['"]/.test(text) || /^trash/.test(icon)) });
   }
+  out.push(...domRowActions(src));
   return out.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * ZEILENAKTIONEN AUS DER DOM-API (R21, Critique 2026-10-21). Die Scanner oben
+ * lesen Markup in Template-Strings und die Helfer-Aufrufe - ein Knopf, den
+ * `document.createElement('button')` baut und dem erst eine Zuweisung die
+ * Klasse gibt, sahen sie nicht. So stand die Rezeptzeile mit Stift,
+ * Duplizieren und Papierkorb ab 30rem sichtbar da (recipes.js), waehrend
+ * row-danger-visible gruen meldete: ein blinder Guard. Erfasst werden hier
+ * `el.className = ...`, `el.classList.add(...)` und `setAttribute('class', ...)`
+ * mit `row-action`; destruktiv ist die Zuweisung, sobald `row-action--danger`
+ * in ihr steht - auch als Zweig einer Bedingung, denn welche Aktion den Zweig
+ * nimmt, entscheidet erst die Laufzeit.
+ */
+function domRowActions(src) {
+  const out = [];
+  const assign = /\.className\s*=\s*(`[^`]*`|'[^']*'|"[^"]*")|\.classList\.add\(([^)]*)\)|\.setAttribute\(\s*['"]class['"]\s*,\s*(`[^`]*`|'[^']*'|"[^"]*")/g;
+  let m;
+  while ((m = assign.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const cls = m[1] ?? m[2] ?? m[3] ?? '';
+    // `row-action` oder `row-action--x`, nicht der Traeger `row-actions`.
+    if (!/\brow-action(?:--[\w-]+)?(?![\w-])/.test(cls)) continue;
+    const more = /\brow-action--more\b|\bpopover-menu__trigger\b/.test(cls);
+    const reorder = /\blist-row__drag\b|__handle\b/.test(cls);
+    out.push({ index: m.index, kind: more ? 'more' : reorder ? 'reorder' : 'action', what: 'createElement',
+      danger: /\brow-action--danger\b/.test(cls) });
+  }
+  return out;
 }
 
 export function scanRowActionCount(src) {
@@ -275,6 +310,176 @@ export function scanRowDangerVisible(src) {
   return rowActionsOf(src)
     .filter((a) => a.kind === 'action' && a.danger)
     .map((a) => ({ line: lineOf(src, a.index), what: `sichtbar destruktiv (${a.what})` }));
+}
+
+/**
+ * D10 ZEILEN-ENDZONE (Critique R21, DESIGN.md "D10 Zeilen-Endzone"): EINE
+ * Reihenfolge am Zeilenende fuer alle Module -
+ * [hoechstens eine sichtbare Primaeraktion] [Mehr-Knopf] [Griff].
+ * Gemessen vor R21: der Einkauf trug den Griff VOR dem Mehr-Knopf (die
+ * Aufgaben dahinter), die Konten der Belohnungen Buchen + Plan + Schliessen,
+ * die Dokumentzeile Auge + Herunterladen + Mehr.
+ *
+ * `row-endzone-order` liest je Aktionszone (wie row-action-count) die Folge:
+ * hinter dem Griff steht nichts mehr, hinter dem Mehr-Knopf keine Aktion.
+ * `row-primary-count` zaehlt die sichtbaren Aktionen ohne Mehr und Griff:
+ * hoechstens EINE (vorher zwei, R18).
+ */
+/**
+ * Zonen-Enden OHNE die, die in einem Helfer-Aufruf stehen: ein Name als
+ * Template-Literal (`label: \`${t('x')}: ${name}\``) endet mit Backtick und
+ * Komma - das las ZONE_END als Ende der Zone, und zwei Aufrufe nebeneinander
+ * standen in zwei Zonen (so blieben Plan und Schliessen der Belohnungskonten
+ * unsichtbar).
+ */
+function zoneEnds(src) {
+  const calls = [];
+  const call = /\b(rowActionHtml|rowActionEl|rowMenuHtml)\(/g;
+  let m;
+  while ((m = call.exec(src))) {
+    const open = m.index + m[1].length;
+    calls.push([open, open + callText(src, open).length]);
+  }
+  return [...src.matchAll(ZONE_END)].map((x) => x.index).filter((i) => !calls.some(([a, b]) => i > a && i < b));
+}
+
+/**
+ * Ein Mehr-Knopf, der VOR dem Markup gebaut wird (`const menu = rowMenuHtml(...)`
+ * ... `${menu}`), steht dort, wo er eingesetzt wird - nicht dort, wo der Aufruf
+ * steht. Sonst laese sich [Speichern][Mehr] (Kalender verwalten) als
+ * "Aktion hinter dem Mehr-Knopf".
+ */
+function placedRowActions(src) {
+  const moved = new Map();
+  const decl = /(?:const|let)\s+(\w+)\s*=\s*rowMenuHtml\(/g;
+  let m;
+  while ((m = decl.exec(src))) {
+    const use = src.indexOf(`\${${m[1]}}`, m.index + m[0].length);
+    if (use !== -1) moved.set(m.index + m[0].length - 'rowMenuHtml('.length, use);
+  }
+  return rowActionsOf(src)
+    .map((a) => (moved.has(a.index) ? { ...a, index: moved.get(a.index) } : a))
+    .sort((a, b) => a.index - b.index);
+}
+
+export function scanRowEndzoneOrder(src) {
+  const ends = zoneEnds(src);
+  const found = [];
+  let zone = [];
+  let e = 0;
+  const flush = () => {
+    const kinds = zone.map((a) => a.kind);
+    const grip = kinds.indexOf('reorder');
+    if (grip >= 0 && kinds.slice(grip + 1).some((k) => k !== 'reorder')) {
+      found.push({ line: lineOf(src, zone[grip].index), what: `Griff vor ${zone.slice(grip + 1).map((a) => a.what).join(', ')} - der Griff steht zuletzt` });
+    }
+    const more = kinds.indexOf('more');
+    if (more >= 0 && kinds.slice(more + 1).includes('action')) {
+      found.push({ line: lineOf(src, zone[more].index), what: `Aktion hinter dem Mehr-Knopf (${zone.slice(more + 1).filter((a) => a.kind === 'action').map((a) => a.what).join(', ')})` });
+    }
+    zone = [];
+  };
+  for (const action of placedRowActions(src)) {
+    let crossed = false;
+    while (e < ends.length && ends[e] < action.index) { e += 1; crossed = true; }
+    if (crossed) flush();
+    zone.push(action);
+  }
+  flush();
+  return found;
+}
+
+export function scanRowPrimaryCount(src) {
+  const ends = zoneEnds(src);
+  const found = [];
+  let zone = [];
+  let e = 0;
+  const flush = () => {
+    const visible = zone.filter((a) => a.kind === 'action');
+    if (visible.length > 1) {
+      found.push({ line: lineOf(src, zone[0].index), what: `${visible.length} sichtbare Handlungen (${visible.map((a) => a.what).join(', ')}) - eine, der Rest in rowMenuHtml()` });
+    }
+    zone = [];
+  };
+  for (const action of rowActionsOf(src)) {
+    let crossed = false;
+    while (e < ends.length && ends[e] < action.index) { e += 1; crossed = true; }
+    if (crossed) flush();
+    zone.push(action);
+  }
+  flush();
+  return found;
+}
+
+/**
+ * D10, zweiter Satz: "Chevron nur bei reiner Navigation". Ein Wegweiser
+ * (chevron-right/-left) im OEFFNER einer Zeile (`.list-row__main--interactive`,
+ * `.u-row-title`), deren Baustein auch einen Mehr-Knopf baut, ist ein Fund: die
+ * Zeile oeffnet ein Objekt und traegt Handlungen, sie ist keine Navigation.
+ * So stand die Rezeptzeile mobil [Name ... >][...] - der Chevron 12px versetzt
+ * neben dem Mehr-Knopf. Der Baustein ist die umschliessende Funktion
+ * (Spalte 0 bis zur schliessenden Klammer in Spalte 0).
+ */
+export function scanRowChevronWithMenu(src) {
+  const found = [];
+  const re = /data-lucide="(chevron-(?:right|left))"|dataset\.lucide\s*=\s*['"](chevron-(?:right|left))['"]/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const start = Math.max(src.lastIndexOf('\nfunction ', m.index), src.lastIndexOf('\nexport function ', m.index),
+      src.lastIndexOf('\nasync function ', m.index), src.lastIndexOf('\nexport async function ', m.index));
+    const endRel = src.slice(m.index).search(/\n\}\n/);
+    const body = src.slice(start < 0 ? 0 : start, endRel === -1 ? src.length : m.index + endRel);
+    if (!/list-row__main--interactive|u-row-title/.test(body)) continue;
+    if (!/rowMenuHtml\(|popoverMenuHtml\(|row-action--more|popover-menu__trigger/.test(body)) continue;
+    // Der Chevron haengt am Oeffner: dieselbe Funktion weist ihn dem Oeffner zu
+    // (insertAdjacentHTML/appendChild am Element mit der Oeffner-Klasse) oder
+    // er steht im Markup des Oeffners.
+    const before = src.slice(Math.max(0, m.index - 400), m.index);
+    const opener = /(\w+)\.className\s*=\s*['"`][^'"`]*list-row__main--interactive/.exec(body)?.[1];
+    const onOpener = (opener && new RegExp(`\\b${reEsc(opener)}\\.insertAdjacentHTML\\([^)]*$`).test(before))
+      || /class="[^"]*(?:list-row__main--interactive|u-row-title)[^"]*"[^<]*>(?:(?!<\/button>)[\s\S])*$/.test(before);
+    if (!onOpener) continue;
+    found.push({ line: lineOf(src, m.index), what: `${m[1] || m[2]} am Oeffner einer Zeile mit Mehr-Knopf` });
+  }
+  return found;
+}
+
+/**
+ * KEINE BROWSER-BLASEN (DESIGN.md "Keine Browser-Blasen", Critique R21 a5 und
+ * S9a): ein Formular, dessen Felder Regeln tragen (required, min, max, step,
+ * minlength, pattern, Zahl-/Mail-/URL-Typ), traegt `novalidate` - sonst zeigt
+ * der Browser seine Blase in seiner Sprache und Gestalt, statt dass die
+ * Meldung am Feld steht (`constraintErrors()` + `reportFieldErrors()` aus
+ * components/modal.js). Gemessen vor S9a: 28 von 59 solchen Formularen ohne,
+ * in Schichtplan (5), Aufteilung (5), Haushaltshilfe (4), Abos, Dokumenten,
+ * Fasten, den Einstellungen und der Tablet-Kopplung. `maxlength` zaehlt
+ * nicht: es laesst sich nicht verletzen.
+ * Template: `<form ...>` bis `</form>`; DOM: `createElement('form')` mit
+ * Regel-Feldern in derselben Funktion verlangt `form.noValidate = true`.
+ */
+const FORM_CONSTRAINT = /\brequired\b|\bminlength=|\bmin=|\bmax=|\bstep=|type="(?:number|email|url|tel)"|\bpattern=|required:\s*true|type:\s*'number'/;
+export function scanFormNovalidate(src) {
+  const found = [];
+  const re = /<form\b[^>]*>/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const end = src.indexOf('</form>', m.index);
+    const body = src.slice(m.index, end < 0 ? m.index + 4000 : end);
+    if (!FORM_CONSTRAINT.test(body) || /\bnovalidate\b/i.test(m[0])) continue;
+    found.push({ line: lineOf(src, m.index), what: (m[0].match(/\b(?:id|class)="[^"]*"/) || [m[0].slice(0, 40)])[0] });
+  }
+  const dom = /(?:const|let)\s+(\w+)\s*=\s*document\.createElement\(\s*['"]form['"]\s*\)/g;
+  while ((m = dom.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const endRel = src.slice(m.index).search(/\n\}\n/);
+    const body = src.slice(m.index, endRel === -1 ? src.length : m.index + endRel);
+    if (!FORM_CONSTRAINT.test(body)) continue;
+    if (new RegExp(`\\b${reEsc(m[1])}\\.noValidate\\s*=\\s*true`).test(body)) continue;
+    found.push({ line: lineOf(src, m.index), what: `${m[1]} = createElement('form') ohne noValidate` });
+  }
+  return found;
 }
 
 /**
@@ -895,6 +1100,26 @@ test('Scanner: row-danger-visible faengt den sichtbaren Papierkorb und laesst de
   assert.deepEqual(scanRowDangerVisible(good), []);
 });
 
+// R21 (Critique 2026-10-21): die Rezeptzeile baute Stift, Duplizieren und
+// Papierkorb per createElement - der Scanner las nur Markup und Helfer und
+// meldete die Datei sauber.
+test('Scanner: row-danger-visible sieht auch den per DOM-API gebauten Papierkorb', () => {
+  const bad = `
+    for (const a of ROW_ACTIONS) {
+      const btn = document.createElement('button');
+      btn.className = \`row-action\${a.danger ? ' row-action--danger' : ''}\`;
+      inline.appendChild(btn);
+    }
+    del.classList.add('row-action', 'row-action--danger');
+    other.setAttribute('class', 'row-action row-action--danger');`;
+  assert.equal(scanRowDangerVisible(bad).length, 3);
+  const good = `
+    cart.className = 'row-action pantry-row__cart';
+    actions.className = 'row-actions';
+    more.className = 'row-action row-action--more';`;
+  assert.deepEqual(scanRowDangerVisible(good), []);
+});
+
 test('Scanner: row-text-capsule faengt die beschriftete Kapsel in einer Listenzeile und laesst den Dialogfuss durch', () => {
   const bad = `
     const actions = '<span><button type="button" class="btn btn--secondary" data-action="edit-shift-type">' + esc(t('common.edit')) + '</button>'
@@ -1167,6 +1392,97 @@ test('Scanner: sheet-drag faengt Touch-Gesten an Blatt und Tafel ausserhalb des 
 
 const { rowActionHtml } = await import('../public/utils/row-action.js');
 
+test('Scanner: row-endzone-order faengt den Griff vor dem Mehr-Knopf und die Aktion dahinter, laesst [Aktion][Mehr][Griff] durch', () => {
+  const griffZuerst = '<div class="list-row__actions"><button class="row-action list-row__drag" aria-label="x"><i data-lucide="grip-vertical"></i></button>${rowMenuHtml({ id: \'m\', label: l, items })}</div>';
+  assert.equal(scanRowEndzoneOrder(griffZuerst).length, 1);
+  const aktionDahinter = '<div>${rowMenuHtml({ id: \'m\', label: l, items })}${rowActionHtml({ icon: \'phone\', label: l })}</div>';
+  assert.equal(scanRowEndzoneOrder(aktionDahinter).length, 1);
+  const kanon = '<div>${rowActionHtml({ icon: \'phone\', label: l })}${rowMenuHtml({ id: \'m\', label: l, items })}<button class="row-action list-row__drag" aria-label="x"><i data-lucide="grip-vertical"></i></button></div>';
+  assert.deepEqual(scanRowEndzoneOrder(kanon), []);
+});
+
+test('Scanner: row-primary-count faengt zwei sichtbare Handlungen und laesst eine plus Mehr-Knopf durch', () => {
+  const zwei = '<div>${rowActionHtml({ icon: \'calendar-clock\', label: l })}${rowActionHtml({ icon: \'x\', label: l })}</div>';
+  assert.equal(scanRowPrimaryCount(zwei).length, 1);
+  const eine = '<div>${rowActionHtml({ icon: \'phone\', label: l })}${rowMenuHtml({ id: \'m\', label: l, items })}</div>';
+  assert.deepEqual(scanRowPrimaryCount(eine), []);
+});
+
+test('Scanner: row-chevron-with-menu faengt den Wegweiser am Oeffner einer Zeile mit Mehr-Knopf, laesst reine Navigation durch', () => {
+  const rezept = `
+function rowEl(r) {
+  const toggle = document.createElement('button');
+  toggle.className = 'list-row__main--interactive recipe-row__toggle';
+  toggle.insertAdjacentHTML('beforeend',
+    '<i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>');
+  more.className = 'row-action popover-menu__trigger';
+}
+`;
+  assert.equal(scanRowChevronWithMenu(rezept).length, 1);
+  const navigation = `
+function areaRow(a) {
+  return \`<a class="list-row" href="/x"><span class="list-row__main">\${a}</span><i data-lucide="chevron-right" aria-hidden="true"></i></a>\`;
+}
+`;
+  assert.deepEqual(scanRowChevronWithMenu(navigation), []);
+});
+
+/* D10, DRITTER SATZ: DIE GANZE ZEILE OEFFNET (list-row.css). Gemessen vorher
+ * (390px, Tipp auf Metazeile/Polster/Avatar, nicht auf ein Steuerelement):
+ * in Aufgaben, Rezepten, Vorrat, Geburtstagen, Inventar, Kontakten und
+ * Haushaltshilfe ging NICHTS auf - nur der Titel (Aufgaben 29 % der Flaeche)
+ * bzw. der Hauptteil oeffnete. Gegen den Stand davor rot gesehen. */
+test('D10: der Oeffner einer Zeile streckt sich ueber die ganze Zeile, Steuerelemente stehen darueber', () => {
+  const css = readFileSync(join(PUBLIC, 'styles/list-row.css'), 'utf8');
+  const rules = [...eachRule(css)];
+  const row = rules.filter((r) => r.selector.trim() === '.list-row' && !r.at.length);
+  assert.ok(row.some((r) => /position:\s*relative/.test(r.body) && /isolation:\s*isolate/.test(r.body)),
+    '.list-row ist der Bezugsrahmen der Strecke und ihr eigener Stapelkontext');
+  const stretch = rules.find((r) => /\.list-row :is\(\.u-row-title, \.list-row__main--interactive\)::after/.test(r.selector));
+  assert.ok(stretch, 'das ::after des Oeffners (Zeilentitel oder antippbarer Hauptteil)');
+  assert.match(stretch.body, /content:\s*""/);
+  assert.match(stretch.body, /position:\s*absolute/);
+  assert.match(stretch.body, /inset:\s*0/);
+  const raise = rules.find((r) => /^:where\(\.list-row :is\(/.test(r.selector.trim()));
+  assert.ok(raise, 'die Steuerelemente der Zeile stehen ueber der Strecke - mit Spezifitaet null (:where)');
+  for (const el of ['a[href]', 'button', 'input', 'select', 'label', '[role="button"]', '[role="checkbox"]', '[role="switch"]']) {
+    assert.ok(raise.selector.includes(el), `${el} steht ueber der Strecke`);
+  }
+  assert.match(raise.selector, /:not\(\.u-row-title, \.list-row__main--interactive\)/, 'der Oeffner selbst nicht');
+  assert.match(raise.body, /position:\s*relative/);
+  assert.match(raise.body, /z-index:\s*1/);
+});
+
+test('D10: kein Modul stellt den Oeffner einer Zeile selbst auf position - die Strecke endete sonst an ihm', () => {
+  // Die Oeffner im Bestand: Zeilentitel und antippbarer Hauptteil, dazu die
+  // Modulklassen, die diese Elemente tragen.
+  const OPENERS = /\.(?:u-row-title|list-row__main--interactive|task-card__title|recipe-row__toggle|contact-item__open|pantry-row__main|documents-folder-item__select|subscription-card__main|housekeeping-task__body)(?![\w-])/;
+  const found = [];
+  for (const { file, src } of CSS) {
+    for (const rule of eachRule(src)) {
+      for (const part of rule.selector.split(/,(?![^(]*\))/).map((x) => x.trim())) {
+        if (part.includes('::') || /:(?:before|after)\b/.test(part)) continue;
+        // Das Subjekt ohne `:not(...)`: die Hebe-Regel nennt die Oeffner, um
+        // sie AUSZUNEHMEN.
+        const last = (part.split(/\s+(?![^(]*\))|>|\+|~/).filter(Boolean).pop() ?? '').replace(/:not\([^)]*\)/g, '');
+        if (!OPENERS.test(last)) continue;
+        const pos = rule.body.match(/(?:^|;|\s)position:\s*(relative|absolute|fixed|sticky)/);
+        if (pos) found.push(`${file}: ${part} { position: ${pos[1]} }`);
+      }
+    }
+  }
+  assert.deepEqual(found, []);
+});
+
+test('Scanner: form-novalidate faengt das Formular mit Feldregeln ohne novalidate, laesst maxlength und novalidate durch', () => {
+  assert.equal(scanFormNovalidate('<form id="a"><input required></form>').length, 1);
+  assert.equal(scanFormNovalidate('<form id="a" novalidate><input required></form>').length, 0);
+  assert.equal(scanFormNovalidate('<form id="a"><input maxlength="64"></form>').length, 0);
+  const dom = "function f() {\n  const form = document.createElement('form');\n  form.insertAdjacentHTML('beforeend', '<input type=\"url\" required>');\n}\n";
+  assert.equal(scanFormNovalidate(dom).length, 1);
+  assert.equal(scanFormNovalidate(dom.replace("('form');", "('form');\n  form.noValidate = true;")).length, 0);
+});
+
 test('rowActionHtml: type=button, Name mit Objekt escaped, Ton als Modifier, Icon stumm', () => {
   const html = rowActionHtml({ icon: 'trash-2', label: 'Kategorie "Obst" <loeschen>', action: 'delete', tone: 'danger', attrs: { 'data-id': 7 } });
   assert.match(html, /^<button type="button" class="row-action row-action--danger"/);
@@ -1240,12 +1556,19 @@ test('Zeilenaktionen sind dauerhaft sichtbar: keine Regel blendet einen Aktions-
   const NOT_ROW_ACTIONS = new Map([
     ['.fab-actions', 'Aufklapp-Menue der Schnellaktionen (dashboard.css), keine Zeilenaktion'],
     ['.meal-card__actions', 'Essenskarte im 148px-Slot des Wochenrasters, eigene Grammatik (meals.css, benannt in scanRowAction)'],
+    // R21 S8: die Faltzeile der Kueche (layout.css, R17 K1) gleitet angedockt als
+    // GANZE Werkzeugzeile hinter die Leiste; ihr Inhalt blendet mit. Bis R21 stand
+    // dort `> *` - derselbe Knoten, nur ohne Namen (der Universalselektor hinter
+    // :has() machte jede Einfuegung zur Stilrunde ueber das ganze Dokument).
+    ['.page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools)',
+      'Faltzeile: die ganze Werkzeugzeile gleitet hinter die Leiste, keine Zeilenaktion'],
   ]);
   const hidden = [];
   for (const { file, src } of CSS) {
     for (const rule of eachRule(src)) {
       if (!/(?:^|;|\s)opacity\s*:\s*0(?![.\d])/.test(rule.body)) continue;
-      for (const part of rule.selector.split(',').map((x) => x.trim().replace(/\s+/g, ' '))) {
+      // Kommas in Klammern (`:is(a, b)`) trennen keine Selektoren.
+      for (const part of rule.selector.split(/,(?![^(]*\))/).map((x) => x.trim().replace(/\s+/g, ' '))) {
         if (!/(?:__actions|row-actions|row-action)(?![\w-])/.test(part)) continue;
         if (NOT_ROW_ACTIONS.has(part)) continue;
         hidden.push(`${file}: ${part}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
@@ -1282,6 +1605,37 @@ const PENDING = {
     'public/pages/documents.js': 1,
   },
   'row-text-capsule': {},
+  // --- R21 (Critique 2026-10-21), D10 Zeilen-Endzone, nur nach UNTEN. ---
+  // Bestand: die VERWALTER (Auf/Ab-Paar vor Bearbeiten und Loeschen) - dieselben
+  // Listen, die row-danger-visible fuehrt. Wer einen anfasst, stellt den Griff
+  // ans Ende und senkt die Zahl. Gegen den Stand vor R21 rot gesehen: Einkauf
+  // (Griff vor dem Mehr-Knopf).
+  'row-endzone-order': {
+    'public/pages/subscriptions.js': 1,
+    'public/settings/pages/admin-family.js': 1,
+  },
+  // Bestand: dieselben Verwalter-, Formular- und Kommentarzeilen mit Stift und
+  // Papierkorb wie row-danger-visible; dazu zwei benannte Ausnahmen in
+  // documents.js - die Leiste der KARTE (renderActions: Auge, Herunterladen;
+  // in der Zeile blendet documents.css das Auge aus) und die Werkzeugleiste
+  // des Betrachters (wie row-action-count) - und housekeeping.js, wo zwei
+  // Zweige einer Bedingung stehen (Profil ODER Bearbeiten, nie beide). Gegen
+  // den Stand vor R21 rot gesehen: die Konten der Belohnungen (Plan + Schliessen).
+  'row-primary-count': {
+    'public/components/tag-manager.js': 1,
+    'public/components/task-detail.js': 1,
+    'public/pages/documents.js': 2,
+    'public/pages/health-fasting.js': 1,
+    'public/pages/health.js': 1,
+    'public/pages/housekeeping.js': 1,
+    'public/pages/subscriptions.js': 1,
+    'public/pages/tasks.js': 1,
+    'public/settings/pages/personal-calendar-subscriptions.js': 1,
+  },
+  // Leer seit R21: gegen den Stand davor rot gesehen (Rezeptzeile).
+  'row-chevron-with-menu': {},
+  // Leer seit R21 S9a (28 Formulare umgestellt): gegen den Stand davor rot gesehen.
+  'form-novalidate': {},
   // BESTAND 2026-10-07 (R18), nur nach UNTEN: Zeilen, die ihren Papierkorb
   // noch dauerhaft zeigen. Die Kette hat die im Auftrag genannten Listen
   // umgestellt (Einkauf, Geburtstage, Schichtplan, Darlehen, Aufgaben,
@@ -1355,6 +1709,10 @@ const RULES = {
   'row-action': { files: JS, scan: (s) => scanRowAction(s), canon: '`.row-action` / `.row-action--danger` (utils/row-action.js `rowActionHtml`)' },
   'row-action-name': { files: JS, scan: (s) => scanRowActionName(s), canon: 'aria-label mit Objekt, z. B. `t(\'common.deleteNamed\', { name })`' },
   'row-action-count': { files: JS, scan: (s) => scanRowActionCount(s), canon: 'hoechstens zwei sichtbare `.row-action` je Zeile, der Rest in `rowMenuHtml()` (utils/row-action.js)' },
+  'row-endzone-order': { files: JS, scan: (s) => scanRowEndzoneOrder(s), canon: 'Endzone [eine Handlung][Mehr-Knopf][Griff] - der Griff zuletzt, keine Aktion hinter dem Mehr-Knopf (DESIGN.md D10)' },
+  'row-primary-count': { files: JS, scan: (s) => scanRowPrimaryCount(s), canon: 'hoechstens EINE sichtbare Handlung je Zeile, der Rest in `rowMenuHtml()` (DESIGN.md D10)' },
+  'form-novalidate': { files: JS, scan: (s) => scanFormNovalidate(s), canon: '`<form novalidate>` + `reportFieldErrors(constraintErrors(form))` (components/modal.js) - keine Browser-Blase' },
+  'row-chevron-with-menu': { files: JS, scan: (s) => scanRowChevronWithMenu(s), canon: 'Chevron nur an reiner Navigation; eine Zeile mit Mehr-Knopf traegt keinen (DESIGN.md D10)' },
   'row-text-capsule': { files: JS, scan: (s) => scanRowTextCapsule(s), canon: 'Bearbeiten/Loeschen einer Listenzeile = `rowMenuHtml()`, keine beschriftete `.btn`-Kapsel' },
   'row-danger-visible': { files: JS, scan: (s) => scanRowDangerVisible(s), canon: 'Loeschen einer Zeile = Eintrag in `rowMenuHtml()` (`danger: true`), kein sichtbarer Papierkorb' },
   'search-field': { files: JS, scan: (s) => scanSearchField(s), canon: '`renderPageSearch()` aus utils/page-search.js (gefuellte Kapsel)' },

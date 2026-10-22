@@ -784,7 +784,17 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false, e
       }
       renderTabs(container);
     }
-    reportError(err, container);
+    // ZURUECKGEROLLT HEISST: DIESER ARTIKEL, DIESER STAND, NOCH EINMAL (Critique
+    // R21, D15). Wo die eigene Absicht zurueckgenommen wurde, nennt der Satz
+    // den Artikel und wie er jetzt wieder steht. Hat jemand anderes dasselbe
+    // getan (die Absicht ist erfuellt, die Zeile steht richtig), stimmt "wieder
+    // offen" nicht - dort bleibt der allgemeine Satz.
+    const name = state.items.find((i) => i.id === id)?.name;
+    if (intent && name) {
+      reportError(err, container, newVal ? 'common.errorCheckRolledBack' : 'common.errorUncheckRolledBack', { name });
+    } else {
+      reportError(err, container);
+    }
   }
   return undefined;
 }
@@ -1580,7 +1590,23 @@ function renderItem(item) {
              vorher hingen die zwei Buttons als direkte Flex-Kinder in der Zeile,
              wodurch die Bedienzone in jedem Tab anders zusammengesetzt war. -->
         <div class="list-row__actions">
-          ${ro ? renderReadActions(item) : `<!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
+          ${ro ? renderReadActions(item) : `${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
+               utils/row-action.js): Stift und Papierkorb standen in jeder der
+               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
+               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
+               widerrufbar (Undo-Toast) und per Wischen erreichbar.
+               MEHR VOR DEM GRIFF (R21, D10 Zeilen-Endzone): der Griff steht
+               in jeder sortierbaren Liste ganz rechts, wie in den Aufgaben -
+               hier stand er als einziges Modul vor dem Mehr-Knopf. */ ''}
+          ${rowMenuHtml({
+            id: `shopping-item-menu-${item.id}`,
+            label: t('common.moreActionsNamed', { name: item.name }),
+            items: [
+              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
+              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+            ],
+          })}
+          <!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
                wie im Kategorie-Manager: dort steht daneben ein Auf/Ab-Paar als
                Tastaturpfad, hier trägt der Griff ihn selbst (Pfeiltasten bei
                Fokus). Die Einkaufszeile hat schon Abhaken, Details, Löschen und
@@ -1591,19 +1617,7 @@ function renderItem(item) {
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
           </button>
-${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
-               utils/row-action.js): Stift und Papierkorb standen in jeder der
-               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
-               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
-               widerrufbar (Undo-Toast) und per Wischen erreichbar. */ ''}
-          ${rowMenuHtml({
-            id: `shopping-item-menu-${item.id}`,
-            label: t('common.moreActionsNamed', { name: item.name }),
-            items: [
-              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
-              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
-            ],
-          })}`}
+`}
         </div>
       </div>
     </div>`;
@@ -2381,6 +2395,26 @@ function syncGroupChrome(listEl) {
   });
 }
 
+/**
+ * DIE ZAEHLER, WIE SIE NACH DEM UMZUG STEHEN (Critique R21, D3). Sie zogen erst
+ * mit `syncGroupChrome` nach dem Austritt nach - gemessen ~1,7s nach dem Haken,
+ * 400ms nachdem die Zeile zu gehen begann. Jetzt nehmen sie den Stand im
+ * selben Frame an, in dem die Zeilen ausblenden: was bleibt, plus was
+ * ankommt. Nur die Zahl - ob eine Gruppe verschwindet, entscheidet weiter
+ * `syncGroupChrome` nach dem Umzug.
+ */
+function previewGroupCounts(listEl, moves) {
+  const leaving = new Set(moves.map((m) => m.row));
+  listEl.querySelectorAll('.list-group').forEach((groupEl) => {
+    const countEl = groupEl.querySelector('.list-group__count');
+    if (!countEl) return;
+    const stay = Array.from(groupEl.querySelectorAll('.row-carrier > .swipe-row')).filter((r) => !leaving.has(r)).length;
+    const arrive = moves.filter((m) => groupEl.contains(m.to)).length;
+    const text = String(stay + arrive);
+    if (countEl.textContent !== text) countEl.textContent = text;
+  });
+}
+
 /** Steht das Element im Bild - weder selbst noch ueber einen Vorfahren `hidden`? */
 function shown(el) {
   return Boolean(el) && !el.closest('[hidden]');
@@ -2490,7 +2524,10 @@ function settleItemPlacements(container, ids, { animate = true } = {}) {
   };
 
   // Aus einem zugeklappten Traeger gibt es nichts zusammenzuklappen.
-  const closing = animate ? leaving.filter((row) => !row.parentElement.hidden).map((row) => collapseOut(row)) : [];
+  const closingRows = animate ? leaving.filter((row) => !row.parentElement.hidden) : [];
+  // Die Zaehler wechseln im Moment des Austritts, nicht nach ihm (D3).
+  if (closingRows.length) previewGroupCounts(listEl, first);
+  const closing = closingRows.map((row) => collapseOut(row));
   if (closing.length) Promise.all(closing).then(move);
   else move();
 }
@@ -3917,9 +3954,10 @@ function wireLiveUpdates(container, routeSignal) {
  * @param {unknown} err
  * @param {Element} container
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ * @param {Record<string, unknown>} [params] - Werte fuer diesen Satz
  */
-function reportError(err, container, fallbackKey) {
-  window.yuvomi.showToast(errorSentence(err, fallbackKey), 'danger');
+function reportError(err, container, fallbackKey, params) {
+  window.yuvomi.showToast(errorSentence(err, fallbackKey, params), 'danger');
   if (isGone(err)) reloadAfterGone(container);
 }
 

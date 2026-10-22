@@ -214,7 +214,7 @@
   color: var(--color-text-primary);
   transition: color var(--transition-fast);
 }
-.rw-standing__points { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.rw-standing__points { color: var(--color-text-secondary); }
 /* Der Punktestand ist die Hauptaussage seiner Zeile und trägt Label-Farbe: der
  * Modulton sagte hier „Belohnungen" auf einer Seite, deren Titel und Siegel das
  * schon beantwortet haben (Herkunfts-Regel). Was die Zahl auszeichnet, ist ihr
@@ -314,7 +314,7 @@
   transform: scaleX(var(--rw-progress, 0));
   transition: transform var(--duration-xl) var(--ease-out);
 }
-.rw-progress__label { margin: 0; font-size: var(--text-xs); color: var(--color-text-secondary); }
+.rw-progress__label { margin: 0; color: var(--color-text-secondary); }
 .rw-progress__label--muted { color: var(--color-text-tertiary); }
 
 /* --------------------------------------------------------
@@ -456,7 +456,7 @@
 .rw-pending + .rw-pending { border-top: 1px solid var(--color-border-subtle); }
 .rw-pending__text { flex: 1 1 auto; min-width: 0; }
 .rw-pending__title { margin: 0; font-weight: 600; color: var(--color-text-primary); }
-.rw-pending__meta { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-secondary); }
+.rw-pending__meta { margin: var(--space-1) 0 0; color: var(--color-text-secondary); }
 .rw-pending__actions { display: flex; gap: var(--space-2); flex: 0 0 auto; }
 
 /* --------------------------------------------------------
@@ -628,7 +628,7 @@
    Modal-Bausteine
    -------------------------------------------------------- */
 .rw-modal-intro { margin: 0 0 var(--space-4); color: var(--color-text-secondary); font-size: var(--text-sm); }
-.rw-hint { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.rw-hint { margin: var(--space-1) 0 0; font-size: var(--type-caption); color: var(--color-text-tertiary); }
 .rw-emoji-input { text-align: center; font-size: var(--text-xl); }
 
 .rw-redeem-summary {

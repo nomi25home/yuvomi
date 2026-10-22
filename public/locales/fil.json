@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Walang tumutugma sa iyong paghahanap at mga filter.",
         "searchReset": "I-reset ang paghahanap",
         "passwordMinLength": "Hindi bababa sa 8 character.",
-        "savedReloadFailed": "Na-save ang pagbabago, pero hindi ma-refresh ang view. I-reload ang page kung may kulang."
+        "savedReloadFailed": "Na-save ang pagbabago, pero hindi ma-refresh ang view. I-reload ang page kung may kulang.",
+        "fieldNumber": "Maglagay ng numero.",
+        "fieldMin": "Hindi bababa sa {{min}}.",
+        "fieldMax": "Hindi hihigit sa {{max}}.",
+        "fieldWholeNumber": "Maglagay ng buong numero.",
+        "fieldStep": "Maglagay ng halaga sa hakbang na {{step}}.",
+        "fieldInvalid": "Suriin ang entry na ito.",
+        "errorCheckRolledBack": "Bukas muli ang \"{{name}}\" - hindi natuloy ang pag-check. Subukan ulit.",
+        "errorUncheckRolledBack": "Naka-check muli ang \"{{name}}\" - hindi natuloy ang pagbabalik. Subukan ulit."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -169,7 +177,9 @@
         "goTo": "Pumunta sa",
         "newSection": "Gumawa ng bago",
         "recentLabel": "Kamakailang binuksan",
-        "createTaskNamed": "Gawing gawain ang “{{title}}”"
+        "createTaskNamed": "Gawing gawain ang “{{title}}”",
+        "hintMove": "Pumili",
+        "hintOpen": "Buksan"
     },
     "dashboard": {
         "title": "Pangkalahatang-tanaw",
@@ -1313,6 +1323,7 @@
         "mvLabelPlaceholder": "Label (hal. trabaho)",
         "mvRemove": "Alisin ang entry",
         "birthdayLabel": "Kaarawan",
+        "showBirthday": "Ipakita sa mga kaarawan",
         "birthdayHint": "Lumalabas din sa kalendaryo sa pamamagitan ng pag-import ng kaarawan.",
         "phonePlaceholder": "+63 …",
         "phonePreview": "Preview: {{value}}",
@@ -1550,7 +1561,6 @@
         "metaLoadError": "Hindi ma-load ang mga kategorya ng badyet.",
         "addCategory": "+ Category",
         "addSubcategory": "+ Subcategory",
-        "moreDetails": "Iba pang detalye",
         "newCategoryPrompt": "Pangalan ng bagong kategorya:",
         "newSubcategoryPrompt": "Pangalan ng bagong subkategorya:",
         "categoryAddedToast": "Naidagdag ang kategorya.",
@@ -1860,6 +1870,7 @@
         "healthCycleSaved": "Na-save ang setting ng siklo.",
         "healthCyclePersonalLabel": "Ipakita ang cycle",
         "healthCyclePersonalHint": "Para lang sa sarili mong view. Kapag pinatay mo ito, makikita pa rin ng iba sa sambahayan ang cycle.",
+        "healthCycleSettingsHint": "Ang haba ng siklo, kontrasepsyon, mga paalala at pregnancy mode ay itinatakda sa pahina ng siklo.",
         "healthCyclePersonalHouseholdOff": "Kasalukuyang nakapatay ang cycle para sa buong sambahayan, kaya walang nakakakita nito.",
         "healthCyclePersonalSaved": "Na-save ang view ng siklo.",
         "pageRewardsModule": "Mga Gantimpala",
@@ -2192,7 +2203,7 @@
         "familyRoleGrandparent": "Lolo/Lola",
         "familyRoleRelative": "Kamag-anak",
         "familyRoleOther": "Miyembro ng pamilya",
-        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”.",
+        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”. Nakatago rin ang siklo; maipapakita ito sa mga personal na setting ng bata.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "Napapamahalaan ng mga system admin ang mga setting ng aplikasyon, integrasyon, API token at account ng pamilya.",
         "systemAdminBadge": "System admin",
@@ -2222,7 +2233,8 @@
         "languageTitle": "Wika",
         "dataLanguageLabel": "Wika ng mga naka-imbak na entry",
         "dataLanguageHint": "Wikang ginagamit ng Yuvomi kapag nag-iimbak ito ng mga entry na siya mismo ang gumawa, tulad ng mga kaganapan sa kaarawan. Naaapektuhan nito ang API, calendar feed at pag-sync, hindi ang ipinapakita dito.",
-        "dataLanguageAuto": "Awtomatiko ({{language}})",
+        "dataLanguageAuto": "Awtomatiko",
+        "hintWithCurrent": "Sa ngayon: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Mga administrator lamang ang makakapagtakda ng wika ng mga naka-imbak na entry.",
         "dataLanguageSaved": "Na-update ang wika ng mga naka-imbak na entry",
         "sectionMeals": "Plano ng Pagkain",
@@ -2916,6 +2928,7 @@
         "regionTitle": "Rehiyon / Format",
         "regionLabel": "Rehiyon",
         "regionHint": "Itinatakda ang pera, numero, petsa at format ng oras ayon sa rehiyon (hal. Switzerland: 1'234.50). Piliin ang \"Custom\" para i-configure sila nang isa-isa.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Mga administrator lamang ang makakapagpalit ng rehiyon at pera.",
         "formatsHouseholdHint": "Naaangkop sa buong sambahayan ang format ng petsa at oras. Maaari itong palitan ng bawat miyembro.",
         "regionCustom": "Custom",
@@ -3104,7 +3117,7 @@
         "timezoneTitle": "Time zone",
         "timezoneLabel": "Time zone ng sambahayan",
         "timezoneHint": "Umiiral saanman walang sariling zone ang isang oras: mga paalala, countdown, ang araw sa kalendaryong tinatawag na \"ngayon\", ang na-export na calendar feed, at ang mga event na ipinapadala sa Google o Outlook.",
-        "timezoneAuto": "Awtomatiko ({{zone}})",
+        "timezoneAuto": "Awtomatiko",
         "timezoneAdminOnly": "Mga administrator lamang ang makakapagpalit ng time zone.",
         "timezoneSaved": "Na-save ang time zone.",
         "timezoneMismatch": "Nasa {{browser}} ang browser mo, {{household}} ang gamit ng sambahayan.",
@@ -3155,6 +3168,7 @@
         "healthPreventionNotifyCaregiversSaved": "Na-save ang setting ng notification.",
         "healthVisibilityTitle": "Default na visibility",
         "healthVisibilityHint": "Kung ano ang panimulang halaga ng bagong entry. Mababago mo pa ito sa bawat entry.",
+        "healthVisibilityCaregivers": "Ang pinapayagang magtala para sa iyo ay nakakakita rin ng iyong mga pribadong entry, maliban sa talaarawan ng siklo. Itinatakda ito ng admin sa mga miyembro.",
         "healthVisibilityOther": "Iba pang bahagi",
         "healthVisibilityApply": "Baguhin din ang mga umiiral na entry",
         "healthVisibilityApplyHint": "Nai-save. Baguhin din ba ang mga umiiral na entry sa {{area}}?",
@@ -3287,10 +3301,12 @@
         "weatherPlaceTooShort": "Maglagay ng hindi bababa sa dalawang character.",
         "weatherPlaceNotFound": "Walang nahanap na lugar sa pangalang ito. Idagdag ang bansa, hal. “San Jose, Philippines”.",
         "weatherPlaceUnavailable": "Hindi maabot ang paghahanap ng lugar ngayon. Subukan ulit mamaya o ilagay nang mano-mano ang mga coordinate.",
-        "weatherManualTitle": "Mano-manong coordinate"
+        "weatherManualTitle": "Mano-manong coordinate",
+        "backupDropzoneTitleTouch": "I-tap para pumili ng backup file",
+        "installModuleDropzoneTitleTouch": "I-tap para pumili ng ZIP file"
     },
     "login": {
-        "tagline": "Maligayang pagbabalik sa iyong family planner.",
+        "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
         "usernameLabel": "Username",
         "passwordLabel": "Password",
         "loginButton": "Mag-log in",
@@ -3359,7 +3375,6 @@
         "unsavedChanges": "Itapon ang mga pagbabago?",
         "unsavedChangesDetail": "Mawawala ang mga inilagay mo sa form na ito.",
         "discardChanges": "Itapon",
-        "moreSettings": "Higit pang setting",
         "moreDetails": "Iba pang detalye"
     },
     "rrule": {
@@ -3464,6 +3479,7 @@
         "editTitle": "I-edit ang kaarawan",
         "nameLabel": "Pangalan",
         "birthDateLabel": "Petsa ng kapanganakan",
+        "showContact": "Ipakita ang contact",
         "nameDay": "Araw ng pangalan",
         "celebratesNameDay": "ipinagdiriwang ang araw ng pangalan",
         "nameDayLabel": "Araw ng pangalan (opsyonal)",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "Maligayang pagdating sa {{name}}",
-        "step1Body": "Ang iyong personal na family planner. Mga gawain, kalendaryo, pamimili at higit pa - nasa isang lugar lang.",
+        "step1Body": "Mga gawain, kalendaryo, pamimili at higit pa para sa iyong tahanan - mag-isa ka man, may kapareha o kasama ang pamilya. Nasa isang lugar lang.",
         "step2Title": "Nabigasyon at mga Modyul",
         "step2Body": "Dinadala ka ng bar sa ibaba nang direkta sa pinakamahahalagang bahagi. Makikita mo ang iba pang module sa ilalim ng “Higit pa”.",
         "step3Title": "Magsimula agad",
@@ -3931,7 +3947,10 @@
         "errorDmsAccountGone": "Wala na ang DMS account na ito.",
         "errorDmsDocumentGone": "Wala na sa DMS ang dokumentong ito.",
         "errorDmsAlreadyLinked": "Naka-link na ang dokumentong ito mula sa DMS.",
-        "errorDmsAlreadyStored": "Nakaimbak na sa isang DMS ang dokumentong ito."
+        "errorDmsAlreadyStored": "Nakaimbak na sa isang DMS ang dokumentong ito.",
+        "dropzoneTitleTouch": "I-tap para pumili ng file",
+        "viewerPrevNamed": "Nakaraang dokumento: {{name}}",
+        "viewerNextNamed": "Susunod na dokumento: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Wala",
@@ -4121,7 +4140,8 @@
         "errorVisitGone": "Wala na ang pagbisitang ito.",
         "errorTaskGone": "Wala na ang gawaing ito.",
         "errorAlreadyCheckedOut": "Naka-check out na ang katulong na ito.",
-        "errorAlreadyCheckedIn": "Naka-check in na ang katulong na ito."
+        "errorAlreadyCheckedIn": "Naka-check in na ang katulong na ito.",
+        "allVisitsInReport": "Lahat ng pagbisita sa ulat"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Buksan ang paghahanap gamit ang magnifier sa overview o sa \"Higit pa\".",
         "mobileSettings": "Matatagpuan ang mga setting sa ilalim ng \"Higit pa\".",
         "guideLink": "Gabay ng gumagamit",
-        "guideHint": "Pinapanatili ng komunidad, sa sariling repository - maaaring mahuli sa isang release."
+        "guideHint": "Pinapanatili ng komunidad. Bubukas sa bagong tab."
     },
     "changelog": {
         "title": "Changelog",
@@ -4379,8 +4399,9 @@
         "success": "Nabago na ang iyong password. Puwede ka nang mag-sign in.",
         "mismatch": "Hindi magkatugma ang mga password.",
         "tooShort": "Dapat may hindi bababa sa 8 karakter ang password.",
-        "invalidToken": "Hindi wasto o expired na ang link na ito.",
-        "missingToken": "Walang natagpuang wastong token."
+        "invalidToken": "Hindi wasto o expired na ang reset link na ito - humiling ng bago.",
+        "missingToken": "Kulang ang reset link na ito - humiling ng bago.",
+        "requestNew": "Humiling ng bagong link"
     },
     "email": {
         "host": "SMTP host",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Mga paparating na paalala",
                 "empty": "Wala nang dosis ngayong araw"
+            },
+            "brief": {
+                "changes": "Mula sa huling sukat: {{list}}.",
+                "latest": "Huling naitala: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} walang pagbabago"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Itala ang iyong unang regla para makita ang mga hula, kalendaryo at estadistika.",
             "emptyCta": "Itala ang unang regla",
             "personsLabel": "Tao",
-            "add": "Itala ang regla",
+            "add": "Magdagdag ng nakaraang regla",
             "loadError": "Hindi ma-load ang datos ng siklo.",
             "loadErrorDesc": "Pakisubukang muli mamaya.",
             "retry": "Subukang muli",
@@ -5406,15 +5433,14 @@
                 "family": "Pamilya"
             },
             "period": {
-                "add": "Itala ang regla",
+                "add": "Magdagdag ng nakaraang regla",
                 "edit": "I-edit ang regla",
                 "warningFuture": "Ang petsa ng simula ay nasa hinaharap - batay lang ang hula sa nakaraang mga siklo.",
                 "warningOverlap": "Nagsasapawan sa isang siklo na naitala na."
             },
             "dayLog": {
                 "title": "Itala ang araw",
-                "date": "Petsa",
-                "more": "Iba pang detalye"
+                "date": "Petsa"
             },
             "export": {
                 "csv": "I-export bilang CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Karaniwang haba ng siklo",
                 "periodLength": "Karaniwang haba ng regla",
                 "lutealLength": "Haba ng yugtong luteal",
+                "daysUnit": "araw",
                 "trackFertility": "Ipakita ang matabang panahon",
-                "autoHint": "Iwanang blangko para awtomatikong kalkulahin mula sa iyong kasaysayan.",
+                "autoHint": "Kapag iniwang blangko ang alinman sa dalawang field, kinukuwenta ng Yuvomi ang halaga mula sa mga regla na naitala mo.",
                 "remindPeriodDaysBefore": "Paalala sa regla",
                 "remindOff": "Naka-off",
                 "remindSameDay": "Sa araw mismo",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Pumili ng CSV file o mag-paste ng teksto.",
                 "error": "Nabigo ang pag-import."
             },
-            "discoveryHint": "Tip: mag-subscribe sa hinulaang cycle bilang ICS feed sa <a href=\"/settings/modules/calendar?section=personal-feeds\">Mga Setting → Mga Modyul → Kalendaryo</a>, o ipakita ang cycle widget sa <a href=\"/\">Pangkalahatang-tanaw</a> gamit ang customize mode nito."
+            "feedLink": "Mag-subscribe sa inaasahang siklo sa kalendaryo",
+            "widgetHint": "Idagdag ang tile ng siklo sa {{overview}} sa “{{customize}}”.",
+            "endBeforeStart": "Hindi maaaring mauna ang pagtatapos sa simula."
         },
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",
@@ -5542,6 +5571,7 @@
             "unitH": "oras"
         },
         "careBanner": "Nagtatala ka para kay {{name}}.",
+        "whoSees": "Sino ang nakakakita nito?",
         "nutrition": {
             "title": "Nutrisyon",
             "emptyTitle": "Wala pang naitalang nutrisyon",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "Sab",
         "weekdaySun": "Lin",
         "intervalLabelWeekly": "Bawat N linggo",
+        "intervalLabelMonthly": "Bawat N buwan",
         "anchorDateLabel": "Unang kolekta",
         "monthDayLabel": "Araw ng buwan",
         "monthDayLastDay": "Huling araw ng buwan",
@@ -6271,8 +6302,8 @@
         "success": "Nagawa na ang iyong account. Puwede ka nang mag-sign in.",
         "mismatch": "Hindi magkatugma ang mga password.",
         "tooShort": "Dapat may hindi bababa sa 8 karakter ang password.",
-        "invalidToken": "Hindi wasto, expired na, o nagamit na ang imbitasyong ito.",
-        "missingToken": "Walang natagpuang wastong token.",
+        "invalidToken": "Hindi wasto, expired na, o nagamit na ang imbitasyong ito - humingi ng bagong link.",
+        "missingToken": "Hindi wasto o expired na ang invitation link na ito - humingi ng bago.",
         "usernameRequired": "Pumili ng username.",
         "usernameInvalid": "Dapat may 3 hanggang 64 na karakter ang username at maaari lamang maglaman ng mga titik, numero, tuldok, gitling at underscore.",
         "usernameTaken": "Nagamit na ang username na ito.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Trabaho",
         "templateSchool": "Paaralan",
         "templateUniversity": "Unibersidad",
-        "overview": "Paghahambing",
+        "overview": "Pangkalahatang-tanaw",
         "overviewPeopleLabel": "Ikumpara ang mga tao",
-        "overviewClearSelection": "I-clear ang pinili",
         "continuesUntil": "…magpapatuloy hanggang {{time}}",
         "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
         "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Pangalan ng device na ito (opsyonal)",
         "labelHint": "Nakakatulong itong makilala mamaya kung aling device ang tinutukoy.",
         "submit": "Ipares",
-        "failed": "Hindi balido ang pairing code na ito."
+        "failed": "Hindi balido ang pairing code na ito.",
+        "codeRequired": "Ilagay ang pairing code na nasa Settings."
     }
 }

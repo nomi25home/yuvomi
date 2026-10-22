@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Inget matchar din sökning och dina filter.",
         "searchReset": "Återställ sökning",
         "passwordMinLength": "Minst 8 tecken.",
-        "savedReloadFailed": "Ändringen är sparad, men vyn kunde inte uppdateras. Läs in sidan igen om något saknas."
+        "savedReloadFailed": "Ändringen är sparad, men vyn kunde inte uppdateras. Läs in sidan igen om något saknas.",
+        "fieldNumber": "Ange ett tal.",
+        "fieldMin": "Minst {{min}}.",
+        "fieldMax": "Högst {{max}}.",
+        "fieldWholeNumber": "Ange ett heltal.",
+        "fieldStep": "Ange ett värde i steg om {{step}}.",
+        "fieldInvalid": "Kontrollera den här uppgiften.",
+        "errorCheckRolledBack": "”{{name}}” är öppen igen - avbockningen gick inte igenom. Försök igen.",
+        "errorUncheckRolledBack": "”{{name}}” är avbockad igen - att ta tillbaka den gick inte. Försök igen."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Etikett (t.ex. arbete)",
         "mvRemove": "Ta bort post",
         "birthdayLabel": "Födelsedag",
+        "showBirthday": "Visa i födelsedagar",
         "birthdayHint": "Visas också i kalendern via födelsedagsimporten.",
         "phonePlaceholder": "+46 …",
         "phonePreview": "Förhandsvisning: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "Budgetkategorier kunde inte läsas in.",
         "addCategory": "+ kategori",
         "addSubcategory": "+ underkategori",
-        "moreDetails": "Fler uppgifter",
         "newCategoryPrompt": "Namn på den nya kategorin:",
         "newSubcategoryPrompt": "Namn på den nya underkategorin:",
         "categoryAddedToast": "Kategori tillagd.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Cykelinställning sparad.",
         "healthCyclePersonalLabel": "Visa cykel",
         "healthCyclePersonalHint": "Gäller bara din egen vy. Stänger du av den förblir cykeln synlig för de andra i hushållet.",
+        "healthCycleSettingsHint": "Cykellängd, preventivmedel, påminnelser och graviditetsläge ställer du in på cykelsidan.",
         "healthCyclePersonalHouseholdOff": "Cykeln är just nu avstängd för hela hushållet, så den visas inte för någon.",
         "healthCyclePersonalSaved": "Cykelvyn sparad.",
         "pageRewardsModule": "Belöningar",
@@ -2038,7 +2047,7 @@
         "familyRoleGrandparent": "Far-/morförälder",
         "familyRoleRelative": "Släkting",
         "familyRoleOther": "Familjemedlem",
-        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”.",
+        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”. Även cykeln är dold; den kan visas i barnets personliga inställningar.",
         "systemAdminLabel": "Systemadministratör",
         "systemAdminHint": "Systemadministratörer kan hantera inställningar, integrationer, API-token och familjekonton.",
         "systemAdminBadge": "Systemadmin",
@@ -2068,7 +2077,8 @@
         "languageTitle": "Språk",
         "dataLanguageLabel": "Språk för sparade poster",
         "dataLanguageHint": "Språk som Yuvomi använder när det sparar poster som skapas automatiskt, till exempel födelsedagshändelser. Påverkar API, kalenderflöde och synkronisering, inte visningen här.",
-        "dataLanguageAuto": "Automatiskt ({{language}})",
+        "dataLanguageAuto": "Automatiskt",
+        "hintWithCurrent": "Just nu: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Endast administratörer kan ange språket för sparade poster.",
         "dataLanguageSaved": "Språket för sparade poster har uppdaterats",
         "sectionMeals": "Måltidsplan",
@@ -2863,6 +2873,7 @@
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Ställer in valuta samt tal-, datum- och tidsformat efter regionen (t.ex. Schweiz: 1'234.50). Välj ”Anpassad” för att ställa in dem individuellt.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Endast administratörer kan ändra region och valuta.",
         "formatsHouseholdHint": "Datum- och tidsformat gäller hela hushållet. Alla medlemmar kan ändra dem.",
         "regionCustom": "Anpassad",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Tidszon",
         "timezoneLabel": "Hushållets tidszon",
         "timezoneHint": "Gäller överallt där en tid inte bär en egen zon: påminnelser, nedräkningar, kalenderdagen som kallas ”idag”, det exporterade kalenderflödet och händelser som skickas till Google eller Outlook.",
-        "timezoneAuto": "Automatiskt ({{zone}})",
+        "timezoneAuto": "Automatiskt",
         "timezoneAdminOnly": "Endast administratörer kan ändra tidszonen.",
         "timezoneSaved": "Tidszonen sparades.",
         "timezoneMismatch": "Din webbläsare står i {{browser}}, hushållet räknar i {{household}}.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Aviseringsinställning sparad.",
         "healthVisibilityTitle": "Standardsynlighet",
         "healthVisibilityHint": "Vad nya poster börjar som. Du kan ändra det för varje post.",
+        "healthVisibilityCaregivers": "Den som får registrera åt dig ser även dina privata poster, utom cykeldagboken. En administratör bestämmer det under medlemmar.",
         "healthVisibilityOther": "Andra områden",
         "healthVisibilityApply": "Ändra även befintliga poster",
         "healthVisibilityApplyHint": "Sparat. Ska de befintliga posterna under {{area}} också ändras?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "Skriv minst två tecken.",
         "weatherPlaceNotFound": "Ingen plats med det namnet hittades. Lägg till landet, t.ex. ”Lund, Sverige”.",
         "weatherPlaceUnavailable": "Platssökningen går inte att nå just nu. Försök igen om en stund eller ange koordinaterna för hand.",
-        "weatherManualTitle": "Koordinater för hand"
+        "weatherManualTitle": "Koordinater för hand",
+        "backupDropzoneTitleTouch": "Tryck för att välja en säkerhetskopia",
+        "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil"
     },
     "login": {
-        "tagline": "Välkommen tillbaka till din familjeplanerare.",
+        "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
         "usernameLabel": "Användarnamn",
         "passwordLabel": "Lösenord",
         "loginButton": "Logga in",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "Ignorera ändringar?",
         "unsavedChangesDetail": "Dina uppgifter i formuläret går förlorade.",
         "discardChanges": "Ignorera",
-        "moreSettings": "Fler inställningar",
         "moreDetails": "Fler uppgifter"
     },
     "rrule": {
@@ -3468,7 +3481,9 @@
         "goTo": "Gå till",
         "newSection": "Skapa ny",
         "recentLabel": "Nyligen öppnade",
-        "createTaskNamed": "Skapa ”{{title}}” som uppgift"
+        "createTaskNamed": "Skapa ”{{title}}” som uppgift",
+        "hintMove": "Välj",
+        "hintOpen": "Öppna"
     },
     "birthdays": {
         "inDays_one": "om {{count}} dag",
@@ -3487,6 +3502,7 @@
         "editTitle": "Redigera födelsedag",
         "nameLabel": "Namn",
         "birthDateLabel": "Födelsedatum",
+        "showContact": "Visa kontakt",
         "nameDay": "Namnsdag",
         "celebratesNameDay": "firar namnsdag",
         "nameDayLabel": "Namnsdag (valfritt)",
@@ -3581,7 +3597,7 @@
     },
     "onboarding": {
         "step1Title": "Välkommen till {{name}}",
-        "step1Body": "Din personliga familjeplanerare. Uppgifter, kalender, shopping och mer - allt på ett ställe.",
+        "step1Body": "Uppgifter, kalender, inköp och mer för ditt hushåll - oavsett om du bor ensam, som par eller som familj. Allt på ett ställe.",
         "step2Title": "Navigering och moduler",
         "step2Body": "Fältet längst ner tar dig direkt till de viktigaste områdena. Alla andra moduler hittar du under ”Mer”.",
         "step3Title": "Kom igång snabbt",
@@ -3867,7 +3883,10 @@
         "errorDmsAccountGone": "Det här DMS-kontot finns inte längre.",
         "errorDmsDocumentGone": "Det här dokumentet finns inte längre i DMS.",
         "errorDmsAlreadyLinked": "Det här DMS-dokumentet är redan länkat.",
-        "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS."
+        "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS.",
+        "dropzoneTitleTouch": "Tryck för att välja en fil",
+        "viewerPrevNamed": "Föregående dokument: {{name}}",
+        "viewerNextNamed": "Nästa dokument: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Kök",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "Det här besöket finns inte längre.",
         "errorTaskGone": "Den här uppgiften finns inte längre.",
         "errorAlreadyCheckedOut": "Den här städaren är redan utcheckad.",
-        "errorAlreadyCheckedIn": "Den här städaren är redan incheckad."
+        "errorAlreadyCheckedIn": "Den här städaren är redan incheckad.",
+        "allVisitsInReport": "Alla besök i rapporten"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Öppna sök med förstoringsglaset på översikten eller via ”Mer”.",
         "mobileSettings": "Inställningar hittar du under ”Mer”.",
         "guideLink": "Användarhandbok",
-        "guideHint": "Underhålls av communityn, i ett eget repository - kan ligga efter en release."
+        "guideHint": "Underhålls av communityn. Öppnas i en ny flik."
     },
     "changelog": {
         "title": "Ändringar",
@@ -4379,8 +4399,9 @@
         "success": "Ditt lösenord har ändrats. Du kan logga in nu.",
         "mismatch": "Lösenorden stämmer inte överens.",
         "tooShort": "Lösenordet måste vara minst 8 tecken långt.",
-        "invalidToken": "Länken är ogiltig eller har gått ut.",
-        "missingToken": "Ingen giltig token hittades."
+        "invalidToken": "Den här återställningslänken är ogiltig eller har gått ut - begär en ny.",
+        "missingToken": "Den här återställningslänken är ofullständig - begär en ny.",
+        "requestNew": "Begär en ny länk"
     },
     "email": {
         "host": "SMTP-värd",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Nästa påminnelser",
                 "empty": "Inga fler intag idag"
+            },
+            "brief": {
+                "changes": "Sedan senaste mätningen: {{list}}.",
+                "latest": "Senast registrerat: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}}: oförändrat"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Registrera din första mens för att se prognoser, kalender och statistik.",
             "emptyCta": "Registrera första mens",
             "personsLabel": "Person",
-            "add": "Registrera mens",
+            "add": "Lägg till tidigare mens",
             "loadError": "Cykeldata kunde inte laddas.",
             "loadErrorDesc": "Försök igen senare.",
             "retry": "Försök igen",
@@ -5406,15 +5433,14 @@
                 "family": "Familj"
             },
             "period": {
-                "add": "Registrera mens",
+                "add": "Lägg till tidigare mens",
                 "edit": "Redigera mens",
                 "warningFuture": "Startdatumet ligger i framtiden - prognoser baseras endast på tidigare cykler.",
                 "warningOverlap": "Överlappar en redan loggad cykel."
             },
             "dayLog": {
                 "title": "Logga dag",
-                "date": "Datum",
-                "more": "Fler uppgifter"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Exportera som CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Genomsnittlig cykellängd",
                 "periodLength": "Genomsnittlig menslängd",
                 "lutealLength": "Lutealfasens längd",
+                "daysUnit": "dagar",
                 "trackFertility": "Visa fertilt fönster",
-                "autoHint": "Lämna tomt = beräknas automatiskt från din historik.",
+                "autoHint": "Lämnar du ett av de två fälten tomt räknar Yuvomi ut värdet från de mens du har registrerat.",
                 "remindPeriodDaysBefore": "Menspåminnelse",
                 "remindOff": "Av",
                 "remindSameDay": "Samma dag",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Välj en CSV-fil eller klistra in text.",
                 "error": "Importen misslyckades."
             },
-            "discoveryHint": "Tips: prenumerera på den förutspådda cykeln som ICS-flöde under <a href=\"/settings/modules/calendar?section=personal-feeds\">Inställningar → Moduler → Kalender</a>, eller visa cykel-widgeten på <a href=\"/\">Översikt</a> via dess anpassningsläge."
+            "feedLink": "Prenumerera på den förväntade cykeln i kalendern",
+            "widgetHint": "Lägg till cykelrutan i {{overview}} under ”{{customize}}”.",
+            "endBeforeStart": "Slutet får inte vara före början."
         },
         "duration": {
             "hm": "{{hours}} tim {{minutes}} min",
@@ -5542,6 +5571,7 @@
             "unitH": "tim"
         },
         "careBanner": "Du registrerar åt {{name}}.",
+        "whoSees": "Vem ser det här?",
         "nutrition": {
             "title": "Näringsvärden",
             "emptyTitle": "Inga näringsvärden registrerade än",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "lör",
         "weekdaySun": "sön",
         "intervalLabelWeekly": "Var N:e vecka",
+        "intervalLabelMonthly": "Var N:e månad",
         "anchorDateLabel": "Första hämtningen",
         "monthDayLabel": "Dag i månaden",
         "monthDayLastDay": "Sista dagen i månaden",
@@ -6271,8 +6302,8 @@
         "success": "Ditt konto har skapats. Du kan logga in nu.",
         "mismatch": "Lösenorden stämmer inte överens.",
         "tooShort": "Lösenordet måste vara minst 8 tecken långt.",
-        "invalidToken": "Inbjudan är ogiltig, har gått ut eller har redan använts.",
-        "missingToken": "Ingen giltig token hittades.",
+        "invalidToken": "Inbjudan är ogiltig, har gått ut eller har redan använts - be om en ny länk.",
+        "missingToken": "Den här inbjudningslänken är ogiltig eller har gått ut - be om en ny.",
         "usernameRequired": "Välj ett användarnamn.",
         "usernameInvalid": "Användarnamnet måste vara 3 till 64 tecken långt och får bara innehålla bokstäver, siffror, punkter, bindestreck och understreck.",
         "usernameTaken": "Användarnamnet är redan taget.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Arbete",
         "templateSchool": "Skola",
         "templateUniversity": "Universitet",
-        "overview": "Jämförelse",
+        "overview": "Översikt",
         "overviewPeopleLabel": "Jämför personer",
-        "overviewClearSelection": "Rensa urvalet",
         "continuesUntil": "…fortsätter till {{time}}",
         "overviewEmptyTitle": "Välj personer att jämföra",
         "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Den här enhetens namn (valfritt)",
         "labelHint": "Hjälper dig att senare känna igen vilken enhet som avses.",
         "submit": "Parkoppla",
-        "failed": "Den här parkopplingskoden gäller inte."
+        "failed": "Den här parkopplingskoden gäller inte.",
+        "codeRequired": "Ange parkopplingskoden som visas i inställningarna."
     }
 }

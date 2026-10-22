@@ -1031,10 +1031,12 @@ function buildRecipeList() {
     toggle.appendChild(sub);
 
     if (hasDetail) {
-      // Ein Wegweiser, kein Aufklapp-Winkel: die Zeile oeffnet das Rezept.
+      // Die Zeile oeffnet das Rezept. KEIN Chevron (R21, D10 Zeilen-Endzone):
+      // ein Wegweiser steht nur an reiner Navigation (Bereiche der Gesundheit,
+      // Einstellungen); eine Zeile, die ein Objekt oeffnet UND einen
+      // Mehr-Knopf traegt, zeigt keinen - der Chevron stand 12px versetzt
+      // neben dem Mehr-Knopf und war die einzige Zeile dieser Art.
       toggle.setAttribute('aria-haspopup', 'dialog');
-      toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron" aria-hidden="true"></i>');
     } else if (!isMirrored) {
       // Ohne Detail kein Versprechen: kein Chevron, kein aria-expanded. Der
       // Button öffnet dann direkt das Bearbeiten-Formular.
@@ -1054,12 +1056,6 @@ function buildRecipeList() {
       // sein Detail rechts, also ist die Zeile dort ein Knopf wie jede andere
       // (syncRowMode).
       toggle.dataset.narrowInert = "";
-      // Trotzdem einen (unsichtbaren) Chevron-Platzhalter einfügen: sonst
-      // wächst der Name per flex-grow um genau dessen Breite, und das Badge
-      // vor ihm rutscht gegenüber jeder anderen gespiegelten Zeile nach
-      // rechts - derselbe Mechanismus wie bei der Zutatenzahl oben.
-      toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
     }
 
     heading.appendChild(toggle);
@@ -1068,9 +1064,7 @@ function buildRecipeList() {
     // Mirror-Rezepte sind read-only (der Provider bleibt Quelle der Wahrheit) - Edit
     // und Delete entfallen, Duplizieren bleibt: das legt eine eigenständige,
     // frei bearbeitbare Kopie an (duplicateRecipe() postet immer als natives
-    // Rezept, unabhängig von der Quelle des Originals). Eine Liste speist
-    // sowohl die Inline-Buttons als auch das Überlaufmenü weiter unten, damit
-    // beide Fassungen nie auseinanderlaufen.
+    // Rezept, unabhängig von der Quelle des Originals).
     // Bei `read` bleibt keine: alle drei schreiben (Duplizieren legt ein
     // Rezept an). Die Bedienzone entfaellt dann samt Ueberlaufmenue.
     const ROW_ACTIONS = ro ? [] : [
@@ -1082,32 +1076,16 @@ function buildRecipeList() {
     const actions = document.createElement('div');
     actions.className = 'list-row__actions';
 
-    // Drei Zeilenaktionen kosten 152px von 262px Zeilenbreite bei 320px - 58% der
-    // Zeile für Sekundäraktionen. Für den Namen blieben 98px, und weil er in einem
-    // Flex-Elternteil steht, fiel er auf min-content: 8px, Zeilenhöhe 448px
-    // (Critique 2026-07-30, P0).
-    //
-    // Unter 30rem Zeilenbreite wandern sie deshalb in dasselbe Überlaufmenü, das der
-    // Einkaufs-Kopf benutzt - mit Labels, und ein 48px-Trigger statt drei Knöpfen.
-    // Die Container-Query dazu steht in recipes.css; hier stehen beide Fassungen im
-    // DOM, CSS entscheidet. Dieselbe Mechanik wie beim Kopf: `display: none` nimmt
-    // die ungenutzte Fassung auch aus der Tabfolge.
-    const inline = document.createElement('div');
-    inline.className = 'recipe-row__inline-actions';
-    for (const a of ROW_ACTIONS) {
-      const btn = document.createElement('button');
-      btn.className = `row-action${a.danger ? ' row-action--danger' : ''}`;
-      btn.type = 'button';
-      btn.dataset.action = a.action;
-      btn.dataset.id = String(recipe.id);
-      btn.setAttribute('aria-label', `${a.label}: ${recipe.title}`);
-      btn.title = a.label;
-      btn.insertAdjacentHTML('beforeend',
-        `<i data-lucide="${a.icon}" class="icon-md" aria-hidden="true"></i>`);
-      inline.appendChild(btn);
-    }
-    actions.appendChild(inline);
-
+    // DIE ZEILE TRAEGT NUR DEN MEHR-KNOPF, AUF JEDER BREITE (R21, Critique
+    // 2026-10-21, Zeilen-Endzone D10). Ab 30rem standen hier Stift,
+    // Duplizieren und ein dauerhaft sichtbarer Papierkorb nebeneinander - bei
+    // 1920px drei Icons je Zeile, der Titel ~130px gekuerzt, und die
+    // Detailspalte daneben bot dieselben drei noch einmal. Die Zeile oeffnet das
+    // Rezept (Leseblatt bzw. Detailspalte), Bearbeiten steht dort; was die Zeile
+    // selbst anbietet, liegt im Ueberlaufmenue, Loeschen als letzter, roter
+    // Eintrag (R18, `danger: true`). Die frueheren Inline-Knoepfe baute
+    // `document.createElement` - darum sah row-danger-visible sie nicht
+    // (test-control-dialect.js, `domRowActions`).
     const more = document.createElement('div');
     more.className = 'recipe-row__more';
     more.insertAdjacentHTML('beforeend', popoverMenuHtml({
@@ -1715,6 +1693,7 @@ function openRecipeModal(mode, recipe = null) {
   const isEdit = mode === 'edit';
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('recipes.editRecipe') : t('recipes.addRecipe'),
     size: 'md',
     content: `

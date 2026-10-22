@@ -17,7 +17,8 @@ import { moduleAccess, isNavModuleReadOnly } from '/permissions.js';
 import { findPageFab } from '/utils/fab.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, leaveDetailTo } from '/components/detail-view.js';
+import { pathAccess } from '/utils/module-access.js';
 // Alias: dieses Modul fuehrt selbst eine `emptyStateHtml()`, die den Renderer
 // mit den Geburtstags-Texten fuellt. Zwei Namen, die sich nur in der
 // Gross-Schreibung unterscheiden, waeren im Modul nicht auseinanderzuhalten.
@@ -474,14 +475,23 @@ ${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07, utils/row-action.js): der
  * Gruppenkoepfe der Aufgaben IN der Liste), und der naechste Geburtstag
  * (`birthday-item--next`) hebt seinen Countdown im Modulton hervor - die
  * Antwort auf die Frage, mit der man die Seite oeffnet.
+ *
+ * DER KOPF IST EIN REGISTER, ERST WENN ER GRUPPIERT (R21 S9b, Critique a3).
+ * Im Seed standen 7 Monatskoepfe ueber 8 Geburtstagen - fast jede Zeile trug
+ * einen eigenen Kopf, der nur wiederholte, was ihr Datum schon sagt (224px
+ * Chrome bei 390px). Die Koepfe stehen deshalb erst, wenn im Mittel mindestens
+ * zwei Geburtstage auf einen Monat kommen; darunter ist die Liste eine Folge
+ * nach Naehe, und der naechste fuehrt weiter im Modulton.
  * @param {Array} list nach Naehe sortiert (sortByProximity)
  * @returns {string}
  */
 function birthdayListHtml(list) {
+  const months = new Set(list.map((b) => String(b.next_birthday ?? '').slice(0, 7)).filter(Boolean));
+  const grouped = list.length >= 2 * months.size;
   let month = '';
   return list.map((birthday, i) => {
     const key = String(birthday.next_birthday ?? '').slice(0, 7);
-    const head = key && key !== month
+    const head = grouped && key && key !== month
       ? `<h2 class="list-group__title birthdays-month">${esc(formatMonthYear(key.slice(0, 4), key.slice(5, 7)))}</h2>`
       : '';
     if (key) month = key;
@@ -897,6 +907,7 @@ function openBirthdayModal({ mode, birthday = null }) {
   const today = todayKey();
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('birthdays.editTitle') : t('birthdays.newTitle'),
     content: `
       <div class="birthday-modal">
@@ -1303,6 +1314,20 @@ function deleteBirthday(id) {
 // Liste + Detail (R10 L5)
 // --------------------------------------------------------
 
+/** Die Adresse eines Kontakts: dieselbe wie aus der Suche (`?open=`). */
+function contactHref(id) {
+  return `/contacts?open=${encodeURIComponent(String(id))}`;
+}
+
+/**
+ * Darf die Leseansicht zum Kontakt springen? Ein Modul ohne Zugang oder ein
+ * haushaltweit abgeschaltetes leitet der Router um - der Knopf fuehrte dann
+ * zurueck auf die Uebersicht (Critique R21, D7).
+ */
+function mayOpenContacts() {
+  return !globalThis.window?.yuvomi?.isModuleDisabled?.('contacts') && pathAccess('/contacts') !== 'none';
+}
+
 /**
  * Der Geburtstag in der Detailspalte: dieselben Angaben wie die Leseansicht
  * (birthdayReadHtml), dazu die Auskunft, die die Zeile nur knapp traegt - wann
@@ -1320,7 +1345,20 @@ function birthdayPaneSections(birthday) {
     // Critique 2026-10-16: "das Geburtstagsdetail sagt dasselbe dreimal").
     // Alter und Abstand stehen als Kennzahlen im Kopf, das Datum als seine
     // Unterzeile (birthdayDetailHead).
-    { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthDateText(birthday.birth_date, birthday.year_unknown) },
+    // DER WEG ZUM KONTAKT (Critique R21, D7): ein importierter Geburtstag kennt
+    // seinen Kontakt (`contact_id`, Migration 90). Wie "Kontakt anzeigen" an
+    // einem Geburtstag in Apples Kalender - an der Datumszeile, nicht im Fuss.
+    {
+      icon: 'cake',
+      label: t('birthdays.birthDateLabel'),
+      value: birthDateText(birthday.birth_date, birthday.year_unknown),
+      action: birthday.contact_id && mayOpenContacts() ? {
+        id: 'birthday-detail-contact',
+        label: t('birthdays.showContact'),
+        icon: 'book-user',
+        onClick: () => leaveDetailTo(contactHref(birthday.contact_id)),
+      } : null,
+    },
     { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
     { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
     { icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) },
@@ -1554,7 +1592,7 @@ export const __test = {
   onListClick, openBirthdayModal,
   birthdayPreviewHtml,
   // R10 L5: die Detailspalte.
-  birthdayPaneSections, birthdayDetailHead, renderBirthdayPane,
+  birthdayPaneSections, birthdayDetailHead, renderBirthdayPane, contactHref,
   // #1821: `?open=` unter der Spaltenschwelle.
   openBirthdayFromQueryNarrow,
   // #1909: Speichern, Loeschen und Import, wenn der Server ablehnt.

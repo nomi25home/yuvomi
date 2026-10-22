@@ -82,10 +82,6 @@
   text-decoration: none;
 }
 
-.health-toolbar__back[hidden] {
-  display: none;
-}
-
 /* DIE PERSONENWAHL TEILT DIE ZEILE DES RUECKWEGS (R14 P3, A8 P3-3). Auf
  * jeder Bereichsseite kostete sie eine eigene Zeile vor der ersten Karte
  * (y122-170 bei 390x844). Jetzt steht sie rechts neben „‹ Gesundheit" wie
@@ -335,7 +331,8 @@
  * kleine Spruenge unter dem Finger. Die Hoehe ist jetzt die von Name plus
  * Status, ob der Status schon da ist oder nie kommt (Fasten ohne laufende
  * Phase); ein Name allein steht mittig. `1lh` ist die Namenszeile, der Status
- * laeuft in --text-sm mit der geerbten Zeilenhoehe. Ohne `lh` (aeltere
+ * laeuft in der Metazeile (--type-caption, typography.css; bis R21 --text-sm)
+ * mit der geerbten Zeilenhoehe. Ohne `lh` (aeltere
  * Browser) faellt die Zeile auf das alte Verhalten zurueck. */
 .health-area-row__main {
   flex: 1 1 auto;
@@ -344,7 +341,7 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--space-0h);
-  min-block-size: calc(1lh + var(--space-0h) + var(--text-sm) * var(--line-height-base));
+  min-block-size: calc(1lh + var(--space-0h) + var(--type-caption) * var(--line-height-base));
 }
 
 /* `.list-row__name` waechst in einem Flex-Traeger (`flex: 1 1 auto`,
@@ -361,7 +358,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 .health-area-row__status:empty {
@@ -391,6 +387,20 @@
     background-color: transparent;
     box-shadow: none;
     border-radius: 0;
+  }
+
+  /* DER KOPF DES BEREICHS HAT EINEN TRAEGER (R21 S7, D9). Die Spalte traegt
+   * hier keine Karte (siehe oben), und ihr klebender Kopf stand als weisser
+   * eckiger Balken ueber der Buehne, ohne Rundung, Schatten oder Flaeche
+   * darunter - als einziges Element der Seite. Er wird die Karte, die er
+   * ohnehin schon ist: Radius und leiser Schatten wie die Bereichskarten
+   * darunter, ohne Trennlinie (die Kante ist der Schatten), und Luft zum
+   * ersten Bereich. */
+  .health-split > .split-view__detail .split-view__detail-head {
+    border-radius: var(--radius-lg);
+    border-block-end-color: transparent;
+    box-shadow: var(--shadow-sm);
+    margin-block-end: var(--space-3);
   }
 
   .health-areas__overview {
@@ -437,10 +447,6 @@
   gap: var(--space-4);
   min-width: 0;
   padding-inline: var(--page-inline-pad);
-}
-
-.health-panel[hidden] {
-  display: none;
 }
 
 /* Ein neuer Bereich blendet ein: seit R16 ueber swapContent()
@@ -584,26 +590,28 @@
  * sondern in EINER Zeile „Weitere Messwerte". Ab 640px bleibt alles, wie es
  * war - dieselbe Grenze wie `PHONE_QUERY` in health.js.
  * -------------------------------------------------------- */
-.health-vitals__more {
+/* SEIT R21 AUF JEDER BREITE (Critique 2026-10-21, D6): die leeren Messarten
+ * stehen nicht mehr als graue Kacheln im Raster, sondern hier - renderCards()
+ * zeichnet nur noch gemessene. Unter 640px liegen Zeitraum und Diagramm
+ * weiter im Blatt der Kachel. */
+@media (max-width: 639px) {
+  .health-vitals__toolbar,
+  .health-vitals__detail {
+    display: none;
+  }
+}
+
+/* Ohne jede Messung entfallen Zeitraum und Diagramm; es bleibt die ruhige
+ * Zeile mit der Erfassen-Aktion (renderCards). */
+.health-vitals--empty .health-vitals__toolbar,
+.health-vitals--empty .health-vitals__detail {
   display: none;
 }
 
-@media (max-width: 639px) {
-  .health-vitals__toolbar,
-  .health-vitals__detail,
-  .health-vitals__cards > .health-vitals__card--empty {
-    display: none;
-  }
-
-  .health-vitals__more {
-    display: block;
-  }
-
-  /* Ohne Inhalt (jede Metrik hat einen Wert) nimmt der Wirt keine Luecke
-   * aus dem Spaltenabstand der Ansicht. */
-  .health-vitals__more:empty {
-    display: none;
-  }
+/* Ohne Inhalt (jede Metrik hat einen Wert) nimmt der Wirt keine Luecke
+ * aus dem Spaltenabstand der Ansicht. */
+.health-vitals__more:empty {
+  display: none;
 }
 
 /* Die Flaeche der Zeile. NICHT `.row-carrier`: der kappt auf --page-measure,
@@ -775,24 +783,19 @@
   fill: color-mix(in oklab, var(--module-health) 14%, transparent);
 }
 
-.health-chart__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+/* DIE REIHEN STEHEN BESCHRIFTET AN IHRER KURVE (R21, Critique 2026-10-21, D6):
+ * der Name ueber dem letzten Punkt, in der Farbe der Kurve (`fill` am Element).
+ * Hier stand eine Legende aus Farbquadraten unter dem Diagramm - die Zuordnung
+ * lief nur ueber die Farbe. Die Schrift ist die feste Achsenschrift
+ * (`.chart__axis`), halbfett, damit sie sich vom Gitter abhebt. */
+.health-chart__series-label {
+  font-weight: var(--font-weight-semibold);
 }
 
-.health-chart__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.health-chart__swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-2xs);
+/* Die zweite Achse einer Messart (der Puls unter dem Blutdruck) folgt direkt;
+ * sie ist ein Teil desselben Diagramms, keine neue Karte. */
+.health-chart--secondary {
+  margin-block-start: var(--space-2);
 }
 
 .health-chart-empty {
@@ -881,24 +884,13 @@
  * traegt den ganzen Satz weiter, seine Zielgroesse kommt unveraendert aus
  * `.btn`. `flex-wrap` zurueckzuholen waere der andere Weg und der falsche: er
  * braeche die geteilte Regel fuer alle vierzehn Module. */
-/* ZWEI STUFEN, WEIL EINE NICHT REICHTE - und das war nachrechenbar, nicht
- * Geschmack. Gemessen bei 390px: Container 324px, die Zeile braucht 371
- * (32 Polsterung + 46 Uhrzeit + 24 Luecken + 128 Namensboden + 157 Aktionen).
- * Das Skip-Label allein fallen zu lassen holte 78px und liess 14 uebrig; bei
- * 320px hat der Container nur 254px, und selbst mit dem Namen auf NULL fehlten
- * noch 5. Der Take-Knopf traegt dort 101px allein.
- *
- * Also: erste Stufe nimmt dem Namen seinen Boden und dem Skip sein Wort,
- * zweite Stufe auch dem Take. Beide behalten ihr `aria-label` und ihre
- * Zielgroesse aus `.btn` - was faellt, ist der sichtbare Text, nie das Ziel.
- * In einem Modul, das Medikamente fuehrt, ist eine unerreichbare Aktion der
- * teuerste Fehler; ein Icon statt eines Wortes ist der billigste Preis dafuer. */
-@container list-rows (max-width: 26rem) {
-  .health-dose__skip-label {
-    display: none;
-  }
-
-}
+/* HIER STANDEN ZWEI STUFEN fuer zwei Knoepfe mit Wort (Einnehmen,
+ * Ueberspringen): bei 390px brauchte die Zeile 371 von 324px, und das Skip-Label
+ * fiel zuerst. Seit R21 (D10 Zeilen-Endzone) steht Ueberspringen im
+ * Mehr-Knopf; die Zeile traegt EINE Handlung mit Wort und den schmalen
+ * Mehr-Knopf, und nur noch der Einnehmen-Knopf gibt Icon und Wort ab. In
+ * einem Modul, das Medikamente fuehrt, ist eine unerreichbare Aktion der
+ * teuerste Fehler - beide bleiben erreichbar, beide mit Namen. */
 
 /* EINNEHMEN BEHAELT SEIN WORT (Re-Critique 2026-09-28, A6 P2-3). Hier fiel es
  * bis dahin schon unter 21rem - also auf jedem 390px-Telefon (Container 324px) -,
@@ -1021,7 +1013,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   flex: 0 0 auto;
   margin-inline-start: auto;
@@ -1188,7 +1179,6 @@ button.health-med-card:hover {
 }
 
 .health-med-card__sub {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
@@ -1522,7 +1512,6 @@ button.health-med-card:hover {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  font-size: var(--text-sm);
 }
 
 .health-lab-rows__ref {
@@ -1532,7 +1521,8 @@ button.health-med-card:hover {
 
 .health-lab-rows__meta .health-lab-flag {
   margin-inline-start: auto;
-  font-size: var(--text-sm);
+  /* Die Groesse erbt die Metazeile (Footnote 13, typography.css): hier
+   * stand 14, groesser als die Zeile, in der die Marke steht (R21, D4). */
 }
 
 .health-lab-rows__row--low .health-lab-rows__value,
@@ -1592,7 +1582,6 @@ button.health-med-card:hover {
 .health-lab-flag--low,
 .health-lab-flag--high   { color: var(--color-warning-ink); }
 .health-lab-flag--normal { color: var(--color-success); }
-.health-lab-flag--none   { color: var(--color-text-tertiary, var(--color-text-secondary)); }
 
 /* Analyt-Trend */
 .health-lab-trend {
@@ -2036,7 +2025,6 @@ button.health-med-card:hover {
 }
 
 .health-prevention-due-row__date {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -2097,6 +2085,51 @@ button.health-med-card:hover {
 .health-overview__grid {
   column-width: 320px;
   column-gap: var(--space-4);
+}
+
+/* DER SATZ OBEN (R21, Critique 2026-10-21, D6 "Gesundheit als Briefing"):
+ * was sich seit der letzten Messung getan hat, als Lesetext ueber den Karten
+ * - Body 17 in Textfarbe, keine Flaeche, kein Symbol. Auf dem Telefon zieht er
+ * mit Personenwahl und "Heute faellig" vor die Bereichsliste (health-hoist.js). */
+.health-brief {
+  margin: 0 0 var(--space-4);
+  max-inline-size: 65ch;
+  font-size: var(--type-body);
+  line-height: var(--line-height-base);
+  color: var(--color-text-primary);
+  /* Ein bis drei Zeilen ohne Flaeche: ausgeglichene Umbrueche statt einer
+   * langen und einer kurzen Zeile (modern-web-guidance
+   * improve-text-layout-and-legibility; ohne Unterstuetzung normaler Umbruch). */
+  text-wrap: balance;
+}
+
+.health-priority > .health-brief {
+  margin-block-end: 0;
+}
+
+/* EINE RUHIGE ZEILE STATT LEERER KACHELN (R21, D6): "Noch keine Messwerte"
+ * und daneben die Erfassen-Aktion. In der Uebersichtskarte steht sie auf der
+ * Karte; auf der Vitalwerte-Seite traegt sie die Flaeche einer Zeile selbst. */
+.health-overview__empty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-block-size: var(--target-base);
+}
+
+.health-overview__empty-text {
+  font-size: var(--type-secondary);
+  color: var(--color-text-secondary);
+}
+
+.health-vitals__empty-row {
+  grid-column: 1 / -1;
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .health-overview__card {
@@ -2209,7 +2242,6 @@ button.health-med-card:hover {
 }
 
 .health-overview__stat-label {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
@@ -2480,6 +2512,19 @@ button.health-med-card:hover {
   height: var(--cycle-ring-size);
   flex: 0 0 auto;
   margin-inline: auto;
+}
+
+/* DIE TAGESMARKE RAGT UEBER DEN RING, ALSO HAT ER LUFT DAFUER (R21 S7,
+ * Critique a5: "Tag 7" lag bei 1280 5px auf der Kennzahlkarte daneben). Die
+ * Marke sitzt am Jetzt-Punkt und steht bis zu ihrer halben Breite (rund 29px)
+ * ueber den Rand - der Abstand zur Seitenspalte (24px) reichte nicht. Neben
+ * den Kennzahlen bekommt der Ring deshalb auf beiden Seiten so viel Rand, wie
+ * die Marke hinausragen kann; untereinander (unter 640px) zentriert er wie
+ * bisher. */
+@media (min-width: 640px) {
+  .cycle-ring {
+    margin-inline: var(--space-4);
+  }
 }
 
 .cycle-ring__svg { width: 100%; height: 100%; display: block; }
@@ -3556,6 +3601,20 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
  * variablen Daten. */
 .cycle-discovery-hint {
   margin-top: var(--space-2);
+  font-size: var(--type-caption);
+}
+
+/* Der Weg zum Zyklus-Feed (R21): ein Link im App-Akzent, unterstrichen wie
+ * jeder Link im Text (.help-guide a) - Farbe allein ist kein Erkennungszeichen. */
+.cycle-discovery-hint__link {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cycle-discovery-hint__note {
+  margin: var(--space-1) 0 0;
 }
 
 /* Server-Fehlerliste beim CSV-Import (bis zu zehn Zeilen, siehe
@@ -3648,16 +3707,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 .health-choice__dot--filled { opacity: 1; }
 
-.cycle-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
-.cycle-hint { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0; }
+.cycle-hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin: 0; }
 
 /* A-3: weiche Warnung im Perioden-Modal (Zukunftsdatum/Ueberschneidung) - Ton
  * wie eine Warn-Kachel, nicht wie `.form-error` (das waere Gefahr/blockierend,
@@ -3692,19 +3742,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 /* display erst wenn sichtbar - sonst überschreibt der Flex das UA-[hidden]. */
 .cycle-bulk__confirm:not([hidden]) { display: flex; }
-/* [hidden] durchsetzen: `.form-field` (layout.css) setzt `display: flex` mit
- * derselben Spezifitaet wie das UA-`[hidden] { display: none }` und gewinnt
- * als spaeter geladene Regel - betraf schon das Entbindungstermin-Feld
- * (#cs-due-field, unveraendert sichtbar geblieben, obwohl der Schwanger-
- * schafts-Modus aus war) und beim Bau der Partner-Erinnerung neu dazu-
- * gekommene #cs-notify-partner-days-field genauso. Gleiches Muster wie
- * .inventory-filters[hidden]/.tasks-filters-row[hidden] in ihren jeweiligen
- * Modulen - hier lokal auf die beiden betroffenen Felder begrenzt, statt
- * layout.css global anzufassen. */
-#cs-due-field[hidden],
-#cs-notify-partner-days-field[hidden] {
-  display: none;
-}
 .cycle-bulk__question { color: var(--color-text-primary); }
 /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
  * (layout.css, #872). */
@@ -3713,6 +3750,13 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 @media (max-width: 639px) {
   .cycle-hero { flex-direction: column; }
   .cycle-ring { width: 200px; height: 200px; }
+
+  /* Die Legende direkt unter dem Ring (health.js, renderCycleShell): mittig
+   * wie er, und der Abstand kommt aus dem `gap` der Spalte. */
+  .cycle-hero > .cycle-ring__legend {
+    justify-content: center;
+    margin-top: 0;
+  }
 
   /* Schmal steht die Heute-Karte IN der Spalte, zwischen Ring und Kennzahlen
    * (health.js, renderCycleShell): volle Breite statt mittig auf
@@ -3764,7 +3808,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .health-recent__date {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
   min-width: 96px;
 }
 
@@ -3901,7 +3944,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
 .fasting-dial__days { display: block; margin-top: var(--space-2); color: var(--color-text-secondary); }
 .fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
-.fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); }
 .fasting-hero__actions { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
 /* Vor dem ersten Fasten (health-fasting.js `idle`): kein leerer Ring, keine
  * Umschaltung der Uhr - Satz und Knoepfe, darunter gleich der Leerzustand
@@ -3910,7 +3953,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero--idle .fasting-clock-switch { display: none; }
 .fasting-hero--idle .u-section-title { margin-block-end: var(--space-3); }
 .fasting-history-more { display: grid; justify-items: center; gap: var(--space-2); padding-block-start: var(--space-3); }
-.fasting-history-more [hidden] { display: none; }
 .fasting-card__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-end: var(--space-3); flex-wrap: wrap; }
 .fasting-card__heading .u-section-title { margin: 0; }
 .fasting-history { list-style: none; margin: 0; padding: 0; }

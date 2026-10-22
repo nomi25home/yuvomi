@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Niets komt overeen met je zoekopdracht en filters.",
         "searchReset": "Zoekopdracht wissen",
         "passwordMinLength": "Minstens 8 tekens.",
-        "savedReloadFailed": "Je wijziging is opgeslagen, maar de weergave kon niet worden vernieuwd. Herlaad de pagina als er iets ontbreekt."
+        "savedReloadFailed": "Je wijziging is opgeslagen, maar de weergave kon niet worden vernieuwd. Herlaad de pagina als er iets ontbreekt.",
+        "fieldNumber": "Voer een getal in.",
+        "fieldMin": "Minimaal {{min}}.",
+        "fieldMax": "Maximaal {{max}}.",
+        "fieldWholeNumber": "Voer een geheel getal in.",
+        "fieldStep": "Voer een waarde in stappen van {{step}} in.",
+        "fieldInvalid": "Controleer deze invoer.",
+        "errorCheckRolledBack": "‘{{name}}’ staat weer open - afvinken is niet gelukt. Probeer het opnieuw.",
+        "errorUncheckRolledBack": "‘{{name}}’ is weer afgevinkt - terugzetten is niet gelukt. Probeer het opnieuw."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Label (bijv. werk)",
         "mvRemove": "Item verwijderen",
         "birthdayLabel": "Verjaardag",
+        "showBirthday": "Tonen bij verjaardagen",
         "birthdayHint": "Verschijnt via de verjaardagsimport ook in de kalender.",
         "phonePlaceholder": "+31 …",
         "phonePreview": "Voorbeeld: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "Budgetcategorieën konden niet worden geladen.",
         "addCategory": "+ categorie",
         "addSubcategory": "+ subcategorie",
-        "moreDetails": "Meer gegevens",
         "newCategoryPrompt": "Naam van de nieuwe categorie:",
         "newSubcategoryPrompt": "Naam van de nieuwe subcategorie:",
         "categoryAddedToast": "Categorie toegevoegd.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Cyclusinstelling opgeslagen.",
         "healthCyclePersonalLabel": "Cyclus tonen",
         "healthCyclePersonalHint": "Geldt alleen voor je eigen weergave. Zet je het uit, dan blijft de cyclus zichtbaar voor de anderen in het huishouden.",
+        "healthCycleSettingsHint": "Cyclusduur, anticonceptie, herinneringen en zwangerschapsmodus stel je in op de cycluspagina.",
         "healthCyclePersonalHouseholdOff": "De cyclus is momenteel voor het hele huishouden uitgeschakeld, dus hij verschijnt bij niemand.",
         "healthCyclePersonalSaved": "Cyclusweergave opgeslagen.",
         "pageRewardsModule": "Beloningen",
@@ -2149,7 +2158,7 @@
         "familyRoleGrandparent": "Grootouder",
         "familyRoleRelative": "Familie",
         "familyRoleOther": "Gezinslid",
-        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget en vasten en zien Huishoudhulp alleen-lezen, zonder lonen en betalingen. Je kunt dit daarna wijzigen onder “Rollen en rechten”.",
+        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget en vasten en zien Huishoudhulp alleen-lezen, zonder lonen en betalingen. Je kunt dit daarna wijzigen onder “Rollen en rechten”. Ook de cyclus is verborgen; die kan worden getoond in de persoonlijke instellingen van het kind.",
         "systemAdminLabel": "Systeembeheerder",
         "systemAdminHint": "Systeembeheerders kunnen applicatie-instellingen, integraties, API-tokens en gezinsaccounts beheren.",
         "systemAdminBadge": "Systeembeheerder",
@@ -2179,7 +2188,8 @@
         "languageTitle": "Taal",
         "dataLanguageLabel": "Taal van opgeslagen items",
         "dataLanguageHint": "Taal waarin Yuvomi items opslaat die het zelf aanmaakt, zoals verjaardagsafspraken. Geldt voor de API, de agendafeed en synchronisatie, niet voor de weergave hier.",
-        "dataLanguageAuto": "Automatisch ({{language}})",
+        "dataLanguageAuto": "Automatisch",
+        "hintWithCurrent": "Nu: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Alleen beheerders kunnen de taal van opgeslagen items instellen.",
         "dataLanguageSaved": "Taal van opgeslagen items bijgewerkt",
         "sectionMeals": "Maaltijdplan",
@@ -2863,6 +2873,7 @@
         "regionTitle": "Regio / Formaat",
         "regionLabel": "Regio",
         "regionHint": "Stelt valuta en getal-, datum- en tijdnotatie in op basis van de regio (bijv. Zwitserland: 1'234.50). Kies “Aangepast” om ze afzonderlijk in te stellen.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Alleen beheerders kunnen regio en valuta wijzigen.",
         "formatsHouseholdHint": "Datum- en tijdnotatie gelden voor het hele huishouden. Elk lid kan ze wijzigen.",
         "regionCustom": "Aangepast",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Tijdzone",
         "timezoneLabel": "Tijdzone van het huishouden",
         "timezoneHint": "Geldt overal waar een tijd geen eigen zone draagt: herinneringen, aftellingen, de kalenderdag die \"vandaag\" heet, de geëxporteerde agendafeed en afspraken die naar Google of Outlook gaan.",
-        "timezoneAuto": "Automatisch ({{zone}})",
+        "timezoneAuto": "Automatisch",
         "timezoneAdminOnly": "Alleen beheerders kunnen de tijdzone wijzigen.",
         "timezoneSaved": "Tijdzone opgeslagen.",
         "timezoneMismatch": "Je browser staat in {{browser}}, het huishouden rekent in {{household}}.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Meldingsinstelling opgeslagen.",
         "healthVisibilityTitle": "Standaardzichtbaarheid",
         "healthVisibilityHint": "Waarmee nieuwe items beginnen. Je kunt het bij elk item nog wijzigen.",
+        "healthVisibilityCaregivers": "Wie voor jou mag invoeren, ziet ook je privé-items, behalve het cyclusdagboek. Een beheerder legt dat vast bij de leden.",
         "healthVisibilityOther": "Andere onderdelen",
         "healthVisibilityApply": "Bestaande items ook aanpassen",
         "healthVisibilityApplyHint": "Opgeslagen. Moeten de bestaande items onder {{area}} ook worden aangepast?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "Voer minstens twee tekens in.",
         "weatherPlaceNotFound": "Geen plaats met deze naam gevonden. Voeg het land toe, bijv. „Bergen, Nederland”.",
         "weatherPlaceUnavailable": "Het zoeken naar plaatsen is nu niet bereikbaar. Probeer het zo opnieuw of vul de coördinaten met de hand in.",
-        "weatherManualTitle": "Coördinaten met de hand"
+        "weatherManualTitle": "Coördinaten met de hand",
+        "backupDropzoneTitleTouch": "Tik om een back-upbestand te kiezen",
+        "installModuleDropzoneTitleTouch": "Tik om een ZIP-bestand te kiezen"
     },
     "login": {
-        "tagline": "Welkom terug bij je gezinsplanner.",
+        "tagline": "Welkom terug. Je huishouden op één plek.",
         "usernameLabel": "Gebruikersnaam",
         "passwordLabel": "Wachtwoord",
         "loginButton": "Inloggen",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "Wijzigingen verwerpen?",
         "unsavedChangesDetail": "Je invoer in dit formulier gaat verloren.",
         "discardChanges": "Verwerpen",
-        "moreSettings": "Meer instellingen",
         "moreDetails": "Meer gegevens"
     },
     "rrule": {
@@ -3448,6 +3461,7 @@
         "editTitle": "Verjaardag bewerken",
         "nameLabel": "Naam",
         "birthDateLabel": "Geboortedatum",
+        "showContact": "Contact tonen",
         "nameDay": "Naamdag",
         "celebratesNameDay": "viert naamdag",
         "nameDayLabel": "Naamdag (optioneel)",
@@ -3577,11 +3591,13 @@
         "goTo": "Ga naar",
         "newSection": "Nieuw aanmaken",
         "recentLabel": "Recent geopend",
-        "createTaskNamed": "„{{title}}” als taak aanmaken"
+        "createTaskNamed": "„{{title}}” als taak aanmaken",
+        "hintMove": "Selecteren",
+        "hintOpen": "Openen"
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",
-        "step1Body": "Je persoonlijke gezinsplanner. Taken, kalender, boodschappen en meer - allemaal op één plek.",
+        "step1Body": "Taken, kalender, boodschappen en meer voor je huishouden - of je nu alleen woont, met z'n tweeën of als gezin. Alles op één plek.",
         "step2Title": "Navigatie & Modules",
         "step2Body": "De balk onderaan brengt je direct naar de belangrijkste onderdelen. Alle andere modules vind je onder ‘Meer’.",
         "step3Title": "Snel aan de slag",
@@ -3931,7 +3947,10 @@
         "errorDmsAccountGone": "Dit DMS-account bestaat niet meer.",
         "errorDmsDocumentGone": "Dit document bestaat niet meer in het DMS.",
         "errorDmsAlreadyLinked": "Dit DMS-document is al gekoppeld.",
-        "errorDmsAlreadyStored": "Dit document staat al in een DMS."
+        "errorDmsAlreadyStored": "Dit document staat al in een DMS.",
+        "dropzoneTitleTouch": "Tik om een bestand te kiezen",
+        "viewerPrevNamed": "Vorig document: {{name}}",
+        "viewerNextNamed": "Volgend document: {{name}}"
     },
     "housekeeping": {
         "title": "Huishouden",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "Dit bezoek bestaat niet meer.",
         "errorTaskGone": "Deze taak bestaat niet meer.",
         "errorAlreadyCheckedOut": "Deze schoonmaker is al uitgecheckt.",
-        "errorAlreadyCheckedIn": "Deze schoonmaker is al ingecheckt."
+        "errorAlreadyCheckedIn": "Deze schoonmaker is al ingecheckt.",
+        "allVisitsInReport": "Alle bezoeken in het rapport"
     },
     "userMultiSelect": {
         "moreUsers": "meer",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Open zoeken met het vergrootglas op het overzicht of via ‘Meer’.",
         "mobileSettings": "Je vindt instellingen onder ‘Meer’.",
         "guideLink": "Gebruikershandleiding",
-        "guideHint": "Door de community bijgehouden, in een eigen repository - kan achterlopen op een release."
+        "guideHint": "Onderhouden door de community. Opent in een nieuw tabblad."
     },
     "changelog": {
         "title": "Wijzigingen",
@@ -4379,8 +4399,9 @@
         "success": "Je wachtwoord is gewijzigd. Je kunt nu inloggen.",
         "mismatch": "De wachtwoorden komen niet overeen.",
         "tooShort": "Het wachtwoord moet minstens 8 tekens lang zijn.",
-        "invalidToken": "Deze link is ongeldig of verlopen.",
-        "missingToken": "Er is geen geldig token gevonden."
+        "invalidToken": "Deze resetlink is ongeldig of verlopen - vraag een nieuwe aan.",
+        "missingToken": "Deze resetlink is onvolledig - vraag een nieuwe aan.",
+        "requestNew": "Nieuwe link aanvragen"
     },
     "email": {
         "host": "SMTP-host",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Volgende herinneringen",
                 "empty": "Vandaag geen innames meer"
+            },
+            "brief": {
+                "changes": "Sinds de laatste meting: {{list}}.",
+                "latest": "Laatst vastgelegd: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} onveranderd"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Registreer je eerste menstruatie om voorspellingen, kalender en statistieken te zien.",
             "emptyCta": "Eerste menstruatie registreren",
             "personsLabel": "Person",
-            "add": "Menstruatie registreren",
+            "add": "Eerdere menstruatie toevoegen",
             "loadError": "Cyclusgegevens konden niet worden geladen.",
             "loadErrorDesc": "Probeer het later opnieuw.",
             "retry": "Opnieuw proberen",
@@ -5406,15 +5433,14 @@
                 "family": "Gezinsbeheer"
             },
             "period": {
-                "add": "Menstruatie registreren",
+                "add": "Eerdere menstruatie toevoegen",
                 "edit": "Menstruatie bewerken",
                 "warningFuture": "Startdatum ligt in de toekomst - voorspellingen zijn alleen gebaseerd op eerdere cycli.",
                 "warningOverlap": "Overlapt met een al geregistreerde cyclus."
             },
             "dayLog": {
                 "title": "Dag registreren",
-                "date": "Datum",
-                "more": "Meer gegevens"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Exporteren als CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Gemiddelde cyclusduur",
                 "periodLength": "Gemiddelde menstruatieduur",
                 "lutealLength": "Lengte luteale fase",
+                "daysUnit": "dagen",
                 "trackFertility": "Vruchtbare periode tonen",
-                "autoHint": "Leeg laten = automatisch berekend uit je geschiedenis.",
+                "autoHint": "Laat je een van beide velden leeg, dan berekent Yuvomi de waarde uit de menstruaties die je hebt ingevoerd.",
                 "remindPeriodDaysBefore": "Menstruatieherinnering",
                 "remindOff": "Uit",
                 "remindSameDay": "Op de dag zelf",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Kies een CSV-bestand of plak tekst.",
                 "error": "Importeren mislukt."
             },
-            "discoveryHint": "Tip: abonneer je op de voorspelde cyclus als ICS-feed onder <a href=\"/settings/modules/calendar?section=personal-feeds\">Instellingen → Modules → Agenda</a>, of toon de cyclus-widget op het <a href=\"/\">Overzicht</a> via de aanpasmodus."
+            "feedLink": "Abonneren op de voorspelde cyclus in je agenda",
+            "widgetHint": "Voeg de cyclustegel toe aan {{overview}} via ‘{{customize}}’.",
+            "endBeforeStart": "Het einde mag niet vóór het begin liggen."
         },
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",
@@ -5542,6 +5571,7 @@
             "unitH": "u"
         },
         "careBanner": "Je noteert voor {{name}}.",
+        "whoSees": "Wie ziet dit?",
         "nutrition": {
             "title": "Voedingswaarden",
             "emptyTitle": "Nog geen voedingswaarden vastgelegd",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "za",
         "weekdaySun": "zo",
         "intervalLabelWeekly": "Elke N weken",
+        "intervalLabelMonthly": "Elke N maanden",
         "anchorDateLabel": "Eerste ophaling",
         "monthDayLabel": "Dag van de maand",
         "monthDayLastDay": "Laatste dag van de maand",
@@ -6271,8 +6302,8 @@
         "success": "Je account is aangemaakt. Je kunt nu inloggen.",
         "mismatch": "De wachtwoorden komen niet overeen.",
         "tooShort": "Het wachtwoord moet minstens 8 tekens lang zijn.",
-        "invalidToken": "Deze uitnodiging is ongeldig, verlopen of al gebruikt.",
-        "missingToken": "Er is geen geldig token gevonden.",
+        "invalidToken": "Deze uitnodiging is ongeldig, verlopen of al gebruikt - vraag om een nieuwe link.",
+        "missingToken": "Deze uitnodigingslink is ongeldig of verlopen - vraag om een nieuwe.",
         "usernameRequired": "Kies een gebruikersnaam.",
         "usernameInvalid": "De gebruikersnaam moet 3 tot 64 tekens lang zijn en mag alleen letters, cijfers, punten, streepjes en underscores bevatten.",
         "usernameTaken": "Deze gebruikersnaam is al in gebruik.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Werk",
         "templateSchool": "School",
         "templateUniversity": "Universiteit",
-        "overview": "Vergelijking",
+        "overview": "Overzicht",
         "overviewPeopleLabel": "Personen vergelijken",
-        "overviewClearSelection": "Selectie wissen",
         "continuesUntil": "…loopt door tot {{time}}",
         "overviewEmptyTitle": "Kies personen om te vergelijken",
         "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Naam van dit apparaat (optioneel)",
         "labelHint": "Helpt later te herkennen welk apparaat wordt bedoeld.",
         "submit": "Koppelen",
-        "failed": "Deze koppelcode is niet geldig."
+        "failed": "Deze koppelcode is niet geldig.",
+        "codeRequired": "Voer de koppelcode in die in de instellingen staat."
     }
 }

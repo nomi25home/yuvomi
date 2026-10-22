@@ -98,7 +98,15 @@
         "searchNoResultsFilteredDescription": "Ingenting passer til søket og filtrene dine.",
         "searchReset": "Tilbakestill søk",
         "passwordMinLength": "Minst 8 tegn.",
-        "savedReloadFailed": "Endringen er lagret, men visningen kunne ikke oppdateres. Last inn siden på nytt hvis noe mangler."
+        "savedReloadFailed": "Endringen er lagret, men visningen kunne ikke oppdateres. Last inn siden på nytt hvis noe mangler.",
+        "fieldNumber": "Skriv inn et tall.",
+        "fieldMin": "Minst {{min}}.",
+        "fieldMax": "Høyst {{max}}.",
+        "fieldWholeNumber": "Skriv inn et heltall.",
+        "fieldStep": "Skriv inn en verdi i trinn på {{step}}.",
+        "fieldInvalid": "Sjekk denne verdien.",
+        "errorCheckRolledBack": "«{{name}}» er åpen igjen - avkryssingen gikk ikke gjennom. Prøv igjen.",
+        "errorUncheckRolledBack": "«{{name}}» er krysset av igjen - å hente den tilbake gikk ikke. Prøv igjen."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -1296,6 +1304,7 @@
         "mvLabelPlaceholder": "Merke (f.eks. jobb)",
         "mvRemove": "Fjern oppføring",
         "birthdayLabel": "Bursdag",
+        "showBirthday": "Vis i bursdager",
         "birthdayHint": "vises også i kalenderen via bursdagsimport.",
         "phonePlaceholder": "+1 …",
         "phonePreview": "Forhåndsvisning: {{value}}",
@@ -1533,7 +1542,6 @@
         "metaLoadError": "Budsjettkategorier kunne ikke lastes.",
         "addCategory": "+ kategori",
         "addSubcategory": "+ underkategori",
-        "moreDetails": "Flere detaljer",
         "newCategoryPrompt": "Navn på ny kategori:",
         "newSubcategoryPrompt": "Navn på ny underkategori:",
         "categoryAddedToast": "Kategori lagt til.",
@@ -1844,6 +1852,7 @@
         "healthCycleSaved": "Syklusinnstilling lagret.",
         "healthCyclePersonalLabel": "Vis syklus",
         "healthCyclePersonalHint": "Gjelder bare din egen visning. Slår du den av, forblir syklusen synlig for de andre i husstanden.",
+        "healthCycleSettingsHint": "Sykluslengde, prevensjon, påminnelser og graviditetsmodus stiller du inn på syklussiden.",
         "healthCyclePersonalHouseholdOff": "Syklusen er for øyeblikket slått av for hele husstanden, så den vises ikke for noen.",
         "healthCyclePersonalSaved": "Syklusvisning lagret.",
         "pageRewardsModule": "Belønninger",
@@ -2149,7 +2158,7 @@
         "familyRoleGrandparent": "Besteforelder",
         "familyRoleRelative": "Slektning",
         "familyRoleOther": "Familiemedlem",
-        "childStartHint": "Nye barnekontoer starter uten Budsjett og faste og ser Husholdningshjelp bare for lesing, uten lønn og betalinger. Du kan endre dette senere under «Roller og tillatelser».",
+        "childStartHint": "Nye barnekontoer starter uten Budsjett og faste og ser Husholdningshjelp bare for lesing, uten lønn og betalinger. Du kan endre dette senere under «Roller og tillatelser». Syklusen er også skjult; den kan vises i barnets personlige innstillinger.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratorer kan administrere applikasjonsinnstillinger, integrasjoner, API-tokener og familiekontoer.",
         "systemAdminBadge": "Systemadministrator",
@@ -2179,7 +2188,8 @@
         "languageTitle": "Språk",
         "dataLanguageLabel": "Språk for lagrede oppføringer",
         "dataLanguageHint": "Språket Yuvomi bruker når den lagrer oppføringer den oppretter selv, som bursdagshendelser. Påvirker API, kalenderstrøm og synkronisering, ikke visningen her.",
-        "dataLanguageAuto": "Automatisk ({{language}})",
+        "dataLanguageAuto": "Automatisk",
+        "hintWithCurrent": "Nå: {{value}}. {{hint}}",
         "dataLanguageAdminOnly": "Kun administratorer kan angi språket for lagrede oppføringer.",
         "dataLanguageSaved": "Språk for lagrede oppføringer oppdatert",
         "sectionMeals": "Måltidsplan",
@@ -2900,6 +2910,7 @@
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Angir format for valuta, tall, dato og tid for å samsvare med regionen (f.eks. Sveits: 1'234.50). Velg «Tilpass» for å konfigurere dem individuelt.",
+        "regionWithLanguage": "{{region}} ({{language}})",
         "regionAdminOnly": "Kun administratorer kan endre region og valuta.",
         "formatsHouseholdHint": "Dato- og tidsformat gjelder for hele husholdningen. Alle medlemmer kan endre dem.",
         "regionCustom": "Tilpass",
@@ -3088,7 +3099,7 @@
         "timezoneTitle": "Tidssone",
         "timezoneLabel": "Husstandens tidssone",
         "timezoneHint": "Gjelder der en tid ikke har sin egen sone: påminnelser, nedtellinger, kalenderdagen som kalles \"i dag\", den eksporterte kalenderstrømmen og hendelser sendt til Google eller Outlook.",
-        "timezoneAuto": "Automatisk ({{zone}})",
+        "timezoneAuto": "Automatisk",
         "timezoneAdminOnly": "Kun administratorer kan endre tidssonen.",
         "timezoneSaved": "Tidssone lagret.",
         "timezoneMismatch": "Nettleseren din står i {{browser}}, husstanden regner i {{household}}.",
@@ -3139,6 +3150,7 @@
         "healthPreventionNotifyCaregiversSaved": "Varslingsinnstilling lagret.",
         "healthVisibilityTitle": "Standard synlighet",
         "healthVisibilityHint": "Hva nye oppføringer starter som. Du kan fortsatt endre det på hver enkelt oppføring.",
+        "healthVisibilityCaregivers": "Den som får registrere for deg, ser også de private oppføringene dine, unntatt syklusdagboken. En administrator bestemmer dette under medlemmer.",
         "healthVisibilityOther": "Andre områder",
         "healthVisibilityApply": "Flytt eksisterende oppføringer også",
         "healthVisibilityApplyHint": "Lagret. Skal de eksisterende oppføringene under {{area}} endres også?",
@@ -3271,10 +3283,12 @@
         "weatherPlaceTooShort": "Skriv minst to tegn.",
         "weatherPlaceNotFound": "Fant ikke noe sted med dette navnet. Legg til landet, f.eks. «Bø, Norge».",
         "weatherPlaceUnavailable": "Stedssøket er ikke tilgjengelig akkurat nå. Prøv igjen om litt, eller skriv inn koordinatene for hånd.",
-        "weatherManualTitle": "Koordinater for hånd"
+        "weatherManualTitle": "Koordinater for hånd",
+        "backupDropzoneTitleTouch": "Trykk for å velge en sikkerhetskopifil",
+        "installModuleDropzoneTitleTouch": "Trykk for å velge en ZIP-fil"
     },
     "login": {
-        "tagline": "Velkommen tilbake til familieplanleggeren din.",
+        "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
         "usernameLabel": "Brukernavn",
         "passwordLabel": "Passord",
         "loginButton": "Logg inn",
@@ -3343,7 +3357,6 @@
         "unsavedChanges": "Forkast endringer?",
         "unsavedChangesDetail": "Inntastinger i dette skjemaet vil gå tapt.",
         "discardChanges": "Forkast",
-        "moreSettings": "Flere innstillinger",
         "moreDetails": "Flere detaljer"
     },
     "rrule": {
@@ -3448,6 +3461,7 @@
         "editTitle": "Rediger bursdag",
         "nameLabel": "Navn",
         "birthDateLabel": "Fødselsdato",
+        "showContact": "Vis kontakt",
         "nameDay": "Navnedag",
         "celebratesNameDay": "feirer navnedagen sin",
         "nameDayLabel": "Navnedag (valgfritt)",
@@ -3577,11 +3591,13 @@
         "goTo": "Gå til",
         "newSection": "Ny",
         "recentLabel": "Nylig åpnet",
-        "createTaskNamed": "Opprett «{{title}}» som oppgave"
+        "createTaskNamed": "Opprett «{{title}}» som oppgave",
+        "hintMove": "Velg",
+        "hintOpen": "Åpne"
     },
     "onboarding": {
         "step1Title": "Velkommen til {{name}}",
-        "step1Body": "Din personlige familieplanlegger. Oppgaver, kalender, handling og mer - alt på ett sted.",
+        "step1Body": "Oppgaver, kalender, handling og mer for husholdningen din - enten du bor alene, i par eller som familie. Alt på ett sted.",
         "step2Title": "Navigasjon og moduler",
         "step2Body": "Linjen nederst tar deg rett til de viktigste områdene. Alle andre moduler finner du under «Mer».",
         "step3Title": "Kom i gang raskt",
@@ -3931,7 +3947,10 @@
         "errorDmsAccountGone": "Denne DMS-kontoen finnes ikke lenger.",
         "errorDmsDocumentGone": "Dette dokumentet finnes ikke lenger i DMS-systemet.",
         "errorDmsAlreadyLinked": "Dette DMS-dokumentet er allerede koblet til.",
-        "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS."
+        "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS.",
+        "dropzoneTitleTouch": "Trykk for å velge en fil",
+        "viewerPrevNamed": "Forrige dokument: {{name}}",
+        "viewerNextNamed": "Neste dokument: {{name}}"
     },
     "housekeeping": {
         "title": "Husarbeid",
@@ -4117,7 +4136,8 @@
         "errorVisitGone": "Dette besøket finnes ikke lenger.",
         "errorTaskGone": "Denne oppgaven finnes ikke lenger.",
         "errorAlreadyCheckedOut": "Denne vaskehjelpen er allerede sjekket ut.",
-        "errorAlreadyCheckedIn": "Denne vaskehjelpen er allerede sjekket inn."
+        "errorAlreadyCheckedIn": "Denne vaskehjelpen er allerede sjekket inn.",
+        "allVisitsInReport": "Alle besøk i rapporten"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -4338,7 +4358,7 @@
         "mobileSearch": "Åpne søk via «Mer» → Søk.",
         "mobileSettings": "Finn innstillinger under «Mer».",
         "guideLink": "Brukerveiledning",
-        "guideHint": "Vedlikeholdes av fellesskapet, i eget depot - kan ligge bak en utgivelse."
+        "guideHint": "Vedlikeholdes av fellesskapet. Åpnes i en ny fane."
     },
     "changelog": {
         "title": "Endringslogg",
@@ -4379,8 +4399,9 @@
         "success": "Passordet ditt er endret. Du kan nå logge inn.",
         "mismatch": "Passordene stemmer ikke overens.",
         "tooShort": "Passordet må være minst 8 tegn langt.",
-        "invalidToken": "Denne lenken er ugyldig eller har utløpt.",
-        "missingToken": "Ingen gyldig token ble funnet."
+        "invalidToken": "Denne tilbakestillingslenken er ugyldig eller utløpt - be om en ny.",
+        "missingToken": "Denne tilbakestillingslenken er ufullstendig - be om en ny.",
+        "requestNew": "Be om en ny lenke"
     },
     "email": {
         "host": "SMTP-vert",
@@ -4789,6 +4810,12 @@
             "reminders": {
                 "title": "Kommende påminnelser",
                 "empty": "Ingen flere doser i dag"
+            },
+            "brief": {
+                "changes": "Siden siste måling: {{list}}.",
+                "latest": "Sist registrert: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} uendret"
             }
         },
         "vitals": {
@@ -5196,7 +5223,7 @@
             "emptyDesc": "Registrer din første periode for å se prognoser, kalender og statistikk.",
             "emptyCta": "Registrer første periode",
             "personsLabel": "Person",
-            "add": "Registrer periode",
+            "add": "Legg til tidligere periode",
             "loadError": "Syklusdata kunne ikke lastes.",
             "loadErrorDesc": "Vennligst prøv igjen senere.",
             "retry": "Prøv igjen",
@@ -5406,15 +5433,14 @@
                 "family": "Familie"
             },
             "period": {
-                "add": "Registrer periode",
+                "add": "Legg til tidligere periode",
                 "edit": "Menstruasjonsperiode",
                 "warningFuture": "Startdatoen er i fremtiden - forutsigelser er kun basert på tidligere perioder.",
                 "warningOverlap": "Overlapper med en allerede registrert periode."
             },
             "dayLog": {
                 "title": "Logg dag",
-                "date": "Dato",
-                "more": "Flere detaljer"
+                "date": "Dato"
             },
             "export": {
                 "csv": "Eksporter som CSV"
@@ -5432,8 +5458,9 @@
                 "cycleLength": "Gjennomsnittlig sykluslengde",
                 "periodLength": "Gjennomsnittlig periodelengde",
                 "lutealLength": "Lutealfase-lengde",
+                "daysUnit": "dager",
                 "trackFertility": "Vis fertilt vindu",
-                "autoHint": "La det stå tomt for å beregne automatisk fra historikken din.",
+                "autoHint": "Lar du ett av de to feltene stå tomt, regner Yuvomi ut verdien fra mensen du har registrert.",
                 "remindPeriodDaysBefore": "Påminnelse om periode",
                 "remindOff": "Av",
                 "remindSameDay": "På dagen",
@@ -5533,7 +5560,9 @@
                 "emptyError": "Vennligst velg en CSV-fil eller lim inn tekst.",
                 "error": "Import feilet."
             },
-            "discoveryHint": "Tips: Abonner på den forutsagte syklusen som en ICS-feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Innstillinger → Moduler → Kalender</a>, eller vis syklus-widgeten på <a href=\"/\">Oversikt</a> via tilpasningsmodus."
+            "feedLink": "Abonner på den forventede syklusen i kalenderen",
+            "widgetHint": "Legg syklusflisen til i {{overview}} under «{{customize}}».",
+            "endBeforeStart": "Slutten kan ikke være før starten."
         },
         "duration": {
             "hm": "{{hours}} t {{minutes}} min",
@@ -5542,6 +5571,7 @@
             "unitH": "t"
         },
         "careBanner": "Du registrerer for {{name}}.",
+        "whoSees": "Hvem ser dette?",
         "nutrition": {
             "title": "Ernæring",
             "emptyTitle": "Ingen ernæring logget ennå",
@@ -5684,6 +5714,7 @@
         "weekdaySat": "Lør",
         "weekdaySun": "Søn",
         "intervalLabelWeekly": "Hver N. uke",
+        "intervalLabelMonthly": "Hver N. måned",
         "anchorDateLabel": "Første henting",
         "monthDayLabel": "Dag i måneden",
         "monthDayLastDay": "Siste dag i måneden",
@@ -6271,8 +6302,8 @@
         "success": "Kontoen din er opprettet. Du kan logge inn nå.",
         "mismatch": "Passordene stemmer ikke overens.",
         "tooShort": "Passordet må være minst 8 tegn langt.",
-        "invalidToken": "Denne invitasjonen er ugyldig, utløpt eller har allerede blitt brukt.",
-        "missingToken": "Ingen gyldig token ble funnet.",
+        "invalidToken": "Denne invitasjonen er ugyldig, utløpt eller allerede brukt - be om en ny lenke.",
+        "missingToken": "Denne invitasjonslenken er ugyldig eller utløpt - be om en ny.",
         "usernameRequired": "Vennligst velg et brukernavn.",
         "usernameInvalid": "Brukernavnet må være mellom 3 og 64 tegn langt og kan bare inneholde bokstaver, tall, punktum, bindestrek og understrek.",
         "usernameTaken": "Dette brukernavnet er allerede i bruk.",
@@ -6486,9 +6517,8 @@
         "templateWork": "Arbeid",
         "templateSchool": "Skole",
         "templateUniversity": "Universitet",
-        "overview": "Sammenlign",
+        "overview": "Oversikt",
         "overviewPeopleLabel": "Sammenlign personer",
-        "overviewClearSelection": "Tøm valg",
         "continuesUntil": "…varer til {{time}}",
         "overviewEmptyTitle": "Velg personer som skal sammenlignes",
         "overviewEmptyDescription": "Velg minst ett medlem av husholdningen over for å se deres ukesplaner ved siden av hverandre.",
@@ -6520,6 +6550,7 @@
         "labelLabel": "Navn på denne enheten (valgfritt)",
         "labelHint": "Hjelper deg å gjenkjenne hvilken enhet dette er senere.",
         "submit": "Par",
-        "failed": "Denne paringskoden er ikke gyldig."
+        "failed": "Denne paringskoden er ikke gyldig.",
+        "codeRequired": "Skriv inn paringskoden som vises i innstillingene."
     }
 }

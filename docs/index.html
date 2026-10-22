@@ -1209,9 +1209,9 @@
              ohne sie hier haette das Skript erst die 2752px-Desktopaufnahme
              geholt und applyShots sie danach ersetzt - also genau der doppelte
              Download, den dieser Kommentar zu verhindern verspricht. -->
-        <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" alt="Yuvomi overview showing what is on today for the whole family, with the family and budget cards below" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
+        <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
         <script>document.getElementById('heroShot')&&(function(i){try{var t=localStorage.getItem('yuvomi-theme')||localStorage.getItem('oikos-theme'),d=t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches),l=localStorage.getItem('yuvomi-lang')||localStorage.getItem('oikos-lang')||((navigator.language||'en').toLowerCase().indexOf('de')===0?'de':'en'),m=matchMedia('(max-width:860px)').matches,k=d?'dark':'light',b=i.dataset[m&&i.dataset[k+'M']?k+'M':k],p=l!=='en'?b.replace('screenshots/','screenshots/'+l+'/'):b;i.onerror=function(){i.onerror=null;i.srcset='';i.src=b;};i.srcset=p.replace(/\.png$/,'@1x.webp')+' 1x, '+p.replace(/\.png$/,'.webp')+' 2x';i.src=p.replace(/\.png$/,'.webp');}catch(e){i.src=i.dataset.light;}})(document.getElementById('heroShot'));</script>
-        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" alt="Yuvomi overview showing what is on today for the whole family, with the family and budget cards below" width="1400" height="1050"></noscript>
+        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" width="1400" height="1050"></noscript>
       </div>
       <!-- Einkaufsliste statt Aufgaben: dieselbe Aufgaben-Aufnahme traegt die
            Planen-Karte weiter unten, dort in lesbarer Groesse (Critique Runde 2).
@@ -1244,7 +1244,7 @@
          the website's privacy policy: the claim is about the app. -->
     <a class="pi proof-link" href="https://github.com/ulsklyc/yuvomi#install" data-href-en="https://github.com/ulsklyc/yuvomi#install" data-href-de="https://github.com/ulsklyc/yuvomi/blob/main/README.de.md#installieren"><b>0</b> <span data-t="proof_telemetry">trackers</span></a>
     <span class="pi" data-t="proof_mit">MIT licensed</span>
-    <span class="pi ver"><b>v2.78.0</b></span>
+    <span class="pi ver"><b>v2.79.0</b></span>
   </div>
 </div>
 
@@ -1306,7 +1306,7 @@
       ho_2_d:'Any task can carry points. They go to whoever did it - the assignee, or the person picked when it is ticked off - and buy rewards from a catalog you control.',
       ho_3_a:'A receipt gets filed', ho_3_b:'It’s attached to the expense',
       ho_3_d:'Attach it to the budget entry from the documents you already keep, or upload it on the spot. Filed once, findable from both sides.',
-      alt_hero:"Yuvomi overview showing what is on today for the whole family, with the family and budget cards below",
+      alt_hero:"Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below",
       alt_hero_m:"Yuvomi shopping list on mobile",
       alt_f_health_m:"Health vitals on mobile",
       alt_f_tasks_m:"Tasks on mobile",
@@ -1331,7 +1331,7 @@
       gal_desc:'No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.',
       gal_meals_k:'Meals', gal_meals_c:'<b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.',
       alt_gal_meals:'Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks',
-      alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers",
+      alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers",
       gal_cal_k:'Calendar', gal_cal_c:'<b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.',
       proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'Everything your household needs',
       /* "for families" war die eine Stelle, die die Solo-Zusage des Heros
@@ -1429,7 +1429,7 @@
       ho_2_d:'Jede Aufgabe kann Punkte tragen. Die bekommt, wer sie erledigt hat: die zugewiesene Person oder die beim Abhaken ausgewählte. Eingelöst werden sie gegen Belohnungen aus einem Katalog, den ihr bestimmt.',
       ho_3_a:'Ein Beleg wird abgelegt', ho_3_b:'Er hängt an der Buchung',
       ho_3_d:'Hängt ihn aus euren vorhandenen Dokumenten an den Budget-Eintrag oder ladet ihn direkt hoch. Einmal ablegen, von beiden Seiten auffindbar.',
-      alt_hero:"Yuvomi-Übersicht: was heute für die ganze Familie ansteht, darunter die Karten für Familie und Budget",
+      alt_hero:"Yuvomi-Übersicht: was heute für die ganze Familie ansteht, darunter die Karten für Familie, Geburtstage und Belohnungen",
       alt_hero_m:"Yuvomi-Einkaufsliste auf dem Handy",
       alt_f_health_m:"Gesundheitswerte auf dem Handy",
       alt_f_tasks_m:"Aufgaben auf dem Handy",
@@ -1454,7 +1454,7 @@
       gal_desc:'Kein Demo-Konto, kein Verkaufsgespräch. Die Bildschirme, die eure Familie täglich öffnet, in der Größe, in der ihr sie wirklich nutzt. Der Rest kommt weiter unten.',
       gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Alle Mahlzeiten der Woche, an einem Ort geplant.</b> Vom Frühstück bis zum Snack, per Ziehen verteilt und für alle im Haus da.',
       alt_gal_meals:'Yuvomi-Essensplaner mit einer Woche Frühstück, Mittag- und Abendessen und Snacks',
-      alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, die Aufgaben und Dosen des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp',
+      alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp',
       gal_cal_k:'Kalender', gal_cal_c:'<b>Google, iCloud und Nextcloud, endlich in einem Kalender.</b> Sync in beide Richtungen, damit ein hier eingetragener Termin auf jedem Handy im Haus landet.',
       proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles, was euer Haushalt braucht',
       feat_desc:'Gegliedert wie in der App selbst. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü.',
@@ -1797,8 +1797,8 @@
            bis dahin den Platz hielt. Nur eine Web-Variante: das Motiv IST das
            Tablet, am Telefon bleibt es quer und stapelt unter dem Kopf. -->
       <div class="fam-shot reveal">
-        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
-        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers" loading="lazy" width="1400" height="1050"></noscript>
+        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
+        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" width="1400" height="1050"></noscript>
       </div>
       <div class="sec-head lead fam-head reveal">
         <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
@@ -2239,7 +2239,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       </nav>
     </div>
     <div class="foot-bottom">
-      <span><span id="gh-stars-footer" data-gh-stars>★ 1.7k · </span><b>v2.78.0</b> · <span id="foot-released" data-released="2026-10-18">18 October 2026</span></span>
+      <span><span id="gh-stars-footer" data-gh-stars>★ 1.7k · </span><b>v2.79.0</b> · <span id="foot-released" data-released="2026-10-22">22 October 2026</span></span>
       <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
     </div>
   </div>

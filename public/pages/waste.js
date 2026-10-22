@@ -1176,6 +1176,7 @@ function openTypeModal(type = null) {
     </div>`;
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('waste.editType') : t('waste.newType'),
     content,
     // 520 statt 400: Loeschen, Archivieren, Abbrechen und Speichern brauchen
@@ -1430,7 +1431,7 @@ function openScheduleModal(type, schedule = null) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label" for="wsm-interval">${t('waste.intervalLabelWeekly')}</label>
+      <label class="form-label" for="wsm-interval" id="wsm-interval-label">${t(kind === 'weekly' ? 'waste.intervalLabelWeekly' : 'waste.intervalLabelMonthly')}</label>
       ${intervalStepperHtml(schedule?.interval ?? 1)}
     </div>
     <div class="form-group">
@@ -1457,6 +1458,7 @@ function openScheduleModal(type, schedule = null) {
     </div>`;
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('waste.editSchedule') : t('waste.newSchedule'),
     content,
     size: 'sm',
@@ -1489,6 +1491,7 @@ function openScheduleModal(type, schedule = null) {
         weeklyFields.hidden = kindSelect.value !== 'weekly';
         monthlyFields.hidden = kindSelect.value !== 'monthly_fixed_day';
         ordinalFields.hidden = kindSelect.value !== 'monthly_ordinal_weekday';
+        panel.querySelector('#wsm-interval-label').textContent = t(kindSelect.value === 'weekly' ? 'waste.intervalLabelWeekly' : 'waste.intervalLabelMonthly');
         if (kindSelect.value === 'monthly_ordinal_weekday') refreshOrdinalAnchor();
       });
 

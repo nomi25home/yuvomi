@@ -143,13 +143,6 @@
  * Hier bleibt nur, wie eine gewaehlte Karte oder Zeile aussieht.
  * -------------------------------------------------------- */
 
-/* `.btn` setzt ein eigenes display und schlaegt damit das UA-`[hidden]
- * { display: none }`. Ohne diesen Guard blieb der DMS-Button sichtbar, obwohl
- * gar kein DMS-Konto konfiguriert ist. */
-.documents-dms-link-btn[hidden] {
-  display: none;
-}
-
 /* Die RASTERKARTE traegt ihre Auswahl als Ring - sie ist ein eigenes Objekt
  * (randlos seit 2026-09-25, der Ring ist deshalb ein Schatten, keine Kante). Die ZEILE hat beides nicht mehr und traegt sie als getoente
  * Flaeche: dasselbe Vokabular wie jeder andere ausgewaehlte Zustand der App
@@ -239,6 +232,14 @@
 /* Der Ordner-Chip (documents.js, erster Chip der Filterzeile) gibt es nur
  * unterhalb Tablet - am Desktop steht die Ordnerspalte offen. */
 .documents-folder-chip {
+  display: none;
+}
+
+/* Die Kategorien als zweite Gruppe der Auswahl gibt es nur am Telefon (Block
+ * unten, max-width 767px); daneben tragen die Chips die Kategorie. */
+.documents-category-browser,
+.documents-category-browser__title,
+.documents-folder-chip__facet {
   display: none;
 }
 
@@ -353,12 +354,6 @@
   gap: var(--space-1);
   margin-bottom: var(--space-3);
   font-size: var(--text-sm);
-}
-
-/* `display: flex` schlaegt das UA-`[hidden]`: im Wurzelordner blieb der leere
- * Pfad samt Aussenabstand ueber der Liste stehen (#1340). */
-.documents-breadcrumb[hidden] {
-  display: none;
 }
 
 .documents-breadcrumb__crumb {
@@ -819,12 +814,18 @@
  * ein Bild, das erst beim Scrollen ankommt, schiebt nichts mehr zur Seite.
  * Gemessen 1440px, vier Spalten: Rahmen 179 x 239px, Blatt 152 x 215px,
  * Karte 394-414px (vorher 309px mit dem 4:3-Ausschnitt) - der Preis des
- * ganzen Blatts sind rund 90px je Reihe; die dichte Sicht ist die Liste. */
+ * ganzen Blatts sind rund 90px je Reihe; die dichte Sicht ist die Liste.
+ *
+ * QUADRATISCHER RAHMEN, GANZES BLATT (R21 S7, Critique a4: "Karte 414px hoch,
+ * 1,5 Reihen"). Bei 1440x900 stand die zweite Reihe nur halb im Bild. Der
+ * Rahmen ist jetzt quadratisch, das Blatt darin bleibt ganz (`contain`,
+ * hochkant also schmaler) - kein Ausschnitt wie beim 4:3-Rahmen, aber rund 60px je
+ * Reihe weniger: zwei Reihen passen. */
 .document-card__media {
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1 / 1;
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
@@ -881,7 +882,6 @@
 .document-card__description {
   margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -892,7 +892,6 @@
   display: flex;
   gap: var(--space-2);
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
 }
 
 /* Die Karte braucht den Abstand zum Titel; die ZEILE bekommt ihn von
@@ -990,7 +989,6 @@
 
 .document-card__date {
   min-width: 0;
-  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1095,30 +1093,37 @@
    * fuer die Tastatur (Codex-Review zu PR #754, dort als Tastaturfall gemeldet).
    * Die Dichte holt sich die Breite aus den Statistiken und dem
    * Herunterladen-Link - das Herunterladen bietet der Betrachter selbst noch
-   * einmal an. Seit 2026-09-25 geht auch das Auge (Regel unten): die Zeile
+   * einmal an. Seit 2026-09-25 geht auch das Auge (Regel darunter): die Zeile
    * oeffnet den Betrachter per Klick, und das Kebab-Menue fuehrt "Ansehen",
    * sobald die Leiste es nicht zeigt - der Weg ins Dokument bleibt fuer Maus,
    * Touch und Tastatur. */
   .document-row__actions a[download] {
     display: none;
   }
+}
 
-  /* DAS AUGE GEHT, DIE ZEILE OEFFNET (Re-Critique 2026-09-25, P2). Mit Auge
-   * und Kebab blieben dem Titel bei 375px 153px, und lange Titel brachen auf
-   * vier Zeilen - fuer einen Knopf, der dasselbe tut wie ein Tipp auf die
-   * Zeile. Der Kebab bleibt das eine nachlaufende Element; fuer die Tastatur
-   * traegt sein Menue dann "Ansehen" (openDocumentMenu), und der Tab-Stopp der
-   * Leiste rueckt auf ihn (utils/roving-toolbar.js, repairRovingStops). Raster
-   * und breite Liste behalten das Auge. */
-  /* OHNE KEBAB BLEIBT DAS AUGE (#1265). Wer das Dokument nicht verwalten darf
-   * (`documents: read` oder ein fremdes Dokument), bekommt kein Menue - seine
-   * Eintraege sind alle Handlungen. Dann ist das Auge das eine nachlaufende
-   * Element und der Tab-Stopp der Zeile; die Breite ist dieselbe wie mit dem
-   * Kebab. Als `:not()` an der Regel selbst statt als zweite, spaetere Regel:
-   * so gibt es keinen Gleichstand, den die Reihenfolge entscheiden muesste. */
-  .document-row__actions:not([data-read-bar]) [data-action="view"] {
-    display: none;
-  }
+/* DAS AUGE GEHT, DIE ZEILE OEFFNET - IN JEDER BREITE (Re-Critique 2026-09-25,
+ * P2; seit R21 auch in der breiten Liste, D10 Zeilen-Endzone). Mit Auge und
+ * Kebab blieben dem Titel bei 375px 153px, und lange Titel brachen auf vier
+ * Zeilen - fuer einen Knopf, der dasselbe tut wie ein Tipp auf die Zeile. Die
+ * breite Liste behielt es bis R21 und trug damit [Auge][Herunterladen][Mehr],
+ * drei Icon-Aktionen, wo die Endzone EINE sichtbare Handlung und den
+ * Mehr-Knopf kennt: jetzt [Herunterladen][Mehr], schmal nur [Mehr]. Fuer die
+ * Tastatur traegt das Menue dann "Ansehen" (openDocumentMenu), und der
+ * Tab-Stopp der Leiste rueckt auf den ersten sichtbaren Knopf
+ * (utils/roving-toolbar.js, repairRovingStops). Das Raster behaelt das Auge:
+ * eine Karte ist keine Zeile.
+ *
+ * OHNE KEBAB BLEIBT DAS AUGE (#1265). Wer das Dokument nicht verwalten darf
+ * (`documents: read` oder ein fremdes Dokument), bekommt kein Menue - seine
+ * Eintraege sind alle Handlungen. Dann ist das Auge das eine nachlaufende
+ * Element und der Tab-Stopp der Zeile, und das Herunterladen geht (der
+ * Betrachter bietet es an): EIN Knopf, wie mit dem Kebab. Als `:not()` an der
+ * Regel selbst statt als zweite, spaetere Regel: so gibt es keinen
+ * Gleichstand, den die Reihenfolge entscheiden muesste. */
+.document-row__actions:not([data-read-bar]) [data-action="view"],
+.document-row__actions[data-read-bar] a[download] {
+  display: none;
 }
 
 .documents-danger {
@@ -1143,7 +1148,7 @@
 .document-form__hint {
   margin-top: var(--space-1);
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
 }
 
 /* Folder upload stays within one form: the drop zone picks files, a secondary
@@ -1181,10 +1186,6 @@
   cursor: pointer;
 }
 
-.document-folder-link[hidden] {
-  display: none;
-}
-
 .document-folder-link:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -1211,10 +1212,6 @@
   border-radius: var(--radius-md);
   background: var(--color-fill-well);
   overflow-wrap: anywhere;
-}
-
-.folder-upload-preview[hidden] {
-  display: none;
 }
 
 .folder-upload-preview__summary {
@@ -1508,6 +1505,74 @@
     padding-inline-start: var(--space-2);
   }
 
+  /* WO UND WAS IN EINER AUSWAHL (R21 S9b, Critique a4, D7: beide Ordnungen
+   * bleiben, nur die Zeile ordnet sich). Drei Achsen in einer Zeile liessen
+   * bei 390px keine der sechs Kategorien ganz im Bild - die Spur lief 775px
+   * ueber. Hier weichen die Kategorie-Chips; die Kategorien stehen als zweite
+   * Gruppe unter den Ordnern in der Auswahl, die der Ordner-Chip aufklappt,
+   * und der Chip nennt die gewaehlte mit. Die Zeile behaelt EINE Bedienzeile
+   * (Chrome-Regel): Status-Segment, Auswahl, Fristen-Chip. */
+  #documents-category {
+    display: none;
+  }
+
+  .documents-folder-browser--open .documents-category-browser {
+    display: block;
+  }
+
+  .documents-folder-chip__facet:not(:empty) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: 0;
+  }
+
+  .documents-folder-chip__facet-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Ohne Ordner nennt der Chip nur die Kategorie; und er darf schrumpfen -
+   * hinter ihm steht hoechstens noch der Fristen-Chip. */
+  .documents-folder-chip[data-category-only] :is(.documents-folder-browser__toggle-label, .documents-folder-chip__icon) {
+    display: none;
+  }
+
+  .documents-folder-chip {
+    flex-shrink: 1;
+    min-inline-size: 0;
+  }
+
+  .documents-folder-chip[data-category-active] {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+    border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-hint), transparent);
+    color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+  }
+
+  /* Zwei Gruppen brauchen zwei Koepfe: der Ordner-Titel, zwischen 768 und
+   * 1023px nur fuer Screenreader (der Chip nennt den Ordner), steht hier
+   * wieder sichtbar ueber seiner Gruppe, der Kategorie-Titel ueber seiner. */
+  .documents-folder-browser__head {
+    justify-content: space-between;
+  }
+
+  .documents-folder-browser__title {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .documents-folder-browser--open .documents-category-browser__title {
+    display: block;
+    margin-block-start: var(--space-2);
+    padding-inline-start: var(--space-1);
+  }
+
   /* HIER STAND EIN VERSCHACHTELTER `max-height: 499px`-BLOCK mit genau den
    * Regeln, die jetzt zwei Absaetze weiter oben stehen. Er nahm den Umbruch
    * zurueck, wo die HOEHE fehlte; seit die Filterzeile auch auf dem Telefon
@@ -1648,7 +1713,6 @@
   padding: var(--space-3) 0 var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
 }
 
 .document-viewer__meta span {
@@ -1660,6 +1724,22 @@
 .document-viewer__meta svg {
   width: 13px;
   height: 13px;
+}
+
+/* VOR UND ZURUECK (Critique R21): ein Paar am Anfang der Leiste, durch
+ * eine Haarlinie von den Handlungen getrennt. Am Rand der Liste haelt eine
+ * Luecke die Stelle des fehlenden Pfeils, damit der andere nicht springt. */
+.document-viewer__pager {
+  display: inline-flex;
+  align-items: center;
+  padding-inline-end: var(--space-2);
+  margin-inline-end: var(--space-1);
+  border-inline-end: 1px solid var(--color-border-subtle);
+}
+
+.document-viewer__pager-gap {
+  width: var(--target-lg);
+  flex-shrink: 0;
 }
 
 .document-viewer__actions {
@@ -1728,6 +1808,62 @@
   object-fit: contain;
   border-radius: var(--radius-glass-inner);
   box-shadow: var(--glass-shadow-md);
+}
+
+/* DIE BUEHNE IST NIE LEER (Critique R21, a4: mobil 300-400 ms ohne Bild und
+ * ohne Ladezeichen). Poster (die Vorschau der Kachel, documents.js
+ * `viewerPoster`), Bild und Ladezeichen teilen EINE Rasterzelle: das Poster
+ * steht sofort da und hat das Seitenverhaeltnis des Bildes, also auch seine
+ * Groesse - das Bild blendet darueber, ohne dass etwas springt. Danach tritt
+ * das Poster zurueck (Deckkraft, damit ein Bild mit Transparenz es nicht
+ * durchscheinen laesst). */
+.document-viewer__stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.document-viewer__stage > * {
+  grid-area: 1 / 1;
+}
+
+.document-viewer__stage > .document-viewer__image,
+.document-viewer__stage > .document-viewer__poster {
+  transition: opacity var(--duration-sm) var(--ease-out);
+}
+
+.document-viewer__stage[data-stage-loading] > .document-viewer__image:not(.document-viewer__poster),
+.document-viewer__stage:not([data-stage-loading]) > .document-viewer__poster {
+  opacity: 0;
+}
+
+.document-viewer__stage:not([data-stage-loading]) > .document-viewer__stage-status {
+  display: none;
+}
+
+.document-viewer__stage-status {
+  display: inline-flex;
+  padding: var(--space-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* Die erste PDF-Seite als Poster: so breit wie die Seite, die pdf.js gleich
+ * an ihre Stelle zeichnet (`.document-viewer__pdf-canvas`). Mit Poster liegt
+ * das Ladezeichen in seiner Kapsel darueber; ohne bleibt es, wie es war. */
+.document-viewer__poster--page {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.document-viewer__stage--poster > .document-viewer__loading {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .document-viewer__pdf {
@@ -1916,17 +2052,9 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  animation: documents-spin 800ms linear infinite;
-}
-
-@keyframes documents-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .document-viewer__spinner {
-    animation: none;
-  }
+  /* Die geteilte Statusdrehung (layout.css); unter reduzierter Bewegung
+   * dreht sie weiter (reset.css, D12). */
+  animation: status-spin var(--spin-period) linear infinite;
 }
 
 /* --------------------------------------------------------
@@ -2190,7 +2318,6 @@
 
 .dms-result__sub {
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

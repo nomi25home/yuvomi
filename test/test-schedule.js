@@ -2050,7 +2050,8 @@ test('R17/E1: shift types and plans are rows, edited in the create dialog with O
   assert.doesNotMatch(sync.replace(/\/\*[\s\S]*?\*\//g, ''), /\.remove\(\)/, 'no day group is removed while typing');
   assert.match(sync, /group\.hidden = Number\(group\.dataset\.dayGroup\) >= cycleLength/);
   assert.match(schedulePage, /form\.querySelectorAll\('\[data-day-group\]:not\(\[hidden\]\) \[data-day-row\]'\)/, 'hidden days are not collected');
-  assert.match(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'), /\.schedule-day-group\[hidden\]\s*\{\s*display:\s*none/);
+  // Seit R21 S9a die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok((await import('./css-rules.js')).globalHiddenRule(), 'ein ausgeblendeter Tag verschwindet');
   // Half written (review of #1767): when the fields request fails after the
   // type was saved, the page reloads the server state instead of staying stale.
   assert.match(saveType, /typeSaved = true;/);
@@ -3488,4 +3489,41 @@ test('#1997: Erfolg nach Dialogwechsel - jeder Speichern-Weg schliesst nur mit d
     globalThis.__modalContextId = saved.context;
     globalThis.window = saved.window;
   }
+});
+
+// R21 (Critique a3, clarify): DER ERSTE REITER HEISST UND ZEIGT, WAS ER IST.
+// "Vergleich" stand vorn, hiess anders als jeder andere erste Reiter (Budget,
+// Gesundheit: "Uebersicht") und war ohne Schichtart leer - ein Erstnutzer
+// landete auf "Schichtarten" und sah links daneben einen Reiter ohne Inhalt.
+// Er heisst jetzt wie die Uebersicht der anderen Module und erscheint erst,
+// wenn es etwas zu ueberblicken gibt. Der Abschnittstitel "Schichtarten"
+// unter dem Reiter "Schichtarten" steht nur noch im Baum.
+test('R21: der erste Reiter heisst Uebersicht, fehlt solange nichts geplant ist, und kein Titel wiederholt den Reiter', () => {
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  for (const file of ['de', 'en', 'fr', 'ja']) {
+    const loc = JSON.parse(readFileSync(new URL(`../public/locales/${file}.json`, import.meta.url), 'utf8'));
+    assert.equal(loc.schedule.overview, loc.health.tabs.overview, `${file}: der erste Reiter heisst wie die Uebersicht der Gesundheit`);
+  }
+  assert.match(src, /overviewTab\.hidden = planningNeedsShiftTypes\(\) && activeView !== 'overview';/, 'ohne Schichtart steht kein leerer Reiter vorn');
+  assert.match(src, /<h2 class="u-section-title sr-only">' \+ esc\(t\('schedule\.shiftTypes'\)\)/, 'der Titel unter dem gleichnamigen Reiter steht nur im Baum');
+  const tablist = readFileSync(new URL('../public/utils/tablist.js', import.meta.url), 'utf8');
+  assert.match(tablist, /const buttons = \(\) => \[\.\.\.container\.querySelectorAll\('\[data-tab-id\]'\)\]\.filter\(\(b\) => !b\.hidden\);/,
+    'ein ausgeblendeter Reiter ist kein Ziel der Pfeiltasten');
+});
+
+// R21 S7 (Critique a3, 1440): das Auswertungs-Segment lief 788px breit (jedes
+// Segment 260px um ein Wort), und die Planung stapelte drei Leerzustaende
+// (299 + 145 + 145px). Das Segment steht in seiner Inhaltsbreite; Ausnahmen
+// und Zusatzschichten ohne Eintrag sind eine ruhige Zeile (56px).
+test('R21 S7: Segment in Inhaltsbreite, Nebenabschnitte ohne Eintrag als ruhige Zeile', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const seg = rules.find((r) => r.selector.trim() === '.schedule-stat-range__choices' && !r.at.length);
+  assert.match(seg?.body ?? '', /inline-size:\s*fit-content/, 'das Segment ist so breit wie seine Worte');
+  const item = rules.find((r) => r.selector.trim() === '.schedule-stat-range__choices .segmented__item');
+  assert.match(item?.body ?? '', /flex:\s*0 0 auto/, 'kein Segment waechst in die Breite');
+  const row = rules.find((r) => /\.schedule-library--overrides > \.empty-state--compact/.test(r.selector) && /\.schedule-library--extras > \.empty-state--compact$/.test(r.selector.trim()));
+  assert.match(row?.body ?? '', /flex-direction:\s*row/, 'Satz und Aktion nebeneinander');
+  assert.match(row.body, /text-align:\s*start/, 'buendig wie eine Zeile, nicht mittig');
 });
