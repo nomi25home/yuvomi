@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed; retrying reports the total across successful batches.
 
 ### Fixed
+- **A CalDAV rate limit or outage no longer sends a moved shopping item back (#2137).** When a
+  target calendar responds with 429 or 5xx while a shopping item is being moved there, the move
+  now waits instead of counting as a failure. Five failures no longer silently return the item to
+  its old list. A dropped connection also pauses further carry attempts for that list, matching
+  the behaviour for rate-limit and outage responses.
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The
