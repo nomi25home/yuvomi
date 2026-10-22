@@ -344,6 +344,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "あなたのダッシュボードは世帯の既定に従っています。",
         "customizeSetDefault": "世帯の既定にする",
         "customizeSetDefaultConfirm": "この配置を世帯の既定にしますか？",

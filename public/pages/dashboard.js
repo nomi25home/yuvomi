@@ -4481,7 +4481,7 @@ function renderCustomizeFootnote({ followsDefault = true, canPublish = false, ph
           </button>
         </div>` : '';
     return `
-    <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
+    <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizePhoneTitle'))}">
       <p>${t('dashboard.customizePhoneScopeHint')}</p>
       ${resetBtn}
     </section>`;
@@ -7403,7 +7403,17 @@ export async function render(container, { user, signal: routeSignal = null } = {
       followsPhoneDefault = false;
     }
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    // Auf dem Telefon mit eigener Anordnung die Telefon-Kacheln merken (#2109),
+    // damit das Skelett den Phone-Aufriss voraussagt statt den Desktop-Aufriss.
+    if (phoneWidgetConfig !== null && onPhoneStage()) {
+      rememberLayoutHint(
+        phoneWidgetConfig.map((p) => { const d = widgetConfig.find((w) => w.id === p.id); return d ? { ...d, visible: p.visible, order: p.order } : p; }),
+        dashboardQuery(widgetConfig),
+        calendarListRowsOf,
+      );
+    } else {
+      rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    }
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
@@ -7566,6 +7576,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
       if (phoneSaved.has('cycle') && !desktopVisible.has('cycle')) await ensureCycleSlice();
       if (phoneSaved.has('schedule') && !desktopVisible.has('schedule')) await ensureScheduleSlice();
       if (phoneSaved.has('waste') && !desktopVisible.has('waste')) await ensureWasteSlice();
+      // Skelett-Vorhersage fuer den naechsten Kaltstart (#2109).
+      if (onPhoneStage()) {
+        rememberLayoutHint(
+          phoneWidgetConfig.map((p) => { const d = widgetConfig.find((w) => w.id === p.id); return d ? { ...d, visible: p.visible, order: p.order } : p; }),
+          dashboardQuery(widgetConfig),
+          calendarListRowsOf,
+        );
+      }
       rebuildDashboard(widgetConfig);
       window.yuvomi?.showToast(t('dashboard.customizeSaved'), 'success', 1500, null);
       return;
@@ -7645,6 +7663,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
 
   // Telefon-Arrangement zuruecksetzen auf "wie Desktop" (#2109).
   async function resetPhoneConfig() {
+    const confirmed = await confirmModal(t('dashboard.customizePhoneResetConfirm'), {
+      confirmLabel: t('dashboard.customizePhoneReset'),
+    });
+    if (!confirmed) return;
     try {
       await api.put('/preferences', { dashboard_widgets_phone: null, dashboard_today_glance: glanceVisible });
     } catch {
@@ -7659,6 +7681,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
       savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
       desktopWidgetConfig = null;
     }
+    // Skelett-Vorhersage zurueck auf Desktop (#2109).
+    if (onPhoneStage()) rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
     isCustomizing = false;
     focusAfterRebuild = ['#dashboard-customize-btn'];
     rebuildDashboard(widgetConfig);

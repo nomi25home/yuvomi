@@ -307,6 +307,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "Sua visão geral segue o padrão da casa.",
         "customizeSetDefault": "Definir como padrão da casa",
         "customizeSetDefaultConfirm": "Tornar esta disposição o padrão da casa?",

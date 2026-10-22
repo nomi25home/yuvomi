@@ -362,6 +362,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "내 개요는 가정 기본값을 따릅니다.",
         "customizeSetDefault": "가정 기본값으로 설정",
         "customizeSetDefaultConfirm": "이 배치를 가정 기본값으로 설정할까요?",

@@ -362,6 +362,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "Sumusunod ang iyong overview sa default ng sambahayan.",
         "customizeSetDefault": "Itakda bilang default",
         "customizeSetDefaultConfirm": "Gawing default ng sambahayan ang ayos na ito?",

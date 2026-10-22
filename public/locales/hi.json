@@ -344,6 +344,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "आपका डैशबोर्ड घर के डिफ़ॉल्ट का अनुसरण करता है।",
         "customizeSetDefault": "घर का डिफ़ॉल्ट बनाएँ",
         "customizeSetDefaultConfirm": "इस व्यवस्था को घर का डिफ़ॉल्ट बनाएँ?",

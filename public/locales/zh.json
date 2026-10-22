@@ -344,6 +344,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "你的概览跟随家庭默认布局。",
         "customizeSetDefault": "设为家庭默认",
         "customizeSetDefaultConfirm": "将此布局设为家庭默认？",

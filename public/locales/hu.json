@@ -344,6 +344,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "Az áttekintésed a háztartás alapértelmezését követi.",
         "customizeSetDefault": "Beállítás alapértelmezettként",
         "customizeSetDefaultConfirm": "Legyen ez az elrendezés a háztartás alapértelmezése?",
