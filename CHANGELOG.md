@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A contact with a birthday can be added to Birthdays from its detail view** (#2149). Until now
+  only contacts whose birthday had been imported showed a way to Birthdays. A contact with a birth
+  date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same
+  linked entry as the import from contacts, and the row then shows "Show in birthdays". The button
+  only appears for members who may edit the calendar, the module Birthdays belongs to.
+- **Traditional Chinese as the 27th language** (#2172, from #1670, translated by @TW199501). The
+  app, the web installer and the command-line installer speak Traditional Chinese (`zh-Hant`),
+  written in Taiwan usage, next to the existing Simplified `zh`. A browser or shell from Taiwan,
+  Hong Kong or Macau (`zh-TW`, `LANG=zh_TW.UTF-8`) picks it on its own, and so does `?lang=zh-TW`
+  in the API; mainland China and Singapore keep `zh`. Both entries now name their script: the
+  language pickers show "Chinese (Simpl.)" and "Chinese (Trad.)" instead of a plain "Chinese", and
+  the web installer 简体中文 and 繁體中文. New regions set the currency, date format and 12-hour clock in one step: Taiwan with
+  New Taiwan dollars and YYYY/MM/DD, Hong Kong and Macau with Hong Kong dollars and patacas and
+  D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
+
+### Changed
+- **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
+  Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
+  once for every child account that never set the switch itself and has not used the cycle yet.
+  A child who turned the tab on or off keeps that choice, a child who already logged a period, a
+  day or saved cycle settings keeps the tab, and the child can turn it on again in its own
+  settings; adults and administrators are not affected. Fasting stays as it is for existing
+  children: whether a parent ever chose it cannot be told apart, so it is still switched in the
+  permissions per member.
+
 ### Fixed
 - **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
   (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
@@ -60,6 +86,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path as calendar names and kept a line break or surrounding spaces from the server. They are now
   trimmed the same way, and an empty name falls back to the usual default. Existing accounts pick
   up the clean names with "Refresh addressbooks" in the CardDAV settings.
+- **Long region and language names are no longer cut off in the appearance settings on a
+  phone.** (#2151) A region such as "United Arab Emirates" or a data language such as "Brazilian
+  Portuguese" ended in "…" on a narrow screen. The setting now shows a short form ("UAE",
+  "Portuguese (BR)"), and the hint below starts with the full name ("Currently United Arab
+  Emirates."). Countries with a region per language show the language as a code ("Canada (FR)").
+  Other names stay as they are.
 - **An error that arrives late no longer pushes aside the dialog you opened in the meantime.**
   (#2134) A few places show their error as a dialog after a request fails, or ask a question
   built from the server's answer: deciding a reward request, closing a pocket-money account or
@@ -70,6 +102,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   question that no longer fits is not asked; for a module that already exists, the install card
   says so. If the participants list fails to load after you moved on, nothing is shown, because
   its dialog would not open anyway.
+- **Buttons on a touch tablet in landscape are finger-sized again.** From 1024px wide, buttons
+  switched to the mouse size of 40px by window width alone, so an iPad in landscape got 40px
+  instead of 48px, including the create button in the page header ("+ Task", "+ Recipe"). They
+  now take the mouse size only where a mouse or trackpad is the pointer. With a mouse nothing
+  changes. The create button in the page header also no longer pops in from half size on first
+  load: the header stays still.
 
 ## [2.79.0] - 2026-10-22
 

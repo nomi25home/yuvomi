@@ -359,7 +359,7 @@ without this repository's private tooling.
 
 - Web Component prefix: `yuvomi-` (one component per file). Not every file in `public/components/` is a Web Component: most are ES modules that export functions, such as `openModal`, `openDetailView` or `renderUserMultiSelect`.
 - All UI text via i18n keys (`t('key')`) - never hardcode text in components. German (`de`) is the reference locale.
-- **Adding a new i18n key:** add it to **all** files in `public/locales/` (26 languages; a
+- **Adding a new i18n key:** add it to **all** files in `public/locales/` (27 languages; a
   non-German value may start as the English text). The JSON files are 4-space indented
   and nested - edit them in place, never reserialize a whole file. A key interpolating a
   numeric `count` needs an `_one` singular variant (`{{count}}` placeholder), otherwise
@@ -492,6 +492,8 @@ npm run test:document-guards > /tmp/dg.log 2>&1; echo $?
 ```
 
 A `| tail` reports the status of `tail`, not of the run. That is not a hypothetical: v2.64.0 shipped on 2 September without this handrail because the step lived only in `docs/test-suites.md` and not in the release checklist anyone actually followed.
+
+After a Puppeteer bump, install the Chrome it pins before the run: `npx puppeteer browsers install chrome`. A machine that ran the handrail before only has the previous version in `~/.cache/puppeteer` ([#2155](https://github.com/ulsklyc/yuvomi/issues/2155)). Until then every browser start falls back to an installed system Chrome and logs a warning with both versions; that run is usable, but it is not the browser Puppeteer guarantees. To force a specific Chrome, set `PUPPETEER_EXECUTABLE_PATH=/path/to/chrome`. If that path does not exist, or no Chrome is found at all, the run stops with an error that names the install command.
 
 ---
 
