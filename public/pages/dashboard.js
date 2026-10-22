@@ -5220,7 +5220,22 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
   });
 }
 
-function renderWidgetCustomizeControls(w, index = 0, total = 1) {
+function renderWidgetSizeControls(w, sizeButtons) {
+  return `<div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+        ${sizeButtons}
+      </div>
+      ${renderWidgetSizeMenu(w.id, nearestPreset(w.size))}`;
+}
+
+function renderWidgetOptionsButton(w) {
+  return `<button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
+              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
+              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
+        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+      </button>`;
+}
+
+function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize = false } = {}) {
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const activeSize = nearestPreset(w.size);
@@ -5258,16 +5273,8 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
           <i data-lucide="chevron-down" aria-hidden="true"></i>
         </button>
       </div>
-      <div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
-        ${sizeButtons}
-      </div>
-      ${renderWidgetSizeMenu(w.id, activeSize)}
-      ${widgetHasOptions(w.id) ? `
-      <button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
-              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
-              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
-        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-      </button>` : ''}
+      ${phoneCustomize ? '' : renderWidgetSizeControls(w, sizeButtons)}
+      ${(phoneCustomize || !widgetHasOptions(w.id)) ? '' : renderWidgetOptionsButton(w)}
       <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
         <i data-lucide="eye-off" aria-hidden="true"></i>
       </button>
@@ -5359,7 +5366,7 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   `;
 }
 
-function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
+function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, phoneCustomize = false } = {}) {
   const widgetById = {
     tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
     calendar: (size, options) => renderCalendarWidget(data, size, options),
@@ -5416,7 +5423,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
       if (!html) return '';
       return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
                    data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
-        ${editing ? renderWidgetCustomizeControls(w, index, arr.length) : ''}
+        ${editing ? renderWidgetCustomizeControls(w, index, arr.length, { phoneCustomize }) : ''}
         ${html}
       </div>`;
     })
@@ -8224,7 +8231,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown, phoneCustomize })}
         ${cockpitHtml}
       </section>
-      ${renderDashboardLayout(displayCfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
+      ${renderDashboardLayout(displayCfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), phoneCustomize })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish, phoneCustomize, followsPhoneDefault }) : ''}
     `);
       // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben

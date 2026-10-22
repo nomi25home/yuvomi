@@ -798,6 +798,21 @@ test('R14 P2: Anpassen mobil ist eine kompakte Liste - Name, Griff, Auge - und d
   assert.match(body('.widget-edit-controls__caption', (r) => !r.at.length), /display:\s*none/, 'breit traegt der Kachelkopf den Namen');
 });
 
+test('R14 P2: Telefon-Anpassen blendet Groesse und Optionen aus - sie werden dort nicht gespeichert', () => {
+  const cfg = [
+    { id: 'notes', visible: true, size: '1x2' },
+    { id: 'budget', visible: true, size: '1x1' },
+  ];
+  global.window ??= { yuvomi: null };
+  const desktop = renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true, phoneCustomize: false });
+  const phone   = renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true, phoneCustomize: true });
+
+  assert.match(desktop, /widget-edit-controls__size/, 'Desktop: Groessen-Auswahl ist da');
+  assert.doesNotMatch(phone, /widget-edit-controls__size/, 'Telefon: Groessen-Auswahl fehlt');
+  assert.match(desktop, /widget-edit-controls__options/, 'Desktop: Optionen-Knopf ist da (budget hat Optionen)');
+  assert.doesNotMatch(phone, /widget-edit-controls__options/, 'Telefon: Optionen-Knopf fehlt');
+});
+
 // R14 P12 (Re-Critique 2026-09-28, A8 P3-2): die Uebersicht war der einzige
 // schwebende FAB am Desktop (48x48 @1360,820, nur "Schnellaktionen" als Name);
 // jedes andere Modul dockt als Pille mit Nomen im Kopf an.
