@@ -380,6 +380,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "نمای کلی تو از پیش‌فرض خانواده پیروی می‌کند.",
         "customizeSetDefault": "تعیین به عنوان پیش‌فرض",
         "customizeSetDefaultConfirm": "این چیدمان پیش‌فرض خانواده شود؟",

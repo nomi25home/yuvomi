@@ -434,6 +434,7 @@
         "customizePhoneTitle": "Phone tiles",
         "customizePhoneReset": "Same as desktop",
         "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "Твой обзор следует настройке по умолчанию для дома.",
         "customizeSetDefault": "Сделать общим по умолчанию",
         "customizeSetDefaultConfirm": "Сделать это расположение общим для дома по умолчанию?",
