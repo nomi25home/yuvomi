@@ -4470,7 +4470,22 @@ function renderCustomizeScopeActions({ followsDefault = true, canPublish = false
  * Unter dem Raster beantwortet er dieselbe Frage ("gilt das fuer alle?") vor
  * dem Tipp auf "Fertig", ohne das Bearbeitete wegzuschieben. Sichtbar nur auf
  * schmaler Buehne (dashboard.css) - breit steht er im Kopf. */
-function renderCustomizeFootnote({ followsDefault = true, canPublish = false } = {}) {
+function renderCustomizeFootnote({ followsDefault = true, canPublish = false, phoneCustomize = false, followsPhoneDefault = true } = {}) {
+  if (phoneCustomize) {
+    // Im Telefon-Anpassen-Modus: eigener Hinweis und "Wie Desktop"-Knopf (#2109).
+    const resetBtn = !followsPhoneDefault ? `
+        <div class="dashboard-customize-footnote__actions">
+          <button class="btn btn--ghost dashboard-customize-scope-action" data-customize-phone-reset>
+            <i data-lucide="monitor" class="icon-sm" aria-hidden="true"></i>
+            ${t('dashboard.customizePhoneReset')}
+          </button>
+        </div>` : '';
+    return `
+    <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
+      <p>${t('dashboard.customizePhoneScopeHint')}</p>
+      ${resetBtn}
+    </section>`;
+  }
   const actions = renderCustomizeScopeActions({ followsDefault, canPublish });
   return `
     <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
@@ -4501,7 +4516,7 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
   // setzen darf, ist Admin (#827).
   // `offerNew: false` im Fehlerzustand: wie der Speed-Dial dort (#634-Kommentar
   // bei initFab) kein Anlegen in Module, deren Daten nicht geladen sind.
-  const { followsDefault = true, canPublish = false, offerNew = true, weatherCard = false } = scope;
+  const { followsDefault = true, canPublish = false, offerNew = true, weatherCard = false, phoneCustomize = false } = scope;
   const dateLabel = mastheadDateLabel();
   // EIN WANDTABLETT BEKOMMT ZWEI KNOEPFE NICHT, WEIL BEIDE NUR SCHEITERN
   // KOENNEN (#1808). "Anpassen" endet in `PUT /preferences`, und ein Display
@@ -4531,8 +4546,8 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                2026-08-16). Ein Satz im Anpassen-Modus beantwortet sie im
                richtigen Moment. -->
           <div class="dashboard-customize-scope">
-            <p>${t('dashboard.customizeScopeHint')}</p>
-            ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
+            <p>${t(phoneCustomize ? 'dashboard.customizePhoneScopeHint' : 'dashboard.customizeScopeHint')}</p>
+            ${(!phoneCustomize && followsDefault) ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
           </div>
           <!-- MOBIL EINE ZEILE: [Abbrechen] Titel [Fertig] (R9 M7, iOS-Muster).
                Der Titel ist nur dort sichtbar (dashboard.css); am Desktop steht
@@ -4541,8 +4556,8 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                Raster (renderCustomizeFootnote) - hier bleiben sie fuer die
                breite Buehne. -->
           <div class="dashboard-customize-toolbar" role="toolbar" aria-label="${t('dashboard.customizeTitle')}">
-            ${renderCustomizeScopeActions({ followsDefault, canPublish, id: true })}
-            <span class="dashboard-customize-toolbar__title" aria-hidden="true">${esc(t('dashboard.customizeTitle'))}</span>
+            ${phoneCustomize ? '' : renderCustomizeScopeActions({ followsDefault, canPublish, id: true })}
+            <span class="dashboard-customize-toolbar__title" aria-hidden="true">${esc(t(phoneCustomize ? 'dashboard.customizePhoneTitle' : 'dashboard.customizeTitle'))}</span>
             <button class="btn btn--secondary" id="dashboard-customize-cancel">${t('common.cancel')}</button>
             <button class="btn btn--primary" id="dashboard-customize-save">${esc(t('dashboard.customizeDone'))}</button>
           </div>` : ''}
@@ -7276,6 +7291,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Folge ich der Vorgabe des Haushalts, habe ich nichts Eigenes gespeichert -
   // dann gibt es auch nichts zurueckzusetzen (#827).
   let followsDefault = true;
+  // Telefonansicht (#2109): eigene Reihenfolge, null heisst "wie Desktop".
+  // desktopWidgetConfig ist nur waehrend des Telefon-Anpassens gesetzt.
+  let phoneWidgetConfig = null;
+  let savedPhoneWidgetConfig = null;
+  let desktopWidgetConfig = null;
+  let followsPhoneDefault = true;
   const canPublish = user?.role === 'admin';
   // Die Wand fragt die Haushaltsfassung der Uebersicht ab (#1817,
   // `dashboardRequest`). JEDER Abruf dieser Seite geht hier durch - auch der
@@ -7374,6 +7395,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
     glanceVisible = prefsRes.data?.dashboard_today_glance !== false;
     savedGlanceVisible = glanceVisible;
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
+    // Telefonansicht (#2109): eigene Anordnung laden, null bleibt null ("folgt Desktop").
+    const ownPhoneWidgets = prefsRes.data?.dashboard_widgets_phone;
+    if (Array.isArray(ownPhoneWidgets)) {
+      phoneWidgetConfig = normalizeDashboardConfigWithExtensions(ownPhoneWidgets);
+      savedPhoneWidgetConfig = phoneWidgetConfig.map((w) => ({ ...w }));
+      followsPhoneDefault = false;
+    }
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
     rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
@@ -7516,6 +7544,25 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const previousQuery = dashboardQuery(savedWidgetConfig);
     widgetConfig = nextConfig.map((w) => ({ ...w }));
     const previousGlance = savedGlanceVisible;
+
+    // Telefon-Anpassen-Modus (#2109): phone arrangement speichern und Desktop-
+    // Config wiederherstellen. Kein layoutHint (Query haengt vom Desktop ab),
+    // kein Slice-Nachladen (Display aendert sich, nicht die Daten).
+    if (desktopWidgetConfig !== null) {
+      const phoneSlim = widgetConfig.map(({ id, visible, order }) => ({ id, visible, order }));
+      await api.put('/preferences', { dashboard_widgets_phone: phoneSlim });
+      phoneWidgetConfig = normalizeDashboardConfigWithExtensions(phoneSlim);
+      savedPhoneWidgetConfig = phoneWidgetConfig.map((w) => ({ ...w }));
+      followsPhoneDefault = false;
+      widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
+      savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      desktopWidgetConfig = null;
+      isCustomizing = false;
+      rebuildDashboard(widgetConfig);
+      window.yuvomi?.showToast(t('dashboard.customizeSaved'), 'success', 1500, null);
+      return;
+    }
+
     await api.put('/preferences', { dashboard_widgets: widgetConfig, dashboard_today_glance: glanceVisible });
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
@@ -7575,10 +7622,39 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   function cancelDashboardConfig() {
-    widgetConfig = savedWidgetConfig.map((w) => ({ ...w }));
-    glanceVisible = savedGlanceVisible;
+    if (desktopWidgetConfig !== null) {
+      // Telefon-Anpassen-Modus: Desktop-Config wiederherstellen.
+      widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
+      savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      desktopWidgetConfig = null;
+    } else {
+      widgetConfig = savedWidgetConfig.map((w) => ({ ...w }));
+      glanceVisible = savedGlanceVisible;
+    }
     isCustomizing = false;
     rebuildDashboard(widgetConfig);
+  }
+
+  // Telefon-Arrangement zuruecksetzen auf "wie Desktop" (#2109).
+  async function resetPhoneConfig() {
+    try {
+      await api.put('/preferences', { dashboard_widgets_phone: null });
+    } catch {
+      window.yuvomi?.showToast(t('common.errorGeneric'), 'danger');
+      return;
+    }
+    phoneWidgetConfig = null;
+    savedPhoneWidgetConfig = null;
+    followsPhoneDefault = true;
+    if (desktopWidgetConfig !== null) {
+      widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
+      savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      desktopWidgetConfig = null;
+    }
+    isCustomizing = false;
+    focusAfterRebuild = ['#dashboard-customize-btn'];
+    rebuildDashboard(widgetConfig);
+    window.yuvomi?.showToast(t('dashboard.customizePhoneResetDone'), 'success', 1500, null);
   }
 
   /* ABBRECHEN FRAGT, SOBALD ES ETWAS ZU VERLIEREN GIBT (Re-Critique
@@ -8062,13 +8138,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Fehlt das Cockpit (alle Domänen als Widgets sichtbar → kein Glance-Inhalt),
     // kollabiert das Band per --slim auf eine schlanke Gruß-Leiste statt ein
     // großes leeres Rechteck zu zeigen (Critique R3 P1).
-    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, cfg, isCustomizing) : '';
+    // Im Telefon-Anpassen-Modus wird die Phone-Anordnung bearbeitet (cfg ist
+    // dann schon die Phone-Config). Im Display-Modus auf dem Telefon zeigen wir
+    // die eigene Phone-Anordnung, falls eine gespeichert ist (#2109).
+    const phoneCustomize = desktopWidgetConfig !== null;
+    const displayCfg = (!isCustomizing && onPhoneStage() && phoneWidgetConfig !== null)
+      ? phoneWidgetConfig
+      : cfg;
+    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, displayCfg, isCustomizing) : '';
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
     // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
     // nicht fuer die Zeile.
-    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    const weatherCardShown = displayCfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
     // (captureRebuildFocus / restoreFocusAfterRebuild).
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
@@ -8100,20 +8183,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
     swapContent(shell, () => {
       setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
-        ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
+        ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown, phoneCustomize })}
         ${cockpitHtml}
       </section>
-      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
-      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
+      ${renderDashboardLayout(displayCfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
+      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish, phoneCustomize, followsPhoneDefault }) : ''}
     `);
       // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
       // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
       const fitted = measurePhoneProgram(shell);
       if (fitted) {
-        replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        replaceProgramSheet(shell, renderTodayCockpit(data, displayCfg, isCustomizing, { cap: fitted }));
         // Zweiter Blick, nur nach unten: der Rest unter den Zeilen hat gewechselt.
         const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
-        if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
+        if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, displayCfg, isCustomizing, { cap: tighter }));
       }
     }, { animate: fromSkeleton });
     wireLinks(container, rerender, { editing: isCustomizing, user });
@@ -8155,6 +8238,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Nur noch der Einstieg: im Anpassen-Modus gibt es diesen Knopf nicht.
       // Der Fokus geht in die Leiste, die ihn abloest.
       isCustomizing = true;
+      if (onPhoneStage()) {
+        // Auf dem Telefon: eigene Phone-Anordnung bearbeiten (#2109).
+        // Desktop-Config sichern, Phone-Config (oder Desktop als Startpunkt) laden.
+        desktopWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+        widgetConfig = (phoneWidgetConfig ?? desktopWidgetConfig).map((w) => ({ ...w }));
+        savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      }
       focusAfterRebuild = ['#dashboard-customize-cancel'];
       rebuildDashboard(widgetConfig);
     }, { signal: signal });
@@ -8182,9 +8272,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Zwei Orte je Knopf (Leiste breit, Fussnote schmal), ein Handler.
     container.querySelectorAll('[data-customize-reset]').forEach((btn) => btn.addEventListener('click', resetDashboardConfig, { signal: signal }));
     container.querySelectorAll('[data-customize-publish]').forEach((btn) => btn.addEventListener('click', publishHouseholdDefault, { signal: signal }));
+    // Telefon-Arrangement zuruecksetzen ("Wie Desktop") (#2109).
+    container.querySelectorAll('[data-customize-phone-reset]').forEach((btn) => btn.addEventListener('click', resetPhoneConfig, { signal: signal }));
     wireDashboardEditMode();
     wireRowFill();
-    void mountExtensionWidgets(shell, cfg, user);
+    void mountExtensionWidgets(shell, displayCfg, user);
 
     /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Jede Geste im Anpassen-Modus baut die
      * Flaeche neu - und bis hierher fiel der Fokus danach auf <body>: wer per
