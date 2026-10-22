@@ -100,15 +100,19 @@ test('category-manager: importiert den Sortable-Wrapper', () => {
   assert.match(comp, /import \{[^}]*\bmakeSortable\b[^}]*\} from '\/utils\/sortable\.js'/);
 });
 
-test('category-manager: Drag-Handle ist kein Button (kein Tab-Stop, keine Fake-Aktion)', () => {
-  assert.match(comp, /<span class="cat-row__handle" role="img" aria-label="[^"]*"/);
-  assert.match(comp, /<span class="cat-subrow__handle" role="img" aria-label="[^"]*"/);
-  assert.doesNotMatch(comp, /<button[^>]*cat-row__handle/);
+// Seit #2152 ist der Griff ein Button am Ende der Zeile (D10) und traegt die
+// Pfeiltasten selbst - wie im Einkauf. Die Form der Zeile pruefen die
+// Render-Tests in test/test-manager-endzone.js; hier steht nur die Quelle.
+test('category-manager: Drag-Handle ist ein Button mit Pfeiltasten, kein role="img" mehr', () => {
+  assert.doesNotMatch(comp, /<span class="cat-(?:sub)?row__handle"/);
+  assert.match(comp, /class="row-action list-row__drag \$\{cls\}" data-reorder-handle/);
+  assert.match(comp, /this\._handleHtml\([^\n]*'cat-row__handle'/);
+  assert.match(comp, /this\._handleHtml\([^\n]*'cat-subrow__handle'/);
+  assert.match(comp, /async _onKeydown\(e\)/);
 });
 
 test('category-manager: Drag-Handle nutzt grip-vertical (Lucide)', () => {
-  assert.match(comp, /cat-row__handle[\s\S]{0,120}data-lucide="grip-vertical"/);
-  assert.match(comp, /cat-subrow__handle[\s\S]{0,120}data-lucide="grip-vertical"/);
+  assert.match(comp, /data-reorder-handle[\s\S]{0,240}data-lucide="grip-vertical"/);
 });
 
 test('category-manager: Tastatur-Fallback (Auf/Ab-Buttons) bleibt erhalten, Drag ist nie der einzige Weg', () => {
@@ -123,8 +127,8 @@ test('category-manager: Tastatur-Fallback (Auf/Ab-Buttons) bleibt erhalten, Drag
     assert.ok(markup(a) || viaHelper, `kein Knopf mit data-action="${a}"`);
     assert.match(comp, new RegExp(`action === '${a}'`), `der Klick-Verteiler kennt "${a}" nicht`);
   }
-  assert.match(comp, /async _move\(key, delta\)/);
-  assert.match(comp, /async _subMove\(parent, subKey, delta\)/);
+  assert.match(comp, /async _move\(key, delta[,)]/);
+  assert.match(comp, /async _subMove\(parent, subKey, delta[,)]/);
 });
 
 test('category-manager: Auf/Ab-Buttons UND Drag-Ende rufen denselben Persistenz-Pfad auf', () => {
@@ -251,19 +255,22 @@ test('category-manager.css: respektiert prefers-reduced-motion', () => {
 });
 
 // --------------------------------------------------------
-// i18n: dragHandle + reorderAnnounce in allen Locales
+// i18n: reorderAnnounce in allen Locales
 // --------------------------------------------------------
 
 // Aus SUPPORTED_LOCALES statt als Liste: die Liste hier kannte 23 Sprachen,
 // `fil` (v1.78.0) und `pt-BR` (#1437) kamen dazu, ohne dass sie mitwuchs.
 const LOCALES = getSupportedLocales();
 
-test('locales: category.dragHandle und category.reorderAnnounce existieren in allen Sprachen', () => {
+// `category.dragHandle` ist seit #2177 ungelesen (der Griff heisst nach
+// `shopping.reorderHandle`) und mit #2180 aus allen Locales gegangen; der
+// Test haelt, dass er nicht als toter Key zurueckkommt.
+test('locales: category.reorderAnnounce existiert in allen Sprachen, category.dragHandle nirgends', () => {
   const missing = [];
   for (const lang of LOCALES) {
     const data = JSON.parse(read(`../public/locales/${lang}.json`));
-    if (typeof data.category?.dragHandle !== 'string' || !data.category.dragHandle.length) {
-      missing.push(`${lang}: dragHandle`);
+    if (data.category && 'dragHandle' in data.category) {
+      missing.push(`${lang}: dragHandle ist zurueck`);
     }
     if (typeof data.category?.reorderAnnounce !== 'string' || !data.category.reorderAnnounce.length) {
       missing.push(`${lang}: reorderAnnounce`);

@@ -443,6 +443,24 @@ const STUBS = {
     // Ablegezone, die gar nicht erst verdrahtet wird, sieht im HTML aus wie
     // jede andere.
     export const isDragActive = () => false;
+    // Der Merker der Dialog-Instanzen (#2152): reicht an makeSortable unten
+    // durch, damit __sortableCalls auch diese Aufrufe sieht. Sein eigenes
+    // Verhalten misst test:manager-endzone am echten Modul.
+    export const sortableSet = () => ({
+      add: (listEl, opts) => makeSortable(listEl, opts),
+      clear() {},
+      size: () => 0,
+    });
+    // Wie das Original: gespeicherte Folge nach einem gescheiterten Zug.
+    // test:manager-endzone misst das Original UND den Weg der Seiten hierher.
+    export const restoreOrder = (listEl, ids, idOf) => {
+      if (!listEl) return;
+      const rows = new Map([...listEl.children].map((row) => [String(idOf(row)), row]));
+      for (const id of ids) {
+        const row = rows.get(String(id));
+        if (row) listEl.appendChild(row);
+      }
+    };
     export const makeSortable = async (listEl, opts) => {
       if (Array.isArray(globalThis.__sortableCalls)) {
         globalThis.__sortableCalls.push({ el: listEl, opts });

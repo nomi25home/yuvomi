@@ -37,6 +37,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   settings; adults and administrators are not affected. Fasting stays as it is for existing
   children: whether a parent ever chose it cannot be told apart, so it is still switched in the
   permissions per member.
+- **The manage dialogs end their rows like every other list** (#2152). Category, tag, subscription
+  category and payment method, quick link and family member rows now end the same way: at most one
+  visible action, then the More button, then the drag handle on the far right. Rename, edit and
+  delete moved into the More menu, with delete marked in red there instead of a red trash can in
+  every row. The handle is now a button: focus it and press the up or down arrow to move the row,
+  as in the shopping list. Quick links can be reordered with the keyboard for the first time.
+  Move up and Move down stay in the More menu for touch screen readers and switch control.
+- **The module order in Settings > Navigation ends its rows the same way** (#2180). Each module
+  row used to carry a visible pair of up and down arrows, on phones as a second line under the
+  name, and a drag handle that only worked with a mouse. A row now ends with Hide, the More button
+  and the drag handle. The handle works by touch too, and pressing the up or down arrow on it
+  moves the module; Move up and Move down sit in the More menu. If a move cannot be saved, the
+  saved order comes back.
 
 ### Fixed
 - **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
