@@ -7488,14 +7488,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   // Nur wenn die opt-in-Kachel sichtbar ist — die Mehrheit ohne aktivierte Kachel
-  // löst keinen Request aus.
-  if (!loadFailed && widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
+  // löst keinen Request aus. Auf dem Telefon zählt die eigene Anordnung (#2109).
+  const phoneVisibleIds = new Set((phoneWidgetConfig ?? []).filter((w) => w.visible).map((w) => w.id));
+  if (!loadFailed && (widgetConfig.some((w) => w.id === 'cycle' && w.visible) || phoneVisibleIds.has('cycle'))) {
     await ensureCycleSlice();
   }
-  if (!loadFailed && widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
+  if (!loadFailed && (widgetConfig.some((w) => w.id === 'schedule' && w.visible) || phoneVisibleIds.has('schedule'))) {
     await ensureScheduleSlice();
   }
-  if (!loadFailed && widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+  if (!loadFailed && (widgetConfig.some((w) => w.id === 'waste' && w.visible) || phoneVisibleIds.has('waste'))) {
     await ensureWasteSlice();
   }
   // Auch die Nachlade-Runden koennen von einem Verlassen oder Neuaufbau
@@ -7546,11 +7547,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const previousGlance = savedGlanceVisible;
 
     // Telefon-Anpassen-Modus (#2109): phone arrangement speichern und Desktop-
-    // Config wiederherstellen. Kein layoutHint (Query haengt vom Desktop ab),
-    // kein Slice-Nachladen (Display aendert sich, nicht die Daten).
+    // Config wiederherstellen. Kein layoutHint (Query haengt vom Desktop ab).
+    // Kacheln, die nur auf dem Telefon sichtbar sind, benoetigen ihren Slice.
     if (desktopWidgetConfig !== null) {
       const phoneSlim = widgetConfig.map(({ id, visible, order }) => ({ id, visible, order }));
-      await api.put('/preferences', { dashboard_widgets_phone: phoneSlim });
+      await api.put('/preferences', { dashboard_widgets_phone: phoneSlim, dashboard_today_glance: glanceVisible });
       phoneWidgetConfig = normalizeDashboardConfigWithExtensions(phoneSlim);
       savedPhoneWidgetConfig = phoneWidgetConfig.map((w) => ({ ...w }));
       followsPhoneDefault = false;
@@ -7558,6 +7559,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
       savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
       desktopWidgetConfig = null;
       isCustomizing = false;
+      // Slices fuer Kacheln nachladen, die auf dem Telefon sichtbar sind, aber
+      // auf dem Desktop nicht - sonst zeigen sie dauerhaft den Leer-Zustand.
+      const phoneSaved = new Set(phoneWidgetConfig.filter((w) => w.visible).map((w) => w.id));
+      const desktopVisible = new Set(widgetConfig.filter((w) => w.visible).map((w) => w.id));
+      if (phoneSaved.has('cycle') && !desktopVisible.has('cycle')) await ensureCycleSlice();
+      if (phoneSaved.has('schedule') && !desktopVisible.has('schedule')) await ensureScheduleSlice();
+      if (phoneSaved.has('waste') && !desktopVisible.has('waste')) await ensureWasteSlice();
       rebuildDashboard(widgetConfig);
       window.yuvomi?.showToast(t('dashboard.customizeSaved'), 'success', 1500, null);
       return;
@@ -7622,6 +7630,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   function cancelDashboardConfig() {
+    glanceVisible = savedGlanceVisible;
     if (desktopWidgetConfig !== null) {
       // Telefon-Anpassen-Modus: Desktop-Config wiederherstellen.
       widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
@@ -7629,7 +7638,6 @@ export async function render(container, { user, signal: routeSignal = null } = {
       desktopWidgetConfig = null;
     } else {
       widgetConfig = savedWidgetConfig.map((w) => ({ ...w }));
-      glanceVisible = savedGlanceVisible;
     }
     isCustomizing = false;
     rebuildDashboard(widgetConfig);
@@ -7638,7 +7646,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Telefon-Arrangement zuruecksetzen auf "wie Desktop" (#2109).
   async function resetPhoneConfig() {
     try {
-      await api.put('/preferences', { dashboard_widgets_phone: null });
+      await api.put('/preferences', { dashboard_widgets_phone: null, dashboard_today_glance: glanceVisible });
     } catch {
       window.yuvomi?.showToast(t('common.errorGeneric'), 'danger');
       return;
@@ -8142,8 +8150,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // dann schon die Phone-Config). Im Display-Modus auf dem Telefon zeigen wir
     // die eigene Phone-Anordnung, falls eine gespeichert ist (#2109).
     const phoneCustomize = desktopWidgetConfig !== null;
+    // Auf dem Telefon die eigene Anordnung (#2109): Reihenfolge und Sichtbarkeit
+    // kommen vom Telefon, Optionen und Groesse bleiben die des Desktops, damit
+    // Filter, Kalender-Limit usw. erhalten bleiben.
     const displayCfg = (!isCustomizing && onPhoneStage() && phoneWidgetConfig !== null)
-      ? phoneWidgetConfig
+      ? phoneWidgetConfig.map((p) => {
+          const desk = cfg.find((w) => w.id === p.id);
+          return desk ? { ...desk, visible: p.visible, order: p.order } : p;
+        })
       : cfg;
     const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, displayCfg, isCustomizing) : '';
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
@@ -8362,19 +8376,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Weg, den ein frisch eingeblendetes Widget in persistWidgetConfig()
       // schon nimmt. Das heilt nebenbei auch einen zuvor gescheiterten Slice
       // (M-6b) beim naechsten stillen Takt, statt auf den Retry-Knopf zu warten.
-      if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
+      const refreshPhoneIds = new Set((phoneWidgetConfig ?? []).filter((w) => w.visible).map((w) => w.id));
+      if (widgetConfig.some((w) => w.id === 'cycle' && w.visible) || refreshPhoneIds.has('cycle')) {
         data.cycle = undefined;
         await ensureCycleSlice();
         if (signal.aborted) return;
       }
       fresh.cycle = data.cycle;
-      if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
+      if (widgetConfig.some((w) => w.id === 'schedule' && w.visible) || refreshPhoneIds.has('schedule')) {
         data.schedule = undefined;
         await ensureScheduleSlice();
         if (signal.aborted) return;
       }
       fresh.schedule = data.schedule;
-      if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+      if (widgetConfig.some((w) => w.id === 'waste' && w.visible) || refreshPhoneIds.has('waste')) {
         data.waste = undefined;
         await ensureWasteSlice();
         if (signal.aborted) return;

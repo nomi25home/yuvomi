@@ -203,6 +203,35 @@ test('phone arrangement rejects invalid widget ids', async () => {
   }
 });
 
+test('saving phone arrangement does not touch the desktop arrangement', async () => {
+  const { baseUrl, close } = await startApp();
+  try {
+    await write(baseUrl, { dashboard_widgets: DESKTOP_WIDGETS });
+    await write(baseUrl, { dashboard_widgets_phone: PHONE_WIDGETS });
+
+    const data = await read(baseUrl);
+    assert.deepEqual(data.dashboard_widgets, DESKTOP_WIDGETS, 'desktop arrangement unchanged after phone save');
+    assert.deepEqual(data.dashboard_widgets_phone, PHONE_WIDGETS);
+  } finally {
+    await close();
+  }
+});
+
+test('resetting phone arrangement does not touch the desktop arrangement', async () => {
+  const { baseUrl, close } = await startApp();
+  try {
+    await write(baseUrl, { dashboard_widgets: DESKTOP_WIDGETS });
+    await write(baseUrl, { dashboard_widgets_phone: PHONE_WIDGETS });
+    await write(baseUrl, { dashboard_widgets_phone: null });
+
+    const data = await read(baseUrl);
+    assert.deepEqual(data.dashboard_widgets, DESKTOP_WIDGETS, 'desktop arrangement unchanged after phone reset');
+    assert.equal(data.dashboard_widgets_phone, null);
+  } finally {
+    await close();
+  }
+});
+
 test('phone arrangement survives a round-trip with a module-extension widget id', async () => {
   const { baseUrl, close } = await startApp();
   try {

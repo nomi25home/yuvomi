@@ -225,7 +225,7 @@ test('„Verwalten" am Familie-Widget fuehrt an das Familienblatt - und nur, wer
 
     // Die Verdrahtung: der echte Aufruf reicht das Ziel des angemeldeten Nutzers durch.
     assert.match(dashboardSource,
-      /renderDashboardLayout\(cfg, data, weather, currency, \{[^}]*familyManage: familyManageHref\(user\)/,
+      /renderDashboardLayout\(displayCfg, data, weather, currency, \{[^}]*familyManage: familyManageHref\(user\)/,
       'rebuildDashboard gibt familyManageHref(user) an das Raster');
   }
 });
@@ -445,7 +445,7 @@ test('R9 M7: mobil eine Kopfzeile [Abbrechen] Titel [Fertig], Reichweite als Fus
   assert.match(foot, /data-customize-publish/);
   assert.match(foot, /data-customize-reset/);
   assert.doesNotMatch(foot, /\bid="/, 'eine Id gibt es einmal - die Fussnote verdrahtet ueber Datenattribute');
-  assert.match(dashboardSource, /\$\{isCustomizing \? renderCustomizeFootnote\(\{ followsDefault, canPublish \}\) : ''\}/, 'die Fussnote steht unter dem Raster, nur im Anpassen-Modus');
+  assert.match(dashboardSource, /\$\{isCustomizing \? renderCustomizeFootnote\(\{ followsDefault, canPublish, phoneCustomize, followsPhoneDefault \}\) : ''\}/, 'die Fussnote steht unter dem Raster, nur im Anpassen-Modus');
   assert.match(dashboardSource, /querySelectorAll\('\[data-customize-publish\]'\)\.forEach/, 'beide Orte laufen durch denselben Handler');
 
   const rules = [...eachRule(css)];
