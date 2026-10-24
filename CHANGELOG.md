@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed; retrying reports the total across successful batches.
 
 ### Fixed
+- **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
+  A property such as `DESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen` was split on the first
+  colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of
+  just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
+  quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The
