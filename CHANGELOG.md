@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   permissions per member.
 
 ### Fixed
+- **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
+  A property such as `DESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen` was split on the first
+  colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of
+  just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
+  quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
+
 - **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
   (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
   there, all remaining items waiting for that same list are now skipped for the rest of the sync
@@ -538,6 +544,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+<<<<<<< Updated upstream
 - **Icons are drawn with one line weight, at every size.** Small icons looked thin and large
   ones heavy: next to each other, icons on one screen used up to twelve different line widths,
   from 1 to almost 5 pixels. The module symbols were meant to keep a fixed line all along, but
@@ -627,6 +634,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cut off at the card edge for a moment, and an empty band opened under the card. The rows, the
   card edge and the groups below now move up together, and the group count changes as the row
   starts to leave instead of afterwards.
+=======
+- **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
+  A property such as `DESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen` was split on the first
+  colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of
+  just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
+  quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
+>>>>>>> Stashed changes
 
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
