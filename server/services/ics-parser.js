@@ -127,6 +127,23 @@ function parseRelations(block) {
  *   tut das bewusst nicht, weil eine sinnvolle Ersatz-Identität vom Label
  *   abhängt, das erst der jeweilige Aufrufer kennt.
  */
+function propertyValue(block, prop) {
+  const lines  = block.split(/\r?\n/);
+  const needle = prop.toUpperCase();
+  for (const line of lines) {
+    if (!line.toUpperCase().startsWith(needle)) continue;
+    const after = line[needle.length];
+    if (after !== ':' && after !== ';') continue;
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') inQuotes = !inQuotes;
+      if (ch === ':' && !inQuotes) return line.slice(i + 1).trim();
+    }
+  }
+  return null;
+}
+
 function parseICS(ics, { onSkip, allowMissingUid = false } = {}) {
   const unfolded = unfoldLines(ics);
   const events   = [];
@@ -134,31 +151,7 @@ function parseICS(ics, { onSkip, allowMissingUid = false } = {}) {
   let match;
   while ((match = vEventRe.exec(unfolded)) !== null) {
     const block = match[1];
-    // Get property value handling parameters, including quoted strings that may contain ':'
-    const get = (prop) => {
-      // Split block into lines and find the line starting with the property name.
-      // The character right after the name must be ':' or ';' (a parameter separator),
-      // otherwise a different property that merely starts with the same prefix
-      // (e.g. DESCRIPTION-X) would match.
-      const lines = block.split(/\r?\n/);
-      const needle = prop.toUpperCase();
-      for (const line of lines) {
-        if (line.toUpperCase().startsWith(needle)) {
-          const after = line[needle.length];
-          if (after !== ':' && after !== ';') continue;
-          // Find first ':' that is not inside double quotes
-          let inQuotes = false;
-          for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"') inQuotes = !inQuotes;
-            if (ch === ':' && !inQuotes) {
-              return line.slice(i + 1).trim();
-            }
-          }
-        }
-      }
-      return null;
-    };
+    const get = (prop) => propertyValue(block, prop);
     const uid         = get('UID');
     const summary     = unescapeICSText(get('SUMMARY') || '(kein Titel)');
     const description = unescapeICSText(get('DESCRIPTION')) || null;
@@ -331,31 +324,7 @@ function parseVTODO(ics) {
   let match;
   while ((match = vTodoRe.exec(unfolded)) !== null) {
     const block = match[1];
-    // Get property value handling parameters, including quoted strings that may contain ':'
-    const get = (prop) => {
-      // Split block into lines and find the line starting with the property name.
-      // The character right after the name must be ':' or ';' (a parameter separator),
-      // otherwise a different property that merely starts with the same prefix
-      // (e.g. DESCRIPTION-X) would match.
-      const lines = block.split(/\r?\n/);
-      const needle = prop.toUpperCase();
-      for (const line of lines) {
-        if (line.toUpperCase().startsWith(needle)) {
-          const after = line[needle.length];
-          if (after !== ':' && after !== ';') continue;
-          // Find first ':' that is not inside double quotes
-          let inQuotes = false;
-          for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"') inQuotes = !inQuotes;
-            if (ch === ':' && !inQuotes) {
-              return line.slice(i + 1).trim();
-            }
-          }
-        }
-      }
-      return null;
-    };
+    const get = (prop) => propertyValue(block, prop);
     const uid = get('UID');
     if (!uid) continue;
     const summary     = unescapeICSText(get('SUMMARY') || '(kein Titel)');
