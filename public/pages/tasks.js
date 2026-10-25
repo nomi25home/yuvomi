@@ -1119,6 +1119,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   // Aufgabe steht. Versteckt wird er nur, wenn darin wirklich eine Person steht.
   const assigneePeople = withChosenPeople(users, task?.assigned_users);
   const visibility = isEdit ? (task?.visibility || 'all') : (state.defaultVisibility || 'all');
+  const locked = isEdit ? !!task?.locked : (state.defaultLocked === true);
 
   const selectedCat = task?.category ?? FALLBACK_CATEGORY;
   const categoryOptions = state.categories.map((c) =>
@@ -1183,7 +1184,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
     advancedSummary.push(STATUSES().find((s) => s.value === statusValue).label);
   }
   if (!hidesPrivacyControls('tasks') && visibility !== 'all') advancedSummary.push(t(`common.visibility.${visibility}`));
-  if (!hidesPrivacyControls('tasks') && task?.locked) advancedSummary.push(t('tasks.lockedBadge'));
+  if (!hidesPrivacyControls('tasks') && locked) advancedSummary.push(t('tasks.lockedBadge'));
   if (task?.documents?.length) advancedSummary.push(task.documents.map((d) => d.name).join(', '));
 
   const advancedLabel = advancedSummary.length
@@ -1327,7 +1328,7 @@ ${syncTargetFieldHtml(task)}
       <div class="form-group" style="margin-top:var(--space-4)"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
         <label class="toggle" style="margin:0">
           <input type="checkbox" id="task-locked" name="locked" aria-describedby="task-locked-hint"
-                 ${(isEdit ? task?.locked : state.defaultLocked) ? 'checked' : ''}>
+                 ${locked ? 'checked' : ''}>
           <span class="toggle__track"></span>
           <span>${t('tasks.lockedToggle')}</span>
         </label>

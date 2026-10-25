@@ -2845,14 +2845,28 @@ test('Aufgaben-Standardwerte: Aenderung der Sperre speichert per PUT /preference
 });
 
 test('Aufgaben-Standardwerte: neue Aufgabe belegt Sichtbarkeit und Sperre aus den Einstellungen vor (#2125)', async () => {
-  const { readFile } = await import('node:fs/promises');
-  const tasksSource = await readFile(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
-  // Beim Anlegen (isEdit = false) soll state.defaultVisibility und state.defaultLocked gelten.
-  assert.match(tasksSource, /state\.defaultVisibility/, 'state.defaultVisibility nicht referenziert');
-  assert.match(tasksSource, /state\.defaultLocked/, 'state.defaultLocked nicht referenziert');
-  // Beim Bearbeiten (isEdit = true) soll immer der task-eigene Wert stehen.
-  assert.match(tasksSource, /isEdit.*task.*visibility|task.*visibility.*isEdit/, 'Fallunterscheidung fuer Sichtbarkeit fehlt');
-  assert.match(tasksSource, /isEdit.*defaultLocked|defaultLocked.*isEdit/, 'Fallunterscheidung fuer Sperre fehlt');
+  globalThis.HTMLElement    ??= class {};
+  globalThis.customElements ??= { define() {}, get() {} };
+  const { __test: tasks } = await import('../public/pages/tasks.js');
+  const prevVisibility = tasks.state.defaultVisibility;
+  const prevLocked    = tasks.state.defaultLocked;
+  try {
+    // Neue Aufgabe: gespeicherte Einstellungen vorbelegen.
+    tasks.state.defaultVisibility = 'private';
+    tasks.state.defaultLocked     = true;
+    const htmlNew = tasks.renderModalContent({ task: null, users: [], reminder: null });
+    assert.match(htmlNew, /value="private"\s+selected/, 'neue Aufgabe: gespeicherte Sichtbarkeit "private" ist nicht vorbelegt');
+    assert.match(htmlNew, /id="task-locked"[^>]*checked/, 'neue Aufgabe: gespeicherter Sperr-Wert ist nicht angehakt');
+
+    // Bestehende Aufgabe: eigener Wert der Aufgabe, nicht die Einstellung.
+    const task = { id: 1, title: 'T', visibility: 'assignees', locked: 0 };
+    const htmlEdit = tasks.renderModalContent({ task, users: [], reminder: null });
+    assert.match(htmlEdit, /value="assignees"\s+selected/, 'bearbeitete Aufgabe: Sichtbarkeit aus der Aufgabe, nicht aus der Einstellung');
+    assert.doesNotMatch(htmlEdit, /id="task-locked"[^>]*checked/, 'bearbeitete Aufgabe: locked=0 darf kein checked setzen');
+  } finally {
+    tasks.state.defaultVisibility = prevVisibility;
+    tasks.state.defaultLocked     = prevLocked;
+  }
 });
 
 /* ==========================================================================

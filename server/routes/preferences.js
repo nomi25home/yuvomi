@@ -1134,6 +1134,9 @@ router.put('/', (req, res) => {
       cfgUserSet('tasks_default_visibility', req.authUserId, tasks_default_visibility);
     }
     if (tasks_default_locked !== undefined) {
+      if (typeof tasks_default_locked !== 'boolean') {
+        return res.status(400).json({ error: 'tasks_default_locked muss ein Boolean sein', code: 400 });
+      }
       cfgUserSet('tasks_default_locked', req.authUserId, tasks_default_locked ? '1' : '0');
     }
 
