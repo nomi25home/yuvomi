@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now waits instead of counting as a failure, so five such answers no longer return the item to
   its old list. After a rate limit, an outage or a dropped connection the sync sends nothing more
   to that account until the next pass.
+- **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
+  A property such as `DESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen` was split on the first
+  colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of
+  just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
+  quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
 - **Yuvomi warns when local document storage would keep files only in the container layer.** With
   `DOCUMENT_STORAGE_LOCAL_ENABLED=true` the start-up check only warned when the folder was missing.
   The image creates `/documents` itself, though, so on the default path the folder always existed and
