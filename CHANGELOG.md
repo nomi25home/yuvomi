@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **New tasks remember your preferred visibility and lock setting (#2125).** In Settings > Tasks
+  you can now choose the visibility and lock state that the new-task dialog opens with. Each
+  individual task can still use different values; the defaults only prefill the dialog.
 - **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
   run cannot book a series for an unexpected reason, the series keeps running and is retried
   every hour, as before - so a fault on our side never stops a household's rent - but its row,
