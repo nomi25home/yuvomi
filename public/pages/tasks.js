@@ -1326,13 +1326,10 @@ ${syncTargetFieldHtml(task)}
            die Sperre das Aendern. In einem Ein-Personen-Haushalt sagen beide
            nichts, also verschwinden sie zusammen (isSoloHousehold). -->
       <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
-        <label class="toggle">
-          <input type="checkbox" role="switch" id="task-locked" name="locked" aria-describedby="task-locked-hint"
-                 ${locked ? 'checked' : ''}>
-          <span class="toggle__track"></span>
-          <span>${t('tasks.lockedToggle')}</span>
-        </label>
-        <p class="task-field-hint" id="task-locked-hint">${t('tasks.lockedHint')}</p>
+        ${formSwitchRowHtml({
+          label: t('tasks.lockedToggle'), checked: locked,
+          hint: t('tasks.lockedHint'), hintId: 'task-locked-hint', attrs: { id: 'task-locked', name: 'locked' },
+        })}
       </div>
 
       ${renderDocumentAttachField({
