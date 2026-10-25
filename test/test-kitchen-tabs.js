@@ -527,3 +527,58 @@ test('R24 E3: der aktive Reiter ist eine getoente Kapsel ohne Ring, das Segment 
   assert.match(base.body, /background-color:\s*var\(--seg-active-bg\)/, 'das Segment behaelt den Daumen');
   assert.match(base.body, /box-shadow:\s*var\(--seg-active-shadow\)/, 'und seine 3:1-Kante');
 });
+
+// --------------------------------------------------------
+// Trailing-Zone (Issue #2043, reviewer-Feedback 2026-10-18)
+// --------------------------------------------------------
+
+test('Trailing-Zone: Desktop-Hide >= 640px via CSS, RTL-sicheres Sticky', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
+  const wide = rules.filter((r) => r.at.some((a) => /\(min-width:\s*640px\)/.test(a)));
+  assert.ok(
+    wide.some((r) => /\.kitchen-tabs-bar__trailing/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'ab 640px ist die Trailing-Zone ausgeblendet - auf dem Desktop steht die Suche im Kontext-Kopf',
+  );
+  const base = rules.filter((r) => !r.at.length);
+  const trailing = base.find((r) => /^\.kitchen-tabs-bar__trailing$/.test(r.selector.trim()));
+  assert.ok(trailing, '.kitchen-tabs-bar__trailing hat eine Basis-Regel');
+  assert.doesNotMatch(trailing.body, /(?:^|;)\s*right\s*:/, 'physisches right: 0 ist RTL-unsicher - bitte inset-inline-end');
+  assert.match(trailing.body, /inset-inline-end/, 'inset-inline-end macht die Zone RTL-sicher');
+});
+
+test('Trailing-Zone: Rezepte und Vorrat fuellen die Zone, Mahlzeiten und Einkauf leeren sie', () => {
+  const recipes  = readSrc('../public/pages/recipes.js');
+  const pantry   = readSrc('../public/pages/pantry.js');
+  const meals    = readSrc('../public/pages/meals.js');
+  const shopping = readSrc('../public/pages/shopping.js');
+
+  assert.match(recipes,  /mountKitchenSearchTrailing\b/, 'Rezepte: mountKitchenSearchTrailing setzt den Suchschalter in die Zone');
+  assert.match(pantry,   /mountKitchenSearchTrailing\b/, 'Vorrat: mountKitchenSearchTrailing setzt den Suchschalter in die Zone');
+  assert.doesNotMatch(meals,    /mountKitchenSearchTrailing\b/, 'Mahlzeiten: kein Suchschalter in der Zone');
+  assert.doesNotMatch(shopping, /mountKitchenSearchTrailing\b/, 'Einkauf: kein Suchschalter in der Zone');
+  assert.match(meals,    /setKitchenTabsTrailing\(null\)/, 'Mahlzeiten: leert die Zone explizit');
+  assert.match(shopping, /setKitchenTabsTrailing\(null\)/, 'Einkauf: leert die Zone explizit');
+});
+
+test('Trailing-Zone: der geteilte Helfer steckt den Schalter und klappt Zeile 2 erst beim Laden ein', () => {
+  const src = readSrc('../public/utils/kitchen-tabs.js');
+  const helper = src.slice(src.indexOf('export function mountKitchenSearchTrailing('));
+  assert.ok(helper.length > 0, 'mountKitchenSearchTrailing ist exportiert');
+  assert.match(helper, /setKitchenTabsTrailing\(btn\)/, 'der Helfer setzt den Knopf in die Trailing-Zone');
+  assert.match(helper, /MutationObserver/, 'der Helfer beobachtet die Klasse, um Zeile 2 beim Laden einzuklappen');
+  assert.match(helper, /is-collapsed/, 'der Helfer ergaenzt is-collapsed sobald --fold-row gesetzt ist');
+  assert.match(helper, /mo\.disconnect\(\)/, 'der Observer laeuft nur einmal und haengt sich selbst ab');
+  // Kein doppelter Observer auf dem Desktop: matchMedia-Guard muss vorhanden sein
+  assert.match(helper, /matchMedia.*639/, 'der Collapse-Observer laeuft nur auf Mobilgeraeten (<= 639px)');
+});
+
+test('Trailing-Zone: Tabs sind text-only, kein Werkzeugknopf direkt in renderKitchenTabsBar', () => {
+  const kitchen = readSrc('../public/utils/kitchen-tabs.js');
+  // Nur der Leisten-Baustein selbst darf keine Icon-Knoepfe einbauen;
+  // mountKitchenSearchTrailing (der Helfer dahinter) darf sie weiterhin nutzen.
+  const start = kitchen.indexOf('export function renderKitchenTabsBar(');
+  const end   = kitchen.indexOf('\nexport function setKitchenTabsTrailing(');
+  const bar = kitchen.slice(start, end);
+  assert.doesNotMatch(bar, /btn--icon|btn--ghost/, 'kein Icon-Knopf mehr im Leisten-HTML selbst');
+});

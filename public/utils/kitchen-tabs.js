@@ -328,3 +328,37 @@ export function setKitchenTabsTrailing(content) {
   if (!_trailing) return;
   _trailing.replaceChildren(...(content ? [content] : []));
 }
+
+/**
+ * Richtet den Suchschalter in der Trailing-Zone ein und klappt die zweite
+ * Kopfzeile auf Mobilgeräten beim ersten Laden ein.
+ *
+ * Gemeinsamer Baustein für Rezepte und Vorrat: beide zeigen einen Suchschalter
+ * in der Tab-Leiste und klappen ihre Zeile 2 auf Mobilgeräten anfangs ein.
+ *
+ * @param {object} opts
+ * @param {Element} opts.toolbar  - die page-toolbar, die is-collapsed bekommt
+ * @param {string}  opts.searchId - id des Suchfeldes (#recipes-search etc.)
+ * @param {string}  opts.ariaLabel - aria-label des Schalters
+ * @param {string}  opts.btnClass - Klasse des Schalters (z.B. recipes-search-toggle)
+ * @param {Element} opts.container - der Seiten-Container (für querySelector)
+ */
+export function mountKitchenSearchTrailing({ toolbar, searchId, ariaLabel, btnClass, container }) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `btn btn--icon btn--ghost ${btnClass}`;
+  btn.setAttribute('aria-label', ariaLabel);
+  btn.insertAdjacentHTML('beforeend', '<i data-lucide="search" aria-hidden="true"></i>');
+  btn.addEventListener('click', () => container.querySelector(`#${searchId}`)?.focus());
+  setKitchenTabsTrailing(btn);
+
+  if (typeof MutationObserver !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
+    const mo = new MutationObserver(() => {
+      if (toolbar.classList.contains('page-toolbar--fold-row')) {
+        toolbar.classList.add('is-collapsed');
+        mo.disconnect();
+      }
+    });
+    mo.observe(toolbar, { attributes: true, attributeFilter: ['class'] });
+  }
+}

@@ -23,7 +23,7 @@ import {
   reportFieldError,
   refocusAfterRender,
 } from '/components/modal.js';
-import { renderKitchenTabsBar, setKitchenTabsTrailing } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, mountKitchenSearchTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, transferMessage, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -538,25 +538,12 @@ export async function render(container) {
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/pantry');
 
-  // Suchschalter in der Leisten-Trailing-Zone (Issue #2043).
-  const searchToggle = document.createElement('button');
-  searchToggle.type = 'button';
-  searchToggle.className = 'btn btn--icon btn--ghost pantry-search-toggle';
-  searchToggle.setAttribute('aria-label', t('pantry.searchPlaceholder'));
-  searchToggle.insertAdjacentHTML('beforeend', '<i data-lucide="search" aria-hidden="true"></i>');
-  searchToggle.addEventListener('click', () => container.querySelector('#pantry-search')?.focus());
-  setKitchenTabsTrailing(searchToggle);
-
-  // Zeile 2 auf Mobilgeräten anfangs eingeklappt (wie Rezepte).
-  if (typeof MutationObserver !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
-    const mo = new MutationObserver(() => {
-      if (toolbar.classList.contains('page-toolbar--fold-row')) {
-        toolbar.classList.add('is-collapsed');
-        mo.disconnect();
-      }
-    });
-    mo.observe(toolbar, { attributes: true, attributeFilter: ['class'] });
-  }
+  mountKitchenSearchTrailing({
+    toolbar, container,
+    searchId: 'pantry-search',
+    ariaLabel: t('pantry.searchPlaceholder'),
+    btnClass: 'pantry-search-toggle',
+  });
 
   if (window.lucide) window.lucide.createIcons({ el: container });
 

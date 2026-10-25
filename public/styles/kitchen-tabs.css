@@ -135,30 +135,41 @@
 /* --------------------------------------------------------
  * TRAILING-WERKZEUGZONE (Issue #2043)
  *
- * Klebt mit `position: sticky; right: 0` am rechten Rand der scrollbaren
+ * Klebt mit `position: sticky; inset-inline-end: 0` am Ende der scrollbaren
  * Leiste: Tabs können links hinter ihr durchscrollen, die Zone bleibt immer
  * sichtbar. Hintergrund deckt die durchlaufenden Tabs ab; ein schmaler
  * Farbverlauf links davon gibt einen weichen Übergang.
  *
- * Auf dem Desktop (≥ 640 px) ist die Zone leer - dort steht die Suche im
- * Kontext-Kopf darunter. Auf Mobilgeräten füllt sie jedes Rezepte-/
+ * Auf dem Desktop (≥ 640 px) ist die Zone ausgeblendet - dort steht die Suche
+ * im Kontext-Kopf darunter. Auf Mobilgeräten füllt sie jedes Rezepte-/
  * Vorrat-Modul mit einem Suchschalter; Mahlzeiten und Einkauf leeren sie.
  * -------------------------------------------------------- */
 .kitchen-tabs-bar__trailing {
   position: sticky;
-  right: 0;
+  inset-inline-end: 0;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   background-color: var(--color-bg);
   padding-inline-start: var(--space-2);
-  /* Farbverlauf-Overlay links der Zone */
-  box-shadow: -8px 0 8px 0 var(--color-bg);
+  /* Farbverlauf-Overlay zur Inline-Start-Seite hin (folgt der Schreibrichtung) */
+  box-shadow: -4px 0 8px 4px var(--color-bg);
+}
+
+[dir="rtl"] .kitchen-tabs-bar__trailing {
+  box-shadow: 4px 0 8px 4px var(--color-bg);
 }
 
 /* Suchschalter in der Trailing-Zone: Lucide-Icon-Knopf in Fingergröße */
 .kitchen-tabs-bar__trailing .btn--icon {
   flex-shrink: 0;
+}
+
+/* Desktop (≥ 640 px): Zone ausblenden — Suche steht im Kontext-Kopf darunter */
+@media (min-width: 640px) {
+  .kitchen-tabs-bar__trailing {
+    display: none;
+  }
 }
 
 @media (max-width: 639px) {
