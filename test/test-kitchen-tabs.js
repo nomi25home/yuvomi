@@ -186,7 +186,7 @@ test('Indikator D11: eine Leiste gibt der Kapsel ihre eigene Form - breiter als 
   }
 });
 
-test('Kueche mobil D11: Kapsel 36-40px hoch, 12px Luft ums Wort, der Zaehler mit Abstand (Critique R21)', async () => {
+test('Kueche mobil D11: Kapsel 36-40px hoch, 8px Luft ums Wort, der Zaehler mit Abstand (Critique R21/R22)', async () => {
   const { eachRule } = await import('./css-rules.js');
   const tokens = readSrc('../public/styles/tokens.css');
   const tok = (name) => Number(tokens.match(new RegExp(`--${name}:\\s*([\\d.]+)px`))?.[1]);
@@ -196,7 +196,9 @@ test('Kueche mobil D11: Kapsel 36-40px hoch, 12px Luft ums Wort, der Zaehler mit
   const block = px(decl('.kitchen-tabs-bar', '--seg-pill-block'));
   assert.ok(block >= 36 && block <= 40, `die aktive Kapsel ist ${block}px hoch - D11 verlangt 36-40`);
   const air = px(decl('.kitchen-tabs-bar .sub-tab', 'padding-inline')) + px(decl('.kitchen-tabs-bar', '--seg-pill-outset'));
-  assert.equal(air, 12, `${air}px Luft ums Wort in der aktiven Kapsel - D11 verlangt 12`);
+  // R22 (#2043): Trailing-Zone belegt ~52px; padding-inline ging von 8px (R21)
+  // auf 4px zurueck. air = tabPad + --seg-pill-outset = 4 + 4 = 8px.
+  assert.equal(air, 8, `${air}px Luft ums Wort in der aktiven Kapsel - seit R22 sind 8px korrekt (R21 verlangte 12)`);
   assert.ok(px(decl('.kitchen-tabs-bar .sub-tab', 'gap')) >= 4, 'der Zaehler klebt am Wort ("Vorrat11")');
   assert.ok(px(decl('.kitchen-tabs-bar .sub-tab__badge', 'padding-inline')) >= 4, 'der Zaehler hat keine Luft in seiner Marke');
 });
@@ -454,12 +456,20 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
     }
     return out;
   };
+  const kitchenAll = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
+  const kitchenBase = kitchenAll.filter((r) => !r.at.length);
   const barGap = px(decl(kitchen, '.kitchen-tabs-bar', 'gap'));
   const tabPad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab', 'padding-inline'));
   const tabGap = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab', 'gap'));
   const badgeMargin = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'margin-inline-start') ?? decl(base, '.sub-tab__badge', 'margin-inline-start'));
   const badgePad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'padding-inline') ?? decl(base, '.sub-tab__badge', 'padding').split(/\s+/)[1]);
   const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
+  // Trailing-Zone: Rezepte und Vorrat fuellen sie mit einer Lupe (Suchschalter).
+  // Die Zone ist ein Flex-Item mit padding-inline-start + --target-base-Knopf;
+  // sie belegt den rechten Rand statt des normalen Seitenpolsters.
+  const trailingZonePad = px(decl(kitchenBase, '.kitchen-tabs-bar__trailing', 'padding-inline-start'));
+  const trailingZoneBtn = tok('target-base');
+  const trailingZoneW = trailingZonePad + trailingZoneBtn;
   // Seit der Re-Critique 2026-09-28 (P7) stehen keine Werkzeuge mehr in der
   // Leiste und kein Zaehler wird zum Punkt - die Rechnung hat vier Tabs mit
   // Zahlen und das Seitenpolster an beiden Enden.
@@ -469,10 +479,14 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const PAGE_PAD = tok('space-4');
   const W = 375;
   const numeric = Math.max(badgeMin, DIGITS + 2 * badgePad);
+  // Rezepte und Vorrat: Trailing-Zone ersetzt das rechte Seitenpolster.
+  // Mahlzeiten und Einkauf: leere Zone (padding-inline-start:0, box-shadow:none),
+  // das normale rechte Seitenpolster schliesst die Leiste ab.
   const width = ({ active, badges }) => {
     const tabs = Object.keys(WORD).map((id) => WORD[id][id === active ? 1 : 0] + 2 * tabPad
       + (badges.includes(id) && id !== active ? tabGap + badgeMargin + numeric : 0));
-    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + PAGE_PAD;
+    const right = (active === 'recipes' || active === 'pantry') ? trailingZoneW : PAGE_PAD;
+    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + right;
   };
   // Einkauf und Vorrat tragen Zaehler; der aktive Tab zeigt seinen nicht.
   for (const tab of Object.keys(WORD)) {

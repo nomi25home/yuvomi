@@ -107,8 +107,12 @@
      * 8px SEIT R21 (D11): seit R9 stehen keine Werkzeuge mehr in der Leiste
      * (Kontextzeile, unten), die 32px sind wieder frei. Die Kapsel ragt 4px
      * darueber hinaus (`--seg-pill-outset` oben): 12px Luft ums Wort im
-     * aktiven Tab, zwischen zwei Worten weiter 16px. */
-    padding-inline: var(--space-2);
+     * aktiven Tab, zwischen zwei Worten weiter 16px.
+     *
+     * 4px SEIT R22 (#2043): die Trailing-Zone am rechten Ende traegt wieder eine
+     * Lupe (Rezepte und Vorrat). Die Zone ist ein eigenes Flex-Item und belegt
+     * ~52px; ohne Ruecknahme auf 4px blieb bei 375px kein Platz mehr. */
+    padding-inline: var(--space-1);
   }
 
   /* DAS SIEGEL WEICHT MOBIL MIT DEM TITEL (R9 M10). Es wiederholte dasselbe

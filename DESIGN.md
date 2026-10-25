@@ -3937,7 +3937,7 @@ Bewegung. Die Zeile bleibt offen, solange sie Fokus, einen Suchbegriff oder ein 
 traegt - wer per Tab hineinkommt, bekommt sie zurueck.
 
 **Suchschalter in der Leiste, Zeile 2 ab Seitenladestart eingeklappt (Issue #2043, 2026-10).**
-Die Leiste traegt rechts eine `.kitchen-tabs-bar__trailing`-Zone (`position: sticky; right: 0`
+Die Leiste traegt rechts eine `.kitchen-tabs-bar__trailing`-Zone (`position: sticky; inset-inline-end: 0`
 in der scrollbaren `<nav>`): die Tabs koennen links durchscrollen, der Schalter klebt am Rand.
 Rezepte und Vorrat fuellen ihn mit einer Lupe (`setKitchenTabsTrailing`); Mahlzeiten und Einkauf
 leeren ihn. Tipp auf die Lupe fokussiert das Suchfeld in Zeile 2; weil die Faltung

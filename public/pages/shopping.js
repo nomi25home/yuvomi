@@ -5003,31 +5003,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // statt zu stehen wie in den drei Geschwister-Tabs (Integration Runde 3).
   const kitchenBar = renderKitchenTabsBar(container, '/shopping');
   setKitchenTabsTrailing(null);
-  state.itemsError = null;
-  try {
-    // loadCategories() und loadLists() fangen selbst; der äußere catch ist das
-    // Netz für alles Unerwartete und bildet es auf denselben Fehlerzustand ab,
-    // statt die Ausnahme in den globalen Fehlerbildschirm laufen zu lassen.
-    await Promise.all([loadCategories(), loadStores(), loadLists()]);
-    if (!state.listsError && state.lists.length) {
-      const listParam = parseInt(new URLSearchParams(window.location.search).get('list'), 10) || null;
-      const target = listParam && state.lists.find((l) => l.id === listParam);
-      state.activeListId = target ? target.id : state.lists[0].id;
-      state.collapsedCategories = loadCollapsedCategories(state.currentUserId, state.activeListId);
-      state.tickedOpen = loadTickedOpen(state.currentUserId, state.activeListId);
-      try {
-        await loadItems(state.activeListId);
-      } catch (err) {
-        console.error('[Shopping] loadItems Fehler:', err);
-        clearItems();
-        state.activeList = state.lists.find((l) => l.id === state.activeListId) ?? null;
-        state.itemsError = err;
-      }
-    }
-  } catch (err) {
-    console.error('[Shopping] Ladefehler:', err);
-    state.listsError = err;
-  }
+  await loadPageData();
 
   // Alles ausser der Leiste abraeumen: sie bleibt eingehaengt, damit ihre
   // Kapsel weitergleitet und der waagrechte Scrollstand nicht zurueckspringt.
