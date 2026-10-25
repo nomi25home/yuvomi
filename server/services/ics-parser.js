@@ -112,21 +112,9 @@ function parseRelations(block) {
   return { parentUid, childUids };
 }
 
-/**
- * @param {string} ics
- * @param {{onSkip?: (info: {uid: string|null, reason: string, summary: string|null}) => void, allowMissingUid?: boolean}} [opts]
- *   `onSkip` meldet jeden VEVENT, den der Parser verwirft. Ohne den Haken war ein
- *   übersprungener Termin von einem nie gelieferten nicht zu unterscheiden: er
- *   fehlte einfach, und der Sync meldete Erfolg (#883).
- *   `allowMissingUid` (Default false, strikt für alle bestehenden Aufrufer):
- *   manche Anbieter-Feeds - insbesondere die kommunaler Entsorgungskalender,
- *   die Waste importiert (#1063) - liefern VEVENTs ganz ohne UID. Mit dieser
- *   Option wird ein fehlendes UID allein NICHT mehr verworfen (DTSTART bleibt
- *   Pflicht); der Aufrufer erhält `uid: null` und ist dafür verantwortlich,
- *   eine eigene deterministische Ersatz-Identität zu bilden - dieser Parser
- *   tut das bewusst nicht, weil eine sinnvolle Ersatz-Identität vom Label
- *   abhängt, das erst der jeweilige Aufrufer kennt.
- */
+// Wert einer Property im Block. Der Doppelpunkt vor dem Wert ist der erste
+// ausserhalb eines gequoteten Parameters: ALTREP="data:text/html,..." enthaelt
+// selbst Doppelpunkte und darf den Wert nicht abschneiden (#2189).
 function propertyValue(block, prop) {
   const lines  = block.split(/\r?\n/);
   const needle = prop.toUpperCase();
@@ -144,6 +132,21 @@ function propertyValue(block, prop) {
   return null;
 }
 
+/**
+ * @param {string} ics
+ * @param {{onSkip?: (info: {uid: string|null, reason: string, summary: string|null}) => void, allowMissingUid?: boolean}} [opts]
+ *   `onSkip` meldet jeden VEVENT, den der Parser verwirft. Ohne den Haken war ein
+ *   übersprungener Termin von einem nie gelieferten nicht zu unterscheiden: er
+ *   fehlte einfach, und der Sync meldete Erfolg (#883).
+ *   `allowMissingUid` (Default false, strikt für alle bestehenden Aufrufer):
+ *   manche Anbieter-Feeds - insbesondere die kommunaler Entsorgungskalender,
+ *   die Waste importiert (#1063) - liefern VEVENTs ganz ohne UID. Mit dieser
+ *   Option wird ein fehlendes UID allein NICHT mehr verworfen (DTSTART bleibt
+ *   Pflicht); der Aufrufer erhält `uid: null` und ist dafür verantwortlich,
+ *   eine eigene deterministische Ersatz-Identität zu bilden - dieser Parser
+ *   tut das bewusst nicht, weil eine sinnvolle Ersatz-Identität vom Label
+ *   abhängt, das erst der jeweilige Aufrufer kennt.
+ */
 function parseICS(ics, { onSkip, allowMissingUid = false } = {}) {
   const unfolded = unfoldLines(ics);
   const events   = [];
