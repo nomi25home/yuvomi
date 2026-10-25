@@ -379,7 +379,7 @@
         "customizePhoneScopeHint": "이 전화기만. 여기서 변경하면 전화기의 타일 순서에만 영향을 줍니다.",
         "customizePhoneTitle": "전화 타일",
         "customizePhoneReset": "데스크톱과 동일",
-        "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetDone": "전화기 배열이 초기화되었습니다.",
         "customizePhoneResetConfirm": "데스크톱과 동일하게 재설정하시겠습니까?",
         "customizeFollowsDefault": "내 개요는 가정 기본값을 따릅니다.",
         "customizeSetDefault": "가정 기본값으로 설정",

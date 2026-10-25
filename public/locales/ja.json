@@ -361,7 +361,7 @@
         "customizePhoneScopeHint": "このスマホのみ。ここでの変更はスマホのタイル順にのみ影響します。",
         "customizePhoneTitle": "スマホのタイル",
         "customizePhoneReset": "デスクトップと同じ",
-        "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetDone": "スマホの並び順をリセットしました。",
         "customizePhoneResetConfirm": "デスクトップと同じにリセットしますか？",
         "customizeFollowsDefault": "あなたのダッシュボードは世帯の既定に従っています。",
         "customizeSetDefault": "世帯の既定にする",
