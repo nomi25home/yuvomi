@@ -1904,9 +1904,9 @@ async function carryShoppingItem(client, accountId, collection, rowId, clientFor
  * Termin, dessen Umzug der Server nicht annimmt.
  *
  * Gezählt wird nur, was über den EINTRAG selbst sagt (#2137): 400, 403, 409,
- * 412, 422, 423, ein Fehler ohne Status aus dem eigenen Code. Das sagt
- * nichts über das Konto oder den Server als Ganzes (401, 429, 5xx, ein
- * Netzfehler) - der Umzug bleibt stehen und verbraucht keinen Versuch, und der
+ * 412, 422, 423. Eine Absage, die das Konto oder den Server als Ganzes
+ * betrifft (401, 429, 5xx), und ein Fehler ohne Status (Netzfehler) zählen
+ * nicht - der Umzug bleibt stehen und verbraucht keinen Versuch, und der
  * Durchgang sendet für dieses Konto nichts mehr (`createRefusalStop`). Ein
  * 403 zählt trotzdem: ein nur lesbares Ziel ist genau der Fall, den
  * `returnShoppingMove` bewältigt, und einen Umzug gibt es zurück.
