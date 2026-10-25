@@ -1325,8 +1325,8 @@ ${syncTargetFieldHtml(task)}
            Frage beantworten - wer darf hier was. Sichtbarkeit regelt das Sehen,
            die Sperre das Aendern. In einem Ein-Personen-Haushalt sagen beide
            nichts, also verschwinden sie zusammen (isSoloHousehold). -->
-      <div class="form-group" style="margin-top:var(--space-4)"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
-        <label class="toggle" style="margin:0">
+      <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
+        <label class="toggle">
           <input type="checkbox" id="task-locked" name="locked" aria-describedby="task-locked-hint"
                  ${locked ? 'checked' : ''}>
           <span class="toggle__track"></span>
