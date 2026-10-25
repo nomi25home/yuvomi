@@ -313,9 +313,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.80.0` (exact version), `2.80` (latest patch of that minor), plus a moving `main`
+> `2.81.0` (exact version), `2.81` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.80.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.81.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.80.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.81.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.80.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.81.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -378,7 +378,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.80.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.81.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -790,7 +790,11 @@ environment:
 > points at a path nobody mounted, uploads still succeed: the folder is created inside the container
 > layer and the files are gone on the next `pull && up -d`, while the database keeps referencing them.
 > Since v2.9.0 the server checks this at startup and warns when the folder is missing or not writable,
-> naming the path it looked for. A silent start means the mount is where the app expects it.
+> naming the path it looked for. The image ships an empty `/documents` folder, though, so on the
+> default path the folder exists even with nothing mounted on it; inside a container the check
+> therefore also warns when the path is not on a volume or bind mount, using the same rule as the
+> modules folder (see [MODULES.md](../MODULES.md)). Where the mount table cannot be read, the check
+> stays quiet, so a silent start there proves nothing about the mount.
 
 ### WebDAV Document Storage (Optional)
 
@@ -913,7 +917,13 @@ the same kind, listed in the same table.
 | `GOOGLE_REDIRECT_URI` | OAuth callback URL, `https://<YOUR-DOMAIN>/api/v1/calendar/google/callback`. Yuvomi does not derive it, so it has to be set | - | Yes when Google sync is used |
 
 The three variables belong together. As long as one of them is empty, the settings page shows
-"Not configured (missing .env variables)" instead of the connect button.
+"Not configured (missing .env variables)" instead of the connect button, and for an admin the
+Google card under **Settings → Modules → Calendar sync → More providers** turns into a short setup
+guide: which of the three variables are still missing (names only, never values), the redirect URI
+to register at Google with a copy button (the value of `GOOGLE_REDIRECT_URI` when it is set,
+otherwise the address the admin is using, with a warning when Google would refuse it), the steps
+below in short, and the ways to get a Google calendar in without any Google setup: subscribe to its
+secret address in iCal format (read only) or import it once as an `.ics` file.
 
 **Setting it up at Google.** Google renames the pages of its console from time to time, so the steps
 below say what has to exist rather than where to click; the current click path is in Google's own

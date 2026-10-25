@@ -8,11 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Birthday import offers "Select all" and "Deselect all".** Select every contact
-  with a birthday that has not already been imported, or clear the selection, with
-  one button above the list. Large selections are imported in batches. If a later
-  batch fails, the saved count remains visible in the warning and the list is
-  refreshed; retrying reports the total across successful batches.
+- **Google Calendar explains its own setup instead of stopping at "Not configured"** (#2221). An admin
+  whose server has no Google credentials yet used to see only "Not configured (missing .env
+  variables)", twice. The Google card now names the variables that are still missing, shows the
+  redirect URI to register at Google with a copy button and warns when Google would refuse it (an IP
+  address or plain HTTP), lists the four steps, links the full guide and offers the ways that need
+  no Google setup at all: subscribe to the calendar's secret iCal address or import it once as an
+  .ics file. The status route reports only the names of missing variables, never their values, and
+  not to API tokens or the wall display.
+- **Yuvomi has a Portainer app template.** `deploy/portainer/portainer-template.json` deploys the
+  existing Portainer stack (`docs/docker-compose.portainer.yml`) and asks only for the session
+  secret, the database encryption key, the host port and the base URL. It is meant for the
+  [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates) catalog, which
+  pulls it from `main` every night, so the template never pins an older version. The installer
+  schema tests check that every field exists in the stack and that no field locks a setting.
+
+### Changed
+- **A new API token now starts with an expiry and a module limit.** Until now a token created with
+  only a name never expired and could do everything the selected person may do. The form now offers
+  30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the
+  module limit is on, with the read/write table open. No expiration and full access are still
+  available, as a deliberate choice. Existing tokens and the API are unchanged: `expires_at` and
+  `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
 - **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
@@ -20,6 +37,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of
   just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
   quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
+- **Creating a second API token no longer switches "Acts as" to another person.** After the first
+  token the form reset the person to the first entry of the list, so the next token silently acted as
+  someone else. The token form also names the Pantry module in the scope table instead of "pantry",
+  fits the custom date and time on a phone, and labels "Acts as" in every language.
+
+## [2.81.0] - 2026-10-25
+
+### Added
+- **Birthday import offers "Select all" and "Deselect all".** Select every contact
+  with a birthday that has not already been imported, or clear the selection, with
+  one button above the list. Large selections are imported in batches. If a later
+  batch fails, the saved count remains visible in the warning and the list is
+  refreshed; retrying reports the total across successful batches.
+- **yuvomi.cloud answers the four questions people ask most before they install.** "Before you
+  commit" now also says whether there is an app in the store (no, it installs from the browser and
+  sends push reminders, with HTTPS), what works without signal (reading the last loaded calendar,
+  tasks, shopping list, contacts and overview; changes need a connection), whether a CalDAV or
+  Nextcloud server is still needed (only to keep editing in other apps; Yuvomi syncs with it but is
+  no CalDAV server itself) and how Home Assistant fits in (ICS feeds, webhooks and the REST API with
+  per-module tokens, no official integration). Each answer is held against the code by the landing
+  page tests.
+
+### Fixed
+- **Yuvomi warns when local document storage would keep files only in the container layer.** With
+  `DOCUMENT_STORAGE_LOCAL_ENABLED=true` the start-up check only warned when the folder was missing.
+  The image creates `/documents` itself, though, so on the default path the folder always existed and
+  the warning never came, even with nothing mounted on it - uploads then vanished with the next
+  update while the database still listed them. A Portainer Git stack is one such setup: its documents
+  mount is commented out and cannot be enabled there. The check now asks the same question the
+  modules page asks for `/app/modules`, whether the folder sits on a volume or bind mount, and warns
+  when it does not. Outside a container, and wherever the mount table cannot be read, it stays quiet.
+- **The currency and long time zones are no longer cut off in the appearance settings on a
+  phone** (#2166). A currency read like "AED - United Arab Emirates Dirham" and ended in "…" on
+  a narrow screen, and so did five time zones such as "North Dakota/New Salem". The currency
+  now shows its code and symbol ("GBP £"), a time zone its city ("New Salem"), and the hint
+  below starts with the full name ("Currently British Pound."). The currency list in the loan
+  dialog of the budget keeps the full names.
+- **A write request without a body gets the route's own answer instead of a server error** (#2209).
+  Since the move to Express 5, a POST, PUT or PATCH without a body left the request body empty
+  and most routes - meals, tasks, shopping, notes, calendar, budget, reminders, pantry, contacts
+  and more - answered 500. The server now treats a missing body as an empty one in one place, so
+  each route says which field is missing (400). The MCP endpoint still answers a call without a
+  body with a JSON-RPC parse error, and an `Idempotency-Key` stored before the update keeps
+  matching its retry.
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The
@@ -64,6 +125,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tokens; note and shift colors show as a colored ring, and empty checklist boxes keep their
   edge. Tints elsewhere stay plain, as the browser table in the installation guide describes;
   current browsers are unchanged ([#2184](https://github.com/ulsklyc/yuvomi/issues/2184)).
+
+### Security
+
+- **Updated three production dependencies for published advisories** (#2192, #2193, #2194).
+  `body-parser` 2.4.0 stops a compressed request body with trailing bytes from tying up the
+  server (denial of service). `nodemailer` 10.1.4 fixes three cases in which its address parser
+  read part of a quoted name or comment as an extra recipient. `ip-address` 10.7.4 no longer spends quadratic
+  time on a long IPv6 zone identifier.
 
 ## [2.80.0] - 2026-10-25
 
