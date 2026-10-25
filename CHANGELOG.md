@@ -963,6 +963,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
+  (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
+  there, all remaining items waiting for that same list are now skipped for the rest of the sync
+  pass. Previously the stop check ran only between lists, not within a single list, so if two items
+  were both waiting to move to the same list, the second PUT went out even after the first was
+  rate-limited. An unreachable server (no HTTP status) also now pauses further carry attempts for
+  that list, matching the behavior for rate-limit and outage responses.
 - **Icons are drawn with one line weight, at every size.** Small icons looked thin and large
   ones heavy: next to each other, icons on one screen used up to twelve different line widths,
   from 1 to almost 5 pixels. The module symbols were meant to keep a fixed line all along, but
@@ -1052,6 +1059,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cut off at the card edge for a moment, and an empty band opened under the card. The rows, the
   card edge and the groups below now move up together, and the group count changes as the row
   starts to leave instead of afterwards.
+=======
+- **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
+  (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
+  there, all remaining items waiting for that same list are now skipped for the rest of the sync
+  pass. Previously the stop check ran only between lists, not within a single list, so if two items
+  were both waiting to move to the same list, the second PUT went out even after the first was
+  rate-limited. An unreachable server (no HTTP status) also now pauses further carry attempts for
+  that list, matching the behavior for rate-limit and outage responses.
+(caldav): a 429 in a multi-item shopping move list no longer leaks a second PUT (#2143))
 
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
