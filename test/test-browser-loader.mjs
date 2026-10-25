@@ -526,6 +526,7 @@ const STUBS = {
     export const renderKitchenTabsBar = () => {};
     export const refreshKitchenBadges = () => {};
     export const setKitchenTabsTrailing = () => {};
+    export const mountKitchenSearchTrailing = () => {};
   `,
   '/utils/pwa-install.js': `
     export const getPwaInstallState = () => ({
