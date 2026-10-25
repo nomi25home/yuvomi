@@ -1327,7 +1327,7 @@ ${syncTargetFieldHtml(task)}
            nichts, also verschwinden sie zusammen (isSoloHousehold). -->
       <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
         <label class="toggle">
-          <input type="checkbox" id="task-locked" name="locked" aria-describedby="task-locked-hint"
+          <input type="checkbox" role="switch" id="task-locked" name="locked" aria-describedby="task-locked-hint"
                  ${locked ? 'checked' : ''}>
           <span class="toggle__track"></span>
           <span>${t('tasks.lockedToggle')}</span>
