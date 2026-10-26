@@ -3945,7 +3945,7 @@ leeren ihn. Tipp auf die Lupe fokussiert das Suchfeld in Zeile 2; weil die Faltu
 dem ersten Scroll auf y 57 startet, setzt ein `MutationObserver` in Rezepte und Vorrat
 `is-collapsed`, sobald `wireCollapsingHeader` `page-toolbar--fold-row` (und damit `--fold-row-h`)
 gesetzt hat. Bis der erste Nutzer-Scroll den Wert verwirft, faengt die Lupe ihn ab. Tab-Icons
-entfallen (D3: Texttabs); 375px de mit Trailing-Zone: ~368px, passt ohne Scrollen.
+entfallen (D3: Texttabs); 375px de mit Trailing-Zone: ~372px (Symbol-only 20px), passt ohne Scrollen.
 
 **Sub-Tabs + Zeitraum: der Zeitraum steht in der Titelzeile (Budget, R16 2026-10-05).** Ein
 Modul, dessen Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, fuehrt
