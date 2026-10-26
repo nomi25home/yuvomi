@@ -3641,7 +3641,8 @@
         "tasksDefaultVisibilityLabel": "Default visibility",
         "tasksDefaultVisibilityHint": "New tasks open with this visibility. You can still change it each time you create one.",
         "tasksDefaultLockedLabel": "Lock editing by default",
-        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."    },
+        "tasksDefaultLockedHint": "New tasks open with editing locked. You can unlock them when you create one."
+    },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
         "usernameLabel": "Nazwa użytkownika",

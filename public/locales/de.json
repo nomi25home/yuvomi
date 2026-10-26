@@ -3427,7 +3427,8 @@
         "tasksDefaultVisibilityLabel": "Standardsichtbarkeit",
         "tasksDefaultVisibilityHint": "Neue Aufgaben öffnen sich mit dieser Sichtbarkeit. Du kannst sie beim Anlegen jedes Mal ändern.",
         "tasksDefaultLockedLabel": "Bearbeitung standardmäßig sperren",
-        "tasksDefaultLockedHint": "Neue Aufgaben öffnen sich mit gesperrter Bearbeitung. Du kannst die Sperre beim Anlegen aufheben."    },
+        "tasksDefaultLockedHint": "Neue Aufgaben öffnen sich mit gesperrter Bearbeitung. Du kannst die Sperre beim Anlegen aufheben."
+    },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
         "usernameLabel": "Benutzername",
