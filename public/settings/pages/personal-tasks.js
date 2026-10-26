@@ -183,7 +183,7 @@ function bindEvents(container) {
         window.yuvomi?.showToast(t('settings.tasksDefaultsSaved'), 'success');
       } catch (error) {
         visibilitySelect.value = persistedVisibility;
-        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       } finally {
         if (visibilitySelect.isConnected) visibilitySelect.disabled = false;
       }
@@ -200,7 +200,7 @@ function bindEvents(container) {
         window.yuvomi?.showToast(t('settings.tasksDefaultsSaved'), 'success');
       } catch (error) {
         lockedToggle.checked = !value;
-        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       } finally {
         if (lockedToggle.isConnected) lockedToggle.disabled = false;
       }

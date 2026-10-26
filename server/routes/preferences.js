@@ -1129,13 +1129,13 @@ router.put('/', (req, res) => {
     // Sichtbarkeit und Sperre als persoenliche Vorbelegung (#2125).
     if (tasks_default_visibility !== undefined) {
       if (!['all', 'assignees', 'private'].includes(tasks_default_visibility)) {
-        return res.status(400).json({ error: 'tasks_default_visibility muss "all", "assignees" oder "private" sein', code: 400 });
+        return res.status(400).json({ error: 'tasks_default_visibility must be "all", "assignees" or "private".', code: 400 });
       }
       cfgUserSet('tasks_default_visibility', req.authUserId, tasks_default_visibility);
     }
     if (tasks_default_locked !== undefined) {
       if (typeof tasks_default_locked !== 'boolean') {
-        return res.status(400).json({ error: 'tasks_default_locked muss ein Boolean sein', code: 400 });
+        return res.status(400).json({ error: 'tasks_default_locked must be a boolean.', code: 400 });
       }
       cfgUserSet('tasks_default_locked', req.authUserId, tasks_default_locked ? '1' : '0');
     }
