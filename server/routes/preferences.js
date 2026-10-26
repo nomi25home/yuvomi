@@ -975,11 +975,11 @@ router.put('/', (req, res) => {
       if (dashboard_widgets_phone === null) {
         cfgUserDelete('dashboard_widgets_phone', req.authUserId);
       } else if (!Array.isArray(dashboard_widgets_phone)) {
-        return res.status(400).json({ error: 'dashboard_widgets_phone muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'dashboard_widgets_phone must be an array.', code: 400 });
       } else {
         const normalized = normalizeWidgetConfig(dashboard_widgets_phone);
         if (normalized === null) {
-          return res.status(400).json({ error: 'dashboard_widgets_phone enthält ungültige Einträge', code: 400 });
+          return res.status(400).json({ error: 'dashboard_widgets_phone contains invalid entries.', code: 400 });
         }
         cfgUserSet('dashboard_widgets_phone', req.authUserId, JSON.stringify(
           normalized.map(({ id, visible, order }) => ({ id, visible, order })),
