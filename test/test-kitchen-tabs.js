@@ -428,6 +428,8 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const px = (v) => {
     const s = String(v ?? '').trim();
     if (s === '0') return 0;
+    const lit = s.match(/^(-?[\d.]+)px$/);
+    if (lit) return Number(lit[1]);
     const m = s.match(/^var\(--([\w-]+)\)$/);
     assert.ok(m, `Laenge nicht lesbar: "${s}"`);
     return tok(m[1]);
@@ -463,13 +465,20 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const badgePad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'padding-inline') ?? decl(base, '.sub-tab__badge', 'padding').split(/\s+/)[1]);
   const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
   // Trailing-Zone: Rezepte und Vorrat fuellen sie mit einer Lupe (Suchschalter).
-  // Auf Telefonen zeigt der Schalter nur das Symbol (--kitchen-trailing-zone-size,
-  // --space-5 = 20px), kein Touch-Polster, damit vier Tabs mit --space-2 in
-  // 375px passen (#2043). Am Desktop ist die Zone ganz ausgeblendet.
-  const trailingZoneNarrow = decl(kitchen, '.kitchen-tabs-bar__trailing', '--kitchen-trailing-zone-size');
-  const trailingZonePad = trailingZoneNarrow ? 0 : px(decl(kitchenBase, '.kitchen-tabs-bar__trailing', 'padding-inline-start'));
-  const trailingZoneBtn = trailingZoneNarrow ? px(trailingZoneNarrow) : tok('target-base');
-  const trailingZoneW = trailingZonePad + trailingZoneBtn;
+  // Auf Telefonen ist der Schalter 24px breit (max-width, WCAG 2.5.8 >= 24px).
+  // Ein ::before vergrossert die Trefferflaeche auf --target-base Hoehe.
+  // Ein negativer Rand (-2px) auf der Zone ergibt netto 22px Layoutbreite,
+  // damit vier Tabs mit --space-2 Polster in 375px passen (#2043).
+  // Am Desktop ist die Zone ganz ausgeblendet.
+  const iconMaxW = decl(kitchen, '.kitchen-tabs-bar__trailing .btn--icon', 'max-width');
+  const trailingMargin = decl(kitchen, '.kitchen-tabs-bar__trailing', 'margin-inline-start');
+  const trailingPad = px(decl(kitchen, '.kitchen-tabs-bar__trailing', 'padding-inline-start') ?? decl(kitchenBase, '.kitchen-tabs-bar__trailing', 'padding-inline-start') ?? '0');
+  const trailingBtn = iconMaxW ? px(iconMaxW) : tok('target-base');
+  const trailingZoneW = (trailingMargin ? px(trailingMargin) : 0) + trailingPad + trailingBtn;
+  // WCAG 2.5.8: Suchschalter mind. 24px breit.
+  assert.ok(trailingBtn >= 24, `Suchschalter ${trailingBtn}px breit - WCAG 2.5.8 braucht 24px`);
+  const beforeInsetBlock = decl(kitchen, '.kitchen-tabs-bar__trailing .btn--icon::before', 'inset-block');
+  assert.ok(beforeInsetBlock, '.btn--icon::before hat eine inset-block-Regel fuer die Trefferflaeche');
   // Seit der Re-Critique 2026-09-28 (P7) stehen keine Werkzeuge mehr in der
   // Leiste und kein Zaehler wird zum Punkt - die Rechnung hat vier Tabs mit
   // Zahlen und das Seitenpolster an beiden Enden.

@@ -183,22 +183,27 @@
     box-shadow: none;
   }
 
-  /* Symbol-only: Bei 375px braucht --target-base (44px) Platz, den die Leiste
-   * nicht hat. Der Suchschalter schrumpft auf --space-5 (20px) -- nur das
-   * Symbol, kein Touch-Polster -- und das Zone-Padding faellt weg.
-   * Beides zusammen belegt 20px statt 52px, sodass vier Tabs mit --space-2
-   * Polster in 375px passen (#2043).
-   *
-   * Die Groesse ueber --target-base statt direkt auf .btn--icon: die Shell
-   * setzt min-height/min-width aus diesem Token, kein Modul darf es
-   * ueberschreiben (test-frontend-audit: "Groesse gehoert der Shell"). */
+  /* Symbol mit Trefferflaeche: der Schalter wird auf 24px Breite/Hoehe
+   * begrenzt (max-width/max-height statt --target-base ueberschreiben, WCAG
+   * 2.5.8 >= 24px erfuellt). Ein ::before vergrossert die Trefferflaeche auf
+   * --target-base in der Hoehe. Ein negativer Rand (-2px) neben der 24px-Taste
+   * deckt den 1,3px-Ueberlauf bei 375px ab: 16 + 336,3 + (−2 + 24) = 374,3px
+   * (<= 375), damit vier Tabs mit --space-2 Polster passen (#2043). */
   .kitchen-tabs-bar__trailing {
-    --kitchen-trailing-zone-size: var(--space-5);
-    --target-base: var(--space-5);
     padding-inline-start: 0;
+    margin-inline-start: -2px;
   }
   .kitchen-tabs-bar__trailing .btn--icon {
     padding: 0;
+    max-width: 24px;
+    max-height: 24px;
+    position: relative;
+  }
+  .kitchen-tabs-bar__trailing .btn--icon::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block: calc((24px - var(--target-base)) / 2);
   }
 }
 
