@@ -7340,10 +7340,11 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize
   // Finger - und der Tastaturweg (Pfeil hoch/runter). Die Handlungen stehen
   // als EINE Gruppe hinter dem Segment: reicht die Breite nicht, bricht die
   // Gruppe als Ganzes in die zweite Zeile, statt den Griff allein zu lassen.
+  const sizeGroupAriaLabel = esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }));
   return `
     <div class="widget-edit-controls" role="group" aria-label="${esc(widgetLabel(w.id))}" data-widget-controls>
       <span class="widget-edit-controls__caption" aria-hidden="true">${esc(widgetLabel(w.id))}</span>
-      ${phoneCustomize ? '' : `<div class="widget-edit-controls__size segmented" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+      ${phoneCustomize ? '' : `<div class="widget-edit-controls__size segmented" role="group" aria-label="${sizeGroupAriaLabel}">
         ${sizeButtons}
       </div>`}
       <div class="widget-edit-controls__actions">
