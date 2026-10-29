@@ -7343,9 +7343,9 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize
   return `
     <div class="widget-edit-controls" role="group" aria-label="${esc(widgetLabel(w.id))}" data-widget-controls>
       <span class="widget-edit-controls__caption" aria-hidden="true">${esc(widgetLabel(w.id))}</span>
-      <div class="widget-edit-controls__size segmented" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+      ${phoneCustomize ? '' : `<div class="widget-edit-controls__size segmented" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
         ${sizeButtons}
-      </div>
+      </div>`}
       <div class="widget-edit-controls__actions">
         <div class="widget-edit-controls__move">
           <button type="button" class="widget-edit-controls__move-btn" data-widget-move="up" data-widget-id="${esc(w.id)}"
@@ -11009,28 +11009,28 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let drawnBodies = new Map();
   let drawnCockpit = '';
   let drawnVisibility = '';
-  function dashboardShellHtml(cfg, { phoneCustomize = false, followsPhoneDefault = true } = {}) {
+  function dashboardShellHtml(displayCfg, { phoneCustomize = false, followsPhoneDefault = true } = {}) {
     // Signature-„Heute"-Masthead: Begrüßung und Glance-Cockpit teilen sich EIN
     // erhöhtes Material-Band (statt zweier gestapelter gerahmter Kästen). Die
     // inneren Sections sind entrahmt; das Band trägt Rahmen/Schatten/Tönung.
     // Fehlt das Cockpit (alle Domänen als Widgets sichtbar → kein Glance-Inhalt),
     // kollabiert das Band per --slim auf eine schlanke Gruß-Leiste statt ein
     // großes leeres Rechteck zu zeigen (Critique R3 P1).
-    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, cfg, isCustomizing) : '';
+    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, displayCfg, isCustomizing) : '';
     drawnCockpit = cockpitHtml;
-    drawnVisibility = visibilityKey(cfg, glanceVisible);
+    drawnVisibility = visibilityKey(displayCfg, glanceVisible);
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
-    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
+    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht auch auch
     // nicht fuer die Zeile.
-    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    const weatherCardShown = displayCfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     return `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
         ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown, phoneCustomize })}
         ${cockpitHtml}
       </section>
-      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []), bodies: (drawnBodies = new Map()), phoneCustomize })}
+      ${renderDashboardLayout(displayCfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []), bodies: (drawnBodies = new Map()), phoneCustomize })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish, phoneCustomize, followsPhoneDefault }) : ''}
     `;
   }
