@@ -123,9 +123,12 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   DB_PATH: 'Vom Descriptor auf /data/yuvomi.db gesetzt.',
   BACKUP_DIR:
     'Die App liest diesen Namen selbst (backup-scheduler.js) und meint damit das Ziel IM '
-    + 'Container. Ein Host-Pfad in der .env wird dort zu /app/backups, ausserhalb des Mounts - '
-    + 'das war #579. Anders als DATA_DIR, das die App nie liest und deshalb im Wizard stehen '
-    + 'darf. Der Host-Ordner der Sicherungen wird ueber den Mount gesetzt, nicht hierueber.',
+    + 'Container; ungepinnt landete ein Host-Pfad aus der .env dort ausserhalb des Mounts - '
+    + 'das war #579. Seither pinnt jeder Descriptor ihn unter environment auf /backups (Guard '
+    + 'unten). Bei Compose verschiebt ein .env-Wert damit nur die Mount-Quelle '
+    + '(docker-compose.yml: ${BACKUP_DIR:-./backups}:/backups), wie bei MODULES_DIR. Der Wizard '
+    + 'fragt ihn trotzdem nicht ab: dieselbe Zeile hiesse im Container etwas anderes als auf dem '
+    + 'Host, und das Quadlet interpoliert nicht.',
   MODULES_DIR:
     'Dieselbe Regel wie bei BACKUP_DIR: die App liest den Namen selbst (services/modules.js) '
     + 'und meint das Verzeichnis IM Container. Docker, Podman und Quadlet laden die .env in den '
@@ -376,7 +379,12 @@ function fieldSources() {
   const body = script.match(/function buildEnv\(\)\s*\{\s*return\s*\{([\s\S]*?)\n\s*\};/);
   assert.ok(body, 'buildEnv() in install.html nicht gefunden');
   const pairs = [...body[1].matchAll(/\b([A-Z][A-Z0-9_]*)\s*:\s*S\.(\w+)/g)].map(m => [m[1], m[2]]);
-  const controls = new Set([...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
+  // Steuernde Felder: Eingabeelemente und Radiogruppen (das Segment fuer den
+  // Zugriff, #adv-proxy, ist seit 2026-10-29 eine Gruppe nativer Radios).
+  const controls = new Set([
+    ...[...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]),
+    ...[...html.matchAll(/<div\b[^>]*\bid="([^"]+)"[^>]*\brole="radiogroup"/g)].map(m => m[1]),
+  ]);
   const esc = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const all = re => [...script.matchAll(re)].map(m => m[1]);
   const expand = (expr, depth, seen) => {
@@ -452,7 +460,8 @@ test('das Upload-Limit prueft dieselben Grenzen wie der Server und meldet am Fel
   assert.ok(cond, 'storage-next prueft adv-max-upload nicht mit Meldung am Feld');
   assert.match(block, /S\.MAX_UPLOAD_MB = maxUpload;/, 'der gepruefte Wert wird nicht in S geschrieben');
   // Die Bedingung AUSFUEHREN, nicht nachlesen.
-  const rejects = new Function('maxUpload', `return Boolean(${cond[1]});`);
+  // untouched() ist ohne Rerun immer false (Erstinstallation: alles wird geprueft).
+  const rejects = maxUpload => new Function('maxUpload', 'untouched', `return Boolean(${cond[1]});`)(maxUpload, () => false);
   for (const ok of ['', String(min), String(def), String(max)]) assert.equal(rejects(ok), false, `${JSON.stringify(ok)} muss durchgehen`);
   for (const bad of [String(min - 1), String(max + 1), '7.5', '1e2', '-5', 'abc', '05']) {
     assert.ok(rejects(bad), `${JSON.stringify(bad)} muss abgelehnt werden - der Server naehme etwas anderes`);
