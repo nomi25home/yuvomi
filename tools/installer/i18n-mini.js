@@ -1,5 +1,5 @@
 /**
- * i18n-mini — schlanke Internationalisierung für den Yuvomi-Installer.
+ * i18n-mini - schlanke Internationalisierung für den Yuvomi-Installer.
  * Spiegelt die Locale-Auflösung der App (public/i18n.js:26-34) wider, ohne
  * deren Abhängigkeiten. Keine externen Libs, reine Fetch-/DOM-/Intl-APIs.
  *
@@ -81,19 +81,27 @@ async function loadLocale(locale) {
   return resp.json();
 }
 
-/** Einmal beim Laden des Installers aufrufen. Setzt lang/dir am <html>. */
+/**
+ * Einmal beim Laden des Installers aufrufen. Setzt lang/dir am <html>.
+ *
+ * Fallback und Ziel-Locale laden PARALLEL. Bis 2026-10-29 wartete die
+ * Ziel-Locale auf en: zwei Roundtrips hintereinander, gemessen ~440 ms mehr
+ * bis zum lokalisierten Titel bei Fast 4G (Critique 2026-10-29).
+ */
 export async function initInstallerI18n() {
   activeLocale = resolveLocale();
-  fallbackTranslations = await loadLocale(FALLBACK_LOCALE).catch(() => ({}));
+  const [fallback, target] = await Promise.all([
+    loadLocale(FALLBACK_LOCALE).catch(() => ({})),
+    activeLocale === FALLBACK_LOCALE ? null : loadLocale(activeLocale).catch(() => null),
+  ]);
+  fallbackTranslations = fallback;
   if (activeLocale === FALLBACK_LOCALE) {
     translations = fallbackTranslations;
+  } else if (target) {
+    translations = target;
   } else {
-    try {
-      translations = await loadLocale(activeLocale);
-    } catch {
-      translations = fallbackTranslations;
-      activeLocale = FALLBACK_LOCALE;
-    }
+    translations = fallbackTranslations;
+    activeLocale = FALLBACK_LOCALE;
   }
   document.documentElement.lang = activeLocale;
   document.documentElement.dir = RTL_LOCALES.includes(activeLocale) ? 'rtl' : 'ltr';
@@ -157,7 +165,7 @@ export function applyTranslations(root = document) {
 
 /**
  * Baut einen Text mit eingebetteten Knoten (Links, <code>) aus einer
- * Übersetzung mit {{slot}}-Platzhaltern — ohne innerHTML, nur Text-/Elementknoten.
+ * Übersetzung mit {{slot}}-Platzhaltern - ohne innerHTML, nur Text-/Elementknoten.
  * `slots` bildet Platzhaltername → vorbereiteten DOM-Knoten ab.
  */
 export function applyRich(el, key, slots = {}) {

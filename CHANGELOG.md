@@ -12,6 +12,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   icon at the right end of the kitchen tab bar, keeping the second header row collapsed until you
   tap it. Meals and Shopping clear the zone so nothing appears there.
 
+### Fixed
+- **Running the web installer again keeps your settings.** On an existing installation the advanced
+  setup now fills its fields with the values from your `.env` - port, public address, reverse-proxy
+  settings, timezone, weather, email, sign-on, storage and backups - so a second run no longer resets
+  them to defaults when you only wanted to add something. A hand-tuned `TRUST_PROXY=2` stays as long
+  as you keep the pre-selected access choice, and the review page shows the kept values instead of
+  "Not set up". Passwords, client secrets and keys never reach the browser: their fields stay empty
+  with the note "Current value is kept", and the existing values are written back. Lines you leave
+  unchanged stay exactly as written, inline comments and quotes included, and a secret read from a
+  file (`GOOGLE_CLIENT_SECRET_FILE`, `SESSION_SECRET_FILE` and the other `_FILE` variables) counts as
+  kept instead of being written a second time, which stopped Yuvomi from starting. A setting you
+  leave as it was is no longer checked against the installer's stricter rules either: a port or
+  address written as a Compose variable (`${HTTP_PORT:-3000}`), a backup schedule with a seconds
+  field or a full weekday name, and OAuth redirect addresses registered under a different host all
+  stay as they are until you change the address or the client.
+- **The simple setup makes Yuvomi reachable on your home network.** It used to write
+  `http://localhost:3000` as the address, so invitation and password-reset links and the app on
+  your phones pointed at a device that could not be reached. It now uses this computer's address on
+  the home network (for example `http://192.168.1.20:3000`), skips Docker bridges and VPN tunnels when
+  looking for it, and lets you change it with "Change". If it finds none, it says plainly that Yuvomi
+  is then reachable only on this computer.
+- **A public address without `http://` or `https://` is refused in the installer** instead of being
+  silently replaced by an address derived from host and port.
+- **The installer catches settings the server would reject before saving them.** A backup schedule
+  like `99 * * * *` used to pass and then switched backups off at startup; the schedule is now
+  checked field by field (minute 0-59, hour 0-23, day 1-31, month 1-12, weekday 0-7). Google,
+  Outlook and iCloud need their ID and secret together, WebDAV switched on needs its URL, the
+  document folder inside the container must start with `/`, and the `REPLACE_WITH_` placeholder
+  from `.env.example` is no longer accepted as a key. A failed key generation now shows a message
+  instead of leaving the key fields silently empty, and the start screen no longer piles up status
+  requests when the server answers slowly.
+- **Clearer wording in the installer.** The key warning is now a calm notice that says what happens:
+  you get a key file (`.env`) at the end, and without the database key your data is lost. It used
+  to be a red alarm that asked you to save the keys "now". The start screen talks about
+  downloading, starting and checking Yuvomi instead of images, containers and health checks, the
+  start button reads "Save & Start Yuvomi" for Docker and Podman alike, and the iCloud row no longer
+  carries a "Legacy" label.
+- **The installer's step count matches its step list.** "Start Yuvomi" is now a numbered step like
+  the others, so the list and "Step N of M" count the same steps: the advanced setup used to show
+  "Step 8 of 9" next to ten entries, the simple setup "Step 1 of 2" next to three.
+- **How you reach Yuvomi is a two-way switch in the installer** instead of a drop-down with two
+  entries, and the home-network switches in the advanced step form their own named group, so screen
+  readers announce the warning above them. On the review page, anything not set up says so in its
+  own row ("Not set up") instead of one row that listed the missing services in the value column. A
+  failed save now reads "The settings could not be saved." instead of naming the `.env` file.
+- **The installer opens faster and in your language right away.** The language files load in
+  parallel and the scripts are fetched with the first byte, the page stays hidden until it can show
+  your language (with a safety timeout), and HTML, scripts and language files go out compressed:
+  about 160 kB instead of 520 kB per visit. Every response now forbids embedding the installer in
+  another page (it shows your keys) and sends no referrer, and the browser tab shows the Yuvomi icon
+  instead of a missing-icon error.
+- **Installer fields behave like the app's.** Address fields open the URL keyboard on phones and are
+  no longer capitalised or spell-checked, ports open the number pad, and the Enter key on the
+  on-screen keyboard says "Next". A field the browser itself recognises as invalid (an address
+  without `https://`) turns red after you leave it, and screen readers hear the same. Long labels
+  on the review page ("Database encryption key") are hyphenated instead of running into the value,
+  addresses like `./data` read correctly in Arabic and Persian, and the page no longer puts a focus
+  ring on the first heading when it opens. Field borders, the main button and the browser bar now
+  match the app, and the language picker on phones is only as wide as the language it shows.
+- **No more long dashes in the installer's texts.** All 27 languages of the web and command-line
+  installer use a plain hyphen, also for ranges and negative numbers.
+
 ## [2.83.0] - 2026-10-29
 
 ### Added
