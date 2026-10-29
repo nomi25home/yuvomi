@@ -7292,6 +7292,21 @@ function attachSizeIndicators(root, signal) {
 function sizeLabelParts(label) {
   const match = /^(.*\S)\s*(\([^()]*\))$/u.exec(label);
   return match ? { name: match[1], dims: match[2] } : { name: label, dims: '' };
+
+function renderWidgetSizeControls(w, sizeButtons) {
+  return `<div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+        ${sizeButtons}
+      </div>
+      ${renderWidgetSizeMenu(w.id, nearestPreset(w.size))}`;
+}
+
+function renderWidgetOptionsButton(w) {
+  return `<button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
+              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
+              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
+        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+      </button>`;
+}
 }
 
 function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize = false } = {}) {
@@ -7343,7 +7358,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize
           </button>
         </div>
         ${phoneCustomize ? '' : renderWidgetSizeMenu(w.id, activeSize)}
-        ${phoneCustomize ? '' : renderWidgetOptionsButton(w)}
+        ${(!phoneCustomize && widgetHasOptions(w.id)) ? renderWidgetOptionsButton(w) : ''}
         ${renderWidgetTileMenu(w, index, total, { phoneCustomize })}
         <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
           <i data-lucide="eye-off" aria-hidden="true"></i>
@@ -7352,8 +7367,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize
                 aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
           <i data-lucide="grip-vertical" aria-hidden="true"></i>
         </button>
-      </div>
-    </div>
+      </div>    </div>
   `;
 }
 
@@ -7511,8 +7525,7 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
  * DENSELBEN drei Teilen, damit Geste und Aufbau nie zwei Fassungen einer Kachel
  * zeichnen: die Renderer je Widget, der Koerper einer Kachel, ihr Rahmen. */
 function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
-  return {
-    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
+  return {    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
     calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
@@ -7575,8 +7588,7 @@ function renderWidgetBody(w, renderers) {
 function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1, phoneCustomize = false } = {}) {
   return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
                    data-widget-id="${esc(w.id)}"${tileSpanWrapperAttrs(html)}>
-        ${editing ? renderWidgetCustomizeControls(w, index, total, { phoneCustomize }) : ''}
-        ${html}
+        ${editing ? renderWidgetCustomizeControls(w, index, total, { phoneCustomize }) : ''}        ${html}
       </div>`;
 }
 
@@ -11109,8 +11121,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Messungen, legte der Browser die Flaeche zweimal aus - einmal ohne,
       // einmal mit rund 600 Zeichen-Knoten (gemessen 19 ms bei 4x CPU im
       // Seitenwechsel). Und das Blatt misst so die Zeilen, die man sieht.
-      createPendingIcons(shell);
-      // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
+      createPendingIcons(shell);      // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
       // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
       const fitted = measurePhoneProgram(shell);
       if (fitted) {
