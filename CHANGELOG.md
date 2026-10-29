@@ -570,7 +570,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appointment in a second family member's link - is not created again but gets them added. So two
   children's feeds leave a shared dentist appointment as one event with both, and running an
   earlier import again with a person assigns what it brought in. Without a person the import works
-  as before.- **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
+  as before.
+- **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
   run cannot book a series for an unexpected reason, the series keeps running and is retried
   every hour, as before - so a fault on our side never stops a household's rent - but its row,
   read view and edit dialog now say "Booking failed - retrying every hour" instead of the error
