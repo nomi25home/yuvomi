@@ -10,9 +10,14 @@ import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { randomBytes } from 'node:crypto';
+import { networkInterfaces } from 'node:os';
+import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'node:zlib';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_SCHEMA } from './env-schema.js';
+import { RERUN_PREFILL_KEYS, RERUN_SECRET_KEYS } from './env-schema.js';
+// Nur Node-Built-ins; dieselbe Liste wie beim App-Start (applyFileSecrets).
+import { FILE_SECRET_VARS } from '../../server/utils/file-secrets.js';
 import { SUPPORTED_LOCALES as INSTALLER_LOCALES } from './i18n-mini.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -123,13 +128,49 @@ export function renderEnvFile(env) {
   return lines.join('\n') + '\n';
 }
 
-/** Gegenstück zu encodeEnvValue(): eine .env-Zeile zurück in ihren Rohwert. */
+/** Escapes in doppelten Anfuehrungszeichen, wie Compose sie aufloest. */
+const DOUBLE_QUOTE_ESCAPES = { n: '\n', r: '\r', t: '\t', '\\': '\\', '"': '"' };
+
+/**
+ * Gegenstück zu encodeEnvValue(): der Wert rechts vom `=` so, wie Docker
+ * Compose ihn liest (docs.docker.com/compose/how-tos/environment-variables/
+ * variable-interpolation, ".env file syntax"):
+ *   - unquoted: ein Inline-Kommentar beginnt erst an einem `#` NACH Leerraum
+ *     (`./data # x` -> `./data`, `a#b` bleibt), danach wird getrimmt; `$$` ist
+ *     ein wörtliches `$`
+ *   - 'einfach': wörtlich, kein `$$`, nur `\'` ist ein Escape; alles nach dem
+ *     schliessenden Quote ist Kommentar
+ *   - "doppelt": `\n \r \t \\ \"` als Escapes, `$$` als `$`; alles nach dem
+ *     schliessenden Quote ist Kommentar
+ * Vorher kannte der Parser nur doppelte Quotes: `DATA_DIR=./data # storage`
+ * kam MIT Kommentar zurück, der Rerun belegte das Feld damit vor und schrieb
+ * `DATA_DIR="./data # storage"` - ein anderes Verzeichnis, die Daten schienen
+ * weg. Variablen (`$VAR`) löst er bewusst nicht auf.
+ */
 export function decodeEnvValue(raw) {
-  let value = raw.trim();
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    value = value.slice(1, -1).replace(/\\(["\\])/g, '$1');
+  const value = raw.trim();
+  const quote = value[0];
+  if (quote === "'" || quote === '"') {
+    let out = '';
+    for (let i = 1; i < value.length; i++) {
+      const ch = value[i];
+      if (ch === quote) return quote === '"' ? out.replace(/\$\$/g, '$') : out;
+      if (ch === '\\' && i + 1 < value.length) {
+        const next = value[i + 1];
+        if (quote === "'" ? next === "'" : next in DOUBLE_QUOTE_ESCAPES) {
+          out += quote === "'" ? "'" : DOUBLE_QUOTE_ESCAPES[next];
+          i++;
+          continue;
+        }
+      }
+      out += ch;
+    }
+    // Kein schliessendes Quote (mehrzeiliger Wert): die Zeile bleibt, wie sie
+    // ist - geraten wird nicht.
+    return value;
   }
-  return value.replace(/\$\$/g, '$');
+  const comment = value.search(/\s#/);
+  return (comment === -1 ? value : value.slice(0, comment)).trim().replace(/\$\$/g, '$');
 }
 
 /**
@@ -163,9 +204,9 @@ export function readEnvFile(envPath) {
  * Das ist der Unterschied zu readEnvFile(): dort wird dekodiert, hier nicht.
  * Eine Zeile, die niemand ändern will, soll die Datei genauso wieder verlassen,
  * wie sie hineingekommen ist. Parsen und neu rendern hiesse, Compose-Syntax zu
- * interpretieren, die decodeEnvValue gar nicht kennt (einfache
- * Anführungszeichen, angehängte Kommentare) - der Rerun änderte damit still
- * Passwörter und Pfade.
+ * interpretieren und neu maskieren - jede Abweichung zwischen decodeEnvValue
+ * und Compose änderte still Passwörter und Pfade (bis Oktober 2026 kannte der
+ * Parser weder einfache Anführungszeichen noch angehängte Kommentare).
  *
  * Kommentare und Leerzeilen fallen weg: sie beziehen sich auf den alten Aufbau
  * der Datei und stünden im neuen an der falschen Stelle.
@@ -205,6 +246,87 @@ export function preserveUnmanagedLines(envPath, written) {
  * hat der Nutzer ihn im Experten-Modus bewusst eingetragen.
  */
 export const PRESERVED_KEYS = ['SESSION_SECRET', 'DB_ENCRYPTION_KEY'];
+
+/**
+ * Was der Wizard bei einem Rerun aus der bestehenden .env erfahren darf.
+ *
+ * `rerunValues`: die Werte der Allowlist RERUN_PREFILL_KEYS, sonst nichts - also
+ * nie ein Secret, auch keins, dessen Name zufällig unauffällig ist.
+ * `keptSecrets`: nur die NAMEN der Secrets, die in der Datei stehen. Damit kann
+ * der Wizard "bestehender bleibt" anzeigen und Paarprüfungen (Client-ID ohne
+ * Secret) bestehen lassen, ohne den Wert je zu sehen.
+ */
+export function rerunSnapshot(existingEnv) {
+  const rerunValues = {};
+  for (const key of RERUN_PREFILL_KEYS) {
+    if (existingEnv[key]) rerunValues[key] = existingEnv[key];
+  }
+  const keptSecrets = RERUN_SECRET_KEYS.filter(key => secretInEnv(existingEnv, key));
+  return { rerunValues, keptSecrets };
+}
+
+/** Steht `<NAME>_FILE` (server/utils/file-secrets.js) für dieses Secret in der .env? */
+export function secretFromFile(existingEnv, key) {
+  return FILE_SECRET_VARS.includes(key) && Boolean(existingEnv[`${key}_FILE`]);
+}
+
+/**
+ * Ist dieses Secret in der .env eingerichtet - als Wert ODER als `<NAME>_FILE`?
+ * Ein `GOOGLE_CLIENT_SECRET_FILE` zählte vorher nicht: der Wizard sah eine
+ * Client-ID ohne Secret, die Paarprüfung blockierte den Rerun, und wer das
+ * Secret dann eintippte, hatte beide Quellen gesetzt - applyFileSecrets()
+ * bricht den App-Start in dem Fall ab. Bei SESSION_SECRET_FILE und
+ * DB_ENCRYPTION_KEY_FILE erzeugte der Wizard sogar selbst einen zweiten Wert.
+ * Gemeldet wird nur der Name, nie der Pfad.
+ */
+export function secretInEnv(existingEnv, key) {
+  return Boolean(existingEnv[key]) || secretFromFile(existingEnv, key);
+}
+
+/**
+ * Schnittstellen, über die ein Handy im Heimnetz den Host NICHT erreicht:
+ * Container-Bridges (Docker, Podman, libvirt, LXC, Kubernetes-CNI), VMs und
+ * VPN-Tunnel. Deren Adressen sind oft ebenfalls RFC 1918 (docker0 172.17.0.1,
+ * WireGuard 10.x) und sähen sonst genauso gut aus wie das echte LAN.
+ */
+const VIRTUAL_INTERFACE = /^(docker|br-|veth|virbr|vnet|vmnet|vboxnet|vethernet|utun|tun|tap|wg|tailscale|zt|ppp|ipsec|cni|flannel|cali|cilium|lxc|lxd|podman|kube|awdl|llw|bridge|anpi|ap\d)/i;
+
+/** Rang einer privaten IPv4: 192.168/16 vor 10/8 vor 172.16/12, sonst null. */
+function privateRank(address) {
+  if (/^192\.168\./.test(address)) return 0;
+  if (/^10\./.test(address)) return 1;
+  // 172.17.0.0/16 ist Dockers Standard-Bridge; heisst sie anders als docker0
+  // (Rootless, umbenannt), soll sie trotzdem hinter allem anderen stehen.
+  if (/^172\.17\./.test(address)) return 3;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(address)) return 2;
+  return null;
+}
+
+/**
+ * Die Adresse, unter der Handys und Tablets im Heimnetz diesen Rechner
+ * erreichen - oder null.
+ *
+ * Der Einfach-Pfad schrieb BASE_URL=http://localhost:3000: Einladungs- und
+ * Reset-Links zeigten damit auf das Gerät, auf dem man sie öffnet, und die
+ * Fertig-Seite empfahl, die App "auf den Handys" zu installieren, die sie nie
+ * erreichen konnten. Nur private IPv4 (RFC 1918), keine internen Adressen und
+ * keine virtuellen Schnittstellen. `interfaces` ist injizierbar, damit die Wahl
+ * ohne das Netz des Testrechners prüfbar ist.
+ */
+export function pickLanAddress(interfaces = networkInterfaces()) {
+  let best = null;
+  for (const [name, addrs] of Object.entries(interfaces || {})) {
+    if (VIRTUAL_INTERFACE.test(name)) continue;
+    for (const a of addrs || []) {
+      const v4 = a.family === 'IPv4' || a.family === 4;
+      if (!v4 || a.internal) continue;
+      const rank = privateRank(a.address);
+      if (rank === null) continue;
+      if (!best || rank < best.rank) best = { rank, address: a.address };
+    }
+  }
+  return best ? best.address : null;
+}
 
 /**
  * Resolve true/false for whether a command can be spawned successfully.
@@ -528,14 +650,77 @@ function readBody(req) {
   });
 }
 
-function json(res, status, body) {
-  const payload = JSON.stringify(body);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(payload),
-    'Cache-Control': 'no-store',
-  });
+/**
+ * Sicherheits-Header fuer JEDE Antwort. Der Installer zeigt Secrets (Session-
+ * und Datenbankschluessel) im Klartext: keine Einbettung in fremde Seiten
+ * (Clickjacking - X-Frame-Options fuer alte Browser, frame-ancestors fuer
+ * neue), kein Referrer mit der Installer-Adresse an Dritte, kein MIME-Raten.
+ * Bewusst KEINE script-src-Regel: install.html traegt sein Skript inline, eine
+ * Skript-CSP braeche den Wizard (Critique 2026-10-29).
+ */
+export const SECURITY_HEADERS = Object.freeze({
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "frame-ancestors 'none'",
+});
+
+/** Textformate, die sich lohnen zu komprimieren (HTML, JS, JSON, CSS). */
+const COMPRESSIBLE = /^(?:text\/(?:html|javascript|css)|application\/json)\b/;
+/** Darunter kostet die Kompression mehr, als sie spart (Status-Polling). */
+const COMPRESS_MIN_BYTES = 1024;
+
+/**
+ * Bevorzugte Kodierung aus Accept-Encoding: br vor gzip, `q=0` heisst nein.
+ * Bis 2026-10-29 ging alles unkomprimiert raus - rund 520 kB je Aufruf, davon
+ * 280 kB install.html (Critique 2026-10-29, Fast 4G).
+ */
+export function negotiateEncoding(acceptEncoding = '') {
+  const offered = new Map();
+  for (const part of String(acceptEncoding).toLowerCase().split(',')) {
+    const [name, ...params] = part.trim().split(';');
+    if (!name) continue;
+    const q = params.map(p => p.trim().match(/^q=([\d.]+)$/)).find(Boolean);
+    offered.set(name.trim(), q ? Number(q[1]) : 1);
+  }
+  const ok = name => (offered.has(name) ? offered.get(name) > 0 : (offered.get('*') ?? 0) > 0);
+  if (ok('br')) return 'br';
+  if (ok('gzip')) return 'gzip';
+  return null;
+}
+
+/**
+ * Eine Antwort senden, komprimiert, wenn Format, Groesse und Accept-Encoding
+ * es hergeben. Die Anfrage kommt ueber res.req (Node setzt sie am Response).
+ * Brotli auf Stufe 5 statt 11: der Installer liest seine Dateien je Aufruf
+ * frisch (no-store), Stufe 11 kostete bei 280 kB spuerbar CPU je Laden.
+ */
+function send(res, status, headers, body) {
+  let payload = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  const out = { ...headers, 'Cache-Control': 'no-store' };
+  if (COMPRESSIBLE.test(headers['Content-Type'] || '')) {
+    out.Vary = 'Accept-Encoding';
+    const encoding = payload.length >= COMPRESS_MIN_BYTES
+      ? negotiateEncoding(res.req?.headers?.['accept-encoding'])
+      : null;
+    if (encoding === 'br') {
+      payload = brotliCompressSync(payload, { params: {
+        [zlibConstants.BROTLI_PARAM_QUALITY]: 5,
+        [zlibConstants.BROTLI_PARAM_SIZE_HINT]: payload.length,
+      } });
+      out['Content-Encoding'] = 'br';
+    } else if (encoding === 'gzip') {
+      payload = gzipSync(payload, { level: 6 });
+      out['Content-Encoding'] = 'gzip';
+    }
+  }
+  out['Content-Length'] = payload.length;
+  res.writeHead(status, out);
   res.end(payload);
+}
+
+function json(res, status, body) {
+  send(res, status, { 'Content-Type': 'application/json' }, JSON.stringify(body));
 }
 
 /**
@@ -544,17 +729,13 @@ function json(res, status, body) {
  * of throwing, keeping the route handler exception-free.
  */
 function serveStatic(res, filePath, contentType) {
+  let body;
   try {
-    const body = readFileSync(filePath);
-    res.writeHead(200, {
-      'Content-Type': contentType,
-      'Content-Length': body.length,
-      'Cache-Control': 'no-store',
-    });
-    res.end(body);
+    body = readFileSync(filePath);
   } catch {
-    json(res, 404, { error: 'Not found' });
+    return json(res, 404, { error: 'Not found' });
   }
+  send(res, 200, { 'Content-Type': contentType }, body);
 }
 
 
@@ -572,10 +753,15 @@ async function route(req, res, server) {
   }
 
   if (req.method === 'GET' && url.pathname === '/') {
-    const html = readFileSync(resolve(__dirname, 'install.html'));
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': html.length, 'Cache-Control': 'no-store' });
-    res.end(html);
-    return;
+    return send(res, 200, { 'Content-Type': 'text/html; charset=utf-8' }, readFileSync(resolve(__dirname, 'install.html')));
+  }
+
+  // Das App-Icon als Favicon. Ohne die Route fragte jeder Browser /favicon.ico
+  // an und bekam 404 - ein roter Eintrag in der Konsole bei jedem Laden, und
+  // im Tab stand kein Zeichen (Critique 2026-10-29). Dieselbe Datei wie die
+  // App (public/favicon.ico), read-only wie tokens.css.
+  if (req.method === 'GET' && url.pathname === '/favicon.ico') {
+    return serveStatic(res, resolve(projectRoot(), 'public', 'favicon.ico'), 'image/x-icon');
   }
 
   // App-Designtokens, read-only aus dem Repo (Phase 3: Token-Angleich).
@@ -596,6 +782,16 @@ async function route(req, res, server) {
   // i18n-Mini-Modul des Installers (Phase 4: i18n-Verdrahtung).
   if (req.method === 'GET' && url.pathname === '/i18n-mini.js') {
     return serveStatic(res, resolve(__dirname, 'i18n-mini.js'), 'text/javascript; charset=utf-8');
+  }
+
+  // Vorbelegung beim Rerun (reine Funktionen, siehe rerun-prefill.js).
+  if (req.method === 'GET' && url.pathname === '/rerun-prefill.js') {
+    return serveStatic(res, resolve(__dirname, 'rerun-prefill.js'), 'text/javascript; charset=utf-8');
+  }
+
+  // Feldpruefungen, die eine Server-Regel spiegeln (siehe field-checks.js).
+  if (req.method === 'GET' && url.pathname === '/field-checks.js') {
+    return serveStatic(res, resolve(__dirname, 'field-checks.js'), 'text/javascript; charset=utf-8');
   }
 
   // Installer-Locale-Dateien. basename() neutralisiert Path-Traversal;
@@ -627,10 +823,13 @@ async function route(req, res, server) {
       const envExists = existsSync(resolve(projectRoot(), '.env'));
       // Nur die NAMEN der vorhandenen Schlüssel - die Werte bleiben auf dem
       // Server. Das Frontend erzeugt für diese keinen neuen Wert mehr.
-      const preservedKeys = PRESERVED_KEYS.filter(key => Boolean(existingEnv[key]));
+      const preservedKeys = PRESERVED_KEYS.filter(key => secretInEnv(existingEnv, key));
+      // Die nicht geheimen Werte (Allowlist) für die Vorbelegung, von den
+      // Secrets nur die Namen - siehe rerunSnapshot().
+      const { rerunValues, keptSecrets } = rerunSnapshot(existingEnv);
       // Mit Zeitlimit: der Wizard wartet auf diese Antwort (siehe probeContainerRunning).
       const containerRunning = await probeContainerRunning();
-      return json(res, 200, { envExists, preservedKeys, containerRunning });
+      return json(res, 200, { envExists, preservedKeys, rerunValues, keptSecrets, containerRunning });
     } catch (err) {
       return json(res, 500, { error: err.message });
     }
@@ -652,6 +851,13 @@ async function route(req, res, server) {
    * und über dieselbe Loopback-Schranke wie jede andere API-Route; in den
    * JS-Zustand der Seite gelangen sie weiterhin nicht.
    */
+  // Die Heimnetz-Adresse fuer den Einfach-Pfad (siehe pickLanAddress). Der
+  // Installer selbst lauscht weiter nur auf 127.0.0.1; die App-Container binden
+  // per Compose auf 0.0.0.0 und sind damit unter dieser Adresse erreichbar.
+  if (req.method === 'GET' && url.pathname === '/api/lan-address') {
+    return json(res, 200, { address: pickLanAddress() });
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/env-file') {
     try {
       const envPath = resolve(projectRoot(), '.env');
@@ -696,13 +902,23 @@ async function route(req, res, server) {
       // starten - dann hat niemand einen Wert bewusst entfernt, er hat ihn nie
       // gesehen. Zum Löschen dient die .env selbst.
       // ... und zwar VERBATIM, nicht ueber readEnvFile geparst und neu
-      // gerendert. decodeEnvValue kennt nur doppelte Anfuehrungszeichen: ein
-      // `EMAIL_SMTP_PASS='a b'` oder ein `DATA_DIR=./data # storage` sind
-      // gueltige Compose-Syntax, kaemen aber als Wert MIT Quotes bzw. MIT
-      // Kommentar zurueck und wuerden beim Rendern erneut maskiert. Der Rerun
-      // haette so still das Passwort geaendert oder ein anderes Verzeichnis
-      // gemountet. Der Parser war nie fuer diesen Zweck gedacht - sein eigener
-      // Kommentar sagt "nur fuer Werte, die erhalten bleiben muessen".
+      // gerendert. Ein `EMAIL_SMTP_PASS='a b'` oder ein
+      // `DATA_DIR=./data # storage` ist gueltige Compose-Syntax; jede
+      // Abweichung zwischen decodeEnvValue und Compose kaeme beim Rendern als
+      // anderer Wert zurueck - der Rerun haette still das Passwort geaendert
+      // oder ein anderes Verzeichnis gemountet. Der Wizard laesst deshalb auch
+      // unveraendert vorbelegte Werte aus dem Request (omitUnchanged in
+      // rerun-prefill.js), damit ihre Originalzeile hier ueberlebt.
+      //
+      // Ein Secret, das die .env per `<NAME>_FILE` bezieht, schreibt der
+      // Installer nicht zusaetzlich als Klartext: beide Quellen zugleich lehnt
+      // applyFileSecrets() beim App-Start ab. Die Datei-Variante bleibt.
+      const existingEnv = readEnvFile(envPath);
+      for (const key of FILE_SECRET_VARS) {
+        if (result.env[key] && secretFromFile(existingEnv, key) && !result.env[`${key}_FILE`]) {
+          delete result.env[key];
+        }
+      }
       const preserved = preserveUnmanagedLines(envPath, result.env);
 
       let backup = null;
@@ -862,6 +1078,7 @@ function postSetup(port, account) {
 
 export function createInstallerServer() {
   const server = http.createServer((req, res) => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
     route(req, res, server).catch(err => json(res, 500, { error: err.message }));
   });
   return server;

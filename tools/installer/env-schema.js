@@ -20,13 +20,13 @@ export const ENV_SCHEMA = [
   { key: 'EMAIL_FROM_ADDRESS',          type: 'user',    label: 'From Address',             required: false, group: 'email',   writeToEnv: true },
   { key: 'EMAIL_FROM_NAME',             type: 'default', label: 'From Name',                default: '',     group: 'email',   writeToEnv: true },
   { key: 'GOOGLE_CLIENT_ID',            type: 'user',    label: 'Google Client ID',         required: false, group: 'google',  writeToEnv: true },
-  { key: 'GOOGLE_CLIENT_SECRET',        type: 'user',    label: 'Google Client Secret',     required: false, group: 'google',  writeToEnv: true },
+  { key: 'GOOGLE_CLIENT_SECRET',        type: 'user',    label: 'Google Client Secret',     required: false, group: 'google',  writeToEnv: true, secret: true },
   { key: 'GOOGLE_REDIRECT_URI',         type: 'user',    label: 'Google Redirect URI',      required: false, group: 'google',  writeToEnv: true },
   { key: 'GOOGLE_DRIVE_CLIENT_ID',      type: 'user',    label: 'Google Drive Client ID',   required: false, group: 'googleDrive', writeToEnv: true },
   { key: 'GOOGLE_DRIVE_CLIENT_SECRET',  type: 'user',    label: 'Google Drive Client Secret', required: false, group: 'googleDrive', writeToEnv: true, secret: true },
   { key: 'GOOGLE_DRIVE_REDIRECT_URI',   type: 'user',    label: 'Google Drive Redirect URI', required: false, group: 'googleDrive', writeToEnv: true },
   { key: 'APPLE_USERNAME',              type: 'user',    label: 'Apple ID (email)',          required: false, group: 'apple',   writeToEnv: true },
-  { key: 'APPLE_APP_SPECIFIC_PASSWORD', type: 'user',    label: 'App-Specific Password',    required: false, group: 'apple',   writeToEnv: true },
+  { key: 'APPLE_APP_SPECIFIC_PASSWORD', type: 'user',    label: 'App-Specific Password',    required: false, group: 'apple',   writeToEnv: true, secret: true },
   { key: 'APPLE_CALDAV_URL',            type: 'default', label: 'CalDAV URL',               default: 'https://caldav.icloud.com', group: 'apple', writeToEnv: true },
   // Outlook-Push (Microsoft Graph), optional; alle drei zusammen oder keiner.
   // Die Redirect-URI leitet der Wizard aus der geplanten Origin ab
@@ -94,7 +94,7 @@ export const ENV_SCHEMA = [
   // Single Sign-On (OIDC). Server aktiviert OIDC nur, wenn alle vier gesetzt sind.
   { key: 'OIDC_ISSUER',                 type: 'user',    label: 'OIDC Issuer',              required: false, group: 'oidc',    writeToEnv: true },
   { key: 'OIDC_CLIENT_ID',              type: 'user',    label: 'OIDC Client ID',           required: false, group: 'oidc',    writeToEnv: true },
-  { key: 'OIDC_CLIENT_SECRET',          type: 'user',    label: 'OIDC Client Secret',       required: false, group: 'oidc',    writeToEnv: true },
+  { key: 'OIDC_CLIENT_SECRET',          type: 'user',    label: 'OIDC Client Secret',       required: false, group: 'oidc',    writeToEnv: true, secret: true },
   { key: 'OIDC_REDIRECT_URI',           type: 'user',    label: 'OIDC Redirect URI',        required: false, group: 'oidc',    writeToEnv: true },
   // Manche IdPs (u. a. Authentik in Standardkonfiguration) liefern kein
   // email_verified. Ohne diesen Schalter verweigert die Anmeldung dort die
@@ -147,4 +147,54 @@ export const ENV_SCHEMA = [
   // genau das blockt der SSRF-Guard. Der Wizard fragte die URL ab und bot
   // keinen Ausweg an: das Feld scheiterte im häufigsten Fall stumm.
   { key: 'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK', type: 'default', label: 'Allow Private Network WebDAV Target', default: 'false', required: false, group: 'documentStorage', writeToEnv: true },
+];
+
+/**
+ * Werte einer bestehenden .env, die /api/preflight dem Wizard für einen Rerun
+ * zurückgibt, damit er seine Felder damit vorbelegt.
+ *
+ * Eine ALLOWLIST, keine Blocklist: das `secret`-Merkmal oben fehlte bis
+ * Oktober 2026 an drei Secrets (Google-, OIDC-Client-Secret, Apple-Passwort) -
+ * eine Ableitung "alles ohne secret" hätte sie an die Seite geschickt. Ein neuer
+ * Schema-Schlüssel landet deshalb in KEINER Liste, bis ihn jemand einordnet, und
+ * test-installer-rerun.js wird dann rot.
+ *
+ * Warum überhaupt: ohne Vorbelegung startete jedes Feld mit seinem Default, und
+ * buildEnv() schickte Port, BASE_URL, SESSION_SECURE, TRUST_PROXY, TZ und
+ * WEATHER_UNITS immer mit. Der Rerun-Schutz des Servers bewahrt nur, was der
+ * Client NICHT schickt - ein zweiter Lauf über den Erweitert-Pfad setzte diese
+ * Werte also still auf Defaults zurück.
+ */
+export const RERUN_PREFILL_KEYS = [
+  'WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS',
+  'EMAIL_SMTP_HOST', 'EMAIL_SMTP_PORT', 'EMAIL_SMTP_SECURE', 'EMAIL_SMTP_USER',
+  'EMAIL_FROM_ADDRESS', 'EMAIL_FROM_NAME',
+  'GOOGLE_CLIENT_ID', 'GOOGLE_REDIRECT_URI', 'GOOGLE_DRIVE_CLIENT_ID', 'GOOGLE_DRIVE_REDIRECT_URI',
+  'APPLE_USERNAME', 'APPLE_CALDAV_URL', 'MS_CLIENT_ID', 'MS_REDIRECT_URI',
+  'SYNC_INTERVAL_MINUTES', 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK',
+  'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK', 'WASTE_SOURCE_ALLOW_PRIVATE_NETWORK',
+  'MODULES_ALLOW_WEB_INSTALL', 'TZ', 'OIKOS_HTTP_PORT', 'DATA_DIR', 'BASE_URL',
+  'SESSION_SECURE', 'TRUST_PROXY',
+  'OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_REDIRECT_URI',
+  'OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM', 'OIDC_ALLOW_SIGNUP', 'AUTH_ALLOW_PASSWORD_LOGIN',
+  'BACKUP_ENABLED', 'BACKUP_SCHEDULE', 'BACKUP_KEEP',
+  'WEBDAV_BACKUP_ENABLED', 'WEBDAV_BACKUP_URL', 'WEBDAV_BACKUP_USERNAME',
+  'WEBDAV_BACKUP_PATH', 'WEBDAV_BACKUP_KEEP',
+  'VAPID_SUBJECT', 'MAX_UPLOAD_MB',
+  'DOCUMENT_STORAGE_LOCAL_ENABLED', 'DOCUMENT_STORAGE_LOCAL_PATH', 'DOCUMENT_STORAGE_LOCAL_DIR',
+  'DOCUMENT_STORAGE_WEBDAV_ENABLED', 'DOCUMENT_STORAGE_WEBDAV_URL',
+  'DOCUMENT_STORAGE_WEBDAV_USERNAME', 'DOCUMENT_STORAGE_WEBDAV_PATH',
+  'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK',
+];
+
+/**
+ * Secrets: von ihnen meldet der Preflight nur, DASS sie in der .env stehen, nie
+ * den Wert. Der Wizard lässt ihr Feld dann leer ("bestehender bleibt"), und der
+ * Server setzt die alte Zeile beim Speichern wieder ein.
+ */
+export const RERUN_SECRET_KEYS = [
+  'SESSION_SECRET', 'DB_ENCRYPTION_KEY', 'FIXER_API_KEY', 'EMAIL_SMTP_PASS',
+  'GOOGLE_CLIENT_SECRET', 'GOOGLE_DRIVE_CLIENT_SECRET', 'APPLE_APP_SPECIFIC_PASSWORD',
+  'MS_CLIENT_SECRET', 'OIDC_CLIENT_SECRET', 'WEBDAV_BACKUP_PASSWORD',
+  'DOCUMENT_STORAGE_WEBDAV_PASSWORD',
 ];

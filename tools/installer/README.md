@@ -1,7 +1,7 @@
 # Yuvomi Web Installer
 
 A browser-based setup wizard for Yuvomi. Run it once to configure your `.env`,
-start your container engine, and create your admin account — no hand-editing of
+start your container engine, and create your admin account - no hand-editing of
 config files. Works with both Docker and Podman (auto-detected).
 
 ## Usage
@@ -20,7 +20,7 @@ of inactivity otherwise). Download the generated `.env` before you close the tab
 ## Requirements
 
 - Node.js 22+ (the installer itself has zero npm dependencies - Node built-ins only; running the app outside a container needs Node.js 22.14 or newer, see `engines` in `package.json`)
-- A container engine — either **Docker** with Compose v2, or **Podman** with the
+- A container engine - either **Docker** with Compose v2, or **Podman** with the
   `podman compose` subcommand (4.1+) or the `podman-compose` package
 - The repository cloned locally
 
@@ -37,12 +37,23 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
    is briefly cut off. When it finds an existing `.env`, the **simple
    path is disabled** and you continue with the advanced setup: the simple path writes
    fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would
-   silently downgrade an installation that already runs behind a reverse proxy
+   silently downgrade an installation that already runs behind a reverse proxy.
+   The advanced setup pre-fills its fields from that `.env` instead: `/api/preflight`
+   returns the non-secret values on the explicit allowlist `RERUN_PREFILL_KEYS`
+   (`env-schema.js`) and, for secrets, only the names (`keptSecrets`). Values you
+   leave untouched are written back unchanged, `SESSION_SECURE`/`TRUST_PROXY` stay as
+   they were while the exposure choice is the pre-selected one, and secret fields
+   stay empty ("Current value is kept") so the server restores their existing lines
 2. Lets you pick a setup path on the welcome screen:
-   - **Simple setup** (recommended for non-technical users) — auto-generates the
-     security keys, applies safe localhost/HTTP defaults, and goes straight to
-     creating your admin account. Two or three clicks, no jargon.
-   - **Advanced setup** — walks every option, step by step. Security keys are
+   - **Simple setup** (recommended for non-technical users) - auto-generates the
+     security keys, applies safe HTTP defaults, and goes straight to
+     creating your admin account. Two or three clicks, no jargon. The address
+     it writes (`BASE_URL`) is this computer's private IPv4 on the home network
+     (`GET /api/lan-address`, skipping Docker/Podman bridges and VPN tunnels such as
+     `docker0`, `br-*`, `utun*`, `wg*`), so invitation and reset links work on the
+     family's phones; "Change" on the summary screen edits it. Without such an
+     address the summary says it is reachable on this device only (`localhost`).
+   - **Advanced setup** - walks every option, step by step. Security keys are
      still pre-generated (regenerate any time), and each screen is optional:
      - **Basics** - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`,
        which also pre-sets the household zone - changeable later in the app),
@@ -80,8 +91,10 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      exposure choice); the simple path derives it. A typed value only wins over
      the pre-fill when it names a full `http://` or `https://` origin.
      Every redirect URI the wizard
-     shows - Google Calendar, Google Drive, OIDC - is built from that one value, so
-     what you copy into a provider console is what the app will send.
+     shows - Google Calendar, Outlook, Google Drive, OIDC - is built from that one value, so
+     what you copy into a provider console is what the app will send. On a
+     rerun an existing redirect URI stays as written (it may name another host
+     than `BASE_URL`) until the address or that provider's client changes.
    - A language switcher (top corner) overrides the auto-detected browser
      language and remembers your choice.
    - Reloading or closing the page mid-setup asks for confirmation first: the
@@ -93,7 +106,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      would leave the app unable to start. Their fields stay empty on the
      security-keys screen and the old values are written back unchanged. Typing
      a value anyway overrides this, which is the deliberate way to start over.
-     The wizard never receives the existing values — the server reports only
+     The wizard never receives the existing values - the server reports only
      which keys exist and restores them when it writes the file.
 3. Backs up any existing `.env` to `.env.bak-<ISO>` before writing
 4. Writes `.env` to the project root (keys are allowlisted against the shared
@@ -111,7 +124,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
    with 400, it retries once without it, so the account never fails over the
    language. `timezone` is deliberately not sent: `TZ` in the `.env` already
    pre-sets the household zone, and a stored zone would decouple the two
-8. Offers to download the written `.env` on the final screen — the only backup
+8. Offers to download the written `.env` on the final screen - the only backup
    of newly generated encryption keys, which cannot be recovered if lost. The
    download is served from disk (`GET /api/env-file`), so it is the file itself,
    including values carried over from a previous run and the two secrets the
@@ -130,7 +143,7 @@ The two local-storage paths are the two ends of one mount and must not drift apa
 `DOCUMENT_STORAGE_LOCAL_DIR` is the **host** folder, `DOCUMENT_STORAGE_LOCAL_PATH` the **container**
 path the app writes to. The Compose files derive both ends from the `.env`
 (`${DOCUMENT_STORAGE_LOCAL_DIR}:${DOCUMENT_STORAGE_LOCAL_PATH}`), because a mount fixed at
-`/documents` would send uploads into the container layer as soon as anyone changes the path — gone on
+`/documents` would send uploads into the container layer as soon as anyone changes the path - gone on
 the next image update, while the database keeps referencing them.
 
 The WebDAV document-storage fields are optional. Non-empty
@@ -160,8 +173,8 @@ loaded by `i18n-mini.js`, which mirrors the app's locale resolution.
 The **CLI installer** (`install.sh` at the repo root) is localized into the same
 27 languages. It detects the language from the shell environment
 (`OIKOS_INSTALLER_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`) and accepts a
-`--lang <code>` override. Its strings live in `tools/installer/locales/cli/<lang>.sh`
-— one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
+`--lang <code>` override. Its strings live in `tools/installer/locales/cli/<lang>.sh` -
+one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
 fallback base, the active language overlays it. Key parity across all 27 files is
 enforced by `test-installer-cli-i18n.js`, which also checks that every value is a
 `printf` format matching its call site (each value is passed to `printf` as the
@@ -174,26 +187,35 @@ re-run; the set of keys the dialog owns is the `MANAGED_KEYS` array in
 `install.sh`, and `test-installer-env-write.js` enforces that it matches the
 template in both directions. It asks for `BASE_URL` instead of deriving it,
 because behind a reverse proxy the public origin differs from the host and port
-the container listens on — and it reads `SESSION_SECURE` and `TRUST_PROXY` back
+the container listens on - and it reads `SESSION_SECURE` and `TRUST_PROXY` back
 out of that answer, since both server defaults are wrong for the other mode
 (no HSTS behind HTTPS; `X-Forwarded-For` trusted without a proxy in front,
 which is what the per-IP login rate limit counts). An existing value in `.env`
 wins over the derivation.
+
+## Delivery
+
+Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+no-referrer`, `X-Frame-Options: DENY` and `Content-Security-Policy:
+frame-ancestors 'none'` - the wizard shows keys in plain text and must not be
+embeddable. There is deliberately no `script-src` policy: the wizard's script is
+inline. HTML, JavaScript, CSS and JSON go out Brotli- or gzip-compressed when
+the browser offers it (`Accept-Encoding`), plain otherwise.
 
 ## Design
 
 The wizard reuses the app's design language: the shared design tokens
 (`public/styles/tokens.css`) are served read-only from the repo, so the
 installer matches the app's violet accent, radii, shadows, and automatic dark
-mode. No font is served any more - the app took the system font stack with the
+mode, and `/favicon.ico` serves the app icon (`public/favicon.ico`). No font is served any more - the app took the system font stack with the
 v2.0.0 redesign, and the `/fonts/` route went with the typeface it carried.
 An inline fallback token block (with a dark-mode variant) precedes the
 `tokens.css` link, so the wizard stays legible even if that stylesheet cannot be
 served; its values mirror the current tokens, because a fallback that shows the
 previous release sends the diagnosis in the wrong direction. The layout follows the app's settings screens: options sit in grouped inset
 lists with the app's switches for on/off settings, wide screens show a step list
-beside the content (finished steps can be revisited, and the Docker start has its
-own entry), the action bar stays in reach at every width, and the review page
+beside the content (finished steps can be revisited, and the Docker start is a
+numbered step, so the list and "Step N of M" always agree), the action bar stays in reach at every width, and the review page
 is grouped by topic with an edit link per group. The wizard meets WCAG 2.1 AA
 (keyboard-operable accordions, ARIA live regions for Docker status, focus
 management, labelled controls, a `<main>` landmark, and field-level error
@@ -206,18 +228,31 @@ double-click cannot pass both confirmation stages at once.
 
 ## Architecture
 
-- `install-server.js` — the temporary HTTP server (port 8090), bound to
+- `install-server.js` - the temporary HTTP server (port 8090), bound to
   loopback. State-changing `POST`s are rejected (403) unless the request's Host
   and any Origin/Referer are loopback, guarding against DNS-rebinding/CSRF while
   the installer runs. Endpoints:
   `GET /api/defaults` (serves `ENV_SCHEMA`), `GET /api/prereqs`,
-  `GET /api/preflight` (existing `.env` / running container),
+  `GET /api/preflight` (existing `.env` / running container, plus the
+  allowlisted non-secret values and the names of kept secrets for a re-run),
+  `GET /api/lan-address` (the private home-network IPv4 for the simple path),
   `POST /api/generate-secret`, `POST /api/save-env` (returns the written path),
   `POST /api/start`, `GET /api/status`, `POST /api/create-admin`,
   `GET /api/env-file` (serves the written `.env` for the final download - same
   loopback guard, since the file carries the encryption keys).
-- `env-schema.js` — the single source of truth (`ENV_SCHEMA`) for every
-  configurable variable, its group, default, and whether it is written to `.env`.
-- `i18n-mini.js` + `locales/*.json` — web-wizard localization.
-- `locales/cli/*.sh` — CLI-installer localization (sourced by `install.sh`).
-- `install.html` — the wizard UI.
+- `env-schema.js` - the variable catalogue (`ENV_SCHEMA`): every configurable
+  variable, its group, default, and whether it is written to `.env`, plus the
+  re-run allowlists. It is not the only place a variable lives: the wizard's
+  fields and `buildEnv()` in `install.html`, the CLI installer and `.env.example`
+  carry their own copies, and `test/test-installer-schema.js` binds them to it.
+- `rerun-prefill.js` - pure functions that turn the re-run values from
+  `/api/preflight` into field pre-fills (`prefillPlan`) and keep `SESSION_SECURE`/
+  `TRUST_PROXY` while the exposure choice is unchanged (`accessEnv`); served to the
+  page and tested without a browser.
+- `field-checks.js` - field checks that mirror a server rule (cron ranges as
+  the backup scheduler accepts them, the `REPLACE_WITH_` placeholder, an absolute
+  container path, ID/secret pairs, WebDAV without URL); served to the page and
+  bound to the server code by `test/test-installer-validation.js`.
+- `i18n-mini.js` + `locales/*.json` - web-wizard localization.
+- `locales/cli/*.sh` - CLI-installer localization (sourced by `install.sh`).
+- `install.html` - the wizard UI.

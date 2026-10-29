@@ -269,10 +269,16 @@ test('kein Compose-Manifest nutzt die env_file-Langform (Compose <2.24 lehnt sie
   }
 });
 
-test('install.html setzt im Reverse-Proxy-Pfad SESSION_SECURE=true', () => {
-  const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
-  assert.match(src, /S\.SESSION_SECURE\s*=\s*'true'/,
+test('install.html setzt im Reverse-Proxy-Pfad SESSION_SECURE=true', async () => {
+  // Seit dem Rerun-Schutz rechnet accessEnv() (rerun-prefill.js) das Paar; die
+  // Zusage bleibt dieselbe: eine Erstinstallation hinter dem Proxy bekommt
+  // sichere Cookies, und cfg-next nimmt genau diesen Wert.
+  const { accessEnv } = await import('../tools/installer/rerun-prefill.js');
+  assert.equal(accessEnv('proxy', null).SESSION_SECURE, 'true',
     'Proxy-Pfad schreibt SESSION_SECURE nicht auf true');
+  const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  assert.match(src, /Object\.assign\(S, accessEnv\(choice, rerunValues\)\)/,
+    'cfg-next setzt SESSION_SECURE nicht aus accessEnv');
 });
 
 // ── env-schema deckt die neuen Settings ab ─────────────────────────────────────
@@ -561,11 +567,13 @@ test('ein Retry raeumt das laufende Polling ab, statt ein zweites zu starten', (
   const startDocker = html.match(/async function startDocker\(\) \{([\s\S]*?)\n\}/);
   assert.ok(startDocker, 'startDocker() nicht gefunden');
   const body = startDocker[1];
-  const clearIdx = body.indexOf('clearInterval(pollInterval)');
-  const setIdx = body.indexOf('setInterval(pollDocker');
-  assert.ok(clearIdx !== -1, 'startDocker() raeumt kein laufendes Intervall ab');
-  assert.ok(setIdx !== -1, 'startDocker() setzt kein Polling-Intervall');
-  assert.ok(clearIdx < setIdx, 'das Abraeumen muss VOR dem neuen setInterval stehen');
+  // Seit der setTimeout-Kette (test-installer-validation.js) heisst das
+  // Abraeumen stopPolling() und das Planen schedulePoll().
+  const clearIdx = body.indexOf('stopPolling()');
+  const setIdx = body.indexOf('schedulePoll(run)');
+  assert.ok(clearIdx !== -1, 'startDocker() raeumt keine laufende Kette ab');
+  assert.ok(setIdx !== -1, 'startDocker() plant kein Polling');
+  assert.ok(clearIdx < setIdx, 'das Abraeumen muss VOR dem neuen Planen stehen');
 
   // Zweiter Riegel: pollDocker ist async, also kann ein Tick seine Antwort noch
   // auswerten, nachdem ein anderer den Endzustand gemeldet hat.
