@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.83.0] - 2026-10-29
-
 ### Added
 - **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
   a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
   layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
   arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
   arrangement and goes back to following the desktop. (#2109)
+
+## [2.83.0] - 2026-10-29
+
+### Added
 - **Secrets can be read from files (`<NAME>_FILE`).** `SESSION_SECRET`, `DB_ENCRYPTION_KEY` and the
   other secrets (client secrets, passwords, API keys) can now come from a file instead of an
   environment variable: set `SESSION_SECRET_FILE=/run/secrets/session_secret` and the content of that
