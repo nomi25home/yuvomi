@@ -7520,13 +7520,19 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   `;
 }
 
+function mergePhoneDisplayCfg(desktopCfg, phoneCfg) {
+  return phoneCfg.map((p) => {
+    const desk = desktopCfg.find((w) => w.id === p.id);
+    return desk ? { ...desk, visible: p.visible, order: p.order } : p;
+  });
+}
+
 /* DIE KACHELN EINZELN ZEICHENBAR (DW-P2-1). Das Raster zeichnet sie alle, eine
  * Anpassen-Geste nur die, die sie aendert (patchCustomize in render()) - aus
  * DENSELBEN drei Teilen, damit Geste und Aufbau nie zwei Fassungen einer Kachel
  * zeichnen: die Renderer je Widget, der Koerper einer Kachel, ihr Rahmen. */
 function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
-  return {    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
-    calendar: (size, options) => renderCalendarWidget(data, size, options),
+  return {    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),    calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
@@ -9984,7 +9990,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // damit das Skelett den Phone-Aufriss voraussagt statt den Desktop-Aufriss.
     if (phoneWidgetConfig !== null && onPhoneStage()) {
       rememberLayoutHint(
-        phoneWidgetConfig.map((p) => { const d = widgetConfig.find((w) => w.id === p.id); return d ? { ...d, visible: p.visible, order: p.order } : p; }),
+        mergePhoneDisplayCfg(widgetConfig, phoneWidgetConfig),
         dashboardQuery(widgetConfig),
         drawnSpanOf,
       );
@@ -10156,7 +10162,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Skelett-Vorhersage fuer den naechsten Kaltstart (#2109).
       if (onPhoneStage()) {
         rememberLayoutHint(
-          phoneWidgetConfig.map((p) => { const d = widgetConfig.find((w) => w.id === p.id); return d ? { ...d, visible: p.visible, order: p.order } : p; }),
+          mergePhoneDisplayCfg(widgetConfig, phoneWidgetConfig),
           dashboardQuery(widgetConfig),
           calendarListRowsOf,
         );
@@ -11065,8 +11071,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         : cfg;
     const html = dashboardShellHtml(displayCfg, { phoneCustomize, followsPhoneDefault });
     // Vor dem Zeichnen, solange nichts Neues auszulegen ist (carryTileSizes).
-    const viewportWidth = window.innerWidth;    // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
-    // (captureRebuildFocus / restoreFocusAfterRebuild).
+    const viewportWidth = window.innerWidth;    // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr    // (captureRebuildFocus / restoreFocusAfterRebuild).
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
     const todayFallback = hadFocus ? todayFocusFallbacks(document.activeElement) : [];
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
@@ -11592,9 +11597,8 @@ async function loadScheduleSlice(day) {
 }
 
 export const __test = {
-  onboardingCardPlacement,
-  usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
-  getOverviewMemo: () => _overviewMemo,
+mergePhoneDisplayCfg, onboardingCardPlacement,
+  usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,  getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
   childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarTileModel, tileSpanOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, gridHoleSuggestion, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
 

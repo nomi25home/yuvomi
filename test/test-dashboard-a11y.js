@@ -20,7 +20,7 @@ import { register } from 'node:module';
 register('./test-browser-loader.mjs', import.meta.url);
 
 const { __test } = await import('../public/pages/dashboard.js');
-const { widgetHeader, renderDashboardLayout, renderMetricTiles } = __test;
+const { widgetHeader, renderDashboardLayout, renderMetricTiles, mergePhoneDisplayCfg } = __test;
 
 /** Der Text, den ein Screenreader aus einem Markup-Stueck liest: ohne aria-hidden und ohne Tags. */
 function accessibleText(html) {
@@ -1040,6 +1040,35 @@ test('R22 D16: die Optionen einer ausgeblendeten Kachel stehen am Chip, in einem
     'das Menue nennt beide Handlungen mit Wort');
   const clock = tray.slice(tray.indexOf('data-widget-show="clock"') - 200, tray.indexOf('data-widget-show="clock"'));
   assert.doesNotMatch(clock, /--split/, 'ohne Optionen bleibt es ein einfacher Chip');
+});
+
+// Telefon-Anzeige: Reihenfolge und Sichtbarkeit kommen vom Telefon-Aufriss,
+// Optionen und Groesse bleiben die des Desktops (#2109).
+test('R14 P2: mergePhoneDisplayCfg haelt Desktop-Optionen, nimmt Reihenfolge und Sichtbarkeit vom Telefon', () => {
+  const desktop = [
+    { id: 'calendar', visible: true,  order: 0, size: '1x2', limit: 5 },
+    { id: 'tasks',    visible: true,  order: 1, size: '1x1', filter: 'mine' },
+    { id: 'weather',  visible: false, order: 2, size: '1x1' },
+  ];
+  const phone = [
+    { id: 'tasks',    visible: true,  order: 0 },
+    { id: 'calendar', visible: false, order: 1 },
+    { id: 'weather',  visible: true,  order: 2 },
+  ];
+  const merged = mergePhoneDisplayCfg(desktop, phone);
+  const byId = (id) => merged.find((w) => w.id === id);
+
+  // Reihenfolge und Sichtbarkeit kommen vom Telefon
+  assert.equal(merged[0].id, 'tasks',    'Telefon-Reihenfolge: tasks zuerst');
+  assert.equal(merged[1].id, 'calendar', 'Telefon-Reihenfolge: calendar zweiter');
+  assert.equal(byId('calendar').visible, false, 'Sichtbarkeit vom Telefon: calendar ausgeblendet');
+  assert.equal(byId('weather').visible,  true,  'Sichtbarkeit vom Telefon: weather eingeblendet');
+
+  // Optionen und Groesse bleiben die des Desktops
+  assert.equal(byId('calendar').limit,  5,      'Desktop-Option erhalten: calendar limit');
+  assert.equal(byId('tasks').filter, 'mine',    'Desktop-Option erhalten: tasks filter');
+  assert.equal(byId('calendar').size, '1x2',    'Desktop-Groesse erhalten: calendar');
+  assert.equal(byId('weather').size,  '1x1',    'Desktop-Groesse erhalten: weather');
 });
 
 // --------------------------------------------------------------------------
