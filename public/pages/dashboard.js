@@ -5239,12 +5239,16 @@ function todayMealsForTimeline(data) {
     .map((meal) => {
       const time = MEAL_SORT_TIME[meal.meal_type];
       const start = clockMinute(time);
+      const nextIdx = MEAL_DAY_ORDER.indexOf(meal.meal_type) + 1;
+      const nextTime = nextIdx < MEAL_DAY_ORDER.length ? MEAL_SORT_TIME[MEAL_DAY_ORDER[nextIdx]] : null;
+      const sheetRowEnd = nextTime != null ? clockMinute(nextTime) : 24 * 60;
       const label = labels[meal.meal_type] ?? t('dashboard.todayDinner');
       return {
         id: meal.id,
         start,
         end: start,
         point: true,
+        sheetRowEnd,
         peopleIds: [],
         title: label,
         timeLabel: formatTime(time),
@@ -5370,6 +5374,7 @@ const TIMELINE_PROGRAM_KINDS = new Set(['event', 'meal']);
 function timelineSheetRows(data, timeline, now = new Date()) {
   const rows = [];
   const seen = new Set();
+  const nowMinute = now.getHours() * 60 + now.getMinutes();
   const allDay = timeline?.allDay ?? todayEventsForTimeline(data, now).allDay;
   for (const item of allDay) {
     if (seen.has(item.key)) continue;
@@ -5377,7 +5382,8 @@ function timelineSheetRows(data, timeline, now = new Date()) {
     rows.push({ ...item.sheetRow, timelineKey: item.key });
   }
   for (const item of (timeline?.lanes ?? []).flatMap((lane) => lane.items)) {
-    if (item.state === 'past' || seen.has(item.key)) continue;
+    const isPast = item.sheetRowEnd != null ? nowMinute >= item.sheetRowEnd : item.state === 'past';
+    if (isPast || seen.has(item.key)) continue;
     seen.add(item.key);
     const row = item.kind === 'meal' ? timelineMealRow(item) : { ...item.sheetRow };
     rows.push({ ...(item.state === 'now' ? runningRow(row) : row), timelineKey: item.key });
