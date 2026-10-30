@@ -317,9 +317,10 @@ test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt m
       // der Zeitleiste nimmt (R24 S7, 08fe2de19), zaehlt jede Mahlzeit, die
       // heute noch kommt - morgens drei, ab dem Abendessen keine. Der Test lief
       // mit der Wanduhr und war nur zwischen Mittag und Abendessen gruen. Um
-      // 15:00 steht genau das Abendessen noch aus: eine Sache.
+      // 15:31 ist das Mittagessen aus der Zeitleiste verschwunden (sheetRowEnd
+      // = Snack-Slot 15:30), sodass genau das Abendessen noch aussteht: eine Sache.
       const afternoon = new Date();
-      afternoon.setHours(15, 0, 0, 0);
+      afternoon.setHours(15, 31, 0, 0);
       const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, wallTasks, users: [ANNA_WAND, BEN_WAND] }, null, { now: afternoon });
       return abschnitt(html, 'class="wall__who"', '</section>');
     } finally {
