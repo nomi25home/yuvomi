@@ -14,7 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
   arrangement and goes back to following the desktop. (#2109)
 
+### Changed
+- **The website tells Yuvomi as one story instead of a feature list.** The homepage at yuvomi.cloud
+  now starts with the problem it takes off your hands - many apps, and one person who keeps it all
+  in their head - then shows how the parts work together, a day at home from morning to evening,
+  what the family gets, and why it stays yours: no subscription, your data on your own disk and
+  encrypted if you want, and one update check as the only call out of the box. Setup comes last,
+  with one main route, the NAS app stores as one-click options, the other ways behind "More ways
+  to install" and the technical details folded away, and the questions worth asking first open one
+  answer at a time. The text is plainer in
+  English and German, technical terms are explained where they appear, and the list of outbound
+  connections now also names Gravatar profile pictures and installing extension modules from GitHub.
+  The screens are staged instead of pasted in: the top of the page shows the desktop, the kitchen
+  wall tablet and a phone together, each connection between two parts shows both ends as real
+  excerpts from the app, the day at home shows each moment as a focused crop, and the overview,
+  wall and health screenshots are current again. On a phone the page is nearly a third shorter.
+  The top bar is the same on every page of the site and groups the jump menu, language and theme in
+  one glass control: EN and DE are two buttons, and pressing the language you are already reading
+  no longer switches to the other one; the theme names its mode on wide screens, and GitHub is a
+  single icon. The jump menu marks the section you are in. The floating Install button on phones
+  gets out of the way while you scroll down and comes back when you scroll up, and stays away over
+  the setup section and at the end of the page; "Back to top" appears only after half the page.
+  The family section shows the kitchen wall tablet large, with the shared notes board on a phone in
+  front, device frames stay visible in dark mode, and the excerpts are sharp on high-density phone
+  screens. The overview image at the top now starts loading right away on phones too, and the
+  footer says "MIT-Lizenz" on the German pages.
+
 ### Fixed
+- **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
+  not written back; the homepage and the install page promised a two-way sync for them.
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
   setup now fills its fields with the values from your `.env` - port, public address, reverse-proxy
   settings, timezone, weather, email, sign-on, storage and backups - so a second run no longer resets
@@ -75,6 +103,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   match the app, and the language picker on phones is only as wide as the language it shows.
 - **No more long dashes in the installer's texts.** All 27 languages of the web and command-line
   installer use a plain hyphen, also for ranges and negative numbers.
+- **Emptying a field when you run the installer again removes the setting.** A pre-filled value you
+  clear (for example the weather city or the sender name) used to come back from the old `.env`; it is
+  now removed, and the review page lists it under "Will be removed from .env". Fields you leave
+  alone, passwords and keys are never removed this way.
+- **The installer asks for a second click only when it replaces something.** A first installation
+  saves and starts with one click; with an existing `.env` or a running container the confirmation
+  stays, and a line above the button now says what you confirm - the old `.env` is replaced after a
+  backup, the running container restarts, or both.
+- **The advanced setup also starts with your home-network address.** Like the simple setup it fills
+  in this computer's address on the home network instead of `localhost`, and the review page says
+  calmly when an address is reachable only on this device.
+- **Backup schedules the scheduler would never run are refused.** A day that no chosen month has
+  (`0 3 31 2 *`, February 31) used to pass and switched backups off at startup. The message now also
+  names the six-field form with seconds and shorthands such as `@daily`.
+- **Copying in the installer says when it did not work.** If the clipboard refuses, the value is
+  selected for manual copying and the note says so, instead of claiming "Copied".
+- **Browsers no longer offer saved passwords in the installer's secret fields.** Calendar, sign-on
+  and app-password fields are marked as new secrets, so a password manager does not fill in an
+  unrelated login.
+- **The installer's last screen leads with the success.** One check mark says Yuvomi is ready, and
+  saving the key file is a quiet checklist row that ticks itself off after the download, instead of
+  a warning banner, a second logo and a download button above "Open Yuvomi". The note that the
+  installer shuts down soon stays as a small line until the file is saved.
+- **Skipped steps look skipped in the installer's step list.** Weather, calendar, email, storage and
+  advanced steps you leave empty show a dash instead of a green check mark.
+- **Installer fields match the app's.** Fields are 48 pixels high on the app's field background, the
+  show-password and copy buttons are full-size touch targets, the Yuvomi mark in the header looks
+  the same as in the app in dark mode, and hovering the advanced option no longer pulls harder than
+  the recommended one.
+- **Clearer installer messages.** A missing field in the admin step is named and focused instead of
+  "All fields are required", a server's own error text appears as a separate "Details" line, the
+  example values in the address and name fields are in your language, the start screen says that a
+  first run usually takes 1-3 minutes and counts in minutes, and technical terms like "session
+  secret", "SSRF protection" and "Compose file" follow a plain description instead of leading it.
+- **Installer hints read at a calmer line length.** Explanations under fields wrap at about 80
+  characters instead of 90, spacing follows the app's scale, a failed copy shows its note on its own
+  line instead of breaking around the button, and the "taking longer than usual" note no longer
+  touches the line above it.
 
 ## [2.83.0] - 2026-10-29
 

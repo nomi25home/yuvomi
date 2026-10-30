@@ -20,11 +20,12 @@
    reads before the first paint. A page that draws theme-dependent images
    (index.html's screenshots) listens for the "yuvomi:theme" event.
 
-   LANGUAGE BUTTON. On the translated pages (index, install) the page switches
-   the language itself and then fires "yuvomi:lang"; this script rewrites the
-   button: visible text is the target language, the name starts with it
-   (SC 2.5.3). The legal pages' language control is a plain link with static
-   text and is left alone. The theme button's name follows the same event.
+   LANGUAGE SEGMENT. On the translated pages (index, install) the page switches
+   the language itself and then fires "yuvomi:lang"; this script moves
+   aria-pressed to the segment of the language now read (#langSeg, two
+   buttons since S7). Text, name and lang of each segment never change. The
+   legal pages' segment is a link plus plain text and is left alone. The
+   theme button's name follows the same event.
 
    Since S2 it also switches the one back-to-top link and sizes the room the
    code plates keep for their copy button (both at the end), since S3 it
@@ -38,10 +39,11 @@
   var KEY = 'yuvomi-theme', LEGACY = 'oikos-theme';
   var ORDER = ['system', 'light', 'dark'];
   var TEXT = {
-    en: { mode: { system: 'system', light: 'light', dark: 'dark' }, label: 'Theme: {cur} - switch to {next}' },
-    de: { mode: { system: 'System', light: 'Hell', dark: 'Dunkel' }, label: 'Design: {cur} - zu {next} wechseln' }
+    en: { mode: { system: 'system', light: 'light', dark: 'dark' }, label: 'Theme: {cur} - switch to {next}',
+      shown: { system: 'System', light: 'Light', dark: 'Dark' } },
+    de: { mode: { system: 'System', light: 'Hell', dark: 'Dunkel' }, label: 'Design: {cur} - zu {next} wechseln',
+      shown: { system: 'System', light: 'Hell', dark: 'Dunkel' } }
   };
-  var LANG_NAME = { de: 'DE - Auf Deutsch lesen', en: 'EN - Read in English' };
 
   var root = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -72,15 +74,14 @@
       btn.setAttribute('data-mode', mode);
       btn.setAttribute('aria-label', name);
       btn.setAttribute('title', name);
+      /* The visible word on a wide screen (S4): the mode you are in, which
+         the name already starts with after its prefix. */
+      var shown = btn.querySelector('.nav-theme-label');
+      if (shown) shown.textContent = s.shown[mode];
     }
-    var lb = document.getElementById('langBtn');
-    if (lb && lb.tagName === 'BUTTON') {
-      var target = pageLang() === 'de' ? 'en' : 'de';
-      var lbl = lb.querySelector('.nav-lang-label');
-      if (lbl) lbl.textContent = target.toUpperCase();
-      lb.setAttribute('lang', target);
-      lb.setAttribute('aria-label', LANG_NAME[target]);
-      lb.setAttribute('title', LANG_NAME[target]);
+    var seg = document.querySelectorAll('#langSeg > button[data-lang]');
+    for (var i = 0; i < seg.length; i++) {
+      seg[i].setAttribute('aria-pressed', String(seg[i].getAttribute('data-lang') === pageLang()));
     }
   }
 
@@ -110,7 +111,8 @@
 
   /* BACK TO TOP (assets/site.css, "Back to top"). Every page carries the
      link (#toTop); it shows once the first screen has scrolled away. One
-     threshold for all five pages instead of 600px here and 800px there.
+     threshold for all five pages instead of 600px here and 800px there
+     (since S4 of the 2026-10-30 critique: half the page, see below).
      Two observers, no scroll handler (S8):
      - a sentinel as tall as max(600px, the first screen) at the top of the
        page: once it has left the viewport, the pill shows;
@@ -126,6 +128,18 @@
     sentinel.setAttribute('aria-hidden', 'true');
     sentinel.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:max(600px,100vh);pointer-events:none;visibility:hidden';
     document.body.prepend(sentinel);
+    /* Late, not after the first screen (S4, Critique 2026-10-30): the pill
+       floated over text and cards from the proof line on, on a page the bar's
+       jump menu already covers. It comes once half the page lies behind -
+       the point where the way back is the longer one. The page grows as
+       deferred sections render and with the language, so the half is
+       re-read when the body's size changes. */
+    var half = function () {
+      sentinel.style.height = Math.round(Math.max(600, innerHeight, document.documentElement.scrollHeight * 0.5)) + 'px';
+    };
+    half();
+    addEventListener('resize', half);
+    if ('ResizeObserver' in window) new ResizeObserver(half).observe(document.body);
     new IntersectionObserver(function (entries) {
       top.classList.toggle('show', !entries[entries.length - 1].isIntersecting);
     }).observe(sentinel);
@@ -260,7 +274,7 @@
     columns(below);
     armed.forEach(function (n) {
       n.classList.add('rv');
-      if (n.matches('.gal-item, .fam-shot')) n.classList.add('rv-media');
+      if (n.matches('.gal-item, .fam-phone')) n.classList.add('rv-media');
     });
     if (!armed.length) return;
     var obs = new IntersectionObserver(function (entries) {

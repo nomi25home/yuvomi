@@ -354,8 +354,13 @@ test('die statische Auslieferung bleibt ohne Origin erreichbar', async () => {
 //
 // Als Regel formuliert, nicht als Liste der beiden heutigen Buttons: ein
 // dritter Schreibpfad fällt damit beim Hinzufügen auf, nicht erst im Critique.
+//
+// Seit der Re-Critique (29.10.2026, Entscheidung B) gilt die Bestätigung nur,
+// wenn Speichern etwas überschreibt oder neu startet (needsConfirm(): bestehende
+// .env, laufender Container oder unbekannter Bestand). Die Erstinstallation
+// speichert mit dem ersten Klick; ausgeführt prüft das test-installer-rerun.js.
 
-test('jeder Pfad, der die .env schreibt, verlangt vorher eine Bestätigung', () => {
+test('jeder Pfad, der die .env schreibt, verlangt vorher eine Bestätigung, wenn er etwas überschreibt', () => {
   const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
   const schreibstellen = [...src.matchAll(/fetch\('\/api\/save-env'/g)].map(m => m.index);
   assert.ok(schreibstellen.length >= 2,
@@ -363,7 +368,7 @@ test('jeder Pfad, der die .env schreibt, verlangt vorher eine Bestätigung', () 
 
   for (const idx of schreibstellen) {
     const handler = src.slice(Math.max(0, idx - 1500), idx);
-    assert.match(handler, /if \(!\w*[Cc]onfirmed\)/,
+    assert.match(handler, /if \(needsConfirm\(\) && !\w*[Cc]onfirmed\)/,
       'ein Pfad schreibt die .env ohne vorherige Zwei-Klick-Bestätigung');
   }
 });
@@ -383,12 +388,13 @@ test('der Erweitert-Pfad zeigt die Warnung über eine bestehende .env', () => {
   assert.match(banner[2], /class="warn-icon"/, 'cfg-existing trägt kein Warn-Icon');
   assert.match(banner[2], /<span data-i18n="config\.existing">/,
     'cfg-existing trägt den falschen i18n-Schlüssel, oder er sitzt nicht im inneren span');
-  // Ein Banner, das der Preflight nie einblendet, ist so gut wie keins - und
-  // .warn-banner ist ein Flex-Container: mit display 'block' fiele das Icon
-  // aus der Zeile.
+  // Ein Banner, das der Preflight nie einblendet, ist so gut wie keins. Per
+  // hidden, nicht style.display: .warn-banner ist ein Flex-Container, und ein
+  // gesetztes display 'block' stellte das Icon aus der Zeile.
   const preflight = src.slice(src.indexOf('d.envExists'), src.indexOf('d.envExists') + 300);
-  assert.ok(preflight.includes("$('cfg-existing').style.display = 'flex'"),
-    'cfg-existing wird bei envExists nicht als Flex-Banner eingeblendet');
+  assert.ok(preflight.includes("$('cfg-existing').hidden = false"),
+    'cfg-existing wird bei envExists nicht eingeblendet');
+  assert.match(src, /<div class="warn-banner" id="cfg-existing"[^>]*\shidden[\s>]/, 'cfg-existing steht schon vor dem Preflight da');
 });
 
 // ── Der Wartebildschirm: eine Phase ist kein Fehlschlag ───────────────────────

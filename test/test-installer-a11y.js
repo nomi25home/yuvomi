@@ -52,6 +52,31 @@ test('jedes error-banner trägt role="alert"', () => {
   }
 });
 
+/* Sichtbarkeit laeuft ueber das hidden-Attribut, wie in renderStepNav und
+ * renderKeyFile - nicht ueber style.display. Vorher standen 38 Zuweisungen und
+ * zehn Inline-`display:none` daneben, und jede musste die Anzeigeart des CSS
+ * kennen: 'flex' fuer .warn-banner, 'inline-flex' fuer den Knopf, 'block' fuer
+ * den Rest. Ein falscher Wert stellte das Icon unter den Text. Mit hidden
+ * bleibt die Anzeigeart beim CSS ([hidden] traegt !important). Weil das CSS die
+ * Fehlerbanner und das Protokoll nicht mehr selbst versteckt, muss jedes davon
+ * im Markup verborgen starten - sonst stuende ein leerer roter Kasten da. */
+test('Sichtbarkeit nur per hidden: kein style.display, Banner starten verborgen', () => {
+  const script = html.slice(html.indexOf('<script', html.indexOf('</style>')));
+  const uses = [...script.matchAll(/\.style\.display\s*(?:=|!==|===|!=|==)|setProperty\(\s*['"]display/g)];
+  assert.deepEqual(uses.map(m => m[0]), [], `style.display im Skript (${uses.length}x) - hidden setzen`);
+  const inline = [...html.matchAll(/<[a-z][^>]*\sstyle="[^"]*\bdisplay\s*:[^>]*>/gi)].map(m => m[0]);
+  assert.deepEqual(inline, [], 'Inline-display im Markup - hidden-Attribut verwenden');
+  const css = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+  for (const sel of ['.error-banner', '.log-box']) {
+    const rule = css.match(new RegExp(`(?:^|\\})\\s*\\${sel}\\s*\\{([^}]*)\\}`, 'm'));
+    assert.ok(rule, `${sel} fehlt im CSS`);
+    assert.doesNotMatch(rule[1], /display\s*:\s*none/, `${sel} versteckt sich per CSS - hidden im Markup tut das`);
+  }
+  const boxes = [...html.matchAll(/<div[^>]*class="(?:error-banner|log-box)\b[^"]*"[^>]*>/g)].map(m => m[0]);
+  assert.ok(boxes.length >= 14, `erwartet 13 Fehlerbanner und das Protokoll, gefunden ${boxes.length}`);
+  for (const tag of boxes) assert.match(tag, /\shidden[\s>]/, `startet sichtbar: ${tag}`);
+});
+
 test('die Docker-Statuszeile ist eine Live-Region', () => {
   // Seit der Phasen-Checkliste ist sie visuell versteckt (class="vh status-row"):
   // sichtbar steht dasselbe in der Liste, die Region traegt nur die Ansage.
@@ -868,22 +893,46 @@ test('Buttons stehen auf 48px, und .open-link gleicht .btn-primary', () => {
     '.open-link hat eine andere Primaerflaeche als .btn-primary');
 });
 
-/* Der Klassentausch am Abschluss animierte die Flaeche, die Schriftfarbe sprang
- * sofort: 120ms Violett auf Violett. setDoneEmphasis() muss die Transition fuer
- * den Tausch abschalten, den Stil festschreiben und sie danach zurueckgeben -
- * in dieser Reihenfolge, sonst wirkt einer der drei Schritte nicht. */
-test('der Tausch der Abschlussknoepfe blendet keine Farbe ueber', () => {
-  const fn = html.match(/function setDoneEmphasis\(\) \{([\s\S]*?)\n\}/);
-  assert.ok(fn, 'setDoneEmphasis nicht gefunden');
-  const body = fn[1];
-  const off = body.indexOf("style.transition = 'none'");
-  const swap = body.indexOf('dl.className');
-  const reflow = body.search(/void \w+\.offsetWidth/);
-  const back = body.indexOf("style.transition = ''");
-  assert.ok(off !== -1 && swap !== -1 && reflow !== -1 && back !== -1,
-    'setDoneEmphasis schaltet die Transition fuer den Klassentausch nicht ab und wieder an');
-  assert.ok(off < swap && swap < reflow && reflow < back,
-    'Reihenfolge muss sein: Transition aus, Klassen tauschen, Reflow, Transition zurueck');
+/* Der Abschluss: der Erfolg fuehrt, die Schluesseldatei ist eine Checkzeile
+ * (Re-Critique 2026-10-29, Entscheidung D). Vorher stand die Bildmarke im
+ * gruenen Ring UNTER derselben Marke im Kopf (zwei Logos), ein Warnbanner
+ * fuehrte, und der Download stand als Primaerknopf ueber "Yuvomi oeffnen". */
+test('der Abschluss: ein Erfolgszeichen, Open fuehrt, die Schluesseldatei hakt sich ab', () => {
+  const done = html.slice(html.indexOf('<div class="step" id="step-done">'), html.indexOf('<div class="next-steps">'));
+  assert.ok(done.length > 100, 'Abschluss-Schritt nicht gefunden');
+  const mark = done.match(/<div class="done-mark"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(mark, 'kein Erfolgszeichen');
+  assert.doesNotMatch(mark[1], /<circle/, 'das Erfolgszeichen traegt wieder die Kreise der Bildmarke - zwei Logos');
+  assert.doesNotMatch(done, /class="warn-banner"/, 'der Abschluss fuehrt wieder mit einer Warnung');
+  // Reihenfolge: Checkzeile vor dem Oeffnen, der Download ist kein Primaerknopf.
+  const row = done.indexOf('id="done-keyfile"');
+  const open = done.indexOf('id="done-link"');
+  assert.ok(row !== -1 && open !== -1 && row < open, 'die Schluesselzeile steht nicht vor "Yuvomi oeffnen"');
+  assert.match(done, /<a id="done-link" class="open-link"/, '"Yuvomi oeffnen" ist nicht der Primaerknopf');
+  assert.match(done, /<button type="button" class="btn btn-ghost btn-sm keyfile__action" id="done-download">/,
+    'der Download ist wieder ein Primaerknopf statt der Aktion einer Zeile');
+  // renderKeyFile wird AUSGEFUEHRT: offen gegen gesichert.
+  const nodes = {
+    'done-keyfile': { dataset: {} }, 'done-download-label': { textContent: '' }, 'done-server-stops': { hidden: false },
+  };
+  const spans = [{ dataset: { keyfileState: 'open' }, hidden: true }, { dataset: { keyfileState: 'saved' }, hidden: false }];
+  const render = saved => new Function('keysDownloaded', '$', 'document', 't', `${fnSource('renderKeyFile')}; renderKeyFile();`)(
+    saved, id => nodes[id], { querySelectorAll: () => spans }, k => k);
+  render(false);
+  assert.equal(nodes['done-keyfile'].dataset.state, 'open');
+  assert.deepEqual(spans.map(x => x.hidden), [false, true]);
+  assert.equal(nodes['done-download-label'].textContent, 'done.download');
+  assert.equal(nodes['done-server-stops'].hidden, false, 'der Zeitdruck-Satz fehlt, solange die Datei nicht gesichert ist');
+  render(true);
+  assert.equal(nodes['done-keyfile'].dataset.state, 'saved');
+  assert.deepEqual(spans.map(x => x.hidden), [true, false]);
+  assert.equal(nodes['done-download-label'].textContent, 'done.downloadAgain');
+  assert.equal(nodes['done-server-stops'].hidden, true, 'der Zeitdruck-Satz bleibt nach dem Download stehen');
+  // Gesichert zeigt der Haken in Erfolgsgruen.
+  assert.equal(declared(sel => sel === '.keyfile[data-state="saved"] .keyfile__mark::before', 'background'), 'var(--color-success)');
+  // Und der Download-Handler hakt erst NACH dem Erfolg ab.
+  const handler = html.slice(html.indexOf("$('done-download').addEventListener('click'"));
+  assert.ok(handler.indexOf('renderKeyFile()') > handler.indexOf('keysDownloaded = true'), 'die Zeile hakt sich vor dem Erfolg ab');
 });
 
 /* Der Zurueck-Knopf stand auf --color-surface-2, das im Dark Mode TIEFER liegt
@@ -1069,13 +1118,17 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
   assert.match(fnSource('showStep'), /renderStep\(\)/, 'showStep zeichnet den Schritt nicht');
   assert.match(fnSource('renderStep'), /renderStepNav\(\)/, 'renderStep aktualisiert die Liste nicht');
 
-  const run = (flow, currentStep, dockerOutcome = null) => {
+  // stepSetUp: was in den optionalen Schritten eingerichtet ist. Standard:
+  // alles eingerichtet, damit "erledigt" der Normalfall dieses Tests bleibt.
+  const run = (flow, currentStep, dockerOutcome = null, setUp = () => true) => {
     const items = navFakes([...numbered]);
     const document = { querySelectorAll: () => items };
-    new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
-      flow, currentStep, UNNUMBERED, dockerOutcome, document);
+    const stepSetUp = name => (OPTIONAL.has(name) ? setUp(name) : undefined);
+    new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', 'stepSetUp', `${fnSource('renderStepNav')}; renderStepNav();`)(
+      flow, currentStep, UNNUMBERED, dockerOutcome, document, stepSetUp);
     return Object.fromEntries(items.map(i => [i.name, i]));
   };
+  const OPTIONAL = new Set(['weather', 'calendar', 'email', 'storage', 'advanced']);
 
   const adv = FLOWS.advanced;
   let r = run(adv, adv.indexOf('calendar'));
@@ -1092,6 +1145,16 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
     assert.equal(r[next].button.disabled, true, `${next} kommt erst noch und ist trotzdem anklickbar`);
     assert.equal(r[next].button.attrs['aria-current'], undefined);
   }
+
+  // Uebersprungen: ein optionaler Schritt ohne Einrichtung traegt keinen
+  // Haken, fuehrt aber zurueck wie ein erledigter (Re-Critique 2026-10-29).
+  r = run(adv, adv.indexOf('review'), null, name => name === 'calendar');
+  for (const skipped of ['weather', 'email', 'storage', 'advanced']) {
+    assert.equal(r[skipped].dataset.state, 'skipped', `${skipped} ist ohne Einrichtung als erledigt abgehakt`);
+    assert.equal(r[skipped].button.disabled, false, `${skipped} ist uebersprungen und fuehrt nicht zurueck`);
+  }
+  assert.equal(r.calendar.dataset.state, 'done', 'ein eingerichteter optionaler Schritt ist nicht erledigt');
+  assert.equal(r.secrets.dataset.state, 'done', 'ein Pflichtschritt gilt als uebersprungen');
 
   r = run(adv, adv.indexOf('docker'));
   assert.equal(r.review.dataset.state, 'done');
@@ -1217,9 +1280,14 @@ test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () =>
   const run = (overrides) => {
     for (const c of cells.values()) { c.textContent = 'VORHER'; c.parentElement.classes.clear(); }
     const S = { ...literal('S'), ...overrides };
-    new Function('S', '$', 't', 'preservedKeys', 'deriveBaseUrl',
+    // Hinweis und Entfernt-Zeile (Re-Critique 29.10.) haben eigene Tests in
+    // test-installer-rerun.js; hier nur so weit gestubbt, dass renderReview laeuft.
+    const extra = id => ({ hidden: true, textContent: '', id });
+    new Function('S', '$', 't', 'preservedKeys', 'deriveBaseUrl', 'isLoopbackHost', 'originHost',
+      'pendingClears', 'buildEnv',
       `${fnSource('fillReviewGroup')}; ${fnSource('renderReview')}; renderReview();`)(
-      S, id => cells.get(id), key => `T:${key}`, new Set(), () => 'http://localhost:3000');
+      S, id => cells.get(id) ?? extra(id), key => `T:${key}`, new Set(), () => 'http://localhost:3000',
+      () => false, () => '', () => [], () => ({}));
     return cells;
   };
 
@@ -1810,8 +1878,11 @@ test('showStep: das erste Bild fokussiert nicht, ein echter Wechsel schon', () =
  * und scrollte NACH dem Klassentausch (gemessen 42 ms bei 4x CPU, Critique
  * 2026-10-29). Jetzt: im Rueckruf zuerst scrollen, dann tauschen, kein
  * focus(); der Fokus folgt als `settle` - sofort ohne Transition, mit
- * Transition erst nach dem Tausch UND `ready`. swapStep wird AUSGEFUEHRT. */
-test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt nach ready', async () => {
+ * Transition erst nach `finished`. Nach `ready` war es noch zu frueh: die
+ * Re-Critique (29.10.) mass dort 31 ms erzwungenen Reflow, weil focus() mitten
+ * in der laufenden Animation Stil und Layout neu rechnete. swapStep wird
+ * AUSGEFUEHRT. */
+test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt nach finished', async () => {
   const render = fnSource('renderStep');
   assert.doesNotMatch(render, /\.focus\(/, 'renderStep fokussiert im Rueckruf der View Transition');
   assert.ok(render.indexOf('scrollTo(') !== -1 && render.indexOf('scrollTo(') < render.indexOf("classList.toggle('active'"),
@@ -1821,7 +1892,7 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
   const make = (api) => {
     const order = [];
     const root = fakeEl();
-    let resolveReady;
+    let resolveReady, resolveFinished;
     const doc = { documentElement: root, visibilityState: 'visible', addEventListener() {}, removeEventListener() {} };
     if (api) {
       doc.startViewTransition = cb => {
@@ -1829,14 +1900,14 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
         const vt = {
           updateCallbackDone: new Promise(r => { done = r; }),
           ready: new Promise(r => { resolveReady = r; }),
-          finished: new Promise(() => {}), skipTransition() {},
+          finished: new Promise(r => { resolveFinished = r; }), skipTransition() {},
         };
         doc.run = () => { cb(); done(); };
         return vt;
       };
     }
     const swapStep = new Function('document', 'matchMedia', src)(doc, () => ({ matches: false }));
-    return { swapStep, doc, order, ready: () => resolveReady() };
+    return { swapStep, doc, order, ready: () => resolveReady(), finished: () => resolveFinished() };
   };
   // Ohne Transition: Tausch, dann sofort Fokus.
   {
@@ -1844,9 +1915,9 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
     swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
     assert.deepEqual(order, ['update', 'focus']);
   }
-  // Mit Transition: Fokus weder vor dem Tausch noch vor ready.
+  // Mit Transition: Fokus weder vor dem Tausch noch waehrend der Animation.
   {
-    const { swapStep, doc, order, ready } = make(true);
+    const { swapStep, doc, order, ready, finished } = make(true);
     swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
     await new Promise(r => setTimeout(r, 0));
     assert.deepEqual(order, [], 'Fokus vor der Aufnahme des alten Bildes');
@@ -1855,7 +1926,45 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
     assert.deepEqual(order, ['update'], 'Fokus vor ready - er erzwingt das Layout des neuen Bildes');
     ready();
     await new Promise(r => setTimeout(r, 0));
-    assert.deepEqual(order, ['update', 'focus'], 'der Fokus folgt nach ready nicht');
+    assert.deepEqual(order, ['update'], 'Fokus waehrend der Animation - erzwungener Reflow (31 ms)');
+    finished();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, ['update', 'focus'], 'der Fokus folgt nach finished nicht');
+  }
+  // Verworfen (finished lehnt ab): der Fokus folgt trotzdem, sobald der Tausch steht.
+  {
+    const order = [];
+    const doc = {
+      documentElement: fakeEl(), visibilityState: 'visible', addEventListener() {}, removeEventListener() {},
+      startViewTransition: cb => {
+        cb();
+        return {
+          updateCallbackDone: Promise.resolve(), ready: Promise.reject(new Error('skip')),
+          finished: Promise.reject(new Error('skip')), skipTransition() {},
+        };
+      },
+    };
+    const src2 = `${fnSource('canViewTransition')}\nlet stepTransition = null;\n${fnSource('swapStep')}\nreturn swapStep;`;
+    const swapStep = new Function('document', 'matchMedia', src2)(doc, () => ({ matches: false }));
+    swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, ['update', 'focus'], 'eine verworfene Transition verliert den Fokus');
+  }
+  // Scheitert schon der Tausch, gibt es nichts zu fokussieren.
+  {
+    const order = [];
+    const doc = {
+      documentElement: fakeEl(), visibilityState: 'visible', addEventListener() {}, removeEventListener() {},
+      startViewTransition: () => ({
+        updateCallbackDone: Promise.reject(new Error('boom')), ready: Promise.reject(new Error('boom')),
+        finished: Promise.reject(new Error('boom')), skipTransition() {},
+      }),
+    };
+    const src3 = `${fnSource('canViewTransition')}\nlet stepTransition = null;\n${fnSource('swapStep')}\nreturn swapStep;`;
+    const swapStep = new Function('document', 'matchMedia', src3)(doc, () => ({ matches: false }));
+    swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, [], 'Fokus nach gescheitertem Tausch');
   }
 });
 
@@ -1977,8 +2086,8 @@ test('Docker-Schirm: Phasen-Checkliste, Erfolg mit neuem Titel und Fokus, Fehler
     assert.equal(states(rows), 'done failed waiting', 'die gescheiterte Phase ist nicht markiert');
     assert.equal(rows[1].note.textContent, 'docker.stepFailed');
     assert.equal(els['dkr-title'].dataset.i18n, 'docker.failed');
-    assert.equal(els['dkr-log'].style.display, 'block', 'das Protokoll bleibt im Fehler nicht stehen');
-    assert.equal(els['dkr-foot'].style.display, 'flex', 'Erneut versuchen fehlt im Fehler');
+    assert.equal(els['dkr-log'].hidden, false, 'das Protokoll bleibt im Fehler nicht stehen');
+    assert.equal(els['dkr-foot'].hidden, false, 'Erneut versuchen fehlt im Fehler');
     assert.equal(els['dkr-title'].focused, 0, 'der Fehler reisst den Fokus an sich');
   }
   {
@@ -2135,7 +2244,9 @@ test('die Einfach-Karte zeigt keinen Haken, der wie "schon ausgewaehlt" liest', 
 test('Warnbanner tragen ein Lucide-SVG, kein Unicode-Glyph', () => {
   assert.doesNotMatch(html, /&#x26A0;|⚠/, 'U+26A0 steht wieder als Icon im Markup');
   const icons = [...html.matchAll(/<span class="warn-icon"[^>]*>([\s\S]*?)<\/span>/g)];
-  assert.ok(icons.length >= 5, `nur ${icons.length} Warn-Icons gefunden`);
+  // 4 seit der Re-Critique 2026-10-29: der Abschluss traegt keine Warnung mehr
+  // (die Schluesseldatei ist dort eine Checkzeile).
+  assert.ok(icons.length >= 4, `nur ${icons.length} Warn-Icons gefunden`);
   for (const [, inner] of icons) assert.match(inner, /^<svg viewBox="0 0 24 24">/, 'Warn-Icon ohne SVG');
 });
 
@@ -2251,8 +2362,8 @@ test('Docker in der Schrittliste: eigener Eintrag mit Nummer, genau ein aria-cur
   const names = ['simple', 'config', 'secrets', 'weather', 'calendar', 'email', 'storage', 'advanced', 'review', 'docker', 'admin'];
   const run = (flow, currentStep, dockerOutcome) => {
     const items = navFakes(names);
-    new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
-      flow, currentStep, UNNUMBERED, dockerOutcome, { querySelectorAll: () => items });
+    new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', 'stepSetUp', `${fnSource('renderStepNav')}; renderStepNav();`)(
+      flow, currentStep, UNNUMBERED, dockerOutcome, { querySelectorAll: () => items }, () => true);
     return Object.fromEntries(items.map(i => [i.name, i]));
   };
   const currentOf = r => Object.values(r).filter(i => !i.hidden && i.button.attrs['aria-current'] === 'step').map(i => i.name);
@@ -2309,8 +2420,8 @@ test('Rail und "Schritt N von M" zaehlen in beiden Wegen dieselben Schritte', ()
     flow.forEach((step, currentStep) => {
       if (SOLO.has(step)) return;   // Einstieg und Abschluss zeigen keine Liste
       const items = navFakes(names);
-      new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
-        flow, currentStep, UNNUMBERED, null, { querySelectorAll: () => items });
+      new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', 'stepSetUp', `${fnSource('renderStepNav')}; renderStepNav();`)(
+        flow, currentStep, UNNUMBERED, null, { querySelectorAll: () => items }, () => true);
       const visible = items.filter(i => !i.hidden);
       const tags = {};
       new Function('flow', 'UNNUMBERED', 'document', 't', `${fnSource('stepPosition')}; ${fnSource('applyStepCounters')}; applyStepCounters();`)(
@@ -2466,8 +2577,10 @@ test('URL-, Host- und Portfelder tragen passende Tastatur und keine Schreibhilfe
   // type=url muss dieselbe Feldoptik bekommen wie type=text (Kante, 44px mobil).
   assert.ok(RULES.some(r => r.selector === 'input[type=url]' && r.media === null && /border:/.test(r.body)),
     'input[type=url] fehlt in der Feldregel - URL-Felder staenden als UA-Kasten');
-  assert.ok(RULES.some(r => r.selector === 'input[type=url]' && /max-width: 640px/.test(r.media ?? '') && /min-height:\s*44px/.test(r.body)),
-    'input[type=url] fehlt in der 44px-Regel fuer Touch');
+  // Seit der Re-Critique 2026-10-29 steht die Mindesthoehe in der Feldregel
+  // selbst (--target-lg, jede Breite) statt in einer eigenen 44px-Regel mobil.
+  assert.ok(RULES.some(r => r.selector === 'input[type=url]' && r.media === null && /min-height:\s*var\(--target-lg\)/.test(r.body)),
+    'input[type=url] fehlt in der Feldregel mit --target-lg');
 });
 
 /* Lange Komposita ragten in die Wertspalte der Pruefseite
@@ -2533,4 +2646,247 @@ test('theme-color folgt --color-bg in beiden Themes', () => {
   const light = fb.slice(0, dark).match(/--color-bg:\s*(#[0-9A-Fa-f]{6})/)?.[1].toLowerCase();
   const darkBg = fb.slice(dark).match(/--color-bg:\s*(#[0-9A-Fa-f]{6})/)?.[1].toLowerCase();
   assert.deepEqual(byScheme, { light, dark: darkBg });
+});
+
+// ── Re-Critique 2026-10-29: Kopierfehler und Autofill ─────────────────────────
+
+/* Kopieren meldete "Kopiert" auch, wenn die Zwischenablage ablehnte (Rechte,
+ * unsicherer Kontext): der catch war leer, die Erfolgsmeldung stand dahinter.
+ * Wer danach einfuegte, hatte nichts - ausgerechnet bei den Schluesseln und
+ * Redirect-URIs, die zeichengenau woanders hin muessen. Jetzt meldet nur der
+ * Erfolg Erfolg; scheitert es, ist der Wert markiert und die Meldung sagt,
+ * was zu tun ist. copyValue wird AUSGEFUEHRT. */
+test('Kopieren meldet nur bei Erfolg "Kopiert", sonst markiert es den Wert', async () => {
+  const make = (writeText) => {
+    const els = {};
+    const selection = { all: null, selectAllChildren(n) { this.all = n; } };
+    const $ = id => els[id];
+    const run = new Function('$', 't', 'navigator', 'document', 'window', 'setTimeout', 'clearTimeout',
+      `return (async ${fnSource('copyValue')});\n${fnSource('selectForManualCopy')}`)(
+      $, k => k, { clipboard: { writeText } }, { querySelector: () => null },
+      { getSelection: () => selection }, () => 0, () => {});
+    return { els, run, selection };
+  };
+  // Erfolg
+  {
+    const { els, run } = make(async () => {});
+    els.a = fakeEl({ value: 'geheim', type: 'text', select() { this.selected = true; } });
+    els['a-copied'] = fakeEl();
+    await run('a');
+    assert.equal(els['a-copied'].textContent, 'common.copied');
+    assert.ok(!els.a.selected, 'bei Erfolg wird nichts markiert');
+  }
+  // Abgelehnt: Feld
+  {
+    const { els, run } = make(async () => { throw new Error('denied'); });
+    els.a = fakeEl({ value: 'geheim', type: 'password', select() { this.selected = true; } });
+    els['a-copied'] = fakeEl();
+    await run('a');
+    assert.notEqual(els['a-copied'].textContent, 'common.copied', 'ein gescheitertes Kopieren meldet Erfolg');
+    assert.equal(els['a-copied'].textContent, 'common.copyFailed');
+    assert.ok(els.a.selected, 'der Wert ist zum manuellen Kopieren nicht markiert');
+    assert.equal(els.a.type, 'text', 'ein verdecktes Feld laesst sich nicht kopieren - es muss sichtbar werden');
+    assert.ok(els['a-copied'].classes.has('copied-note--fail'), 'die Fehlermeldung steht in Erfolgsgruen');
+  }
+  // Abgelehnt: <code> ohne value
+  {
+    const { els, run, selection } = make(async () => { throw new Error('denied'); });
+    els.c = fakeEl({ textContent: 'https://x.test/cb' });
+    els['c-copied'] = fakeEl();
+    await run('c');
+    assert.equal(els['c-copied'].textContent, 'common.copyFailed');
+    assert.equal(selection.all, els.c, 'die Redirect-URI ist nicht markiert');
+  }
+  // Ganz ohne Clipboard-API (unsicherer Kontext): derselbe Weg, kein TypeError nach aussen.
+  {
+    const els = {};
+    const run = new Function('$', 't', 'navigator', 'document', 'window', 'setTimeout', 'clearTimeout',
+      `return (async ${fnSource('copyValue')});\n${fnSource('selectForManualCopy')}`)(
+      id => els[id], k => k, {}, { querySelector: () => null },
+      { getSelection: () => ({ selectAllChildren() {} }) }, () => 0, () => {});
+    els.a = fakeEl({ value: 'x', type: 'text', select() {} });
+    els['a-copied'] = fakeEl();
+    await run('a');
+    assert.equal(els['a-copied'].textContent, 'common.copyFailed');
+  }
+  assert.match(html, /const copyBtn = e\.target\.closest\('\[data-copy\]'\);\s*if \(copyBtn\) \{\s*await copyValue\(copyBtn\.dataset\.copy\);/,
+    'der Klick-Handler kopiert nicht ueber copyValue');
+});
+
+/* Secret- und Passwortfelder ohne autocomplete: Chrome sah in apple-user
+ * (type=email) plus apple-pass ein Login, bot gespeicherte Passwoerter an und
+ * fuellte im schlimmsten Fall ein fremdes Passwort als App-Passwort ein.
+ * Gilt fuer JEDES Passwortfeld: autocomplete steht ausdruecklich, und nur
+ * "new-password" (fuellt nie ein bestehendes) oder "off". */
+test('jedes Passwort-/Secret-Feld traegt ein autocomplete, das nie ein gespeichertes Passwort einfuellt', () => {
+  const inputs = [...html.matchAll(/<input\b[^>]*>/g)].map(m => m[0]);
+  const pw = inputs.filter(tag => /\btype="password"/.test(tag));
+  assert.ok(pw.length >= 13, `nur ${pw.length} Passwortfelder gefunden - der Test misst nichts`);
+  const bad = pw.filter(tag => !/\bautocomplete="(new-password|off)"/.test(tag)).map(tag => tag.match(/id="([^"]+)"/)?.[1]);
+  assert.deepEqual(bad, [], 'Passwortfelder ohne autocomplete="new-password"/"off"');
+  // Das Feld direkt vor einem Passwortfeld macht daraus fuer Chrome ein Login-Paar.
+  const missing = [];
+  inputs.forEach((tag, i) => {
+    if (!/\btype="password"/.test(tag) || i === 0) return;
+    const prev = inputs[i - 1];
+    if (/\btype="(email|text)"/.test(prev) && !/\bautocomplete="/.test(prev)) missing.push(prev.match(/id="([^"]+)"/)?.[1]);
+  });
+  assert.deepEqual(missing, [], 'Nutzerfeld vor einem Passwortfeld ohne autocomplete');
+  assert.match(html, /<input type="email" id="apple-user"[^>]*autocomplete="off"/, 'apple-user sieht weiter wie ein Login aus');
+});
+
+// ── Re-Critique 2026-10-29, Optik und Wortlaut (Agent 2) ─────────────────────
+
+/* Die Felder sind die Feldhaut der App (.form-input, layout.css): Mulde
+ * --color-field-bg und 48px. Vorher 41px auf --color-surface - im Dark Mode
+ * ein Feld ohne Boden auf der Karte, und neben dem 48px-Knopf sprang die Zeile. */
+test('Eingabefelder tragen die Feldhaut der App: Mulde und --target-lg', () => {
+  const base = media => media === null;
+  for (const sel of ['input[type=text]', 'input[type=url]', 'input[type=password]', 'input[type=email]', 'input[type=number]', 'select']) {
+    assert.equal(declared(s => s === sel, 'background-color', base), 'var(--color-field-bg)', `${sel}: keine Feldmulde`);
+    assert.equal(declared(s => s === sel, 'min-height', base), 'var(--target-lg)', `${sel}: nicht 48px wie .form-input`);
+  }
+  assert.equal(toPx('var(--target-lg)'), 48, 'der Fallback kennt --target-lg nicht als 48px');
+  assert.ok(ROOT_VARS.has('--color-field-bg'), 'der Fallback kennt --color-field-bg nicht - ohne tokens.css waere das Feld transparent');
+});
+
+/* Das Auge am Passwort war 43x41px, das kleinste Ziel des Wizards. Symbol-
+ * knoepfe in einer Feldzeile stehen quadratisch auf Feldhoehe. */
+test('Augen- und Kopierknoepfe sind mindestens 44x44px, in jeder Breite', () => {
+  for (const media of [null, '@media (max-width: 640px)']) {
+    const at = m => m === null || m === media;
+    const h = toPx(declared(s => s === '.secret-row .btn-sm', 'min-height', at));
+    const w = toPx(declared(s => s === '.secret-row [data-eye]', 'min-width', at));
+    const wc = toPx(declared(s => s === '.secret-row [data-copy]', 'min-width', at));
+    assert.ok(h >= 44 && w >= 44 && wc >= 44, `${media ?? 'Desktop'}: Auge/Kopieren ${w}x${h}px, Kopieren ${wc}px breit`);
+  }
+  const eyes = [...html.matchAll(/<div class="secret-row[^"]*">[\s\S]*?<button[^>]*data-eye=/g)];
+  assert.ok(eyes.length >= 8, `nur ${eyes.length} Augen in einer .secret-row gefunden - die Groessenregel griffe nicht`);
+});
+
+/* Uebersprungene optionale Schritte trugen den gruenen Haken. Der eigene
+ * Zustand ist ruhig (Strich, Tertiaertext) und fuer Screenreader benannt. */
+test('die Schrittliste kennt "uebersprungen": eigenes Zeichen, kein Gruen, benannt', () => {
+  const sel = '.steps-nav__item[data-state="skipped"] .steps-nav__mark::before';
+  const bg = declared(s => s === sel, 'background');
+  assert.ok(bg, 'kein Zeichen fuer uebersprungene Schritte');
+  assert.doesNotMatch(bg, /success/, 'uebersprungen traegt wieder Erfolgsgruen');
+  for (const step of ['weather', 'calendar', 'email', 'storage', 'advanced']) {
+    const li = html.match(new RegExp(`<li class="steps-nav__item" data-nav-step="${step}"[^>]*>(.*?)</li>`));
+    assert.match(li?.[1] ?? '', /class="vh steps-nav__skipped" data-i18n="common\.stepSkipped"/, `${step}: "(uebersprungen)" fehlt fuer Screenreader`);
+  }
+  // stepSetUp wird ausgefuehrt: leer ist uebersprungen, eingerichtet nicht,
+  // Pflichtschritte kennen die Frage nicht.
+  const run = (name, S) => new Function('S', `${fnSource('stepSetUp')}; return stepSetUp(${JSON.stringify(name)});`)(S);
+  assert.equal(run('weather', { WEATHER_LAT: '' }), false);
+  assert.equal(run('weather', { WEATHER_LAT: '52.5' }), true);
+  assert.equal(run('calendar', { APPLE_USERNAME: 'a@b.c' }), true);
+  assert.equal(run('storage', { DATA_DIR: './data', BACKUP_ENABLED: '' }), false, 'die Vorgabe ./data zaehlt als eingerichtet');
+  assert.equal(run('storage', { BACKUP_ENABLED: 'false' }), true, 'abgeschaltete Backups zaehlen nicht als Entscheidung');
+  assert.equal(run('advanced', { ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: 'true' }), true);
+  assert.equal(run('config', {}), undefined, 'ein Pflichtschritt koennte als uebersprungen gelten');
+});
+
+/* Englische Beispiele in einer deutschen Oberflaeche: "localhost or
+ * 192.168.1.x", "jane", "Jane Smith". Jeder Platzhalter, der Sprache traegt
+ * (Woerter mit Leerzeichen) oder einen Menschen meint (Namens-/Nutzerfelder),
+ * kommt aus der Locale. */
+test('Platzhalter mit Sprache oder Personennamen sind uebersetzt', () => {
+  const inputs = [...html.matchAll(/<input\b[^>]*>/g)].map(m => m[0]);
+  const bad = [];
+  for (const tag of inputs) {
+    const ph = tag.match(/\splaceholder="([^"]*)"/)?.[1];
+    if (!ph) continue;
+    const id = tag.match(/\sid="([^"]*)"/)?.[1];
+    const prose = /\p{L}\s+\p{L}/u.test(ph);
+    const person = /\sautocomplete="(username|name|given-name|family-name|nickname)"/.test(tag);
+    if ((prose || person) && !/\sdata-i18n-ph="/.test(tag)) bad.push(`${id}: "${ph}"`);
+  }
+  assert.deepEqual(bad, [], `Platzhalter ohne Uebersetzung: ${bad.join(', ')}`);
+  const en = loadLocale('en').config.hostPlaceholder;
+  for (const locale of SUPPORTED_LOCALES.filter(l => l !== 'en')) {
+    assert.notEqual(loadLocale(locale).config.hostPlaceholder, en, `${locale}: config.hostPlaceholder ist englisch`);
+  }
+});
+
+/* "Alle Felder sind erforderlich" liess raten, welches fehlt. createAdmin
+ * wird bis zur Pruefung AUSGEFUEHRT: die Meldung nennt das erste leere Feld
+ * mit seinem Label, und genau dieses Feld bekommt den Fokus. */
+test('ein fehlendes Pflichtfeld wird benannt und fokussiert', async () => {
+  const src = fnSource('createAdmin');
+  for (const [filled, expectId, expectLabel] of [
+    [{}, 'adm-user', 'admin.userLabel'],
+    [{ 'adm-user': 'anna' }, 'adm-name', 'admin.nameLabel'],
+    [{ 'adm-user': 'anna', 'adm-name': 'Anna' }, 'adm-pass', 'admin.passLabel'],
+    [{ 'adm-user': 'anna', 'adm-name': 'Anna', 'adm-pass': 'geheim123' }, 'adm-conf', 'admin.confLabel'],
+  ]) {
+    const calls = [];
+    const fn = new Function('$', 't', 'fail', 'clearInvalid', 'fetch',
+      `async ${src}; return createAdmin();`);
+    await fn(id => ({ value: filled[id] ?? '' }), (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k),
+      (banner, msg, id) => calls.push({ msg, id }), () => {}, () => { throw new Error('fetch trotz fehlendem Feld'); });
+    assert.equal(calls.length, 1, `kein Fehler fuer leeres ${expectId}`);
+    assert.equal(calls[0].id, expectId, 'falsches Feld fokussiert');
+    assert.equal(calls[0].msg, `admin.errMissing:${JSON.stringify({ field: expectLabel })}`, 'die Meldung nennt das Feld nicht');
+  }
+  for (const locale of SUPPORTED_LOCALES) {
+    assert.match(loadLocale(locale).admin.errMissing, /\{\{field\}\}/, `${locale}: admin.errMissing nennt das Feld nicht`);
+  }
+  assert.doesNotMatch(html, /admin\.errAll/, 'die Sammelmeldung ist zurueck');
+});
+
+/* Die rohe Server-/Netzwerkmeldung stand als Klammer am Satzende. Sie steht
+ * jetzt als eigene, benannte Zeile darunter (showErr detail). */
+test('rohe Servermeldungen stehen als eigene Zeile, nicht in einer Klammer', () => {
+  assert.doesNotMatch(html, /\}\s\(\$\{(?:e\.message|d\.error|d\?\.error)\}\)/, 'eine Meldung haengt das rohe Detail wieder in Klammern an');
+  const nodes = { x: { textContent: '', style: {} } };
+  const show = new Function('$', 't', `${fnSource('showErr')}; return showErr;`)(id => nodes[id], (k, p) => `${k}=${p?.detail}`);
+  show('x', 'Konnte nicht speichern.', 'Port in use');
+  assert.equal(nodes.x.textContent, 'Konnte nicht speichern.\ncommon.errorDetail=Port in use');
+  show('x', 'Konnte nicht speichern.');
+  assert.equal(nodes.x.textContent, 'Konnte nicht speichern.');
+  assert.equal(declared(s => s === '.error-banner', 'white-space'), 'pre-line', 'der Umbruch erreicht den Bildschirm nicht');
+});
+
+/* Der Hover der Sekundaerkarte zog staerker als der der empfohlenen. */
+test('der Willkommens-Hover folgt der Rangordnung und versetzt keinen Text', () => {
+  assert.equal(declared(s => s === '.mode-card:hover', 'transform'), null, 'der Hover verschiebt die Karte (unscharfer Text)');
+  assert.equal(declared(s => s === '.mode-card:hover', 'box-shadow'), 'var(--shadow-sm)');
+  assert.equal(declared(s => s === '.mode-card.is-primary:hover', 'box-shadow'), 'var(--shadow-md)', 'die empfohlene Karte hebt sich nicht staerker');
+  assert.equal(declared(s => s === '.mode-card.is-primary:hover', 'border-color'), 'var(--color-accent)');
+});
+
+/* Die Bildmarke im Kopf ist die der App: Verlauf + weisse Kreise, in beiden
+ * Themes gleich. Vorher Akzentkachel mit Tinte-auf-Akzent - dunkel matt. */
+test('die Bildmarke im Kopf folgt der App und kippt nicht mit dem Theme', () => {
+  assert.equal(declared(s => s === '.brand__mark', 'background-color'), null, 'die Kachel haengt wieder an einer Theme-Farbe');
+  assert.equal(declared(s => s === '.brand__mark .brand-mark__circles', 'fill'), 'var(--brand-mark-ink)');
+  const brand = html.match(/<span class="brand__mark"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? '';
+  assert.match(brand, /<rect width="160" height="160" rx="36" fill="url\(#installer-brand-mark\)"\/>/, 'die Kachel ist nicht Teil der Marke');
+  assert.equal((brand.match(/<circle/g) || []).length, 3);
+  for (const t of ['--brand-mark-from', '--brand-mark-to', '--brand-mark-ink']) assert.ok(ROOT_VARS.has(t), `Fallback ohne ${t}`);
+});
+
+/* Docker-Warten: ein Zeitfenster ab Sekunde 0, und kein Sekundentakt. */
+test('der Docker-Schirm nennt ein Zeitfenster und zaehlt ruhig in Minuten', () => {
+  for (const locale of SUPPORTED_LOCALES) {
+    assert.match(loadLocale(locale).docker.firstRunHint, /[13１３۱۳][-‐][3３۳]|1 (?:y|a|e|und|to|и|és|à) 3|1 a 3|de 1 a 3/u,
+      `${locale}: docker.firstRunHint nennt kein Zeitfenster`);
+  }
+  const src = fnSource('tickElapsed');
+  assert.doesNotMatch(src, /'docker\.elapsed'/, 'der Zaehler springt wieder jede Sekunde');
+  assert.match(src, /60000/, 'der Zaehler rechnet nicht in Minuten');
+});
+
+/* Fachjargon im Erweitert-Pfad: verstaendlich zuerst, der Fachbegriff als
+ * Nebeninfo. Geprueft an de und en, die anderen folgen derselben Vorlage. */
+test('Fachbegriffe stehen als Nebeninfo hinter einer verstaendlichen Bezeichnung', () => {
+  for (const locale of ['de', 'en']) {
+    const l = loadLocale(locale);
+    assert.doesNotMatch(l.secrets.sessionLabel, /^Session/i, `${locale}: das Label beginnt mit dem Fachbegriff`);
+    assert.doesNotMatch(l.review.sessionSecret, /secret/i, `${locale}: die Pruefseite nennt nur den Fachbegriff`);
+    for (const k of ['icsPrivateNetworkHint', 'recipeProviderPrivateNetworkHint', 'wasteSourcePrivateNetworkHint', 'documentWebdavPrivateNetworkHint']) {
+      assert.match(l.advanced[k], /\([^)]*SSRF[^)]*\)/, `${locale}: advanced.${k} fuehrt mit "SSRF" statt es nachzustellen`);
+    }
+  }
 });

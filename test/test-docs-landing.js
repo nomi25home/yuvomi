@@ -1236,19 +1236,22 @@ test('der Kapitelmarken-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   assert.equal(sectionHeads(alleLead).filter((h) => h.lead).length, 6, 'Vorbedingung: sechs Kapitelmarken');
   assert.ok(6 * 2 > sectionCount(alleLead), 'der Guard muss hier anschlagen');
 
-  // Der echte Stand ist still - und zwar KNAPP: eine fuenfte Kapitelmarke laesst
-  // die Regel fallen, und das ist die Absicht. Bis 2026-09-29 stand hier "vier
-  // von acht, exakt auf der Grenze"; mit .family kam eine neunte Sektion dazu,
-  // die bewusst KEINE Kapitelmarke ist. Die Zusicherung bleibt dieselbe - kein
-  // Spielraum fuer eine weitere Marke -, nur ueber eine ungerade Grundmenge
-  // formuliert: mit einer Marke mehr kippte die Haelfte.
+  // Der echte Stand ist still. Bis S6 (2026-10-30) lag er KNAPP an der Grenze
+  // (fuenf von zehn), und dieser Test hielt das fest. Seit S7 sind es drei:
+  // die Re-Critique fand sechs gleich gebaute Koepfe, und "Gehoert euch" und
+  // die Fragen sind seitdem bewusst anders komponiert. Die Zusicherung ist
+  // dieselbe: die Haelfte bleibt die Grenze. Zurueck auf Kapitelmarke gestellt
+  // und um eine weitere Kapitelsektion ergaenzt (sechs von elf), schlaegt sie an.
   const html = read('index.html');
   const lead = sectionHeads(html).filter((h) => h.lead).length;
   const sections = sectionCount(html);
   assert.ok(lead * 2 <= sections, 'Vorbedingung: der echte Stand haelt die Regel');
-  assert.ok((lead + 1) * 2 > sections,
-    `${lead} Kapitelmarken bei ${sections} Sektionen: eine weitere passte noch hinein - `
-    + 'der Stand liegt nicht mehr an der Grenze, die dieser Test festhaelt');
+  const back = html.replace('<div class="sec-head yours-statement reveal">', '<div class="sec-head lead reveal"><span class="eyebrow">x</span>')
+    .replace('<div class="sec-head long-head reveal">', '<div class="sec-head lead reveal"><span class="eyebrow">y</span>')
+    .replace('</main>', '<section><div class="sec-head lead"><span class="eyebrow">z</span></div></section></main>');
+  assert.notEqual(back, html);
+  const leadBack = sectionHeads(back).filter((h) => h.lead).length;
+  assert.ok(leadBack * 2 > sectionCount(back), `${leadBack} Kapitelmarken bei ${sectionCount(back)} Sektionen haette der Guard durchgelassen`);
 });
 
 // ── (7) Ein Telefonrahmen hat die Proportion eines Telefons ──────────────────
@@ -2443,7 +2446,7 @@ test('der Hero-Schaerfe-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   assert.ok(heroDeliveryFindings(old).some((f) => /uebernimmt srcset\/sizes/.test(f)));
   const noHead = html.replace(/window\.YuvomiHero = hero;/, '').replace(/YuvomiHero/g, 'Other');
   assert.deepEqual(heroDeliveryFindings(noHead), ['kein Kopfskript waehlt die Hero-Aufnahme (window.YuvomiHero)']);
-  const drift = html.replace('data-sizes="(max-width: 467px)', 'data-sizes="(max-width: 468px)');
+  const drift = html.replace('data-sizes="(max-width: 569px)', 'data-sizes="(max-width: 570px)');
   assert.notEqual(drift, html);
   assert.ok(heroDeliveryFindings(drift).some((f) => /weichen ab/.test(f)));
   const renamed = html.replace('data-dark-m="screenshots/dashboard-dark-mobile.png"', 'data-dark-m="screenshots/home-dark-mobile.png"');
@@ -2712,7 +2715,9 @@ test('index.html: jeder Beleg-Link fuehrt auf das, was die Aussage belegt', () =
 /** Trennpunkte der Proof-Leiste stehen nicht als Text im Markup und nicht im Sternskript. */
 function proofSeparatorFindings(html, starScript) {
   const found = [];
-  const bar = (stripComments(html).match(/<div class="proof">([\s\S]*?)\n<\/div>/) || [])[1];
+  // Seit S1 (2026-10-30) steht die Leiste im Hero und traegt kein inneres
+  // .wrap mehr: sie endet am ersten </div>.
+  const bar = (stripComments(html).match(/<div class="proof">([\s\S]*?)<\/div>/) || [])[1];
   if (!bar) return ['Proof-Leiste nicht gefunden'];
   if (/·/.test(stripTags(bar))) found.push('Trennpunkt als Text in der Proof-Leiste (bleibt beim Umbruch am Zeilenende stehen)');
   const rule = (starScript.match(/gh-stars-proof[\s\S]*?replacement:\s*`([^`]*)`/) || [])[1];
@@ -3057,8 +3062,11 @@ const R2_CLAIMS = [
   { where: 'm_rewards_d', says: { en: /go to whoever did it/, de: /bekommt, wer sie erledigt hat/ },
     holds: (s) => /if \(doneByUserId\) return enrolled\.has\(doneByUserId\)/.test(s.rewards),
     what: 'die benannte Person schlaegt die Zuweisung (server/services/rewards.js rewardTargets)' },
-  // Sicherheit (long_a4)
-  { where: 'long_a4', says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn für den ganzen Haushalt verlangen/ },
+  // Sicherheit (long_k4 + long_a4). Seit S1 (Website-Critique 2026-10-30) ist
+  // die Frage ein Akkordeon: der Kernsatz (vorher das <b> am Anfang von
+  // long_a4) steht offen als long_k4, der Rest der Antwort hinter der Klappe.
+  // Die Zusage zur haushaltsweiten Pflicht steht im Kernsatz.
+  { where: 'long_k4', says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn für den ganzen Haushalt verlangen/ },
     holds: (s) => /export function setRequiredForHousehold/.test(s.twoFactor) && /export function isRequiredForHousehold/.test(s.twoFactor),
     what: 'haushaltsweite Pflicht (server/services/two-factor.js set/isRequiredForHousehold)' },
   { where: 'long_a4', says: { en: /\(TOTP\), with recovery codes/, de: /\(TOTP\), mit Wiederherstellungscodes/ },
@@ -3118,8 +3126,9 @@ function r2Findings(html, sources) {
   for (const [file, md] of Object.entries(sources.readmes)) {
     for (const re of R2_NEVER) if (re.test(md)) found.push(`${file} sagt wieder ${re}`);
   }
-  // Die Sicherheitsfrage steht auch im Markup (ohne JS), nicht nur im Woerterbuch.
-  if (!/<dt data-t="long_q4">/.test(html) || !/<dd data-t="long_a4">/.test(html)) found.push('long_q4/long_a4 fehlen im Markup');
+  // Die Sicherheitsfrage steht auch im Markup (ohne JS), nicht nur im Woerterbuch -
+  // Frage, Kernsatz und Rest der Antwort (Akkordeon seit S1).
+  if (!/<dt data-t="long_q4">/.test(html) || !/data-t="long_k4"/.test(html) || !/data-t="long_a4"/.test(html)) found.push('long_q4/long_a4 fehlen im Markup');
   return found;
 }
 
@@ -3156,7 +3165,7 @@ test('der Guard aus (16) erkennt den Schaden, gegen den er gebaut ist', () => {
   const noLogout = { ...real, auth: real.auth.replace("router.post('/logout-others'", "router.post('/logout-all'") };
   assert.ok(hit(r2Findings(html, noLogout), /long_a4 \(de\): haengt an andere Sitzungen beenden/), 'Abmelde-Guard blind');
   const no2fa = { ...real, twoFactor: real.twoFactor.replace('export function setRequiredForHousehold', 'function setRequiredForHousehold') };
-  assert.ok(hit(r2Findings(html, no2fa), /long_a4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
+  assert.ok(hit(r2Findings(html, no2fa), /long_k4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
   // Die Frage verschwindet aus dem Markup.
   assert.ok(hit(r2Findings(html.replace('<dt data-t="long_q4">', '<dt>'), real), /long_q4\/long_a4 fehlen im Markup/));
 });
@@ -3264,7 +3273,7 @@ function faqFindings(html, sources) {
   }
   // Ohne JS steht das Markup: jede Frage auch dort, nicht nur im Woerterbuch.
   for (const n of [5, 6, 7, 8]) {
-    if (!html.includes(`<dt data-t="long_q${n}">`) || !html.includes(`<dd data-t="long_a${n}">`)) found.push(`long_q${n}/long_a${n} fehlen im Markup`);
+    if (!html.includes(`<dt data-t="long_q${n}">`) || !html.includes(`data-t="long_k${n}"`) || !html.includes(`data-t="long_a${n}"`)) found.push(`long_q${n}/long_a${n} fehlen im Markup`);
   }
   return found;
 }
@@ -3278,9 +3287,10 @@ test('der Guard aus (16b) erkennt den Schaden, gegen den er gebaut ist', () => {
   const real = faqSources();
   const hit = (list, re) => list.some((l) => re.test(l));
   // Offline-Schreiben zugesagt.
-  const offline = html.replace('<b>For reading, yes.</b>', '<b>Yes, it works fully offline.</b>');
-  assert.notEqual(offline, html, 'Vorbedingung: long_a6 beginnt so');
-  assert.ok(hit(faqFindings(offline, real), /long_a6 \(en\) sagt \/works fully offline\/i/));
+  // Seit S1 steht der Kernsatz als eigener Schluessel (long_k6) vor dem Rest.
+  const offline = html.replace("long_k6:'For reading, yes.'", "long_k6:'Yes, it works fully offline.'");
+  assert.notEqual(offline, html, 'Vorbedingung: long_k6 lautet so');
+  assert.ok(hit(faqFindings(offline, real), /long_k6 \(en\) sagt \/works fully offline\/i/));
   // Der Code verliert, woran die Zusagen haengen.
   const noShopCache = { ...real, sw: real.sw.replace("'/shopping', ", '') };
   assert.notEqual(noShopCache.sw, real.sw, "Vorbedingung: '/shopping' steht in API_CACHE_WHITELIST");
@@ -3345,6 +3355,11 @@ function pngSrcFindings(page, html) {
  * zweite "Beleg" wiederholte den ersten. Gezaehlt wird das Modul der Aufnahme
  * (`meals-light-web` und `meals-light-mobile` sind dasselbe Motiv).
  */
+// Gezaehlt werden ganze Aufnahmen (.sc mit data-light). Ein Ausschnitt
+// (data-crop, scripts/build-screenshot-crops.mjs) ist ein Detail und darf ein
+// Motiv wiederholen: seit S7 steht die Wand klein als Ausschnitt im Hero und
+// gross als Aufnahme in #family - Silhouette und Beleg, nicht zweimal dasselbe
+// Bild (catalogFamilyFindings haelt die grosse Fassung in #family).
 function motifFindings(html) {
   const seen = new Map();
   const found = [];
@@ -3601,7 +3616,7 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   const pages = PAGES.map((p) => [p, read(p)]);
   const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">') : h]);
   assert.ok(hit(sharedBarFindings(oldHead, read('assets/site.css'), read('assets/legal.css')), /privacy\.html: 0x <header class="site-bar">/));
-  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn nav-lang" id="langBtn" hreflang="en"', 'class="lang-link" id="langBtn" hreflang="en"') : h]);
+  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('<a href="privacy.html" class="nav-btn" hreflang="en"', '<a href="privacy.html" class="lang-link" hreflang="en"') : h]);
   assert.notDeepEqual(oldBtn, pages, 'Vorbedingung: datenschutz.html traegt den Sprachlink als .nav-btn');
   assert.ok(hit(sharedBarFindings(oldBtn, read('assets/site.css'), read('assets/legal.css')), /datenschutz\.html: <a class="lang-link"> in der Leiste ist keine \.nav-btn/));
   const legalOld = read('assets/legal.css') + '\nheader.top { background: var(--surface); padding: 18px 0; }\n.nav-logo { font-size: 18px; }\n';
@@ -3641,7 +3656,8 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   const lift = html.replace('.plat-card:hover { transform: translateY(-1px);', '.plat-card:hover { transform: translateY(-4px);');
   assert.notEqual(lift, html);
   assert.ok(hit(platLiftFindings(lift), /hebt die Karte 4px/));
-  const nameless = site.replace('  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '  .nav-gh-label { display: none; }');
+  // Seit S4 (Critique 2026-10-30) auf jeder Breite nur das Symbol: die Regel steht ohne Medienabfrage.
+  const nameless = site.replace('\n.nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '\n.nav-gh-label { display: none; }');
   assert.notEqual(nameless, site);
   assert.ok(hit(ghNameFindings([nameless]), /nimmt dem Leistenknopf den Namen/));
 });
@@ -3668,7 +3684,7 @@ function shellSkeleton(block) {
     .replace(/<div class="nav-progress"[\s\S]*?<\/div>\s*/, '')
     .replace(/<details class="nav-jump"[\s\S]*?<\/details>\s*/, '')
     .replace(/<a href="install\.html" class="mobile-cta"[\s\S]*?<\/a>\s*/, '')
-    .replace(/<(a|button)\b[^>]*\bid="langBtn"[\s\S]*?<\/\1>\s*/, '')
+    .replace(/<div class="nav-lang" id="langSeg"[\s\S]*?<\/div>\s*/, '')
     .replace(/<span class="foot-meta">[\s\S]*?<\/span>(?=\s*<span data-t="foot_madewith")/, '<span class="foot-meta"></span>')
     .replace(/>[^<]*</g, '><')
     .replace(/\s(?:aria-label|title|lang|hreflang|data-href-en|data-href-de|aria-current)="[^"]*"/g, '')
@@ -3677,6 +3693,53 @@ function shellSkeleton(block) {
     .replace(/datenschutz\.html/g, 'privacy.html')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Das Sprachsegment einer Leiste: EN links, DE rechts, je ein eigenes
+ * Element mit lang und sichtbarem Kuerzel; genau eins ist die gelesene
+ * Sprache (aria-pressed="true" auf den uebersetzten Seiten, aria-current an
+ * Text auf den Rechtsseiten), das andere schaltet (Knopf mit
+ * aria-pressed="false" oder Link mit hreflang). Ein Name, wenn es einen gibt,
+ * beginnt mit dem Sichtbaren (SC 2.5.3).
+ */
+function langSegmentFindings(page, head) {
+  const found = [];
+  const seg = head.match(/<div class="nav-lang" id="langSeg"([^>]*)>([\s\S]*?)<\/div>/);
+  if (!seg) { if (!LANG_OPTIONAL.includes(page)) found.push(`${page}: Leiste ohne Sprachsegment (#langSeg)`); return found; }
+  if (!/\brole="group"/.test(seg[1]) || !/\baria-label="[^"]+"/.test(seg[1])) found.push(`${page}: Sprachsegment ohne role="group" und Namen`);
+  const opts = [...seg[2].matchAll(/<(a|button|span)\b([^>]*)>([^<]*)<\/\1>/g)];
+  if (opts.length !== 2) { found.push(`${page}: Sprachsegment mit ${opts.length} statt zwei Elementen`); return found; }
+  if (opts.map((o) => o[3].trim()).join('|') !== 'EN|DE') found.push(`${page}: Sprachsegment zeigt nicht EN|DE (${opts.map((o) => o[3].trim()).join('|')})`);
+  let current = 0;
+  for (const [, tag, attrs, text] of opts) {
+    if (!/\bclass="nav-btn"/.test(attrs)) found.push(`${page}: Segment ${text.trim()} ohne class="nav-btn"`);
+    if (!new RegExp(`\\blang="${text.trim().toLowerCase()}"`).test(attrs)) found.push(`${page}: Segment ${text.trim()} nennt seine Sprache nicht (lang)`);
+    const name = (attrs.match(/aria-label="([^"]*)"/) || [])[1];
+    if (name !== undefined && !name.startsWith(text.trim())) found.push(`${page}: Name "${name}" beginnt nicht mit dem sichtbaren "${text.trim()}" (SC 2.5.3)`);
+    const isCur = /aria-pressed="true"/.test(attrs) || /aria-current="(?:true|page)"/.test(attrs);
+    if (isCur) current += 1;
+    if (tag === 'button' && !/\btype="button"/.test(attrs)) found.push(`${page}: Segment ${text.trim()} ohne type="button"`);
+    if (tag === 'button' && !/aria-pressed="(?:true|false)"/.test(attrs)) found.push(`${page}: Segment ${text.trim()} ohne aria-pressed`);
+    if (tag === 'a' && !/\bhreflang="/.test(attrs)) found.push(`${page}: Segment-Link ${text.trim()} ohne hreflang`);
+    if (tag === 'span' && !isCur) found.push(`${page}: Segment ${text.trim()} ist Text, aber nicht die gelesene Sprache`);
+  }
+  if (current !== 1) found.push(`${page}: Sprachsegment mit ${current} gelesenen Sprachen statt einer`);
+  return found;
+}
+
+/**
+ * Die Seite schaltet die Sprache nur, wenn eine ANDERE gewaehlt wurde: der
+ * Klick auf das gedrueckte Segment tut nichts.
+ */
+function langSwitchFindings(page, html) {
+  const body = stripComments(html);
+  if (!/id="langSeg"[^>]*>\s*<button/.test(body)) return [];
+  const h = (body.match(/getElementById\('langSeg'\)\.addEventListener\('click',[^\n]*/) || [''])[0];
+  if (!h) return [`${page}: kein Klick-Handler am Sprachsegment`];
+  if (!/getAttribute\('data-lang'\) === lang\) return/.test(h)) return [`${page}: der Klick auf die gelesene Sprache schaltet trotzdem`];
+  if (/lang === 'en' \? 'de' : 'en'/.test(h)) return [`${page}: das Segment schaltet wie ein Umschalter hin und her`];
+  return [];
 }
 
 function siteShellFindings(pages, siteCss, siteJs) {
@@ -3690,17 +3753,10 @@ function siteShellFindings(pages, siteCss, siteJs) {
     if (foot.length !== 1) { found.push(`${page}: ${foot.length}x <footer class="site-foot"> statt einmal`); continue; }
     if (/<footer(?![^>]*class="site-foot")/.test(masked)) found.push(`${page}: eine zweite Fusszeile neben .site-foot`);
     sk[page] = { head: shellSkeleton(head[0]), foot: shellSkeleton(foot[0]) };
-    // Sprachknopf: eine ID, eine Klasse, der Name beginnt mit dem Sichtbaren.
-    const lb = head[0].match(/<(a|button)\b([^>]*\bid="langBtn"[^>]*)>([\s\S]*?)<\/\1>/);
-    if (!lb) { if (!LANG_OPTIONAL.includes(page)) found.push(`${page}: Leiste ohne #langBtn`); }
-    else {
-      if (!/class="nav-btn nav-lang"/.test(lb[2])) found.push(`${page}: #langBtn ohne class="nav-btn nav-lang"`);
-      const vis = (lb[3].match(/<span class="nav-lang-label">([^<]*)<\/span>/) || [])[1];
-      const name = (lb[2].match(/aria-label="([^"]*)"/) || [])[1];
-      if (!vis) found.push(`${page}: #langBtn ohne .nav-lang-label`);
-      else if (name !== undefined && !name.startsWith(vis.trim())) found.push(`${page}: Name "${name}" beginnt nicht mit dem sichtbaren "${vis.trim()}" (SC 2.5.3)`);
-      if (!/\blang="(?:de|en)"/.test(lb[2])) found.push(`${page}: #langBtn nennt seine Sprache nicht (lang)`);
-    }
+    // Sprache: ein Segment aus ZWEI Bedienelementen (S7). Bis dahin war es
+    // EIN Knopf im Segment-Kostuem, und der Klick auf die erhabene, gelesene
+    // Sprache schaltete um (Re-Critique 2026-10-30, P1).
+    for (const f of langSegmentFindings(page, head[0])) found.push(f);
     // Ein Label, ein Ziel: "Install" der Leiste fuehrt nach install.html, und
     // das Sprungmenue traegt keinen zweiten Install-Eintrag.
     const inst = head[0].match(/<a href="([^"]*)" class="nav-btn nav-install"/);
@@ -3714,7 +3770,17 @@ function siteShellFindings(pages, siteCss, siteJs) {
     else if (!/<script src="assets\/site\.js" defer><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js ohne defer (blockiert den Parser)`);
     if (/lsSet\('theme'|setItem\('yuvomi-theme'/.test(masked)) found.push(`${page}: schreibt das Theme selbst statt ueber assets/site.js`);
     if (!/id="themeBtn"[^>]*data-mode="system"/.test(head[0])) found.push(`${page}: Theme-Knopf ohne data-mode="system"`);
+    for (const f of langSwitchFindings(page, html)) found.push(f);
   }
+  // Derselbe Install-Knopf auf jeder Seite (S7): aria-current="page" auf
+  // install.html ist Semantik, kein eigenes Aussehen - die Toenung aus S8
+  // machte die Leiste dort zur einzigen abweichenden.
+  for (const r of eachRule(siteCss)) {
+    if (/aria-current/.test(r.selector) && /\.nav-(?:btn|install)\b/.test(r.selector) && !/\.nav-lang/.test(r.selector) && /background/.test(r.body)) {
+      found.push(`site.css: ${r.selector} gibt der Leiste der aktuellen Seite ein eigenes Aussehen`);
+    }
+  }
+  if (!/aria-pressed/.test(siteJs) || !/#langSeg/.test(siteJs)) found.push('site.js: zieht aria-pressed des Sprachsegments nicht nach');
   const ref = sk['index.html'];
   for (const [page] of pages) {
     if (!sk[page] || !ref || page === 'index.html') continue;
@@ -3745,13 +3811,26 @@ test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Die alte Fusszeile der Rechtsseiten.
   const oldFoot = swap('privacy.html', '<footer class="site-foot">', '<footer class="bot">');
   assert.ok(hit(siteShellFindings(oldFoot, css, js), /privacy\.html: 0x <footer class="site-foot">/));
-  // Der alte Sprachknopfname (2.5.3) und der fehlende Sprachknopf.
-  const oldName = swap('index.html', 'aria-label="DE - Auf Deutsch lesen"', 'aria-label="Auf Deutsch umschalten"');
+  // Ein Name, der nicht mit dem Sichtbaren beginnt (2.5.3), und das fehlende Segment.
+  const oldName = swap('index.html', 'title="Auf Deutsch lesen">DE</button>', 'title="Auf Deutsch lesen" aria-label="Auf Deutsch umschalten">DE</button>');
   assert.notDeepEqual(oldName, pages);
   assert.ok(hit(siteShellFindings(oldName, css, js), /index\.html: Name "Auf Deutsch umschalten" beginnt nicht mit dem sichtbaren "DE"/));
-  const noLang = swap('privacy.html', /<a href="datenschutz\.html" class="nav-btn nav-lang"[\s\S]*?<\/a>\s*/, '');
+  const noLang = swap('privacy.html', /<div class="nav-lang" id="langSeg"[\s\S]*?<\/div>\s*/, '');
   assert.notDeepEqual(noLang, pages);
-  assert.ok(hit(siteShellFindings(noLang, css, js), /privacy\.html: Leiste ohne #langBtn/));
+  assert.ok(hit(siteShellFindings(noLang, css, js), /privacy\.html: Leiste ohne Sprachsegment/));
+  // Der Stand vor S7: EIN Knopf im Segment-Kostuem, der hin und her schaltet,
+  // und die Toenung des Install-Knopfs auf install.html.
+  const toggle = swap('index.html', /<div class="nav-lang" id="langSeg"[\s\S]*?<\/div>/, '<div class="nav-lang" id="langSeg" role="group" aria-label="Language"><button class="nav-btn" type="button" lang="de" data-lang="de" aria-pressed="false">DE</button></div>');
+  assert.notDeepEqual(toggle, pages);
+  assert.ok(hit(siteShellFindings(toggle, css, js), /index\.html: Sprachsegment mit 1 statt zwei Elementen/));
+  const both = swap('install.html', 'data-lang="de" aria-pressed="false"', 'data-lang="de" aria-pressed="true"');
+  assert.notDeepEqual(both, pages);
+  assert.ok(hit(siteShellFindings(both, css, js), /install\.html: Sprachsegment mit 2 gelesenen Sprachen/));
+  const flip = swap('index.html', "if (!b || b.getAttribute('data-lang') === lang) return; lang = b.getAttribute('data-lang');", "if (!b) return; lang = lang === 'en' ? 'de' : 'en';");
+  assert.notDeepEqual(flip, pages);
+  assert.ok(hit(siteShellFindings(flip, css, js), /index\.html: der Klick auf die gelesene Sprache schaltet trotzdem/));
+  const tint = css + '\n.nav-btn[aria-current="page"], .nav-btn[aria-current="page"]:hover {\n  background: var(--accent-soft); color: var(--accent-on-soft); }\n';
+  assert.ok(hit(siteShellFindings(pages, tint, js), /gibt der Leiste der aktuellen Seite ein eigenes Aussehen/));
   // Install mit zwei Zielen: der alte Sprungmenue-Eintrag.
   const twoInstall = swap('index.html', 'data-t="jump_install">Where it runs<', 'data-t="jump_install">Install it<');
   assert.notDeepEqual(twoInstall, pages);
@@ -3782,7 +3861,7 @@ test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
  * Pille ueber der Install-Pille (zusammen 17 % des Bildschirms).
  * ========================================================================== */
 const RHYTHM_SECTIONS = {
-  'index.html': ['.gallery', '.swap', '.handoff', '.family', '.showcase', '.platforms', '.longevity', '.cta'],
+  'index.html': ['.gallery', '.swap', '.handoff', '.family', '.showcase', '.yours', '.platforms', '.longevity', '.cta'],
   'install.html': ['section'],
 };
 
@@ -3846,7 +3925,7 @@ test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const hit = (list, re) => list.some((l) => re.test(l));
   const swap = (page, from, to) => pages.map(([p, h]) => [p, p === page ? h.replace(from, to) : h]);
   // Die alte Galerie mit festem Desktop-Wert.
-  const fixed = swap('index.html', '.gallery { padding: var(--sec-m) 0; }', '.gallery { padding: 88px 0; }');
+  const fixed = swap('index.html', '.gallery { padding: var(--sec-s) 0; }', '.gallery { padding: 88px 0; }');
   assert.notDeepEqual(fixed, pages);
   assert.ok(hit(rhythmFindings(fixed, css, js), /index\.html: \.gallery \{ padding: 88px 0 \} - eigene Pixel/));
   // install.html mit der alten Telefon-Ueberschreibung.
@@ -4125,7 +4204,7 @@ test('index.html: die 2400er-Stufe erreicht nur Retina-Schirme, nach Breite gewa
 test('der Retina-Stufen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const html = read('index.html');
   // Ohne sizes-Grenze (100vw) wuerde ein 1920er-Schirm bei DPR 1 die 2400er-Datei ziehen.
-  const wide = html.replace('data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw"', 'data-sizes="100vw"');
+  const wide = html.replace('data-sizes="(max-width: 860px) 300px, (min-width: 1200px) 960px, 80vw"', 'data-sizes="100vw"');
   assert.notEqual(wide, html);
   assert.match(retinaTierFindings(wide, BUILD_WEBP()).join(), /bei DPR 1 laedt das die 2400er-Stufe/);
   // Dichte- statt Breiten-Deskriptor.
@@ -4136,4 +4215,440 @@ test('der Retina-Stufen-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   const drift = BUILD_WEBP().replace("xl: 2400", "xl: 2300");
   assert.match(retinaTierFindings(html, drift).join(), /SHOT_W\.webLead .* weicht vom Build-Skript ab/);
   assert.equal(slotWidth('(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, 1150px', 400), 350);
+});
+
+// ── (24) Version und Datum auf der Website = package.json und CHANGELOG ─────
+/**
+ * Seit S1 (Website-Critique 2026-10-30) standen Version und Datum dreimal in
+ * index.html (Proof-Zeile, "Gehoert euch", Fuss) und einmal in install.html,
+ * alle von Hand gepflegt; release-prep greift die alte Nummer woertlich, das
+ * Datum aber nur "als sichtbaren Text" - eine vergessene Stelle faellt dort
+ * niemandem auf. Seit S2 steht die Nummer nur noch in "Gehoert euch" und im
+ * Fuss, und dieser Guard koppelt jede Stelle an die Quelle: jede Version
+ * (`<b>vX.Y.Z</b>`) ist die aus package.json, jedes `data-released` das Datum,
+ * das der CHANGELOG fuer genau diese Version nennt, und der sichtbare Text
+ * (Fallback ohne JS) sagt dasselbe Datum.
+ */
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+function releaseFacts(pkg, changelog) {
+  const version = JSON.parse(pkg).version;
+  const m = changelog.match(new RegExp(String.raw`^## \[${version.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}\] - (\d{4}-\d{2}-\d{2})`, 'm'));
+  return { version, date: m ? m[1] : null };
+}
+
+function versionFindings(pages, facts) {
+  const found = [];
+  if (!facts.date) return [`CHANGELOG nennt kein Datum fuer ${facts.version}`];
+  const [y, mo, d] = facts.date.split('-').map(Number);
+  const visible = `${d} ${MONTH_NAMES[mo - 1]} ${y}`;
+  for (const [page, html] of Object.entries(pages)) {
+    const body = stripComments(html);
+    const versions = [...body.matchAll(/<b>v(\d+\.\d+\.\d+)<\/b>/g)].map((m) => m[1]);
+    const dates = [...body.matchAll(/data-released="([^"]*)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2].trim()]);
+    if (!versions.length) found.push(`${page}: keine Versionsangabe gefunden - Muster veraltet?`);
+    if (!dates.length) found.push(`${page}: kein data-released gefunden - Muster veraltet?`);
+    for (const v of versions) if (v !== facts.version) found.push(`${page}: nennt v${v}, package.json ist ${facts.version}`);
+    for (const [iso, text] of dates) {
+      if (iso !== facts.date) found.push(`${page}: data-released="${iso}", der CHANGELOG datiert ${facts.version} auf ${facts.date}`);
+      if (text !== visible) found.push(`${page}: sichtbares Datum "${text}" statt "${visible}"`);
+    }
+  }
+  return found;
+}
+
+const SITE_RELEASE = () => releaseFacts(
+  readFileSync(resolve(ROOT, 'package.json'), 'utf8'),
+  readFileSync(resolve(ROOT, 'CHANGELOG.md'), 'utf8'));
+
+test('docs: jede Version und jedes Release-Datum der Website folgen package.json und dem CHANGELOG', () => {
+  assert.deepEqual(versionFindings({ 'index.html': read('index.html'), [INSTALL]: read(INSTALL) }, SITE_RELEASE()), []);
+});
+
+test('index.html: die Versionsnummer steht hoechstens zweimal (Lebenszeichen und Fuss)', () => {
+  const n = (stripComments(read('index.html')).match(/<b>v\d+\.\d+\.\d+<\/b>/g) || []).length;
+  assert.ok(n <= 2, `${n} Versionsangaben in index.html - jede weitere ist eine Stelle, die beim Release vergessen wird`);
+});
+
+test('der Versions-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const facts = SITE_RELEASE();
+  const html = read('index.html');
+  // Eine Stelle bleibt beim Release auf der alten Nummer stehen.
+  const stale = html.replace(`<b>v${facts.version}</b>`, '<b>v2.82.0</b>');
+  assert.notEqual(stale, html);
+  assert.match(versionFindings({ 'index.html': stale }, facts).join(), /nennt v2\.82\.0/);
+  // Das Attribut zieht mit, der sichtbare Text nicht (der Fall, den release-prep nur per Hand prueft).
+  const [y, mo, d] = facts.date.split('-').map(Number);
+  const text = html.replace(`>${d} ${MONTH_NAMES[mo - 1]} ${y}<`, '>1 January 2020<');
+  assert.notEqual(text, html);
+  assert.match(versionFindings({ 'index.html': text }, facts).join(), /sichtbares Datum "1 January 2020"/);
+  // Das Attribut bleibt stehen.
+  const attr = html.replace(`data-released="${facts.date}"`, 'data-released="2020-01-01"');
+  assert.match(versionFindings({ 'index.html': attr }, facts).join(), /data-released="2020-01-01"/);
+  // Eine Version ohne CHANGELOG-Eintrag.
+  assert.deepEqual(versionFindings({}, releaseFacts('{"version":"9.9.9"}', '## [1.0.0] - 2020-01-01')), ['CHANGELOG nennt kein Datum fuer 9.9.9']);
+});
+
+// ── (25) Outbound: was der Betreiber einschaltet, steht auch auf der Seite ───
+/**
+ * Der Outbound-Guard (3) haelt nur die Liste "Once you switch them on" der
+ * README. Zwei Verbindungen schaltet der BETREIBER ein, und die Seite
+ * verschwieg beide (Website-Critique 2026-10-30, handoff-2 P2): das Profilbild
+ * von Gravatar (schickt einen Hash der E-Mail-Adresse) und die Installation
+ * von Erweiterungsmodulen von GitHub (MODULES_ALLOW_WEB_INSTALL). Beide haengen
+ * an je einem Dienst im Code; gibt es den Dienst, muss tb_out_list ihn nennen.
+ */
+const OPERATOR_OUTBOUND = [
+  { file: 'server/services/gravatar.js', says: { en: /Gravatar/, de: /Gravatar/ } },
+  { file: 'server/services/module-github.js', says: { en: /modules from GitHub/, de: /Erweiterungsmodule von GitHub/ } },
+];
+
+function operatorOutboundFindings(html, has = (p) => existsSync(resolve(ROOT, p))) {
+  const found = [];
+  for (const lang of ['en', 'de']) {
+    const list = dictValue(dictBlock(html, lang), 'tb_out_list');
+    const text = list === null ? '' : stripTags(unescapeJs(list));
+    for (const c of OPERATOR_OUTBOUND) {
+      if (has(c.file) && !c.says[lang].test(text)) found.push(`tb_out_list (${lang}) verschweigt ${c.file} (${c.says[lang]})`);
+    }
+  }
+  return found;
+}
+
+test('index.html: die Outbound-Liste nennt auch, was der Betreiber einschaltet', () => {
+  assert.deepEqual(operatorOutboundFindings(read('index.html')), []);
+});
+
+test('der Betreiber-Outbound-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Der Stand vor S2, woertlich: ohne Gravatar und ohne Modulinstallation.
+  const before = read('index.html').replace(/(tb_out_list:')[^']*'/g,
+    "$1Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, and weather connect once you switch them on.'");
+  const found = operatorOutboundFindings(before);
+  assert.equal(found.length, 4, found.join('\n'));
+  // Gibt es den Dienst nicht mehr, verlangt der Guard ihn auch nicht.
+  assert.deepEqual(operatorOutboundFindings(before, () => false), []);
+});
+
+// ── (26) CardDAV ist nur Lesen: kein Satz verspricht Kontakte in beide Richtungen ──
+/**
+ * Der Kontakte-Abgleich holt nur herein (docs/SPEC.md "CardDAV multi-account
+ * sync: ... read-only inbound sync", server/services/cardav-sync.js schreibt
+ * nichts zurueck). Die Startseite sagte trotzdem "Calendars and contacts sync
+ * both ways over CalDAV and CardDAV", install.html "Two-way sync with ...
+ * CalDAV/CardDAV" - und widersprach damit der eigenen FAQ (long_a7, Website-
+ * Critique 2026-10-30, handoff-2 P1). Ein Satz, der CardDAV und "beide
+ * Richtungen" nennt, muss deshalb sagen, dass Kontakte nur hereinkommen.
+ */
+const TWO_WAY = /both ways|two-way|beide Richtungen|Zwei-Wege/i;
+const INBOUND_ONLY = /come in|read in|fetches|holt|herein|nur lesend/i;
+
+function carddavTwoWayFindings(pages) {
+  const found = [];
+  for (const [page, html] of Object.entries(pages)) {
+    for (const lang of ['en', 'de']) {
+      for (const [key, text] of dictEntries(dictBlock(html, lang) || '')) {
+        for (const sentence of text.split(/(?<=\.)\s+/)) {
+          if (/CardDAV/.test(sentence) && TWO_WAY.test(sentence) && !INBOUND_ONLY.test(sentence)) {
+            found.push(`${page} ${key} (${lang}): "${sentence.slice(0, 90)}..." verspricht CardDAV in beide Richtungen`);
+          }
+        }
+      }
+    }
+  }
+  return found;
+}
+
+test('docs: kein Satz verspricht den Kontakte-Abgleich in beide Richtungen', () => {
+  assert.ok(existsSync(resolve(ROOT, 'server/services/cardav-sync.js')), 'Vorbedingung: der CardDAV-Abgleich liegt dort');
+  assert.match(readFileSync(resolve(ROOT, 'docs/SPEC.md'), 'utf8'), /read-only inbound sync/, 'SPEC sagt nicht mehr "read-only inbound" - Guard pruefen');
+  assert.deepEqual(carddavTwoWayFindings({ 'index.html': read('index.html'), [INSTALL]: read(INSTALL) }), []);
+});
+
+test('der CardDAV-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Die Saetze vor S2, woertlich.
+  const old = {
+    'index.html': "  var T = {\n    en: {\n      more_scope:'Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV.'\n    },\n    de: {\n      more_scope:'Kalender und Kontakte synchronisieren in beide Richtungen über CalDAV und CardDAV.'\n    }\n  };",
+  };
+  assert.equal(carddavTwoWayFindings(old).length, 2, carddavTwoWayFindings(old).join('\n'));
+  const install = read(INSTALL).replace('multi-account CalDAV (iCloud, Nextcloud, Radicale), contacts read in over CardDAV,', 'multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale),');
+  assert.notEqual(install, read(INSTALL));
+  assert.match(carddavTwoWayFindings({ [INSTALL]: install }).join(), /pt_cal_desc \(en\)/);
+});
+
+// ── (27) Ausschnitte der Verbindungen (S3, Website-Critique 2026-10-30) ─────
+//
+// "Alles greift ineinander" zeigt je Verbindung zwei Ausschnitte aus
+// Telefonaufnahmen, gebaut von scripts/build-screenshot-crops.mjs nach
+// docs/screenshots[/<locale>]/crops/. Sie laufen nicht durch die Aufnahme-
+// Pipeline der Seite (data-light/PNG-Rueckfall), also haelt sie hier ein
+// eigener Guard: jeder Ausschnitt, den die Seite nennt, steht in der Tabelle
+// des Build-Skripts (sonst baut ihn nach dem naechsten Screenshot-Lauf
+// niemand neu und er zeigt still den alten Stand), und es gibt ihn in jedem
+// Sprachordner in beiden Themes und beiden Breiten - ein fehlender faellt im
+// Browser auf den englischen zurueck, der Fehler bliebe unsichtbar. Das
+// Markup traegt die englische helle Fassung mit Breiten-Deskriptoren.
+function cropFindings(html, build, exists) {
+  const found = [];
+  const table = new Set([...build.matchAll(/\{\s*name:\s*'([a-z0-9-]+)',\s*from:/g)].map((m) => m[1]));
+  const tags = [...maskNonMarkup(html).matchAll(/<img\b[^>]*\bdata-crop="([^"]+)"[^>]*>/g)];
+  if (!tags.length) return ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?'];
+  for (const [tag, name] of tags) {
+    if (!table.has(name)) found.push(`${name}: steht nicht in CROPS (scripts/build-screenshot-crops.mjs)`);
+    const b = `screenshots/crops/${name}-light`;
+    if (!tag.includes(`src="${b}.webp"`) || !tag.includes(`srcset="${b}@1x.webp 320w, ${b}.webp 640w, ${b}@3x.webp 960w"`)) found.push(`${name}: src/srcset nicht die englische helle Fassung mit 320w/640w/960w`);
+    if (!/\bloading="lazy"/.test(tag)) found.push(`${name}: nicht lazy - mit src im Markup holte der Browser die englische helle Fassung vor dem Tausch`);
+    for (const dir of localeDirs()) {
+      for (const theme of ['light', 'dark']) {
+        for (const suffix of ['.webp', '@1x.webp', '@3x.webp']) {
+          const rel = `${dir ? `${dir}/` : ''}crops/${name}-${theme}${suffix}`;
+          if (!exists(rel)) found.push(`screenshots/${rel} fehlt`);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+const CROPS_BUILD = () => readFileSync(resolve(ROOT, 'scripts/build-screenshot-crops.mjs'), 'utf8');
+
+test('index.html: jeder Ausschnitt der Verbindungen ist gebaut, in jeder Sprache und jedem Theme', () => {
+  assert.deepEqual(cropFindings(read('index.html'), CROPS_BUILD(), (rel) => existsSync(resolve(SHOTS, rel))), []);
+});
+
+test('der Ausschnitt-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const build = CROPS_BUILD();
+  const all = () => true;
+  // Eine Datei fehlt im deutschen Ordner.
+  assert.match(cropFindings(html, build, (rel) => rel !== 'de/crops/handoff-budget-dark@1x.webp').join(), /de\/crops\/handoff-budget-dark@1x\.webp fehlt/);
+  // Der Ausschnitt steht nicht mehr in der Tabelle des Build-Skripts.
+  const gone = build.replace("{ name: 'handoff-pantry',", "{ name: 'handoff-larder',");
+  assert.notEqual(gone, build);
+  assert.match(cropFindings(html, gone, all).join(), /handoff-pantry: steht nicht in CROPS/);
+  // Ohne lazy.
+  const eager = html.replace(/(data-crop="handoff-meals"[^>]*?) loading="lazy"/, '$1');
+  assert.notEqual(eager, html);
+  assert.match(cropFindings(eager, build, all).join(), /handoff-meals: nicht lazy/);
+  // Der Stand vor S7: zwei Stufen - am Telefon mit DPR 3 weich (0,79).
+  assert.match(cropFindings(html, build, (rel) => !rel.endsWith('@3x.webp')).join(), /handoff-meals-light@3x\.webp fehlt/);
+  const two = html.replace(', screenshots/crops/handoff-meals-light@3x.webp 960w', '');
+  assert.notEqual(two, html);
+  assert.match(cropFindings(two, build, all).join(), /handoff-meals: src\/srcset nicht die englische helle Fassung mit 320w\/640w\/960w/);
+  // Der Stand vor S3: keine Ausschnitte.
+  assert.deepEqual(cropFindings(read('index.html').replace(/data-crop=/g, 'data-x='), build, all), ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?']);
+});
+
+// ── (28) Bedienelemente, Bewegung, Messbefunde (S4, Critique 2026-10-30) ─────
+/**
+ * Die Stimme bleibt selten. Bis S4 trug JEDER Sektionskopf ein kursiv-
+ * violettes <em> (achtmal auf der Seite), und die Betonung las sich als
+ * Schriftart, nicht als Betonung. Erlaubt sind die h1 (hero_h1_em) und der
+ * Schluss (cta_title) - im Markup wie in beiden Woerterbuechern.
+ */
+const EM_ALLOWED = ['hero_h1_em', 'cta_title'];
+
+/* Schneidet wiederholt, bis nichts mehr passt: ein einmaliger Durchlauf
+ * liesse verschachtelte Reste wie "<scr<script></script>ipt>" stehen. */
+function stripUntilStable(text, re) {
+  let prev;
+  do { prev = text; text = text.replace(re, ''); } while (text !== prev);
+  return text;
+}
+
+function headlineEmFindings(html) {
+  const found = [];
+  const body = stripUntilStable(stripComments(html), /<style\b[\s\S]*?<\/style[^>]*>/gi);
+  const markup = stripUntilStable(body, /<script\b[\s\S]*?<\/script[^>]*>/gi);
+  for (const m of markup.matchAll(/<em\b[^>]*>/g)) {
+    const own = (m[0].match(/data-t="([^"]+)"/) || [])[1];
+    const host = (markup.slice(Math.max(0, m.index - 300), m.index).match(/data-t="([^"]+)"[^<]*$/) || [])[1];
+    const key = own || host || '?';
+    if (!EM_ALLOWED.includes(key)) found.push(`Markup: <em> in ${key}`);
+  }
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    for (const m of block.matchAll(/(\w+):\s*(['"])((?:\\.|(?!\2).)*)\2/g)) {
+      if (/<em>/.test(m[3]) && !EM_ALLOWED.includes(m[1])) found.push(`T.${lang}.${m[1]}: <em>`);
+    }
+  }
+  return found;
+}
+
+test('index.html: kursiv-violett betont nur die h1 und den Schluss', () => {
+  assert.deepEqual(headlineEmFindings(read('index.html')), []);
+});
+
+test('der Betonungs-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const old = html.replace("ho_title:'Everything in it works together.'", "ho_title:'Everything in it <em>works together.</em>'")
+    .replace('data-t="ho_title">Everything in it works together.</h2>', 'data-t="ho_title">Everything in it <em>works together.</em></h2>');
+  assert.notEqual(old, html);
+  assert.deepEqual(headlineEmFindings(old), ['Markup: <em> in ho_title', 'T.en.ho_title: <em>']);
+  // Die erlaubten zwei bleiben still.
+  assert.ok(/<em data-t="hero_h1_em">/.test(html) && /cta_title:'[^']*<em>/.test(html), 'Vorbedingung: h1 und Schluss tragen ihr <em>');
+});
+
+/**
+ * Das LCP-Bild wird auf JEDER Breite vorgeladen. Bis S4 nur am breiten
+ * Schirm (`if (!n)`): am Telefon war damals der Text das LCP-Element. Seit S3
+ * ist es dort die Uebersicht im Telefonrahmen, und ohne Preload wartete sie
+ * auf das Inline-Skript am Bild - Slow 4G, CPU 4x: 2.895 ms, davon 1.712 ms
+ * Ladeverzoegerung; mit Preload 2.395 ms / 627 ms (gleiche Laufart).
+ */
+function heroPreloadEverywhereFindings(html) {
+  const head = heroHeadScript(html);
+  if (!/rel = 'preload'/.test(head)) return ['kein Preload im Kopfskript'];
+  const before = head.slice(0, head.indexOf("rel = 'preload'"));
+  const open = (before.match(/\{/g) || []).length - (before.match(/\}/g) || []).length;
+  // Das Kopfskript steht in function + try: zwei offene Bloecke. Jeder weitere ist eine Bedingung.
+  return open > 2 ? ['der Hero-Preload steht in einer Bedingung (nur eine Breite?) - am Telefon ist die Aufnahme das LCP-Element'] : [];
+}
+
+test('index.html: das Hero-Bild wird auf jeder Breite vorgeladen', () => {
+  assert.deepEqual(heroPreloadEverywhereFindings(read('index.html')), []);
+});
+
+test('der Preload-Breiten-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const narrowOnly = html.replace("        k.rel = 'preload'; k.as = 'image';", "        if (!n) {\n        k.rel = 'preload'; k.as = 'image';")
+    .replace("        document.head.appendChild(k);\n", "        document.head.appendChild(k);\n        }\n");
+  assert.notEqual(narrowOnly, html);
+  assert.equal(heroPreloadEverywhereFindings(narrowOnly).length, 1);
+});
+
+/**
+ * Die Leiste: Sprung, Sprache und Theme sind EINE Glasgruppe (.nav-group),
+ * Sprache ein Segment aus zwei Elementen (seit S7, langSegmentFindings im
+ * Rahmen-Guard; bis dahin ein Knopf mit data-cur als ::before), Theme mit
+ * sichtbarem Zustand (.nav-theme-label), GitHub auf jeder Breite nur Symbol.
+ * Auf allen Seiten, die den Knopf tragen.
+ */
+function barGroupFindings(pages, siteCss) {
+  const found = [];
+  for (const [page, html] of pages) {
+    const head = (stripComments(html).match(/<header class="site-bar">[\s\S]*?<\/header>/) || [''])[0];
+    const group = (head.match(/<div class="nav-group">([\s\S]*?)\n\s*<\/div>/) || [])[1];
+    if (!group) { found.push(`${page}: keine .nav-group in der Leiste`); continue; }
+    if (!/id="themeBtn"/.test(group)) found.push(`${page}: Theme-Knopf ausserhalb der Gruppe`);
+    if (/id="langSeg"/.test(head) && !/id="langSeg"/.test(group)) found.push(`${page}: Sprachsegment ausserhalb der Gruppe`);
+    if (/id="navJump"/.test(head) && !/id="navJump"/.test(group)) found.push(`${page}: Sprungmenue ausserhalb der Gruppe`);
+    if (/nav-gh|nav-install/.test(group)) found.push(`${page}: GitHub oder Installieren in der Gruppe`);
+    if (/id="langBtn"/.test(head)) found.push(`${page}: der alte Sprach-Umschalter (#langBtn) steht wieder in der Leiste`);
+    if (!/<span class="nav-theme-label">/.test(group)) found.push(`${page}: Theme ohne sichtbaren Zustand (.nav-theme-label)`);
+  }
+  const top = [...eachRule(siteCss)].find((r) => r.selector === '.nav-gh-label' && !r.at.length);
+  if (!top || !/clip-path:\s*inset\(50%\)/.test(top.body)) found.push('site.css: .nav-gh-label nicht auf jeder Breite nur fuer Screenreader');
+  return found;
+}
+
+test('docs: Sprung, Sprache und Theme sind eine Glasgruppe, GitHub ein Symbol', () => {
+  assert.deepEqual(barGroupFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css')), []);
+});
+
+test('der Glasgruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css');
+  const flat = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('<div class="nav-group">\n', '').replace(/(<button class="nav-btn nav-theme"[\s\S]*?<\/button>)\n\s*<\/div>\n/, '$1\n') : h]);
+  assert.notDeepEqual(flat, pages);
+  assert.deepEqual(barGroupFindings(flat, css), ['install.html: keine .nav-group in der Leiste']);
+  const oldSeg = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('<div class="nav-lang" id="langSeg"', '<div class="nav-lang" id="langBtn"') : h]);
+  assert.notDeepEqual(oldSeg, pages);
+  assert.deepEqual(barGroupFindings(oldSeg, css), ['datenschutz.html: der alte Sprach-Umschalter (#langBtn) steht wieder in der Leiste']);
+  const ghWord = css.replace('\n.nav-gh-label { position: absolute;', '\n@media (max-width: 700px) {\n.nav-gh-label { position: absolute;').replace('white-space: nowrap; }\n/* Phones.', 'white-space: nowrap; }\n}\n/* Phones.');
+  assert.notEqual(ghWord, css);
+  assert.deepEqual(barGroupFindings(pages, ghWord), ['site.css: .nav-gh-label nicht auf jeder Breite nur fuer Screenreader']);
+});
+
+/**
+ * Schwebende Pillen. Die Install-Pille weicht auch der Sektion Einrichten
+ * (#install) - von dort bis zum Ende ist lueckenlos ein Besitzer im Bild;
+ * auf Deutsch blieb sie vorher am Seitenende stehen (B, 98 %). "Nach oben"
+ * kommt erst nach der halben Seite (site.js), am Telefon erst mit der
+ * Fusszeile (html.pill-end), deren Band frei ist.
+ *
+ * Seit S7 (Re-Critique 2026-10-30) geht sie beim Runterscrollen weg und kommt
+ * beim Hochscrollen wieder (html.pill-away nach der Scrollrichtung, mit
+ * Schwelle); vorher stand sie beim Lesen ueber Ueberschriften und Fragen.
+ * Unter reduzierter Bewegung blendet sie nur, ohne zu gleiten.
+ */
+function floatingPillFindings(html, siteJs) {
+  const found = [];
+  const body = stripComments(html);
+  if (!/classList\.toggle\('pill-away', d > 0\)/.test(body)) found.push('Install-Pille: kein html.pill-away nach der Scrollrichtung - sie steht beim Lesen ueber dem Text');
+  else if (!/Math\.abs\(d\) < \d+\) return/.test(body)) found.push('Install-Pille: Scrollrichtung ohne Schwelle - jedes Zittern laesst sie blinken');
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)]);
+  const away = rules.filter((r) => /html\.js\.pill-away \.mobile-cta\.show/.test(r.selector));
+  if (!away.some((r) => r.at.some((a) => /max-width:\s*700px/.test(a)) && /visibility:\s*hidden/.test(r.body) && /opacity:\s*0/.test(r.body))) found.push('Install-Pille: html.pill-away blendet sie am Telefon nicht aus');
+  if (!away.some((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /transform:\s*translateX\(-50%\)\s*;?\s*$/.test(r.body.trim()))) found.push('Install-Pille: gleitet auch unter reduzierter Bewegung');
+  const owners = (body.match(/var owners = \[([^\]]*)\]/) || [])[1] || '';
+  if (!/getElementById\('install'\)/.test(owners)) found.push('Install-Pille: #install ist kein Besitzer - sie schwebt ueber dem eigenen Ziel');
+  const end = (body.match(/classList\.toggle\('pill-end',[^\n]*/) || [''])[0];
+  if (/ctaBox/.test(end)) found.push('pill-end schon mit der Schlusskarte - "Nach oben" laege dort auf Text');
+  if (!/scrollHeight \* 0\.5/.test(siteJs)) found.push('site.js: "Nach oben" kommt nicht erst nach der halben Seite');
+  return found;
+}
+
+test('index.html: die schwebenden Pillen weichen dem Einrichten und kommen spaet', () => {
+  assert.deepEqual(floatingPillFindings(read('index.html'), read('assets/site.js')), []);
+});
+
+test('der Pillen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const js = read('assets/site.js');
+  const old = html.replace(", document.getElementById('install'), ctaBox, foot]", ', ctaBox, foot]')
+    .replace("toggle('pill-end', inView.indexOf(foot) >= 0)", "toggle('pill-end', inView.indexOf(ctaBox) >= 0 || inView.indexOf(foot) >= 0)");
+  assert.notEqual(old, html);
+  assert.equal(floatingPillFindings(old, js).length, 2);
+  const early = js.replace('document.documentElement.scrollHeight * 0.5', 'innerHeight');
+  assert.notEqual(early, js);
+  assert.deepEqual(floatingPillFindings(html, early), ['site.js: "Nach oben" kommt nicht erst nach der halben Seite']);
+  // S7: ohne Richtung (der Stand bis S6), ohne Schwelle, und gleitend unter reduzierter Bewegung.
+  const still = html.replace("root.classList.toggle('pill-away', d > 0);", '');
+  assert.notEqual(still, html);
+  assert.deepEqual(floatingPillFindings(still, js), ['Install-Pille: kein html.pill-away nach der Scrollrichtung - sie steht beim Lesen ueber dem Text']);
+  const jitter = html.replace('if (Math.abs(d) < 12) return;', '');
+  assert.notEqual(jitter, html);
+  assert.deepEqual(floatingPillFindings(jitter, js), ['Install-Pille: Scrollrichtung ohne Schwelle - jedes Zittern laesst sie blinken']);
+  const slide = html.replace('      html.js.pill-away .mobile-cta.show, html.js.cta-yield .mobile-cta.show { transform: translateX(-50%); }\n', '');
+  assert.notEqual(slide, html);
+  assert.deepEqual(floatingPillFindings(slide, js), ['Install-Pille: gleitet auch unter reduzierter Bewegung']);
+});
+
+/**
+ * Katalog und Familie. Das Modulsymbol steht IN der h4, nicht als Kachel
+ * davor (Detektor icon-tile-stack, 17x bis S4); und die Familie hat ein
+ * eigenes Bild, seit die Wand in den Hero zog (S3) war sie Text.
+ */
+function catalogFamilyFindings(html) {
+  const found = [];
+  const body = stripComments(html);
+  const tiles = (body.match(/<div class="mod-ico">/g) || []).length;
+  if (tiles) found.push(`${tiles}x .mod-ico als eigene Kachel vor der Ueberschrift`);
+  const cards = (body.match(/<h4><span class="mod-ico">/g) || []).length;
+  if (!cards) found.push('kein Modul traegt sein Symbol in der h4');
+  const fam = (body.match(/<section class="family" id="family">[\s\S]*?<\/section>/) || [''])[0];
+  if (!/<img class="sc"[^>]*data-light="screenshots\//.test(fam)) found.push('#family ohne eigene Aufnahme');
+  // Der Titel verspricht die Kuechenwand (S7): die volle Wandaufnahme steht
+  // hier, nicht nur als Ausschnitt im Hero.
+  else if (!/<img class="sc"[^>]*data-light="screenshots\/dashboard-wall-light-web\.png"/.test(fam)) found.push('#family zeigt die Kuechenwand nicht, die ihr Titel verspricht');
+  return found;
+}
+
+test('index.html: Modulsymbol in der Ueberschrift, die Familie mit eigenem Bild', () => {
+  assert.deepEqual(catalogFamilyFindings(read('index.html')), []);
+});
+
+test('der Katalog-und-Familie-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const tile = html.replace('<h4><span class="mod-ico">', '<div class="mod-ico"></div><h4><span class="x">');
+  assert.notEqual(tile, html);
+  assert.deepEqual(catalogFamilyFindings(tile), ['1x .mod-ico als eigene Kachel vor der Ueberschrift']);
+  const bare = html.replace(/<figure class="fam-stage[\s\S]*?<\/figure>/, '');
+  assert.notEqual(bare, html);
+  assert.deepEqual(catalogFamilyFindings(bare), ['#family ohne eigene Aufnahme']);
+  // Der Stand bis S6: nur die Pinnwand am Handy.
+  const notesOnly = html.replace(/<span class="fam-wall">[\s\S]*?<\/noscript><\/span>/, '');
+  assert.notEqual(notesOnly, html);
+  assert.deepEqual(catalogFamilyFindings(notesOnly), ['#family zeigt die Kuechenwand nicht, die ihr Titel verspricht']);
 });
