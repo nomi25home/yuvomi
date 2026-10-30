@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Syntax error: Unterminated quoted string` and the container stayed `unhealthy` although the app
   was running. The quotes are swapped - single quotes around the `node -e` argument, double quotes
   inside the JavaScript.
+- **A meal stays on the wall until the next planned meal.** Since 2.83.0 "Today at a glance" dropped
+  a meal the moment its slot began, so breakfast was gone at 08:00 and dinner at 18:30. A meal now
+  stays until the next meal planned for today starts, and the last one until the end of the day.
+  The smaller Today sheet on phones and tablets follows the same rule, and the timeline dot is
+  unchanged.
 - **Vietnamese counts show the real number.** In browsers with current language data, Vietnamese
   picks the singular wording for 0 as well as for 1, so eleven messages such as the active filter
   count said "1" when nothing was selected. They now show the actual count.

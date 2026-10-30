@@ -5231,17 +5231,23 @@ function timelineEventRow(event, span, memberIds = []) {
  * eingetragen hat. Eine erfundene Stunde Dauer und ein „laeuft gerade"
  * behaupteten mehr; der Punkt sagt nur „um diese Zeit, ungefaehr". Er klappt
  * die Zeile der Mahlzeit auf; in der Liste steht sie dann nicht noch einmal.
+ *
+ * DIE ZEILE LEBT LAENGER ALS DER PUNKT (#2393): um 08:00 faengt das Fruehstueck
+ * an, vorbei ist es nicht. `sheetRowEnd` ist der Slot der naechsten GEPLANTEN
+ * Mahlzeit, ohne eine das Ende des Tages - ein leerer Slot loest nichts ab. Das
+ * haelt auch den Neuaufbau: wo eine Zeile geht, beginnt eine andere Mahlzeit,
+ * und das merkt der Fingerabdruck des Tages (todayFingerprint, `passed`).
  */
 function todayMealsForTimeline(data) {
   const labels = MEAL_LABELS();
-  return (Array.isArray(data?.todayMeals) ? data.todayMeals : [])
-    .filter((meal) => MEAL_SORT_TIME[meal?.meal_type])
+  const meals = (Array.isArray(data?.todayMeals) ? data.todayMeals : [])
+    .filter((meal) => MEAL_SORT_TIME[meal?.meal_type]);
+  const slots = meals.map((meal) => clockMinute(MEAL_SORT_TIME[meal.meal_type]));
+  return meals
     .map((meal) => {
       const time = MEAL_SORT_TIME[meal.meal_type];
       const start = clockMinute(time);
-      const nextIdx = MEAL_DAY_ORDER.indexOf(meal.meal_type) + 1;
-      const nextTime = nextIdx < MEAL_DAY_ORDER.length ? MEAL_SORT_TIME[MEAL_DAY_ORDER[nextIdx]] : null;
-      const sheetRowEnd = nextTime != null ? clockMinute(nextTime) : 24 * 60;
+      const sheetRowEnd = Math.min(24 * 60, ...slots.filter((slot) => slot > start));
       const label = labels[meal.meal_type] ?? t('dashboard.todayDinner');
       return {
         id: meal.id,
@@ -5366,15 +5372,15 @@ const TIMELINE_PROGRAM_KINDS = new Set(['event', 'meal']);
  * Mahlzeit: der Filmabend um 20:00 stand im Bild und nie als Text, das
  * vergangene Mittagessen und die beendete Fruehschicht standen als Text, aber
  * nicht mehr im Bild. Jetzt kommen die Zeilen aus demselben Modell wie die
- * Balken: was dort nicht vorbei ist (`state !== 'past'`, eine Mahlzeit ist es,
- * sobald ihre Zeit da war), ueber die Zeile, die auch der Block aufklappt.
+ * Balken: was dort nicht vorbei ist (`state !== 'past'`, eine Mahlzeit erst an
+ * ihrem `sheetRowEnd`, #2393), ueber die Zeile, die auch der Block aufklappt.
  * Ein Termin fuer zwei steht in zwei Spuren und EINMAL als Zeile. Das
  * Ganztaegige bleibt Zeile - es hat keinen Balken, aber dieselbe Quelle.
  */
 function timelineSheetRows(data, timeline, now = new Date()) {
   const rows = [];
   const seen = new Set();
-  const nowMinute = now.getHours() * 60 + now.getMinutes();
+  const nowMinute = householdMinuteOf(now);
   const allDay = timeline?.allDay ?? todayEventsForTimeline(data, now).allDay;
   for (const item of allDay) {
     if (seen.has(item.key)) continue;
@@ -11400,9 +11406,9 @@ function todayFingerprint(data, cfg, now = new Date()) {
     .flatMap((key) => (Array.isArray(data[key]) ? data[key] : []))
     .filter((event) => eventHasEnded(event, nowStamp))
     .map((event) => `${event.id}@${event.start_datetime}`);
-  // Und die Mahlzeit, deren Zeit da war, und die beendete eigene Schicht: unter
-  // der breiten Buehne verlassen sie die Zeilen (timelineSheetRows), ohne dass
-  // ein Termin endet.
+  // Und die Mahlzeit, deren Zeit da war - sie loest die vorige ab (#2393) -, und
+  // die beendete eigene Schicht: unter der breiten Buehne verlassen sie die
+  // Zeilen (timelineSheetRows), ohne dass ein Termin endet.
   const timeline = buildTodayTimeline(data, { now, includeMeals: true, includeShifts: true });
   const items = (timeline?.lanes ?? []).flatMap((lane) => lane.items);
   const passed = items
