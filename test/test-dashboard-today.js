@@ -1292,7 +1292,7 @@ for (const stage of ['compact', 'phone']) {
     assert.match(text, /today-cockpit-card__value">Filmabend</, 'der Filmabend aus der Familienliste ist als Text erreichbar');
     assert.match(text, /today-cockpit-card__value">Apfelschnitze</, 'der Snack um 15:30 steht als Zeile');
     assert.match(text, /today-cockpit-card__value">Ofengemuese</, 'das Abendessen um 18:30 steht als Zeile');
-    assert.ok(!text.includes('Linsensuppe'), 'das Mittagessen um 12:30 ist vorbei');
+    assert.match(text, /today-cockpit-card__value">Linsensuppe</, 'das Mittagessen um 12:30 steht noch - erst der Snack um 15:30 loest es ab');
     assert.ok(!text.includes('data-object-kind="shift"'), 'die Fruehschicht endete um 14:00');
     assert.ok(!text.includes('Zahnarzt'), 'der beendete Termin bleibt Bild');
     assert.match(text, /today-cockpit-card__value">Ausflug</, 'das Ganztaegige bleibt Zeile');
