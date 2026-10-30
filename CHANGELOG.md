@@ -41,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **The status bar no longer blurs elements at the top of the screen on iOS 26 (Dynamic Island).**
+  On an iPhone 17 Pro Max (and any device with a Dynamic Island running iOS 26), the gaps on either
+  side of the Dynamic Island pill showed the app content through the transparent status bar, and iOS
+  26's Liquid Glass material rendered those gaps as frosted, blurring whatever was visible there.
+  Switching the status bar style from `black-translucent` to `default` gives the status bar a solid
+  background whose colour is already supplied by the existing `theme-color` meta tags — the same warm
+  dark or warm light colour as the app background — so the gaps show a clean, unblurred surface. The
+  edge-to-edge layout and the `env(safe-area-inset-top)` inset are unchanged. (#2390)
 - **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
   not written back; the homepage and the install page promised a two-way sync for them.
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
