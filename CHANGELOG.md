@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A document can name who it is about.** The document dialog has a new "About" field for one
+  household member, and the Documents page can filter by person. The person also gets the expiry
+  reminder, along with whoever filed the document, and once if that is the same person. This never
+  changes who can see the document: if the person cannot open it, the dialog says so and they get
+  no reminder until they can.
+- **Expiring documents appear in Key dates.** A document about to expire now shows up on the
+  overview tile next to your events and tasks, with the person's name, and opens directly in the
+  viewer. Archived documents stay out, and the tile follows the Documents module switch and your
+  rights.
 - **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
   a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
   layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
@@ -15,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrangement and goes back to following the desktop. (#2109)
 
 ### Changed
+- **A document's lead time now also decides when it shows as expiring.** The "expiring" chip and
+  the Deadlines filter used a fixed 30 days, whatever lead time the reminder had. They now follow
+  the document's own lead time, and stay at 30 days if it has none, so a document with a 90-day
+  reminder is marked from the day the reminder arrives, and one with 7 days is no longer marked
+  three weeks early.
 - **The website tells Yuvomi as one story instead of a feature list.** The homepage at yuvomi.cloud
   now starts with the problem it takes off your hands - many apps, and one person who keeps it all
   in their head - then shows how the parts work together, a day at home from morning to evening,
@@ -41,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **Vietnamese counts show the real number.** In browsers with current language data, Vietnamese
+  picks the singular wording for 0 as well as for 1, so eleven messages such as the active filter
+  count said "1" when nothing was selected. They now show the actual count.
 - **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
   not written back; the homepage and the install page promised a two-way sync for them.
 - **Running the web installer again keeps your settings.** On an existing installation the advanced

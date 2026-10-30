@@ -587,6 +587,60 @@ const ORDNER = [
   { id: 6, name: 'Keller', parent_id: 3 },
 ];
 
+test('#1705: Kategorie- und Ordnerzaehler meinen die gewaehlte Person', async () => {
+  const docs = [
+    dokument({ id: 21, category: 'insurance', folder_id: 3, subject_user_id: ANDERE }),
+    dokument({ id: 22, category: 'travel', folder_id: null, subject_user_id: ICH }),
+  ];
+  await mitDokumenten({ allDocuments: docs, personId: ANDERE }, () => {
+    assert.equal(documents.categoryCounts().get('travel') ?? 0, 0, 'ein Zaehler fuehrt nicht ins Leere');
+    assert.equal(documents.categoryCounts().get('insurance'), 1);
+    assert.equal(documents.presentCategories().has('travel'), false, 'kein Chip ohne Treffer');
+    assert.equal(documents.folderCounts().get('__none'), 0);
+    assert.equal(documents.folderCounts().get('3'), 1);
+  });
+  await mitDokumenten({ allDocuments: docs, personId: '' }, () => {
+    assert.equal(documents.categoryCounts().get(''), 2, 'ohne Person zaehlt alles');
+    assert.equal(documents.folderCounts().get('__none'), 1);
+  });
+});
+
+/** Die Seite mit gesetztem Archiv zeichnen: der Modulzustand ueberlebt den Seitenwechsel. */
+async function archivSeite(search) {
+  const zuvor = globalThis.location;
+  globalThis.location = { search };
+  try {
+    return await mitDokumenten({ status: 'archived', selectMode: true, selected: new Set([7]), allDocuments: [], documents: [] }, async () => {
+      const ende = new AbortController();
+      try {
+        const liste = await aufrufe(() => renderDocuments(seite(), { user: { id: ICH }, signal: ende.signal }));
+        return {
+          liste, status: documents.state.status, auswahl: documents.state.selectMode, gewaehlt: documents.state.selected.size,
+        };
+      } finally {
+        ende.abort();
+      }
+    });
+  } finally {
+    globalThis.location = zuvor;
+  }
+}
+
+test('#1705: ?open= laedt den aktiven Bestand, auch wenn zuletzt das Archiv gewaehlt war', async () => {
+  const { liste, status, auswahl, gewaehlt } = await archivSeite('?open=9999');
+  assert.ok(liste.includes('GET /documents?status=active'), `geladen: ${liste.join(', ')}`);
+  assert.ok(!liste.includes('GET /documents?status=archived'));
+  assert.equal(status, 'active', 'das Segment zeigt, was geladen ist');
+  assert.equal(auswahl, false, 'eine Auswahl aus dem Archiv gilt im aktiven Bestand nicht');
+  assert.equal(gewaehlt, 0);
+});
+
+test('#1705: ohne ?open= bleibt das gewaehlte Archiv stehen', async () => {
+  const { liste, status } = await archivSeite('');
+  assert.ok(liste.includes('GET /documents?status=archived'), `geladen: ${liste.join(', ')}`);
+  assert.equal(status, 'archived');
+});
+
 /**
  * Die Dokumentenseite wirklich zeichnen: `render()` mit seinem Kontext, die
  * Daten aus den Antworten des Servers. `currentUserId` steht vorher auf null -
