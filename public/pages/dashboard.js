@@ -7375,7 +7375,8 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize
                 aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
           <i data-lucide="grip-vertical" aria-hidden="true"></i>
         </button>
-      </div>    </div>
+      </div>
+  </div>
   `;
 }
 
@@ -7540,7 +7541,9 @@ function mergePhoneDisplayCfg(desktopCfg, phoneCfg) {
  * DENSELBEN drei Teilen, damit Geste und Aufbau nie zwei Fassungen einer Kachel
  * zeichnen: die Renderer je Widget, der Koerper einer Kachel, ihr Rahmen. */
 function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
-  return {    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),    calendar: (size, options) => renderCalendarWidget(data, size, options),
+  return {
+    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
+    calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
@@ -7602,7 +7605,8 @@ function renderWidgetBody(w, renderers) {
 function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1, phoneCustomize = false } = {}) {
   return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
                    data-widget-id="${esc(w.id)}"${tileSpanWrapperAttrs(html)}>
-        ${editing ? renderWidgetCustomizeControls(w, index, total, { phoneCustomize }) : ''}        ${html}
+        ${editing ? renderWidgetCustomizeControls(w, index, total, { phoneCustomize }) : ''}
+        ${html}
       </div>`;
 }
 
@@ -10172,7 +10176,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         rememberLayoutHint(
           mergePhoneDisplayCfg(widgetConfig, phoneWidgetConfig),
           dashboardQuery(widgetConfig),
-          calendarListRowsOf,
+          drawnSpanOf,
         );
       }
       rebuildDashboard(widgetConfig);
@@ -10273,7 +10277,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       desktopWidgetConfig = null;
     }
     // Skelett-Vorhersage zurueck auf Desktop (#2109).
-    if (onPhoneStage()) rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    if (onPhoneStage()) rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     focusAfterRebuild = ['#dashboard-customize-btn'];
     rebuildDashboard(widgetConfig);
@@ -10591,7 +10595,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const early = focus.length ? focusTarget(container, focus) : null;
     if (early && early !== document.activeElement) early.focus({ preventScroll: true });
     const active = document.activeElement;
-    const cfg = widgetConfig;
+    // Im Telefon-Anpassen-Modus: dieselbe merged cfg wie der erste Aufbau (#1115
+    // Blocker: tileDrawKey sah sonst bei jeder Geste eine Aenderung weil
+    // patchCustomize die bare phone-cfg las, der Aufbau aber die merged cfg).
+    const phoneCustomize = desktopWidgetConfig !== null;
+    const cfg = phoneCustomize ? mergePhoneDisplayCfg(desktopWidgetConfig, widgetConfig) : widgetConfig;
     // Kein Echo: das Heute-Blatt spricht fuer die Domaenen ohne Kachel - und
     // nur eine geaenderte Sichtbarkeit (oder Option) aendert, was es sagt.
     // Gezeichnet VOR dem ersten Schreiben: es liest die Breite seiner Buehne
@@ -10620,7 +10628,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       if (!body) continue;
       listed.push(w);
       if (!old) {
-        const [el] = elementsFromHtml(renderWidgetWrapper(w, body, { editing: true }));
+        const [el] = elementsFromHtml(renderWidgetWrapper(w, body, { editing: true, phoneCustomize }));
         nodes.push(el);
         fresh.push(el);
       } else {

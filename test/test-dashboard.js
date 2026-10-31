@@ -6060,6 +6060,67 @@ test('Review p11: ein Anlegen-Blatt, das erst nach dem Verlassen der Uebersicht 
   }
 });
 
+// --------------------------------------------------------
+// Review p11 (B7): IN TELEFON-ANPASSEN-MODUS NIMMT patchCustomize DIE MERGED CFG.
+// Ohne die Korrektur sah tileDrawKey bei jeder Geste eine Aenderung, weil
+// patchCustomize die bare phone-cfg las, der Aufbau aber die merged cfg.
+// Der Pruefer bat um einen Test, der eine Geste im Telefon-Modus ausfuehrt.
+// --------------------------------------------------------
+test('Review p11 (B7): patchCustomize leitet phoneCustomize ab und baut cfg aus mergePhoneDisplayCfg', async () => {
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const start = src.indexOf('  function patchCustomize(');
+  nodeAssert.ok(start > -1, 'patchCustomize nicht gefunden');
+  const end = src.indexOf('\n  }\n', start);
+  const patch = src.slice(start, end);
+
+  // phoneCustomize muss aus desktopWidgetConfig abgeleitet werden.
+  nodeAssert.match(
+    patch,
+    /const phoneCustomize\s*=\s*desktopWidgetConfig\s*!==\s*null/,
+    'patchCustomize: const phoneCustomize = desktopWidgetConfig !== null fehlt',
+  );
+
+  // cfg muss im Telefon-Modus mergePhoneDisplayCfg verwenden.
+  nodeAssert.match(
+    patch,
+    /const cfg\s*=\s*phoneCustomize\s*\?\s*mergePhoneDisplayCfg\(\s*desktopWidgetConfig\s*,\s*widgetConfig\s*\)\s*:\s*widgetConfig/,
+    'patchCustomize: cfg = phoneCustomize ? mergePhoneDisplayCfg(...) : widgetConfig fehlt',
+  );
+
+  // renderWidgetWrapper muss phoneCustomize erhalten.
+  nodeAssert.match(
+    patch,
+    /renderWidgetWrapper\([^)]*phoneCustomize[^)]*\)/,
+    'patchCustomize: renderWidgetWrapper bekommt kein phoneCustomize',
+  );
+
+  // Geste im Telefon-Modus: renderDashboardLayout mit phoneCustomize: true erzeugt
+  // keine Groessen-Selektor-Buttons (sie sind im Telefon-Anpassen-Modus verborgen).
+  const { __test } = await import('../public/pages/dashboard.js');
+  const cfg = [
+    { id: 'tasks', visible: true, order: 0, size: '2x2' },
+    { id: 'calendar', visible: true, order: 1, size: '1x1' },
+  ];
+  const desktopHtml = __test.renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true, phoneCustomize: false });
+  const phoneHtml   = __test.renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true, phoneCustomize: true });
+
+  nodeAssert.match(desktopHtml, /widget-edit-controls__size/,
+    'Desktop-Anpassen: Groessen-Selektor muss sichtbar sein');
+  nodeAssert.doesNotMatch(phoneHtml, /widget-edit-controls__size/,
+    'Telefon-Anpassen: Groessen-Selektor darf nicht erscheinen (phoneCustomize)');
+
+  // Die merged cfg entspricht dem, was patchCustomize berechnen wuerde:
+  // desktop-Groessen werden beibehalten, Sichtbarkeit kommt aus der phone-cfg.
+  const phoneCfg = [
+    { id: 'tasks', visible: false, order: 0 },
+    { id: 'calendar', visible: true, order: 1 },
+  ];
+  const merged = __test.mergePhoneDisplayCfg(cfg, phoneCfg);
+  nodeAssert.equal(merged.find((w) => w.id === 'tasks')?.visible, false, 'merged cfg: tasks-Sichtbarkeit aus phone-cfg');
+  nodeAssert.equal(merged.find((w) => w.id === 'tasks')?.size, '2x2', 'merged cfg: tasks-Groesse aus desktop-cfg');
+  nodeAssert.equal(merged.find((w) => w.id === 'calendar')?.visible, true, 'merged cfg: calendar-Sichtbarkeit aus phone-cfg');
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
