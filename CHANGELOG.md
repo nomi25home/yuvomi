@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **Leaving the title blank in a budget entry dialog no longer blocks saving.** The title field is
+  now optional. When you leave it empty, the dialog fills in the label of the subcategory (or
+  category if there is no subcategory) you selected, so the entry is never saved untitled. Editing
+  an entry and clearing the title leaves the stored title in place. API callers that omit the title
+  get the same localized label from the household language. (#2403)
 - **Tasks remember how you group them.** Grouping the list by due date instead of category now
   stays after a reload, on that device, like the choice between list, board and history.
 - **The Podman Quadlet health check passes.** The `HealthCmd` in `tools/quadlet/oikos.container`
