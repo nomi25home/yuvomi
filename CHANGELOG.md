@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A recurring budget series can now have an end date.** The recurring-entry dialog
+  has a new "End on (optional)" date field. Once the end date passes, the series stops
+  generating new occurrences; occurrences already booked before that date are kept.
+  The end date is also accepted by `PUT /api/v1/budget/{id}/series` and
+  `POST /api/v1/budget`. (#1742)
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
