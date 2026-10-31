@@ -5578,7 +5578,7 @@ button.today-cockpit__more--link {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 2px solid var(--color-fill-base);
+  border: 2px solid var(--color-surface);
 }
 .family-widget-avatar[data-avail="available"]::after    { background: #22c55e; }
 .family-widget-avatar[data-avail="busy"]::after         { background: #f59e0b; }
