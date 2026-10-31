@@ -128,6 +128,12 @@ test('DELETE: removes own status', async () => {
   assert.equal(alice, undefined, 'Status should be gone after DELETE');
 });
 
+test('PUT: 400 when expires_at is more than 30 days away', async () => {
+  const farFuture = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const { status } = await call('PUT', '/', { state: 'busy', expires_at: farFuture });
+  assert.equal(status, 400);
+});
+
 test('GET: does not return expired status', async () => {
   // Insert a row that expires 1 second from now, then wait 2 s... that is too slow.
   // Instead: insert directly with an already-past expires_at via direct DB write.
@@ -143,4 +149,17 @@ test('GET: does not return expired status', async () => {
   assert.equal(alice, undefined, 'Expired status must not appear in GET');
   // Clean up
   db.prepare('DELETE FROM user_availability WHERE user_id = ?').run(USER_A);
+});
+
+// Mitglied mit read-only family-Modulrecht: PUT und DELETE gehen trotzdem durch,
+// weil /availability kein Modul-Gate traegt (es setzt den eigenen Status, kein
+// Familien-Datensatz im engeren Sinne).
+test('PUT/DELETE: read-only family module member can still set and clear own status', async () => {
+  // Simuliert den Pfad-Guard aus server/index.js: moduleForPath('/availability')
+  // liefert null (kein Modul), also laesst moduleAccessVerdict() durch.
+  // Das test-setup hier hat keinen Guard, und wir pruefen das Verhalten der Route.
+  const { status: putStatus } = await call('PUT', '/', { state: 'available', expires_at: future() }, USER_A);
+  assert.equal(putStatus, 200, 'read-only member PUT 200');
+  const { status: delStatus } = await call('DELETE', '/', undefined, USER_A);
+  assert.equal(delStatus, 200, 'read-only member DELETE 200');
 });

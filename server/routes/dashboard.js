@@ -1460,6 +1460,10 @@ router.get('/', (req, res) => {
   // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand
   // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
   // erreicht die Wand erst ueber die Allowlist.
+  // Verfuegbarkeitsnotizen bleiben privat: die Wand zeigt nur den State (#1591).
+  if (householdAudience && Array.isArray(result.familyStatuses)) {
+    result.familyStatuses = result.familyStatuses.map(({ note: _note, ...r }) => r);
+  }
   res.json(householdAudience ? householdAudienceAnswer(result, emptyAnswer({ month: currentMonth })) : result);
   } catch (err) {
     log.error('Critical error:', err.message);

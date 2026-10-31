@@ -451,10 +451,18 @@
         "todayAlsoTitle": "Også i dag",
         "todayNothingPlanned": "Ingenting planlagt ennå",
         "todayNothingPlannedSub": "Dagens avtaler, oppgaver og måltider vises her.",
-        "availState_available": "Available",
-        "availState_busy": "Busy",
-        "availState_do_not_disturb": "Do not disturb",
-        "availState_away": "Away"
+        "availState_available": "Tilgjengelig",
+        "availState_busy": "Opptatt",
+        "availState_do_not_disturb": "Ikke forstyrr",
+        "availState_away": "Borte",
+        "availTitle": "Angi status",
+        "availNoteLabel": "Merknad (valgfri)",
+        "availClear": "Fjern status",
+        "avail1h": "1 time",
+        "avail4h": "4 timer",
+        "availEndOfDay": "Til midnatt",
+        "availTomorrow": "Til i morgen 8:00",
+        "avail1w": "1 uke"
     },
     "tasks": {
         "resetOrder": "Sorter automatisk",

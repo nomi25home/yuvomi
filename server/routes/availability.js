@@ -69,16 +69,22 @@ router.put('/', (req, res) => {
     if (!expires_at || typeof expires_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expires_at)) {
       return res.status(400).json({ error: 'expires_at must be an ISO-8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ).', code: 400 });
     }
-    const nowCheck = db.get().prepare(
-      `SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now') < ? AS in_future`
-    ).get(expires_at);
-    if (!nowCheck.in_future) {
+    const parsedExpiry = new Date(expires_at);
+    if (isNaN(parsedExpiry.getTime())) {
+      return res.status(400).json({ error: 'expires_at must be a valid date.', code: 400 });
+    }
+    const nowMs = Date.now();
+    if (parsedExpiry.getTime() <= nowMs) {
       return res.status(400).json({ error: 'expires_at must be in the future.', code: 400 });
+    }
+    const MAX_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+    if (parsedExpiry.getTime() - nowMs > MAX_EXPIRY_MS) {
+      return res.status(400).json({ error: 'expires_at must be within 30 days from now.', code: 400 });
     }
 
     db.get().prepare(`
-      INSERT INTO user_availability (user_id, state, note, expires_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO user_availability (user_id, state, note, expires_at, created_at)
+      VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
       ON CONFLICT(user_id) DO UPDATE SET
         state      = excluded.state,
         note       = excluded.note,

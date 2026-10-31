@@ -11799,6 +11799,15 @@ const MIGRATIONS = [
       database.exec('CREATE INDEX IF NOT EXISTS idx_user_availability_user ON user_availability(user_id)');
     },
   },
+  {
+    version: 275,
+    description: 'user_availability: add created_at column, drop redundant user_id index (#1591)',
+    up(database) {
+      database.exec(`ALTER TABLE user_availability ADD COLUMN created_at TEXT`);
+      database.exec(`UPDATE user_availability SET created_at = set_at WHERE created_at IS NULL`);
+      database.exec(`DROP INDEX IF EXISTS idx_user_availability_user`);
+    },
+  },
 ];
 
 /**
