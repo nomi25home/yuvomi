@@ -1029,7 +1029,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Visszaállítás az eredetire",
-            "resetToast": "Változtatások visszaállítva."
+            "resetToast": "Változtatások visszaállítva.",
+            "resetPendingToast": "Visszaállítva. Az eredeti szöveg a következő szinkronnal tér vissza."
         },
         "iconLabel": "Ikon",
         "iconSearchPlaceholder": "Ikon keresése",
@@ -5820,7 +5821,8 @@
         "errorCycleImportNoRows": "A fájlban csak fejlécsor van, menstruáció nincs.",
         "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt.",
         "errorVitalImpossible": "Ez az érték nem lehetséges. Ellenőrizd a bevitelt.",
-        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál."
+        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál.",
+        "errorVitalUnit": "Ez a mértékegység nem illik ehhez a méréshez."
     },
     "waste": {
         "title": "Hulladékgyűjtés",

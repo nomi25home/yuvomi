@@ -1029,7 +1029,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Orijinale sıfırla",
-            "resetToast": "Değişiklikler sıfırlandı."
+            "resetToast": "Değişiklikler sıfırlandı.",
+            "resetPendingToast": "Sıfırlandı. Özgün metin bir sonraki eşitlemede geri gelir."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Simge ara",
@@ -5820,7 +5821,8 @@
         "errorCycleImportNoRows": "Dosyada yalnızca başlık satırı var ve hiç adet dönemi yok.",
         "errorCycleImportTooManyRows": "Bir içe aktarma en fazla {{limit}} adet dönemi içerebilir. Dosyayı böl.",
         "errorVitalImpossible": "Bu değer mümkün değil. Lütfen girdiğini kontrol et.",
-        "errorVitalBpOrder": "Sistolik değer diyastolikten büyük olmalı."
+        "errorVitalBpOrder": "Sistolik değer diyastolikten büyük olmalı.",
+        "errorVitalUnit": "Bu birim bu ölçüme uymuyor."
     },
     "waste": {
         "title": "Atık toplama",

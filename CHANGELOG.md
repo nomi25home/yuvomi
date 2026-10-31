@@ -54,7 +54,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screens. The overview image at the top now starts loading right away on phones too, and the
   footer says "MIT-Lizenz" on the German pages.
 
+### Security
+- **Channel routes only manage household channels.** The admin routes for notification channels now
+  always create a household channel, and a personal channel cannot be pointed at a member through
+  the admin API or changed by it. A member's private reminders stay out of reach of anything an
+  admin sets up, in line with how private entries already work.
+
 ### Fixed
+- **Vitals take the units Yuvomi can convert, and impossible values no longer slip past in them**
+  (#2375). The API took any text as a unit, so 9,000,000 g went past the limits that stop 9,000 kg,
+  and a typo like `kgs` was drawn unconverted next to kilograms. `POST` and `PATCH
+  /api/v1/health/vitals` now accept the units a measurement lists plus those the chart can convert,
+  in any capitalisation (weight also `g`, `lbs` and `stone`, height and head circumference also `m`
+  and `mm`, temperature also `C` and `F`), and check the limits on the converted value: 700,001 g
+  is refused like 700.001 kg. Any other unit is refused with 400 and the reason
+  `health_vital_unit_invalid`, and the message names the ones that work. Weights in stone now also
+  convert in the chart. `unit` stays optional, stored readings stay as they were sent, and older
+  readings in any unit can still be edited.
+- **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
+  `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
+  past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
+  the server did not start (#2380). The entrypoint now drops to `node` with `setpriv` from
+  util-linux, which is already in the base image, and sets `HOME` to node's home as `gosu` did.
+  The `gosu` package is gone from the image. Starting as root without the option, or directly as
+  `node`, works as before.
+- **Reset to original restores a subscribed event at once.** Resetting a changed event from an ICS
+  subscription only cleared the edit mark, so the changed text stayed until the next sync. Each sync
+  now keeps the feed's values, and the reset restores them straight away, without a network call.
+  Subscriptions synced before this update have no stored values yet: their reset clears the mark
+  and says so, and the next sync fills them in (Refs D#2330).
+- **Calendar responses no longer carry internal sync state.** The event data sent to the app
+  included the snapshots Yuvomi keeps to match calendar syncs. The app never reads them, so they
+  are gone from the responses now; nothing you see changes.
+- **Tasks remember how you group them.** Grouping the list by due date instead of category now
+  stays after a reload, on that device, like the choice between list, board and history.
+- **The Podman Quadlet health check passes.** The `HealthCmd` in `tools/quadlet/oikos.container`
+  reached Podman as a shell command with a missing closing quote, so every check failed with
+  `Syntax error: Unterminated quoted string` and the container stayed `unhealthy` although the app
+  was running. The quotes are swapped - single quotes around the `node -e` argument, double quotes
+  inside the JavaScript.
+- **The end of a long recipe list stays reachable on the iPhone.** The last recipes used to sit behind the
+  bottom menu and sprang back out of reach when you let go. The list now ends above the menu, and
+  the bounce at the end of a list no longer brings the search row back. The same holds for the other
+  kitchen lists.
+- **A meal stays on the wall until the next planned meal.** Since 2.83.0 "Today at a glance" dropped
+  a meal the moment its slot began, so breakfast was gone at 08:00 and dinner at 18:30. A meal now
+  stays until the next meal planned for today starts, and the last one until the end of the day.
+  The smaller Today sheet on phones and tablets follows the same rule, and the timeline dot is
+  unchanged.
 - **Vietnamese counts show the real number.** In browsers with current language data, Vietnamese
   picks the singular wording for 0 as well as for 1, so eleven messages such as the active filter
   count said "1" when nothing was selected. They now show the actual count.

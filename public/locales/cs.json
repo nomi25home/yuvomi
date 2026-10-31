@@ -1110,7 +1110,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Obnovit původní",
-            "resetToast": "Změny byly vráceny."
+            "resetToast": "Změny byly vráceny.",
+            "resetPendingToast": "Vráceno. Původní text se vrátí až při příští synchronizaci."
         },
         "iconLabel": "Ikona",
         "iconSearchPlaceholder": "Hledat ikonu",
@@ -5967,7 +5968,8 @@
         "errorCycleImportNoRows": "Soubor obsahuje jen řádek záhlaví a žádné menstruace.",
         "errorCycleImportTooManyRows": "Jeden import smí obsahovat nejvýše {{limit}} menstruací. Rozděl soubor.",
         "errorVitalImpossible": "Tato hodnota není možná. Zkontrolujte prosím zadání.",
-        "errorVitalBpOrder": "Systolická hodnota musí být vyšší než diastolická."
+        "errorVitalBpOrder": "Systolická hodnota musí být vyšší než diastolická.",
+        "errorVitalUnit": "Tato jednotka k tomuto měření nepatří."
     },
     "waste": {
         "title": "Svoz odpadu",

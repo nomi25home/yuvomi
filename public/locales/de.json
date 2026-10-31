@@ -1057,7 +1057,8 @@
         "timeSuffix": "Uhr",
         "ics": {
             "reset": "Auf Original zurücksetzen",
-            "resetToast": "Änderungen zurückgesetzt."
+            "resetToast": "Änderungen zurückgesetzt.",
+            "resetPendingToast": "Zurückgesetzt. Der Originaltext kommt erst mit dem nächsten Abgleich zurück."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Icon suchen",
@@ -5820,7 +5821,8 @@
         "errorCycleImportNoRows": "Die Datei enthält nur eine Kopfzeile und keine Perioden.",
         "errorCycleImportTooManyRows": "Ein Import darf höchstens {{limit}} Perioden enthalten. Teile die Datei auf.",
         "errorVitalImpossible": "Dieser Wert ist nicht möglich. Bitte prüfe die Eingabe.",
-        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische."
+        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische.",
+        "errorVitalUnit": "Diese Einheit passt nicht zu dieser Messung."
     },
     "waste": {
         "title": "Entsorgung",
