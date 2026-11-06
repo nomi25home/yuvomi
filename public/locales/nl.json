@@ -2502,6 +2502,7 @@
         "backupSchedulerLastSuccess": "{{date}} (geslaagd)",
         "backupSchedulerLastFail": "{{date}} (mislukt)",
         "backupSchedulerNever": "Nog geen back-up aangemaakt",
+        "backupSchedulerLastError": "Laatste fout",
         "backupSchedulerTrigger": "Nu back-up aanmaken",
         "backupSchedulerTriggering": "Back-up aanmaken...",
         "backupSchedulerTriggeredToast": "Back-up succesvol aangemaakt.",
@@ -3550,8 +3551,8 @@
         "apiTokenErrorExpiryPast": "De vervaldatum ligt in het verleden. Kies een later tijdstip.",
         "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon.",
         "dmsErrorUrlInvalid": "De server-URL moet beginnen met http:// of https://.",
-        "dmsErrorAccountExists": "Met deze server-URL is al een DMS verbonden."
-    },
+        "dmsErrorAccountExists": "Met deze server-URL is al een DMS verbonden."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
         "usernameLabel": "Gebruikersnaam",

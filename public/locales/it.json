@@ -2429,6 +2429,7 @@
         "backupSchedulerLastFail": "{{date}} (fallito)",
         "backupSchedulerLastSuccess": "{{date}} (riuscito)",
         "backupSchedulerNever": "Nessun backup ancora creato",
+        "backupSchedulerLastError": "Ultimo errore",
         "backupSchedulerSchedule": "Pianificazione",
         "backupSchedulerCronDaily": "Ogni giorno alle {{time}}",
         "backupSchedulerCronWeekly": "Ogni {{weekday}} alle {{time}}",
@@ -3550,8 +3551,8 @@
         "apiTokenErrorExpiryPast": "La data di scadenza è nel passato. Scegli un momento successivo.",
         "apiTokenErrorSubjectDeactivated": "Questo account è disattivato e non può ricevere un token. Scegli un’altra persona.",
         "dmsErrorUrlInvalid": "L’URL del server deve iniziare con http:// o https://.",
-        "dmsErrorAccountExists": "Con questo URL del server è già collegato un DMS."
-    },
+        "dmsErrorAccountExists": "Con questo URL del server è già collegato un DMS."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",
         "usernameLabel": "Nome utente",

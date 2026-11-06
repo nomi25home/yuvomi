@@ -2577,6 +2577,7 @@
         "backupSchedulerLastSuccess": "{{date}} (sikeres)",
         "backupSchedulerLastFail": "{{date}} (sikertelen)",
         "backupSchedulerNever": "Még nem történt biztonsági mentés",
+        "backupSchedulerLastError": "Utolsó hiba",
         "backupSchedulerTrigger": "Biztonsági mentés létrehozása most",
         "backupSchedulerTriggering": "Biztonsági mentés létrehozása...",
         "backupSchedulerTriggeredToast": "Biztonsági mentés sikeresen létrehozva.",
@@ -3550,8 +3551,8 @@
         "apiTokenErrorExpiryPast": "A lejárati dátum a múltban van. Válassz egy későbbi időpontot.",
         "apiTokenErrorSubjectDeactivated": "Ez a fiók inaktív, és nem kaphat tokent. Válassz másik személyt.",
         "dmsErrorUrlInvalid": "A szerver URL-nek http:// vagy https:// előtaggal kell kezdődnie.",
-        "dmsErrorAccountExists": "Ezzel a szerver URL-lel már csatlakozik egy DMS."
-    },
+        "dmsErrorAccountExists": "Ezzel a szerver URL-lel már csatlakozik egy DMS."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
         "usernameLabel": "Felhasználónév",

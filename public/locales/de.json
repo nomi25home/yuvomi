@@ -2583,6 +2583,7 @@
         "backupSchedulerLastSuccess": "{{date}} (erfolgreich)",
         "backupSchedulerLastFail": "{{date}} (fehlgeschlagen)",
         "backupSchedulerNever": "Noch kein Backup erstellt",
+        "backupSchedulerLastError": "Letzter Fehler",
         "backupSchedulerTrigger": "Jetzt Backup erstellen",
         "backupSchedulerTriggering": "Backup wird erstellt...",
         "backupSchedulerTriggeredToast": "Backup erfolgreich erstellt.",
@@ -3568,8 +3569,8 @@
         "apiTokenErrorExpiryPast": "Das Ablaufdatum liegt in der Vergangenheit. Wähle einen späteren Zeitpunkt.",
         "apiTokenErrorSubjectDeactivated": "Dieses Konto ist deaktiviert und kann kein Token bekommen. Wähle eine andere Person.",
         "dmsErrorUrlInvalid": "Die Server-URL muss mit http:// oder https:// beginnen.",
-        "dmsErrorAccountExists": "Mit dieser Server-URL ist schon ein DMS verbunden."
-    },
+        "dmsErrorAccountExists": "Mit dieser Server-URL ist schon ein DMS verbunden."    },
+        "backupSchedulerReasonDirNotWritable": "Der Backup-Ordner ist nicht schreibbar. Prüfe die BACKUP_DIR-Einstellung und die Berechtigungen.",
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
         "usernameLabel": "Benutzername",

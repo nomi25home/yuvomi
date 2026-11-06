@@ -2627,6 +2627,7 @@
         "backupSchedulerLastSuccess": "{{date}} (úspěšně)",
         "backupSchedulerLastFail": "{{date}} (selhalo)",
         "backupSchedulerNever": "Ještě nebyla vytvořena žádná záloha",
+        "backupSchedulerLastError": "Poslední chyba",
         "backupSchedulerTrigger": "Vytvořit zálohu nyní",
         "backupSchedulerTriggering": "Vytváří se záloha...",
         "backupSchedulerTriggeredToast": "Záloha úspěšně vytvořena.",
@@ -3668,8 +3669,8 @@
         "apiTokenErrorExpiryPast": "Datum vypršení je v minulosti. Vyber pozdější čas.",
         "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu.",
         "dmsErrorUrlInvalid": "URL serveru musí začínat http:// nebo https://.",
-        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS."
-    },
+        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
         "usernameLabel": "Uživatelské jméno",

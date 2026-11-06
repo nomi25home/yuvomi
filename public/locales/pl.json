@@ -2738,6 +2738,7 @@
         "backupSchedulerLastSuccess": "{{date}} (pomyślnie)",
         "backupSchedulerLastFail": "{{date}} (nie powiodło się)",
         "backupSchedulerNever": "Jeszcze nie utworzono kopii",
+        "backupSchedulerLastError": "Ostatni błąd",
         "backupSchedulerTrigger": "Utwórz kopię teraz",
         "backupSchedulerTriggering": "Tworzenie kopii...",
         "backupSchedulerTriggeredToast": "Kopia pomyślnie utworzona.",
@@ -3794,8 +3795,8 @@
         "apiTokenErrorExpiryPast": "Data wygaśnięcia jest w przeszłości. Wybierz późniejszy termin.",
         "apiTokenErrorSubjectDeactivated": "To konto jest dezaktywowane i nie może otrzymać tokenu. Wybierz inną osobę.",
         "dmsErrorUrlInvalid": "Adres URL serwera musi zaczynać się od http:// lub https://.",
-        "dmsErrorAccountExists": "Z tym adresem URL serwera jest już połączony DMS."
-    },
+        "dmsErrorAccountExists": "Z tym adresem URL serwera jest już połączony DMS."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
         "usernameLabel": "Nazwa użytkownika",

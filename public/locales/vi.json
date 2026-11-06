@@ -2502,6 +2502,7 @@
         "backupSchedulerLastSuccess": "{{date}} (thành công)",
         "backupSchedulerLastFail": "{{date}} (thất bại)",
         "backupSchedulerNever": "Chưa tạo bản sao lưu nào",
+        "backupSchedulerLastError": "Lỗi gần nhất",
         "backupSchedulerTrigger": "Tạo bản sao lưu ngay",
         "backupSchedulerTriggering": "Đang tạo sao lưu...",
         "backupSchedulerTriggeredToast": "Sao lưu được tạo thành công.",
@@ -3550,8 +3551,8 @@
         "apiTokenErrorExpiryPast": "Ngày hết hạn đã qua. Hãy chọn thời điểm muộn hơn.",
         "apiTokenErrorSubjectDeactivated": "Tài khoản này đã bị vô hiệu hóa và không thể nhận token. Hãy chọn người khác.",
         "dmsErrorUrlInvalid": "URL máy chủ phải bắt đầu bằng http:// hoặc https://.",
-        "dmsErrorAccountExists": "Đã có một DMS được kết nối với URL máy chủ này."
-    },
+        "dmsErrorAccountExists": "Đã có một DMS được kết nối với URL máy chủ này."    },
+        "backupSchedulerReasonDirNotWritable": "Thư mục sao lưu không thể ghi. Kiểm tra cài đặt BACKUP_DIR và quyền truy cập.",
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",
         "usernameLabel": "Tên người dùng",

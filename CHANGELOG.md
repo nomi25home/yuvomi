@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **A failed scheduled backup now says why.** The backup card showed the time of the last run and
+  "(failed)", but never the reason, so a full disk and an unwritable `BACKUP_DIR` looked the same -
+  and both need something different done about them. The card now adds a "Last error" row with the
+  message of the last failed run, in red, and the row disappears by itself as soon as a run
+  succeeds again. The scheduler already tracked it and `GET /api/v1/backup/status` already returned
+  it as `scheduler.lastError` (`{ timestamp, message }`, `null` after a success); only the card
+  never read it, which is now covered by a test. (#2525)
 - **CardDAV accepts long app passwords and tokens** (#2575). Saving a CardDAV account refused
   any password over 200 characters, and the password field cut longer input off without a word, so
   app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
@@ -149,19 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep it busy by requesting one after another. Further downloads in the same hour are refused;
   other administrators are not affected, and members still get no download at all.
 
-### Changed
-- **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
-  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but four
-  deploy descriptors still demanded one: the Portainer stack stopped the deploy outright
-  (`${SESSION_SECRET:?...}`), the Portainer app template and the Unraid template labelled the
-  field "required", and the TrueNAS form refused to install without it. All four now offer both
-  secrets as optional fields with an empty default, and say that Yuvomi generates them and keeps
-  them in `.secrets/` next to the database; setting your own still wins. A Portainer stack, an
-  Unraid container and a TrueNAS app can therefore be installed without running `openssl` first,
-  which is what the 2.85.0 note already promised. Umbrel keeps `${APP_SEED}` for both: it asks
-  nobody for anything, and an existing database is encrypted with that value
-  (`deploy/umbrel/README.md` records the decision). The TrueNAS change needs a pull request
-  upstream before it reaches the catalog (`deploy/truenas/MAINTAINING.md`). (#2507)
 
 ## [2.85.0] - 2026-11-04
 

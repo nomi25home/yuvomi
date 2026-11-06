@@ -2546,6 +2546,7 @@
         "backupSchedulerLastSuccess": "{{date}} (berhasil)",
         "backupSchedulerLastFail": "{{date}} (gagal)",
         "backupSchedulerNever": "Belum ada cadangan dibuat",
+        "backupSchedulerLastError": "Kesalahan terakhir",
         "backupSchedulerTrigger": "Buat cadangan sekarang",
         "backupSchedulerTriggering": "Membuat cadangan...",
         "backupSchedulerTriggeredToast": "Cadangan berhasil dibuat.",
@@ -3568,8 +3569,8 @@
         "apiTokenErrorExpiryPast": "Tanggal kedaluwarsa sudah lewat. Pilih waktu yang lebih lambat.",
         "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain.",
         "dmsErrorUrlInvalid": "URL Server harus diawali http:// atau https://.",
-        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini."
-    },
+        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
         "usernameLabel": "Nama pengguna",

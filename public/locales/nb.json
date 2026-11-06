@@ -2539,6 +2539,7 @@
         "backupSchedulerLastSuccess": "{{date}} (vellykket)",
         "backupSchedulerLastFail": "{{date}} (feilet)",
         "backupSchedulerNever": "Ingen sikkerhetskopi opprettet ennå",
+        "backupSchedulerLastError": "Siste feil",
         "backupSchedulerTrigger": "Opprett sikkerhetskopi nå",
         "backupSchedulerTriggering": "Oppretter sikkerhetskopi...",
         "backupSchedulerTriggeredToast": "Sikkerhetskopi opprettet vellykket.",
@@ -3550,8 +3551,8 @@
         "apiTokenErrorExpiryPast": "Utløpsdatoen er passert. Velg et senere tidspunkt.",
         "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person.",
         "dmsErrorUrlInvalid": "Server-URL-en må begynne med http:// eller https://.",
-        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en."
-    },
+        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en."    },
+        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
         "usernameLabel": "Brukernavn",
