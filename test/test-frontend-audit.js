@@ -22463,7 +22463,16 @@ const ERROR_MESSAGE_OWNERS = new Set([
 // auf 0, und eine neue Stelle ist rot. Eine Fehlerzeile, an der die Pruefung
 // des Servers die Ursache nennt, braucht dort einen `reason`; ein blindes
 // errorSentence nimmt dem Nutzer die Ursache.
-const ERROR_MESSAGE_OPEN = new Map([]);
+const ERROR_MESSAGE_OPEN = new Map([
+  ['components/category-manager.js', 1],
+  ['settings/pages/admin-backup.js', 2],
+  ['settings/pages/documents-dms.js', 2],
+  ['settings/pages/documents-storage.js', 1],
+  ['settings/pages/modules-install.js', 1],
+  ['settings/pages/personal-device.js', 1],
+  ['settings/pages/personal-feeds.js', 1],
+  ['utils/folder-upload.js', 2],
+]);
 
 // Datei -> Stellen, an denen der Admin den Text des Servers im Rahmen eines
 // uebersetzten Satzes sieht, und warum. Alle sprechen mit einem FREMDEN Dienst,
