@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "有効期限が過去になっています。もっと後の日時を選んでください。",
         "apiTokenErrorSubjectDeactivated": "このアカウントは無効化されているため、トークンを発行できません。別の人を選んでください。",
         "dmsErrorUrlInvalid": "サーバーURLは http:// または https:// で始める必要があります。",
-        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。"    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。",
+        "backupSchedulerReasonDirNotWritable": "バックアップフォルダに書き込めません。BACKUP_DIR の設定と権限を確認してください。"
+    },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",
         "usernameLabel": "ユーザー名",

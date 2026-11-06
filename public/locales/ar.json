@@ -3891,8 +3891,9 @@
         "apiTokenErrorExpiryPast": "تاريخ الانتهاء في الماضي. اختر وقتًا لاحقًا.",
         "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر.",
         "dmsErrorUrlInvalid": "يجب أن يبدأ رابط الخادم بـ http:// أو https://.",
-        "dmsErrorAccountExists": "يوجد بالفعل نظام DMS متصل بعنوان URL هذا للخادم."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "يوجد بالفعل نظام DMS متصل بعنوان URL هذا للخادم.",
+        "backupSchedulerReasonDirNotWritable": "مجلد النسخ الاحتياطي غير قابل للكتابة. تحقق من إعداد BACKUP_DIR والأذونات."
+    },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
         "usernameLabel": "اسم المستخدم",

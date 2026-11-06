@@ -3569,8 +3569,9 @@
         "apiTokenErrorExpiryPast": "Tanggal kedaluwarsa sudah lewat. Pilih waktu yang lebih lambat.",
         "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain.",
         "dmsErrorUrlInvalid": "URL Server harus diawali http:// atau https://.",
-        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini.",
+        "backupSchedulerReasonDirNotWritable": "Folder cadangan tidak bisa ditulis. Periksa pengaturan BACKUP_DIR dan izinnya."
+    },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
         "usernameLabel": "Nama pengguna",

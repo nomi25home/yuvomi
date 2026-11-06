@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "Η ημερομηνία λήξης είναι στο παρελθόν. Επίλεξε μια μεταγενέστερη ώρα.",
         "apiTokenErrorSubjectDeactivated": "Αυτός ο λογαριασμός είναι απενεργοποιημένος και δεν μπορεί να πάρει token. Επίλεξε άλλο άτομο.",
         "dmsErrorUrlInvalid": "Η URL διακομιστή πρέπει να ξεκινά με http:// ή https://.",
-        "dmsErrorAccountExists": "Ένα DMS είναι ήδη συνδεδεμένο με αυτή την URL διακομιστή."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "Ένα DMS είναι ήδη συνδεδεμένο με αυτή την URL διακομιστή.",
+        "backupSchedulerReasonDirNotWritable": "Ο φάκελος αντιγράφων ασφαλείας δεν είναι εγγράψιμος. Ελέγξτε τη ρύθμιση BACKUP_DIR και τα δικαιώματα."
+    },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",
         "usernameLabel": "Όνομα χρήστη",

@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "Son kullanma tarihi geçmişte. Daha sonraki bir zaman seç.",
         "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç.",
         "dmsErrorUrlInvalid": "Sunucu URL'si http:// veya https:// ile başlamalıdır.",
-        "dmsErrorAccountExists": "Bu sunucu URL'siyle zaten bir DMS bağlı."    },
-        "backupSchedulerReasonDirNotWritable": "Yedekleme klasörü yazılabilir değil. BACKUP_DIR ayarını ve izinleri kontrol edin.",
+        "dmsErrorAccountExists": "Bu sunucu URL'siyle zaten bir DMS bağlı.",
+        "backupSchedulerReasonDirNotWritable": "Yedekleme klasörü yazılabilir değil. BACKUP_DIR ayarını ve izinleri kontrol edin."
+    },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
         "usernameLabel": "Kullanıcı adı",

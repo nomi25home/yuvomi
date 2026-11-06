@@ -3569,8 +3569,9 @@
         "apiTokenErrorExpiryPast": "만료 날짜가 과거입니다. 더 나중 시각을 선택하세요.",
         "apiTokenErrorSubjectDeactivated": "이 계정은 비활성화되어 토큰을 받을 수 없습니다. 다른 사람을 선택하세요.",
         "dmsErrorUrlInvalid": "서버 URL은 http:// 또는 https://로 시작해야 합니다.",
-        "dmsErrorAccountExists": "이 서버 URL로 이미 DMS가 연결되어 있습니다."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "이 서버 URL로 이미 DMS가 연결되어 있습니다.",
+        "backupSchedulerReasonDirNotWritable": "백업 폴더에 쓸 수 없습니다. BACKUP_DIR 설정과 권한을 확인하세요."
+    },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
         "usernameLabel": "사용자 이름",

@@ -3777,8 +3777,9 @@
         "apiTokenErrorExpiryPast": "Срок действия уже прошёл. Выбери более позднее время.",
         "apiTokenErrorSubjectDeactivated": "Этот аккаунт деактивирован и не может получить токен. Выбери другого человека.",
         "dmsErrorUrlInvalid": "URL сервера должен начинаться с http:// или https://.",
-        "dmsErrorAccountExists": "С этим URL сервера уже подключена DMS."    },
-        "backupSchedulerReasonDirNotWritable": "Папка для резервных копий недоступна для записи. Проверьте настройку BACKUP_DIR и права доступа.",
+        "dmsErrorAccountExists": "С этим URL сервера уже подключена DMS.",
+        "backupSchedulerReasonDirNotWritable": "Папка для резервных копий недоступна для записи. Проверьте настройку BACKUP_DIR и права доступа."
+    },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",
         "usernameLabel": "Имя пользователя",

@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "到期日期已经过去。请选择更晚的时间。",
         "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。",
         "dmsErrorUrlInvalid": "服务器网址必须以 http:// 或 https:// 开头。",
-        "dmsErrorAccountExists": "已有 DMS 以此服务器网址连接。"    },
-        "backupSchedulerReasonDirNotWritable": "备份文件夹无法写入。请检查 BACKUP_DIR 设置和权限。",
+        "dmsErrorAccountExists": "已有 DMS 以此服务器网址连接。",
+        "backupSchedulerReasonDirNotWritable": "备份文件夹无法写入。请检查 BACKUP_DIR 设置和权限。"
+    },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
         "usernameLabel": "用户名",

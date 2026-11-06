@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "到期日已經過去。請選擇較晚的時間。",
         "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。",
         "dmsErrorUrlInvalid": "伺服器網址必須以 http:// 或 https:// 開頭。",
-        "dmsErrorAccountExists": "已有 DMS 以此伺服器網址連線。"    },
-        "backupSchedulerReasonDirNotWritable": "備份資料夾無法寫入。請檢查 BACKUP_DIR 設定和權限。",
+        "dmsErrorAccountExists": "已有 DMS 以此伺服器網址連線。",
+        "backupSchedulerReasonDirNotWritable": "備份資料夾無法寫入。請檢查 BACKUP_DIR 設定和權限。"
+    },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
         "usernameLabel": "使用者名稱",

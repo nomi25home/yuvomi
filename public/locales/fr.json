@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "La date d’expiration est dans le passé. Choisis un moment ultérieur.",
         "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne.",
         "dmsErrorUrlInvalid": "L’URL du serveur doit commencer par http:// ou https://.",
-        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur.",
+        "backupSchedulerReasonDirNotWritable": "Le dossier de sauvegarde n'est pas accessible en écriture. Vérifiez le paramètre BACKUP_DIR et ses permissions."
+    },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",
         "usernameLabel": "Nom d'utilisateur",

@@ -3569,8 +3569,9 @@
         "apiTokenErrorExpiryPast": "تاریخ انقضا در گذشته است. زمان دیرتری انتخاب کنید.",
         "apiTokenErrorSubjectDeactivated": "این حساب غیرفعال است و نمی‌تواند توکن بگیرد. شخص دیگری را انتخاب کنید.",
         "dmsErrorUrlInvalid": "آدرس سرور باید با http:// یا https:// شروع شود.",
-        "dmsErrorAccountExists": "یک DMS از قبل با این نشانی سرور متصل است."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "یک DMS از قبل با این نشانی سرور متصل است.",
+        "backupSchedulerReasonDirNotWritable": "پوشه پشتیبان‌گیری قابل نوشتن نیست. تنظیم BACKUP_DIR و مجوزها را بررسی کنید."
+    },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
         "usernameLabel": "نام کاربری",

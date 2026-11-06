@@ -3551,8 +3551,9 @@
         "apiTokenErrorExpiryPast": "Utløpsdatoen er passert. Velg et senere tidspunkt.",
         "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person.",
         "dmsErrorUrlInvalid": "Server-URL-en må begynne med http:// eller https://.",
-        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en.",
+        "backupSchedulerReasonDirNotWritable": "Sikkerhetskopimappen kan ikke skrives til. Kontroller BACKUP_DIR-innstillingen og tillatelsene."
+    },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
         "usernameLabel": "Brukernavn",

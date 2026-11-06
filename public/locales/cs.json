@@ -3669,8 +3669,9 @@
         "apiTokenErrorExpiryPast": "Datum vypršení je v minulosti. Vyber pozdější čas.",
         "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu.",
         "dmsErrorUrlInvalid": "URL serveru musí začínat http:// nebo https://.",
-        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS."    },
-        "backupSchedulerReasonDirNotWritable": "The backup folder is not writable. Check the BACKUP_DIR setting and permissions.",
+        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS.",
+        "backupSchedulerReasonDirNotWritable": "Záložní složka není zapisovatelná. Zkontrolujte nastavení BACKUP_DIR a oprávnění."
+    },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
         "usernameLabel": "Uživatelské jméno",
